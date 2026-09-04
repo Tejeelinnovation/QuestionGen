@@ -1,0 +1,16 @@
+# ============================================================
+# Question Generation System — Python Dependencies
+# Pinned to exact versions for reproducible installs.
+# ============================================================
+
+# Web framework
+Django==6.0.3
+
+# REST API layer
+djangorestframework==3.15.2
+
+# PostgreSQL driver
+psycopg2-binary==2.9.12
+
+# Environment variable management (reads .env files)
+django-environ==0.13.0
