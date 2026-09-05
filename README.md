@@ -263,3 +263,82 @@ curl -X POST http://127.0.0.1:8000/api/auth/token/refresh/ \
   -d '{"refresh":"<refresh_token>"}'
 ```
 
+---
+
+## P2 — Content / Question Bank
+
+### Seed the demo content
+
+```bash
+# First run — creates 1 book, 1 chapter, 5 topics, 42 questions
+python manage.py seed_demo_content
+
+# Re-run at any time — idempotent, prints "already exists, skipping" for each row
+python manage.py seed_demo_content
+
+# Full reseed from scratch (deletes and recreates everything)
+python manage.py seed_demo_content --clear
+```
+
+**What is seeded:**
+- **Book**: Mathematics for Class 10 (NCERT)
+- **Chapter**: Chapter 1 — Real Numbers
+- **Topics** (5): Euclid's Division Lemma, Fundamental Theorem of Arithmetic, Irrational Numbers, Decimal Expansions of Rational Numbers, HCF and LCM Applications
+- **Questions** (42): mix of MCQ / SHORT_ANSWER / LONG_ANSWER, EASY / MEDIUM / HARD, BEGINNER / INTERMEDIATE / ADVANCED, marks 1–5
+
+---
+
+### Content API examples
+
+All content endpoints require authentication (`Authorization: Bearer <token>`).
+
+#### GET /api/books/
+
+```bash
+curl http://127.0.0.1:8000/api/books/ \
+  -H "Authorization: Bearer <access_token>"
+```
+
+#### GET /api/chapters/?book_id=1
+
+```bash
+curl "http://127.0.0.1:8000/api/chapters/?book_id=1" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+#### GET /api/topics/?chapter_id=1
+
+```bash
+curl "http://127.0.0.1:8000/api/topics/?chapter_id=1" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+#### GET /api/questions/ — with filters
+
+All filter params are optional and combine with AND logic:
+
+| Param | Values | Example |
+|-------|--------|---------|
+| `topic_id` | integer | `?topic_id=1` |
+| `difficulty` | `EASY` \| `MEDIUM` \| `HARD` | `?difficulty=HARD` |
+| `question_type` | `MCQ` \| `SHORT_ANSWER` \| `LONG_ANSWER` | `?question_type=MCQ` |
+| `learner_level` | `BEGINNER` \| `INTERMEDIATE` \| `ADVANCED` | `?learner_level=ADVANCED` |
+| `marks` | decimal | `?marks=2` |
+
+```bash
+# All MCQ questions that are HARD and for ADVANCED learners
+curl "http://127.0.0.1:8000/api/questions/?question_type=MCQ&difficulty=HARD&learner_level=ADVANCED" \
+  -H "Authorization: Bearer <access_token>"
+
+# 2-mark questions in topic 3
+curl "http://127.0.0.1:8000/api/questions/?topic_id=3&marks=2" \
+  -H "Authorization: Bearer <access_token>"
+
+# All EASY questions (no other constraint)
+curl "http://127.0.0.1:8000/api/questions/?difficulty=EASY" \
+  -H "Authorization: Bearer <access_token>"
+```
+
+Response fields include `topic_name`, `chapter_title`, `book_title`,
+`question_type_display`, `difficulty_display`, `learner_level_display`,
+`options` (MCQ choices dict), and `correct_answer`.

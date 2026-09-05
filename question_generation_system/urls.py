@@ -16,4 +16,7 @@ urlpatterns = [
 
     # User management: list, create, update, permission grant/revoke
     path("api/users/", include((users_urlpatterns, "users"), namespace="users")),
+
+    # Content: books, chapters, topics, questions (read-only browsing)
+    path("api/", include(("content.urls", "content"), namespace="content")),
 ]

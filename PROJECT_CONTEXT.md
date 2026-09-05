@@ -96,11 +96,13 @@ All authentication and authorisation.
 
 ### `content`
 The question bank — the core curriculum data.
-- `Book` → `Chapter` → `Topic` hierarchy
-- `Question` model with type variants (MCQ, short answer, long answer, etc.)
-- Difficulty, marks, and subject tagging
-- Teacher-facing CRUD APIs
-- **NOT YET BUILT** — planned for P2.
+- `Book` → `Chapter` → `Topic` → `Question` hierarchy
+- `QuestionType` choices: `MCQ` | `SHORT_ANSWER` | `LONG_ANSWER`
+- `Difficulty` choices: `EASY` | `MEDIUM` | `HARD`
+- `LearnerLevel` choices: `BEGINNER` | `INTERMEDIATE` | `ADVANCED`
+- `filter_questions(queryset, params)` in `content/filters.py` — reused by papers app
+- Read-only browse/filter APIs (P2 only; write endpoints added in later phases)
+- **BUILT in P2.**
 
 ### `papers`
 Question paper assembly and delivery.
@@ -203,6 +205,15 @@ Computed from granted capabilities — display only, never used for authz:
 | POST | `/api/users/{id}/permissions/` | Yes | CREATE_SCHOOL_ADMIN |
 | DELETE | `/api/users/{id}/permissions/{cap}/` | Yes | CREATE_SCHOOL_ADMIN |
 
+## API Surface (P2 — Content)
+
+| Method | Path | Auth Required | Notes |
+|--------|------|--------------|-------|
+| GET | `/api/books/` | Yes | Active books only |
+| GET | `/api/chapters/?book_id=` | Yes | Filter by book (optional) |
+| GET | `/api/topics/?chapter_id=` | Yes | Filter by chapter (optional) |
+| GET | `/api/questions/?topic_id=&difficulty=&question_type=&learner_level=&marks=` | Yes | All filters combinable (AND logic) |
+
 ---
 
 ## Naming Conventions
@@ -253,11 +264,25 @@ Computed from granted capabilities — display only, never used for authz:
   - [x] `create_super_admin` management command (bootstrap)
   - [x] All acceptance criteria verified via live API calls
 
+- [x] **P2 — Content / Question Bank**
+  - [x] `Book` model: title, subject, grade, publisher, is_active + TimestampedModel
+  - [x] `Chapter` model: FK→Book, title, chapter_order (unique per book)
+  - [x] `Topic` model: FK→Chapter, name
+  - [x] `Question` model: FK→Topic, question_text, question_type, marks, difficulty, learner_level, options (JSON), correct_answer, source_reference, is_active
+  - [x] `QuestionType` choices: `MCQ` | `SHORT_ANSWER` | `LONG_ANSWER`
+  - [x] `Difficulty` choices: `EASY` | `MEDIUM` | `HARD`
+  - [x] `LearnerLevel` choices: `BEGINNER` | `INTERMEDIATE` | `ADVANCED`
+  - [x] `content/filters.py`: `filter_questions(queryset, params)` — reusable, imported by papers app (P3)
+  - [x] Read-only API: `GET /api/books/`, `/api/chapters/`, `/api/topics/`, `/api/questions/`
+  - [x] Combined AND filtering (topic_id + difficulty + question_type + learner_level + marks)
+  - [x] `seed_demo_content` management command (42 questions, re-runnable, idempotent)
+  - [x] Demo data: NCERT Mathematics Class 10, Chapter 1 Real Numbers, 5 topics, 42 questions
+  - [x] All acceptance criteria verified (filters, idempotency, 401 on unauth)
+
 ---
 
 ## Not Yet Built
 
-- [ ] **P2 — Content / Question Bank** (`content` app: Book, Chapter, Topic, Question models + APIs)
 - [ ] **P3 — Papers & Delivery** (`papers` app: Paper, PaperVersion, Section, Delivery)
 - [ ] **P4 — Attempts & Results** (`attempts` app: Attempt, Answer, scoring)
 - [ ] **P5 — Generation Service Boundary** (`generation` app: LLM/RAG integration — plan only, not logic)
