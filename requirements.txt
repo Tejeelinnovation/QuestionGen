@@ -9,6 +9,9 @@ Django==6.0.3
 # REST API layer
 djangorestframework==3.15.2
 
+# JWT authentication
+djangorestframework-simplejwt==5.4.0
+
 # PostgreSQL driver
 psycopg2-binary==2.9.12
 

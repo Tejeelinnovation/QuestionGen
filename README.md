@@ -114,10 +114,11 @@ DJANGO_SETTINGS_MODULE=question_generation_system.settings.prod python manage.py
 | App | Responsibility |
 |-----|---------------|
 | `core` | Shared utilities, abstract base models, audit logging |
-| `users` | User accounts, roles, permissions *(P2)* |
-| `content` | Book / Chapter / Topic / Question bank *(P3)* |
-| `papers` | Question Papers, Versions, Delivery *(P4)* |
-| `attempts` | Student Attempts and Results *(P5)* |
+| `schools` | School / Organisation entity (tenant boundary) |
+| `users` | User accounts, capabilities, JWT auth |
+| `content` | Book / Chapter / Topic / Question bank *(P2)* |
+| `papers` | Question Papers, Versions, Delivery *(P3)* |
+| `attempts` | Student Attempts and Results *(P4)* |
 | `generation` | *(Planned)* LLM/RAG generation service boundary |
 
 ---
@@ -133,3 +134,132 @@ python manage.py test
 ## Environment variables quick reference
 
 See [`.env.example`](.env.example) for the full list with descriptions.
+
+---
+
+## P1 — Auth & Capability System
+
+### Running migrations (P1)
+
+```bash
+# Apply all migrations including schools, users, core, token_blacklist
+python manage.py migrate
+```
+
+### Bootstrap — creating the first Super Admin
+
+The first Super Admin cannot be created via the API (no one holds the
+`CREATE_SCHOOL` capability yet). Use the management command:
+
+```bash
+# Interactive (prompts for password)
+python manage.py create_super_admin --username admin --email admin@example.com
+
+# Non-interactive (for CI/scripting)
+DJANGO_SUPERUSER_PASSWORD=<password> python manage.py create_super_admin \
+    --username admin --email admin@example.com --no-input
+```
+
+This creates the user, grants all 10 capabilities, and writes an AuditLog entry.
+
+---
+
+### Example API calls
+
+#### Login and obtain JWT
+
+```bash
+# PowerShell
+$r = Invoke-RestMethod -Method POST `
+    -Uri "http://127.0.0.1:8000/api/auth/login/" `
+    -ContentType "application/json" `
+    -Body '{"username":"admin","password":"your_password"}'
+$TOKEN = $r.access
+$REFRESH = $r.refresh
+
+# curl
+curl -X POST http://127.0.0.1:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"your_password"}'
+```
+
+Response:
+```json
+{"access": "<jwt_access_token>", "refresh": "<jwt_refresh_token>"}
+```
+
+#### Get current user profile
+
+```bash
+# PowerShell
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/auth/me/" `
+    -Headers @{"Authorization"="Bearer $TOKEN"}
+
+# curl
+curl http://127.0.0.1:8000/api/auth/me/ \
+  -H "Authorization: Bearer <access_token>"
+```
+
+Response includes `role_label` (computed, e.g. `"Super Admin"`) and
+`capabilities` list.
+
+#### Create a School Admin (as Super Admin)
+
+You need a School first. Create one via the Django shell or admin panel:
+```bash
+python manage.py shell -c "
+from schools.models import School
+s = School.objects.create(name='Example High School')
+print(s.id)
+"
+```
+
+Then create the School Admin:
+```bash
+# PowerShell
+Invoke-RestMethod -Method POST `
+    -Uri "http://127.0.0.1:8000/api/users/" `
+    -ContentType "application/json" `
+    -Headers @{"Authorization"="Bearer $TOKEN"} `
+    -Body '{"username":"sa1","email":"sa1@school.com","password":"Pass1234!","profile":"school_admin","school":1}'
+
+# curl
+curl -X POST http://127.0.0.1:8000/api/users/ \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"sa1","email":"sa1@school.com","password":"Pass1234!","profile":"school_admin","school":1}'
+```
+
+Valid `profile` values: `school_admin`, `teacher`, `student`.
+
+#### Grant / revoke a capability
+
+```bash
+# Grant CREATE_PAPER to user 5
+curl -X POST http://127.0.0.1:8000/api/users/5/permissions/ \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"capability_name":"CREATE_PAPER"}'
+
+# Revoke it
+curl -X DELETE http://127.0.0.1:8000/api/users/5/permissions/CREATE_PAPER/ \
+  -H "Authorization: Bearer <access_token>"
+```
+
+#### Logout (blacklist refresh token)
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/logout/ \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"refresh":"<refresh_token>"}'
+```
+
+#### Refresh access token
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/token/refresh/ \
+  -H "Content-Type: application/json" \
+  -d '{"refresh":"<refresh_token>"}'
+```
+

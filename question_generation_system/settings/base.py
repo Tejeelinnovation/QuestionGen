@@ -51,12 +51,16 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
 ]
 
 LOCAL_APPS = [
     # Shared utilities, audit logging, abstract base models.
     "core",
-    # User accounts, roles, and permissions (auth system).
+    # Multi-tenancy boundary — School / Organisation entity.
+    "schools",
+    # User accounts, capabilities, and permissions (auth system).
     "users",
     # Books, Chapters, Topics, Questions — the content / question bank.
     "content",
@@ -158,6 +162,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------
+# Custom User model
+# ---------------------------------------------------------------------------
+# MUST be set before any migration that references the user model.
+AUTH_USER_MODEL = "users.User"
+
+# ---------------------------------------------------------------------------
 # Django REST Framework defaults
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
@@ -167,9 +177,34 @@ REST_FRAMEWORK = {
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
     ],
-    # Authentication and permissions will be configured in the users app (P2).
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+    # Default: require authentication on all endpoints.
+    # Individual views / viewsets override this where public access is needed.
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# SimpleJWT configuration
+# ---------------------------------------------------------------------------
+from datetime import timedelta  # noqa: E402
+
+SIMPLE_JWT = {
+    # Access tokens are short-lived; clients must refresh regularly.
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
+    # Refresh tokens are valid for 7 days.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    # Each refresh call issues a new refresh token (rotation).
+    "ROTATE_REFRESH_TOKENS": True,
+    # Old refresh tokens are blacklisted after rotation.
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
 }
