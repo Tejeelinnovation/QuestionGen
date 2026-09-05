@@ -458,3 +458,78 @@ curl http://127.0.0.1:8000/api/deliveries/ \
 curl http://127.0.0.1:8000/api/deliveries/ \
   -H "Authorization: Bearer <student_token>"
 ```
+
+---
+
+## P4 — Attempts & Results (Student Workflow & Evaluation)
+
+All endpoints require authentication (`Authorization: Bearer <token>`).
+Student endpoints require `ATTEMPT_TEST` capability.
+Teacher endpoints require `ASSIGN_TEST` or `CREATE_PAPER` capabilities.
+
+### Student Exam Sitting Workflow (curl)
+
+#### 1. Start or Resume an Online Test Attempt
+
+```bash
+curl http://127.0.0.1:8000/api/deliveries/1/start/ \
+  -H "Authorization: Bearer <student_token>"
+```
+Returns `attempt_id`, instructions, and questions list (with options, without correct answers). Resuming an in-progress attempt is idempotent.
+
+#### 2. Save Answers Incrementally
+
+```bash
+# Save an MCQ choice
+curl -X PATCH http://127.0.0.1:8000/api/attempts/1/answers/101/ \
+  -H "Authorization: Bearer <student_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"student_response": "B"}'
+
+# Save a Short Answer response
+curl -X PATCH http://127.0.0.1:8000/api/attempts/1/answers/102/ \
+  -H "Authorization: Bearer <student_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"student_response": "Heat is released during the reaction."}'
+```
+
+#### 3. Submit the Attempt (Auto-Grading)
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/attempts/1/submit/ \
+  -H "Authorization: Bearer <student_token>"
+```
+Auto-grades all MCQ questions against the version snapshot, marks short/long answers as pending review, computes score awarded so far, and locks the attempt from further changes (double submit protection).
+
+#### 4. View Attempt Result (Student)
+
+```bash
+curl http://127.0.0.1:8000/api/attempts/1/result/ \
+  -H "Authorization: Bearer <student_token>"
+```
+Returns total score, max score, per-question correctness and marks for auto-graded questions, and pending review flags for descriptive questions.
+
+---
+
+### Teacher Evaluation & Roster Workflow (curl)
+
+#### 5. View Delivery Results Roster
+
+```bash
+curl http://127.0.0.1:8000/api/deliveries/1/results/ \
+  -H "Authorization: Bearer <teacher_token>"
+```
+Returns list of all assigned students, submission status, scores, and completion timestamps.
+
+#### 6. Teacher Manual Grading for Short / Long Answers
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/attempts/1/answers/102/grade/ \
+  -H "Authorization: Bearer <teacher_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "marks_awarded": 2.5,
+    "is_correct": true
+  }'
+```
+Awards marks, updates question correctness, recalculates attempt total score, and transitions attempt status to `EVALUATED` once all questions are graded.

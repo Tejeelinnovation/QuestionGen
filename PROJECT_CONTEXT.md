@@ -118,7 +118,7 @@ Student assessment records.
 - `Answer` (per-question response)
 - Scoring, aggregation, and results
 - Review and feedback endpoints
-- **NOT YET BUILT** — planned for P4.
+- **BUILT in P4.**
 
 ### `generation` ⚠️ PLANNED — DO NOT BUILD YET
 This app/service boundary is reserved for the LLM/RAG integration phase.
@@ -233,6 +233,12 @@ Computed from granted capabilities — display only, never used for authz:
 | GET | `/api/papers/{id}/versions/{version_id}/print/` | Yes | — | Structured print layout from the version snapshot |
 | GET | `/api/deliveries/` | Yes | — | Scoped: student sees assigned, teacher sees created |
 | GET | `/api/deliveries/{id}/` | Yes | — | Delivery detail |
+| GET | `/api/deliveries/{id}/start/` | Yes | `ATTEMPT_TEST` | Start or resume online test attempt (student-facing, no correct answers) |
+| GET | `/api/deliveries/{id}/results/` | Yes | `ASSIGN_TEST` / `CREATE_PAPER` | Delivery results roster (teacher view) |
+| PATCH | `/api/attempts/{id}/answers/{question_id}/` | Yes | `ATTEMPT_TEST` | Save/update single question response incrementally (owning student only) |
+| POST | `/api/attempts/{id}/submit/` | Yes | `ATTEMPT_TEST` | Submit attempt: auto-grades MCQ, sets short/long to pending, computes score |
+| GET | `/api/attempts/{id}/result/` | Yes | `VIEW_OWN_RESULT` | View attempt result (student sees own; teacher sees created deliveries) |
+| POST | `/api/attempts/{id}/answers/{question_id}/grade/` | Yes | `ASSIGN_TEST` / `CREATE_PAPER` | Teacher manually grades short/long response, recalculates score, transitions to EVALUATED |
 
 ---
 
@@ -241,15 +247,15 @@ Computed from granted capabilities — display only, never used for authz:
 | Thing | Convention | Example |
 |-------|-----------|---------||
 | Django app directories | `snake_case`, singular nouns | `core`, `users`, `content` |
-| Models | `PascalCase`, singular | `Question`, `PaperVersion` |
-| Model fields | `snake_case` | `created_at`, `difficulty_level` |
+| Models | `PascalCase`, singular | `Question`, `PaperVersion`, `Attempt` |
+| Model fields | `snake_case` | `created_at`, `difficulty_level`, `student_response` |
 | API URL paths | `kebab-case`, plural resources | `/api/v1/questions/`, `/api/v1/paper-versions/` |
 | Serializers | `<Model>Serializer` | `QuestionSerializer` |
 | Views/ViewSets | `<Model>ViewSet` or `<Model>View` | `QuestionViewSet` |
 | Settings modules | `base`, `dev`, `prod` | `settings.dev` |
 | Env variables | `UPPER_SNAKE_CASE` | `DATABASE_URL`, `SECRET_KEY` |
-| Audit action strings | `<domain>.<verb>` | `user.created`, `capability.granted`, `paper.created` |
-| Capability names | `UPPER_SNAKE_CASE` | `CREATE_TEACHER`, `ATTEMPT_TEST` |
+| Audit action strings | `<domain>.<verb>` | `user.created`, `paper.created`, `attempt.started` |
+| Capability names | `UPPER_SNAKE_CASE` | `CREATE_TEACHER`, `ATTEMPT_TEST`, `VIEW_OWN_RESULT` |
 
 ---
 
@@ -316,11 +322,23 @@ Computed from granted capabilities — display only, never used for authz:
   - [x] Audit logging on `paper.created`, `version.created`, `version.cloned`, `delivery.created`
   - [x] Comprehensive test suite in `papers/tests.py` (16 passing tests)
 
+- [x] **P4 — Attempts & Results (Student Workflow & Evaluation)**
+  - [x] `Attempt` model: delivery, student, status (NOT_STARTED/IN_PROGRESS/SUBMITTED/EVALUATED), started_at, submitted_at, score, max_score, unique_together (delivery, student)
+  - [x] `Answer` model: attempt, question_id (int), question_snapshot (JSON), student_response, is_correct, marks_awarded, unique_together (attempt, question_id)
+  - [x] Start / resume attempt endpoint (`GET /api/deliveries/{id}/start/`) with question snapshot delivery without correct answers
+  - [x] Incremental answer save endpoint (`PATCH /api/attempts/{id}/answers/{question_id}/`)
+  - [x] Auto-grading on submit (`POST /api/attempts/{id}/submit/`): MCQ graded automatically, short/long answers marked pending review, score computed so far
+  - [x] Double submit protection
+  - [x] Result views (`GET /api/attempts/{id}/result/`): student view vs teacher evaluation view
+  - [x] Delivery results roster endpoint (`GET /api/deliveries/{id}/results/`)
+  - [x] Teacher manual grading endpoint (`POST /api/attempts/{id}/answers/{question_id}/grade/`) with score update and status transition to EVALUATED
+  - [x] Audit logging on `attempt.started`, `attempt.submitted`, `answer.graded`
+  - [x] Comprehensive test suite in `attempts/tests.py` (16 passing tests)
+
 ---
 
 ## Not Yet Built
 
-- [ ] **P4 / Prompt 5 — Attempts & Results** (`attempts` app still empty — built in Prompt 5: Attempt, Answer, scoring)
 - [ ] **P5 — Generation Service Boundary** (`generation` app: LLM/RAG integration — plan only, not logic)
 - [ ] **Frontend** (React + TypeScript + Tailwind — separate directory, added later)
 - [ ] **Deployment** (Docker, CI/CD, production PostgreSQL, static files with WhiteNoise or S3)

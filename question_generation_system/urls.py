@@ -22,4 +22,7 @@ urlpatterns = [
 
     # Papers, versions, delivery
     path("api/", include(("papers.urls", "papers"), namespace="papers")),
+
+    # Attempts, answers, scoring, results
+    path("api/", include(("attempts.urls", "attempts"), namespace="attempts")),
 ]
