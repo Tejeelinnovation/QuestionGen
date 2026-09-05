@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { papersApi } from '../../api/papers';
 import { usersApi } from '../../api/users';
-import type { Paper, User } from '../../types';
+import type { Paper, User, Delivery } from '../../types';
 
 export const TeacherDashboard: React.FC = () => {
   const [papers, setPapers] = useState<Paper[]>([]);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [students, setStudents] = useState<User[]>([]);
   const [isLoadingPapers, setIsLoadingPapers] = useState<boolean>(true);
+  const [isLoadingDeliveries, setIsLoadingDeliveries] = useState<boolean>(true);
   const [isLoadingStudents, setIsLoadingStudents] = useState<boolean>(true);
   const [papersError, setPapersError] = useState<string | null>(null);
+  const [deliveriesError, setDeliveriesError] = useState<string | null>(null);
   const [studentsError, setStudentsError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,6 +26,19 @@ export const TeacherDashboard: React.FC = () => {
         setPapersError(err.response?.data?.detail || 'Failed to load question papers.');
       } finally {
         setIsLoadingPapers(false);
+      }
+    };
+
+    const fetchDeliveries = async () => {
+      setIsLoadingDeliveries(true);
+      setDeliveriesError(null);
+      try {
+        const data = await papersApi.getDeliveries();
+        setDeliveries(data);
+      } catch (err: any) {
+        setDeliveriesError(err.response?.data?.detail || 'Failed to load deliveries.');
+      } finally {
+        setIsLoadingDeliveries(false);
       }
     };
 
@@ -41,6 +57,7 @@ export const TeacherDashboard: React.FC = () => {
     };
 
     fetchPapers();
+    fetchDeliveries();
     fetchStudents();
   }, []);
 
@@ -76,27 +93,128 @@ export const TeacherDashboard: React.FC = () => {
                 <tr className="bg-gray-100 text-left">
                   <th className="border border-gray-300 p-2">ID</th>
                   <th className="border border-gray-300 p-2">Title</th>
-                  <th className="border border-gray-300 p-2">Subject</th>
-                  <th className="border border-gray-300 p-2">Grade</th>
+                  <th className="border border-gray-300 p-2">Chapter</th>
+                  <th className="border border-gray-300 p-2">Versions</th>
                   <th className="border border-gray-300 p-2">Created At</th>
+                  <th className="border border-gray-300 p-2">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {papers.map((p) => (
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="border border-gray-300 p-2">{p.id}</td>
-                    <td className="border border-gray-300 p-2 font-medium">{p.title}</td>
-                    <td className="border border-gray-300 p-2">{p.subject}</td>
-                    <td className="border border-gray-300 p-2">Grade {p.grade}</td>
+                    <td className="border border-gray-300 p-2 font-medium">
+                      <Link
+                        to={`/papers/${p.id}`}
+                        className="text-blue-600 hover:underline font-medium"
+                      >
+                        {p.title}
+                      </Link>
+                    </td>
+                    <td className="border border-gray-300 p-2">{p.chapter_title || `Chapter #${p.chapter}`}</td>
+                    <td className="border border-gray-300 p-2">
+                      <span className="border border-gray-300 px-2 py-0.5 text-xs bg-gray-100 font-semibold">
+                        {p.version_count ?? 0}
+                      </span>
+                    </td>
                     <td className="border border-gray-300 p-2 text-xs text-gray-600">
                       {new Date(p.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="border border-gray-300 p-2">
+                      <Link
+                        to={`/papers/${p.id}`}
+                        className="border border-gray-300 bg-gray-50 hover:bg-gray-100 px-2 py-1 text-xs inline-block font-medium"
+                      >
+                        View &rarr;
+                      </Link>
                     </td>
                   </tr>
                 ))}
                 {papers.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500">
+                    <td colSpan={6} className="border border-gray-300 p-4 text-center text-gray-500">
                       No question papers created yet. Click &quot;Create Test&quot; above to start.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Deliveries & Results Section */}
+      <section className="border border-gray-300 p-4">
+        <h2 className="text-lg font-semibold mb-3">Test Deliveries & Results</h2>
+
+        {isLoadingDeliveries && (
+          <div className="text-sm text-gray-600 py-2">Loading deliveries...</div>
+        )}
+
+        {deliveriesError && (
+          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm mb-4">
+            {deliveriesError}
+          </div>
+        )}
+
+        {!isLoadingDeliveries && !deliveriesError && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100 text-left">
+                  <th className="border border-gray-300 p-2">Delivery ID</th>
+                  <th className="border border-gray-300 p-2">Paper / Version</th>
+                  <th className="border border-gray-300 p-2">Mode</th>
+                  <th className="border border-gray-300 p-2">Assigned Students</th>
+                  <th className="border border-gray-300 p-2">Created</th>
+                  <th className="border border-gray-300 p-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveries.map((d) => (
+                  <tr key={d.id} className="hover:bg-gray-50">
+                    <td className="border border-gray-300 p-2 font-mono">#{d.id}</td>
+                    <td className="border border-gray-300 p-2 font-medium">
+                      {d.paper_title || 'Paper'} (Ver. {d.version_label})
+                    </td>
+                    <td className="border border-gray-300 p-2">
+                      <span
+                        className={`text-xs px-2 py-0.5 border font-semibold ${
+                          d.mode === 'ONLINE'
+                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                            : 'bg-gray-100 text-gray-800 border-gray-300'
+                        }`}
+                      >
+                        {d.mode}
+                      </span>
+                    </td>
+                    <td className="border border-gray-300 p-2">
+                      {d.assigned_students?.length || 0} student(s)
+                    </td>
+                    <td className="border border-gray-300 p-2 text-xs text-gray-600">
+                      {new Date(d.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="border border-gray-300 p-2 space-x-2">
+                      {d.mode === 'ONLINE' ? (
+                        <Link
+                          to={`/deliveries/${d.id}/results`}
+                          className="border border-blue-500 bg-blue-50 hover:bg-blue-100 text-blue-800 px-2 py-1 text-xs inline-block font-medium"
+                        >
+                          Results Roster &rarr;
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-gray-500 italic">Print Only</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {deliveries.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="border border-gray-300 p-4 text-center text-gray-500"
+                    >
+                      No deliveries scheduled yet. Deliver a finalized paper version to view results.
                     </td>
                   </tr>
                 )}

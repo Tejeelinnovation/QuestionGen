@@ -66,8 +66,10 @@ question-generation-system/       ← repo root
 │   │   ├── api/                  ← Axios instance & domain endpoints (auth, users, papers, deliveries, attempts)
 │   │   ├── auth/                 ← AuthContext, useAuth, RequireCapability
 │   │   ├── layouts/              ← AppLayout with minimal navbar and logout
-│   │   ├── pages/                ← LoginPage, PaperBuilderPlaceholder, AttemptPlaceholder
-│   │   │   └── dashboards/       ← SuperAdmin, SchoolAdmin, Teacher, Student dashboards
+│   │   ├── pages/                ← LoginPage
+│   │   │   ├── dashboards/       ← SuperAdmin, SchoolAdmin, Teacher, Student dashboards
+│   │   │   ├── papers/           ← PaperSetup, PaperConfigure, QuestionReview, VersionDetail, Delivery, PrintView, PaperDetail
+│   │   │   └── attempts/         ← TestAttemptPage, ResultPage
 │   │   ├── types/                ← TypeScript interfaces matching backend serializers
 │   │   ├── routes.tsx            ← Central routes & capability-based index redirect
 │   │   ├── App.tsx
@@ -139,12 +141,14 @@ Student assessment records.
 - Review and feedback endpoints
 - **BUILT in P4.**
 
-### `generation` ⚠️ PLANNED — DO NOT BUILD YET
-This app/service boundary is reserved for the LLM/RAG integration phase.
-- Will provide AI-assisted question suggestion and auto-generation
-- Must be its own Django app (and potentially a separate service)
-- **Do not add any generation/AI logic to `content`, `papers`, or any other
-  existing app.** When the time comes, all such logic belongs here.
+### `generation`
+Architectural boundary and contracts for Question Generation.
+- `QuestionDraft` dataclass: Generated-but-not-yet-persisted candidate question, mirroring `content.Question` core fields
+- `QuestionGenerationService`: Abstract interface (`ABC`) defining `generate_questions(chapter, constraints)`
+- `SeededBankGenerationService`: Concrete implementation wrapping `content.filters.filter_questions()`, mapping persisted database questions into `QuestionDraft` objects
+- `get_generation_service()`: Factory resolver driven by `GENERATION_SERVICE_BACKEND` setting (defaults to `"seeded_bank"`)
+- Pluggable extension mechanism allows introducing future `LLMRAGGenerationService` without modifying `papers`, `content`, or frontend code
+- **BUILT in P2 (Generation Service Boundary).**
 
 ---
 
@@ -389,9 +393,62 @@ frontend/src/
   - [x] Audit logging on `attempt.started`, `attempt.submitted`, `answer.graded`
   - [x] Comprehensive test suite in `attempts/tests.py` (16 passing tests)
 
+- [x] **P1 — Teacher Workflow UI (React + TypeScript)**
+  - [x] `src/pages/papers/PaperSetupPage.tsx` (`/papers/new`): Paper creation with title, instructions, and curriculum chapter selector
+  - [x] `src/pages/papers/PaperConfigurePage.tsx` (`/papers/:id/configure`): Question selection criteria (chapter topics multi-select, difficulty, question type, learner level, marks, quantity)
+  - [x] `src/pages/papers/QuestionReviewPage.tsx` (`/papers/:id/review`): Candidate question review, reordering (up/down), deletion, running total marks, backend zero-questions error surfacing, and save as version
+  - [x] `src/pages/papers/VersionDetailPage.tsx` (`/papers/:id/versions/:versionId`): Immutable snapshot viewer, DRAFT to FINALIZED transition, and version cloning (Version B created without altering Version A)
+  - [x] `src/pages/papers/DeliveryPage.tsx` (`/papers/:id/versions/:versionId/deliver`): Delivery creation supporting both `PRINT` mode and `ONLINE` mode with student assignment
+  - [x] `src/pages/papers/PrintViewPage.tsx` (`/papers/:id/versions/:versionId/print`): Clean print layout with exam header, question marks, and browser `window.print()` trigger
+  - [x] `src/pages/papers/PaperDetailPage.tsx` (`/papers/:id`): Paper details with version list and links
+  - [x] `src/pages/dashboards/TeacherDashboard.tsx`: Papers table enhanced with direct links to paper details and version counts
+  - [x] All routes guarded by atomic `CREATE_PAPER` / `ASSIGN_TEST` capabilities
+
+- [x] **P1 — Student Workflow UI (React + TypeScript)**
+  - [x] `src/pages/attempts/TestAttemptPage.tsx` (`/deliveries/:id/attempt`): Replaces placeholder. Start/resume online exam sitting (`GET /api/deliveries/:id/start/`), scrollable question list (MCQ radio buttons, Short Answer text input, Long Answer textarea), debounced auto-save with inline "Saved" / "Saving..." / "Error" indicators (`PATCH /api/attempts/:id/answers/:qid/`), running answered count, available_until expiration detection and input disabling, browser confirm submit dialog (`POST /api/attempts/:id/submit/`), and double-submit auto-redirect.
+  - [x] `src/pages/attempts/ResultPage.tsx` (`/attempts/:id/result`): Student test result viewer (`GET /api/attempts/:id/result/`) displaying score, max score, percentage, status badge, pending manual review banner, and individual question breakdown.
+  - [x] `src/pages/dashboards/StudentDashboard.tsx`: Enhanced assigned tests table with delivery attempt status and "View Result" links.
+  - [x] Gap Note: Backend `GET /api/deliveries/` does not currently include caller's attempt status in its payload; frontend leverages session state and start/resume redirect.
+  - [x] **Completes ALL P1 Frontend Work** (Auth shell, 4 role dashboards, complete Teacher paper-builder workflow through print/delivery, and Student test attempt sitting through results).
+
+- [x] **P2 (Part 1) — Hardening: Teacher Grading UI, Results Roster & §9 Acceptance Verification**
+  - [x] `src/pages/attempts/ResultsRosterPage.tsx` (`/deliveries/:id/results`): Teacher delivery results roster view displaying delivery metadata, summary counter cards (Assigned, In Progress / Started, Submitted, Evaluated), and sortable attempts table with direct links to grade each student attempt.
+  - [x] `src/pages/attempts/GradeAttemptPage.tsx` (`/attempts/:id/grade`): Teacher manual grading UI fetching attempt detail (`GET /api/attempts/{id}/result/`), per-question input for `marks_awarded` bounded 0 to max_marks, correctness toggle, inline editing for previously graded responses, real-time score accumulation, and auto-transition to `EVALUATED` once descriptive answers are graded (`POST /api/attempts/{id}/answers/{question_id}/grade/`).
+  - [x] Routing & Guards: `/deliveries/:id/results` and `/attempts/:id/grade` registered in `routes.tsx` guarded by `anyOf={['ASSIGN_TEST', 'CREATE_PAPER']}` via updated `RequireCapability` component.
+  - [x] Navigation links added in `DeliveryPage.tsx` and `TeacherDashboard.tsx` linking directly to results roster.
+  - [x] Environment Seed & Reset: Consolidated "Full Demo Environment Reset" section added to `README.md` and new Django management command `python manage.py seed_demo_users` created to populate all 4 user roles with their capability sets.
+  - [x] Error state audit & Double-submit protection: Verified every page displays informative red error banners when network/API calls fail, and all teacher/student forms disable submit buttons while requests are in flight.
+  - [x] Full §9 Acceptance Checklist Pass executed and verified.
+
+- [x] **P2 (Part 2) — Generation Service Boundary (Interface Stub)**
+  - [x] `generation/interfaces.py`: `QuestionDraft` dataclass (shape parity with `content.Question`, JSON serializable `to_dict()`, constructed via `from_question()`) and `QuestionGenerationService` abstract base class defining `generate_questions(chapter, constraints)`.
+  - [x] `generation/services/seeded_bank.py`: `SeededBankGenerationService` concrete implementation wrapping `content.filters.filter_questions()`, querying chapter questions and returning formatted `QuestionDraft` objects.
+  - [x] `generation/factory.py`: `get_generation_service()` factory resolver and `register_generation_service()` plugin hook, controlled by `settings.GENERATION_SERVICE_BACKEND` (env var `GENERATION_SERVICE_BACKEND`, default `"seeded_bank"`).
+  - [x] Settings & Env: `generation` registered in `LOCAL_APPS` (`settings/base.py`) and `GENERATION_SERVICE_BACKEND` documented in `.env.example`.
+  - [x] Design Documentation: `generation/README.md` details contract design, how to add an `LLMRAGGenerationService`, conceptual LLM prompt schema, and explicit MVP scope exclusions (multi-book ingestion, production prompts, Bloom classification).
+  - [x] Code isolation: Existing `papers/views.py` `select-questions/` endpoint preserved untouched with explanatory integration comment; existing test suites continue passing with 100% success.
+  - [x] Comprehensive test suite in `generation/tests.py` (12 passing tests).
+
+---
+
+## Acceptance Checklist Verification Report (Doc 2 §9)
+
+| Checklist Item | Status | Verification Evidence & Notes |
+|----------------|--------|-------------------------------|
+| **Authentication** | **PASS** | Valid login (`teacher1`, `student1`, `schooladmin1`, `superadmin`) issues JWT and loads respective dashboard; invalid password returns HTTP 400 with user-facing error message; expired/invalid Bearer token returns HTTP 401 and cleanly redirects to `/login`. |
+| **Authorization** | **PASS** | Gated client-side by `RequireCapability` and server-side by DRF permissions: `student1` attempting to create a student returns HTTP 403; `teacher1` attempting to create a school admin returns HTTP 403; `schooladmin1` attempting cross-school or unauthorized admin creation returns HTTP 403. |
+| **Scope** | **PASS** | Scoped queries verified in UI and API: teachers only see students within their assigned school and papers they authored; students only see deliveries assigned to their student ID via `assigned_students` M2M filter. |
+| **Question Selection** | **PASS** | Applying combinations of filters (`chapter=1`, `difficulty=EASY`, `question_type=MCQ`, `learner_level=BEGINNER`) deterministically returns identical ordered subsets from the 42-question NCERT question bank. |
+| **Paper** | **PASS** | Version `total_marks` is computed immediately upon version creation by summing question snapshot marks and persists across page refreshes and browser reloads. |
+| **Versions** | **PASS** | Creating Version B by cloning Version A does not mutate Version A's stored snapshot, total marks, or lifecycle status; each version maintains an independent immutable record. |
+| **Online Test** | **PASS** | End-to-end flow verified via live browser subagent: Teacher delivers test -> Student sits and saves responses incrementally -> Student submits (MCQ auto-graded, descriptive set to pending) -> Teacher views roster (`/deliveries/:id/results`) -> Teacher grades descriptive questions (`/attempts/:id/grade`) -> Attempt transitions to `EVALUATED` -> Student result page (`/attempts/:id/result`) displays final evaluated score with no pending banner. |
+| **Print** | **PASS** | Print layout route (`/papers/:id/versions/:id/print`) renders clean exam header (title, instructions, version label, total marks) and question sequence with mark allocation; print preview trigger confirmed functional. |
+| **Regression** | **N/A** | Repository git history reviewed: no legacy document-processing or external DTO layer preceded this project. |
+
 ---
 
 ## Not Yet Built
 
-- [ ] **P5 — Generation Service Boundary** (`generation` app: LLM/RAG integration — plan only, not logic)
 - [ ] **Deployment** (Docker, CI/CD, production PostgreSQL, static files with WhiteNoise or S3)
+
+

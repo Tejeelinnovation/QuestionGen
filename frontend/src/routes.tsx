@@ -6,8 +6,17 @@ import { SuperAdminDashboard } from './pages/dashboards/SuperAdminDashboard';
 import { SchoolAdminDashboard } from './pages/dashboards/SchoolAdminDashboard';
 import { TeacherDashboard } from './pages/dashboards/TeacherDashboard';
 import { StudentDashboard } from './pages/dashboards/StudentDashboard';
-import { PaperBuilderPlaceholder } from './pages/PaperBuilderPlaceholder';
-import { AttemptPlaceholder } from './pages/AttemptPlaceholder';
+import { TestAttemptPage } from './pages/attempts/TestAttemptPage';
+import { ResultPage } from './pages/attempts/ResultPage';
+import { ResultsRosterPage } from './pages/attempts/ResultsRosterPage';
+import { GradeAttemptPage } from './pages/attempts/GradeAttemptPage';
+import { PaperSetupPage } from './pages/papers/PaperSetupPage';
+import { PaperConfigurePage } from './pages/papers/PaperConfigurePage';
+import { QuestionReviewPage } from './pages/papers/QuestionReviewPage';
+import { VersionDetailPage } from './pages/papers/VersionDetailPage';
+import { DeliveryPage } from './pages/papers/DeliveryPage';
+import { PrintViewPage } from './pages/papers/PrintViewPage';
+import { PaperDetailPage } from './pages/papers/PaperDetailPage';
 import { RequireCapability } from './auth/RequireCapability';
 import { useAuth } from './auth/AuthContext';
 
@@ -96,7 +105,55 @@ export const routes: RouteObject[] = [
         path: 'papers/new',
         element: (
           <RequireCapability capability="CREATE_PAPER">
-            <PaperBuilderPlaceholder />
+            <PaperSetupPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'papers/:id',
+        element: (
+          <RequireCapability capability="CREATE_PAPER">
+            <PaperDetailPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'papers/:id/configure',
+        element: (
+          <RequireCapability capability="CREATE_PAPER">
+            <PaperConfigurePage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'papers/:id/review',
+        element: (
+          <RequireCapability capability="CREATE_PAPER">
+            <QuestionReviewPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'papers/:id/versions/:versionId',
+        element: (
+          <RequireCapability capability="CREATE_PAPER">
+            <VersionDetailPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'papers/:id/versions/:versionId/deliver',
+        element: (
+          <RequireCapability capability="ASSIGN_TEST">
+            <DeliveryPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'papers/:id/versions/:versionId/print',
+        element: (
+          <RequireCapability capability="CREATE_PAPER">
+            <PrintViewPage />
           </RequireCapability>
         ),
       },
@@ -104,7 +161,31 @@ export const routes: RouteObject[] = [
         path: 'deliveries/:id/attempt',
         element: (
           <RequireCapability capability="ATTEMPT_TEST">
-            <AttemptPlaceholder />
+            <TestAttemptPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'deliveries/:id/results',
+        element: (
+          <RequireCapability anyOf={['ASSIGN_TEST', 'CREATE_PAPER']}>
+            <ResultsRosterPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'attempts/:id/grade',
+        element: (
+          <RequireCapability anyOf={['ASSIGN_TEST', 'CREATE_PAPER']}>
+            <GradeAttemptPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'attempts/:id/result',
+        element: (
+          <RequireCapability capability="VIEW_OWN_RESULT">
+            <ResultPage />
           </RequireCapability>
         ),
       },

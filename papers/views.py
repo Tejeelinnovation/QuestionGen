@@ -194,6 +194,11 @@ class PaperSelectQuestionsView(APIView):
             qs = qs.filter(topic_id__in=topic_ids)
 
         # Delegate standard filters to content.filters.filter_questions()
+        #
+        # Future integration point: papers/views.py's select-questions endpoint can be
+        # refactored to call get_generation_service().generate_questions(...) instead of
+        # filter_questions() directly, once a real LLM/RAG backend exists.
+        # Intentionally not wired in yet to avoid destabilizing the tested MVP flow.
         filter_params = {}
         if data.get("difficulty"):
             filter_params["difficulty"] = data["difficulty"]

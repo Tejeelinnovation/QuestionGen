@@ -93,6 +93,56 @@ Visit [http://127.0.0.1:8000/](http://127.0.0.1:8000/) — you should see the Dj
 
 ---
 
+## Full Demo Environment Reset (Copy-Pasteable Sequence)
+
+To completely reset the demo environment from scratch (fresh schema, clear state, reseed NCERT question bank, and recreate demo accounts with accurate capabilities):
+
+### Option A: Clean Schema & Full Reseed (Recommended)
+
+Run this single command block in PowerShell or Bash from the repository root:
+
+```bash
+# 1. Run migrations to ensure latest schema
+python manage.py migrate
+
+# 2. Reseed NCERT Class 10 Math question bank (42 questions across 5 topics)
+python manage.py seed_demo_content --clear
+
+# 3. Reseed demo users for all 4 roles
+python manage.py seed_demo_users --clear
+```
+
+### Option B: Complete PostgreSQL Database Drop & Recreate
+
+If you wish to wipe PostgreSQL tables entirely:
+
+```bash
+# PostgreSQL CLI (drop & recreate database)
+psql -U postgres -c "DROP DATABASE IF EXISTS question_generation_system;"
+psql -U postgres -c "CREATE DATABASE question_generation_system OWNER qgs_user;"
+
+# Apply fresh migrations from scratch
+python manage.py migrate
+
+# Reseed content and demo users
+python manage.py seed_demo_content
+python manage.py seed_demo_users
+```
+
+### Demo Accounts Quick Reference
+
+All demo accounts share the password: `password123`
+
+| Role | Username | Password | School | Assigned Capabilities | Primary Landing Dashboard |
+|------|----------|----------|--------|----------------------|---------------------------|
+| **Super Admin** | `superadmin` | `password123` | *None (Global)* | All 10 capabilities (`CREATE_SCHOOL`, `CREATE_SCHOOL_ADMIN`, etc.) | `/dashboard/super-admin` |
+| **School Admin** | `schooladmin1` | `password123` | Greenwood High (`1`) | `CREATE_TEACHER`, `CREATE_STUDENT`, `VIEW_SCHOOL_WIDE_CONTROLS` | `/dashboard/school-admin` |
+| **Teacher** | `teacher1` | `password123` | Greenwood High (`1`) | `CREATE_PAPER`, `ASSIGN_TEST`, `GENERATE_SELECT_QUESTIONS`, `CREATE_STUDENT` | `/dashboard/teacher` |
+| **Student** | `student1` | `password123` | Greenwood High (`1`) | `ATTEMPT_TEST`, `VIEW_OWN_RESULT` | `/dashboard/student` |
+| **Student (Alt)** | `student2` | `password123` | Greenwood High (`1`) | `ATTEMPT_TEST`, `VIEW_OWN_RESULT` | `/dashboard/student` |
+
+---
+
 ## Running the frontend
 
 ### Prerequisites

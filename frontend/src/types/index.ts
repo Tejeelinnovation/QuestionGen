@@ -46,45 +46,188 @@ export interface LoginResponse {
   refresh: string;
 }
 
+export interface Chapter {
+  id: number;
+  book: number;
+  book_title?: string;
+  book_subject?: string;
+  book_grade?: string;
+  title: string;
+  chapter_order: number;
+  topic_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Topic {
+  id: number;
+  chapter: number;
+  chapter_title?: string;
+  chapter_order?: number;
+  book_title?: string;
+  book_subject?: string;
+  name: string;
+  question_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface QuestionPreview {
+  id: number;
+  topic: number;
+  topic_name?: string;
+  chapter_title?: string;
+  question_text: string;
+  question_type: 'MCQ' | 'SHORT_ANSWER' | 'LONG_ANSWER';
+  question_type_display?: string;
+  marks: number | string;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  difficulty_display?: string;
+  learner_level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  learner_level_display?: string;
+  options?: Record<string, string> | null;
+  correct_answer?: string;
+  source_reference?: string;
+}
+
+export interface QuestionSnapshotItem {
+  question_id: number;
+  question_text: string;
+  question_type: string;
+  marks: number;
+  difficulty: string;
+  learner_level: string;
+  options?: Record<string, string> | null;
+  correct_answer?: string;
+  source_reference?: string;
+}
+
+export interface PaperVersionSummary {
+  id: number;
+  version_label: string;
+  total_marks: number;
+  question_count: number;
+  status: 'DRAFT' | 'FINALIZED';
+  created_at: string;
+}
+
 export interface Paper {
   id: number;
   title: string;
-  subject: string;
-  grade: number;
-  school: number;
+  instructions: string;
+  chapter: number;
+  chapter_title?: string;
   created_by: number;
-  created_by_name?: string;
+  created_by_username?: string;
+  school: number;
+  school_name?: string;
+  status: string;
+  version_count?: number;
+  versions?: PaperVersionSummary[];
   created_at: string;
   updated_at: string;
-  versions?: PaperVersion[];
 }
 
 export interface PaperVersion {
   id: number;
   paper: number;
-  version_number: number;
-  title: string;
+  paper_title?: string;
+  version_label: string;
   total_marks: number;
-  time_limit_minutes: number;
-  instructions: string;
-  questions_snapshot: any[];
-  blueprint_snapshot: any;
-  created_by: number;
+  question_count?: number;
+  question_snapshot: QuestionSnapshotItem[];
+  constraints_used: Record<string, any>;
+  status: 'DRAFT' | 'FINALIZED';
   created_at: string;
+  updated_at: string;
+}
+
+export interface PaperPrintData {
+  paper_id: number;
+  title: string;
+  instructions: string;
+  version_label: string;
+  total_marks: number;
+  question_count: number;
+  questions: QuestionSnapshotItem[];
 }
 
 export interface Delivery {
   id: number;
   paper_version: number;
-  paper_version_detail?: PaperVersion;
+  paper_id?: number;
+  paper_title?: string;
+  version_label?: string;
+  total_marks?: number;
   mode: 'PRINT' | 'ONLINE';
-  title: string;
-  school: number;
-  created_by: number;
+  status: string;
   assigned_students: number[];
+  assigned_students_count?: number;
+  assigned_students_details?: Array<{ id: number; username: string; email: string }>;
   available_from: string | null;
   available_until: string | null;
+  created_by: number;
+  created_by_username?: string;
   created_at: string;
+  updated_at: string;
+}
+
+export interface AttemptQuestionItem {
+  question_id: number;
+  question_text: string;
+  question_type: 'MCQ' | 'SHORT_ANSWER' | 'LONG_ANSWER' | string;
+  marks: number;
+  options: Record<string, string> | null;
+  student_response: string;
+}
+
+export interface AttemptStartResponse {
+  attempt_id: number;
+  delivery_id: number;
+  paper_title: string;
+  instructions: string;
+  version_label: string;
+  total_marks: string | number;
+  status: string;
+  started_at: string;
+  available_until?: string | null;
+  questions: AttemptQuestionItem[];
+}
+
+export interface AttemptSubmitResponse {
+  id: number;
+  delivery: number;
+  paper_title: string;
+  status: 'SUBMITTED' | 'EVALUATED' | string;
+  score: number;
+  max_score: number;
+  started_at: string;
+  submitted_at: string;
+  message: string;
+}
+
+export interface StudentResultAnswerItem {
+  question_id: number;
+  question_text: string;
+  question_type: string;
+  max_marks: number;
+  student_response: string;
+  is_correct: boolean | null;
+  marks_awarded: number | null;
+  pending_manual_review: boolean;
+  correct_answer?: string;
+}
+
+export interface StudentAttemptResult {
+  id: number;
+  delivery: number;
+  paper_title: string;
+  status: 'SUBMITTED' | 'EVALUATED' | string;
+  score: number;
+  max_score: number;
+  started_at: string;
+  submitted_at: string;
+  answers: StudentResultAnswerItem[];
 }
 
 export interface Attempt {
@@ -93,13 +236,13 @@ export interface Attempt {
   delivery_detail?: Delivery;
   student: number;
   student_name?: string;
-  status: 'IN_PROGRESS' | 'SUBMITTED' | 'AUTO_SUBMITTED' | 'GRADED';
+  status: 'IN_PROGRESS' | 'SUBMITTED' | 'AUTO_SUBMITTED' | 'EVALUATED' | 'GRADED';
   started_at: string;
   submitted_at: string | null;
   score: number | null;
   total_marks: number | null;
   percentage: number | null;
-  time_spent_seconds: number;
+  time_spent_seconds?: number;
   answers?: Answer[];
 }
 
@@ -107,11 +250,76 @@ export interface Answer {
   id: number;
   attempt: number;
   question_id: number;
-  student_answer: any;
+  student_answer?: any;
+  student_response?: string;
   is_correct: boolean | null;
   marks_awarded: number | null;
-  auto_graded: boolean;
-  teacher_feedback: string;
+  auto_graded?: boolean;
+  teacher_feedback?: string;
+}
+
+export interface DeliveryRosterAttempt {
+  attempt_id: number;
+  student_id: number;
+  student_username: string;
+  status: 'IN_PROGRESS' | 'SUBMITTED' | 'EVALUATED' | string;
+  score: number | null;
+  max_score: number;
+  submitted_at: string | null;
+}
+
+export interface DeliveryResultsRoster {
+  delivery_id: number;
+  paper_title: string;
+  version_label: string;
+  total_marks: number;
+  total_students_assigned: number;
+  attempts_count: number;
+  submitted_count: number;
+  evaluated_count: number;
+  attempts: DeliveryRosterAttempt[];
+}
+
+export interface TeacherAttemptAnswerItem {
+  answer_id?: number;
+  question_id: number;
+  question_text: string;
+  question_type: string;
+  max_marks: number;
+  student_response: string;
+  correct_answer?: string;
+  options?: Record<string, string> | null;
+  is_correct: boolean | null;
+  marks_awarded: number | null;
+  needs_grading?: boolean;
+}
+
+export interface TeacherAttemptDetail {
+  id: number;
+  delivery: number;
+  paper_title: string;
+  status: 'IN_PROGRESS' | 'SUBMITTED' | 'EVALUATED' | string;
+  score: number;
+  max_score: number;
+  started_at: string;
+  submitted_at: string | null;
+  student_id: number;
+  student_username: string;
+  answers: TeacherAttemptAnswerItem[];
+}
+
+export interface GradeAnswerInput {
+  marks_awarded: number;
+  is_correct?: boolean;
+}
+
+export interface GradeAnswerResponse {
+  attempt_id: number;
+  question_id: number;
+  marks_awarded: number;
+  is_correct: boolean;
+  attempt_score: number;
+  attempt_status: string;
 }
 
 export interface School {
@@ -121,3 +329,4 @@ export interface School {
   is_active: boolean;
   created_at: string;
 }
+

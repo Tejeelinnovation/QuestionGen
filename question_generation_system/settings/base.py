@@ -69,10 +69,8 @@ LOCAL_APPS = [
     "papers",
     # Student Attempts and Results.
     "attempts",
-    # NOTE: A `generation` app/service boundary is PLANNED but NOT created yet.
-    # When LLM/RAG integration is introduced it must live here — do not add
-    # generation logic to any other app before that boundary is established.
-    # When LLM/RAG integration is introduced it must live here — do not add
+    # Question Generation Service boundary & interfaces.
+    "generation",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -219,3 +217,9 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
 }
+
+# ---------------------------------------------------------------------------
+# Question Generation Service configuration
+# ---------------------------------------------------------------------------
+GENERATION_SERVICE_BACKEND = env("GENERATION_SERVICE_BACKEND", default="seeded_bank")
+
