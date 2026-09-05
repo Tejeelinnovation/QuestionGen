@@ -19,4 +19,7 @@ urlpatterns = [
 
     # Content: books, chapters, topics, questions (read-only browsing)
     path("api/", include(("content.urls", "content"), namespace="content")),
+
+    # Papers, versions, delivery
+    path("api/", include(("papers.urls", "papers"), namespace="papers")),
 ]

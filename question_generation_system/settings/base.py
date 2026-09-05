@@ -117,9 +117,17 @@ TEMPLATES = [
 # ---------------------------------------------------------------------------
 # Database — PostgreSQL, configured entirely via environment variables
 # ---------------------------------------------------------------------------
+import sys
+
 DATABASES = {
     "default": env.db("DATABASE_URL")
 }
+
+if "test" in sys.argv:
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
 
 # ---------------------------------------------------------------------------
 # Password validation

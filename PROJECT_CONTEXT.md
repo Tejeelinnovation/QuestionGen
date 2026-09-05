@@ -216,6 +216,26 @@ Computed from granted capabilities — display only, never used for authz:
 
 ---
 
+## API Surface (P3 — Papers, Versions & Delivery)
+
+| Method | Path | Auth Required | Capability Required | Notes |
+|--------|------|--------------|---------------------|-------|
+| GET | `/api/papers/` | Yes | — | Scoped: teacher sees own, school admin sees school, super admin sees all |
+| POST | `/api/papers/` | Yes | `CREATE_PAPER` | Create Paper shell (title, instructions, chapter) |
+| GET | `/api/papers/{id}/` | Yes | — | Paper detail with version summaries |
+| POST | `/api/papers/{id}/select-questions/` | Yes | `CREATE_PAPER` or `GENERATE_SELECT_QUESTIONS` | Preview candidate questions via `content.filters.filter_questions()`; no persistence |
+| GET | `/api/papers/{id}/versions/` | Yes | — | List versions of a paper |
+| POST | `/api/papers/{id}/versions/` | Yes | `CREATE_PAPER` | Create immutable `PaperVersion` with snapshot + computed `total_marks` |
+| GET | `/api/papers/{id}/versions/{version_id}/` | Yes | — | Full version detail including `question_snapshot` |
+| POST | `/api/papers/{id}/versions/{version_id}/finalize/` | Yes | `CREATE_PAPER` | Explicit finalize step (locks snapshot, allows delivery) |
+| POST | `/api/papers/{id}/versions/{version_id}/clone/` | Yes | `CREATE_PAPER` | Clones to Version B/C from explicit IDs or constraints pool; leaves source version immutable |
+| POST | `/api/papers/{id}/versions/{version_id}/deliver/` | Yes | `ASSIGN_TEST` | Creates Delivery record (PRINT or ONLINE). Version must be FINALIZED. ONLINE requires students |
+| GET | `/api/papers/{id}/versions/{version_id}/print/` | Yes | — | Structured print layout from the version snapshot |
+| GET | `/api/deliveries/` | Yes | — | Scoped: student sees assigned, teacher sees created |
+| GET | `/api/deliveries/{id}/` | Yes | — | Delivery detail |
+
+---
+
 ## Naming Conventions
 
 | Thing | Convention | Example |
@@ -228,7 +248,7 @@ Computed from granted capabilities — display only, never used for authz:
 | Views/ViewSets | `<Model>ViewSet` or `<Model>View` | `QuestionViewSet` |
 | Settings modules | `base`, `dev`, `prod` | `settings.dev` |
 | Env variables | `UPPER_SNAKE_CASE` | `DATABASE_URL`, `SECRET_KEY` |
-| Audit action strings | `<domain>.<verb>` | `user.created`, `capability.granted` |
+| Audit action strings | `<domain>.<verb>` | `user.created`, `capability.granted`, `paper.created` |
 | Capability names | `UPPER_SNAKE_CASE` | `CREATE_TEACHER`, `ATTEMPT_TEST` |
 
 ---
@@ -279,12 +299,28 @@ Computed from granted capabilities — display only, never used for authz:
   - [x] Demo data: NCERT Mathematics Class 10, Chapter 1 Real Numbers, 5 topics, 42 questions
   - [x] All acceptance criteria verified (filters, idempotency, 401 on unauth)
 
+- [x] **P3 — Papers, Versions & Delivery (Teacher Workflow)**
+  - [x] `Paper` model: title, instructions, created_by, school, chapter, status, timestamps
+  - [x] `PaperVersion` model: paper, version_label, question_snapshot (JSON), total_marks (computed/stored), constraints_used (JSON), status, timestamps
+  - [x] Immutability on save/update for finalized versions
+  - [x] `Delivery` model: paper_version, mode (PRINT/ONLINE), assigned_students (M2M), status, available_from, available_until, created_by, timestamps
+  - [x] 10 Teacher Question Workflow endpoints implemented and routed
+  - [x] Separate serializers: read/write, question preview, snapshot, clone, delivery, and print
+  - [x] Question selection uses `content.filters.filter_questions()` without duplication
+  - [x] Total marks calculated immediately and persisted across refreshes
+  - [x] Cloning creates alternate version without mutating source version
+  - [x] Explicit finalize step prevents delivering draft versions
+  - [x] Online delivery enforces assigned students and teacher scope boundary (`created_by`)
+  - [x] Print and Online delivery derive from identical PaperVersion snapshot
+  - [x] Scoping rules: student cannot see unassigned papers/versions/deliveries
+  - [x] Audit logging on `paper.created`, `version.created`, `version.cloned`, `delivery.created`
+  - [x] Comprehensive test suite in `papers/tests.py` (16 passing tests)
+
 ---
 
 ## Not Yet Built
 
-- [ ] **P3 — Papers & Delivery** (`papers` app: Paper, PaperVersion, Section, Delivery)
-- [ ] **P4 — Attempts & Results** (`attempts` app: Attempt, Answer, scoring)
+- [ ] **P4 / Prompt 5 — Attempts & Results** (`attempts` app still empty — built in Prompt 5: Attempt, Answer, scoring)
 - [ ] **P5 — Generation Service Boundary** (`generation` app: LLM/RAG integration — plan only, not logic)
 - [ ] **Frontend** (React + TypeScript + Tailwind — separate directory, added later)
 - [ ] **Deployment** (Docker, CI/CD, production PostgreSQL, static files with WhiteNoise or S3)

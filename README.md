@@ -342,3 +342,119 @@ curl "http://127.0.0.1:8000/api/questions/?difficulty=EASY" \
 Response fields include `topic_name`, `chapter_title`, `book_title`,
 `question_type_display`, `difficulty_display`, `learner_level_display`,
 `options` (MCQ choices dict), and `correct_answer`.
+
+---
+
+## P3 — Papers, Versions & Delivery (Teacher Workflow)
+
+All endpoints require authentication (`Authorization: Bearer <token>`).
+Teacher endpoints require `CREATE_PAPER` and `ASSIGN_TEST` capabilities.
+
+### End-to-End Teacher Workflow (curl)
+
+#### 1. Create a Paper shell
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/papers/ \
+  -H "Authorization: Bearer <teacher_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Class 10 Unit Test — Real Numbers",
+    "instructions": "All questions are compulsory. Total marks: 5.",
+    "chapter": 1
+  }'
+```
+Response `id` is the `paper_id` (e.g. `1`).
+
+#### 2. Select / Review Candidate Questions (does not persist)
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/papers/1/select-questions/ \
+  -H "Authorization: Bearer <teacher_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "difficulty": "EASY",
+    "quantity": 3
+  }'
+```
+Returns eligible candidate questions from the paper's chapter for review.
+
+#### 3. Create Version A (immutable snapshot + computed total marks)
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/papers/1/versions/ \
+  -H "Authorization: Bearer <teacher_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question_ids": [1, 2],
+    "constraints_used": {
+      "difficulty": "EASY",
+      "total_marks": 5
+    },
+    "status": "DRAFT"
+  }'
+```
+Creates `PaperVersion` with `version_label: "A"`, stores the snapshot, and calculates `total_marks: 5`.
+
+#### 4. Clone Version A to create Version B (alternate version)
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/papers/1/versions/1/clone/ \
+  -H "Authorization: Bearer <teacher_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question_ids": [3, 4]
+  }'
+```
+Creates `PaperVersion` with `version_label: "B"`. Version A's snapshot and marks remain completely untouched.
+
+#### 5. Finalize Version A (required before delivery)
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/papers/1/versions/1/finalize/ \
+  -H "Authorization: Bearer <teacher_token>"
+```
+Locks Version A into `FINALIZED` status.
+
+#### 6. Deliver PRINT mode
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/papers/1/versions/1/deliver/ \
+  -H "Authorization: Bearer <teacher_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "PRINT"
+  }'
+```
+
+#### 7. Deliver ONLINE mode (assign to students)
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/papers/1/versions/1/deliver/ \
+  -H "Authorization: Bearer <teacher_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "ONLINE",
+    "student_ids": [6]
+  }'
+```
+
+#### 8. Retrieve Print Layout (structured format for PDF/printing)
+
+```bash
+curl http://127.0.0.1:8000/api/papers/1/versions/1/print/ \
+  -H "Authorization: Bearer <teacher_token>"
+```
+Returns title, instructions, version label, total marks, and ordered questions derived from the snapshot.
+
+#### 9. List Deliveries (scoped)
+
+```bash
+# As Teacher — sees deliveries created by this teacher
+curl http://127.0.0.1:8000/api/deliveries/ \
+  -H "Authorization: Bearer <teacher_token>"
+
+# As Student — sees ONLY tests assigned to them
+curl http://127.0.0.1:8000/api/deliveries/ \
+  -H "Authorization: Bearer <student_token>"
+```

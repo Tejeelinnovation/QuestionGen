@@ -14,6 +14,8 @@ from .base import *  # noqa: F401, F403
 # Dev-only overrides
 # ---------------------------------------------------------------------------
 
+ALLOWED_HOSTS = ALLOWED_HOSTS + ["testserver"]
+
 # Show all SQL queries in the console.
 LOGGING = {
     "version": 1,
