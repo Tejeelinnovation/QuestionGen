@@ -93,6 +93,42 @@ Visit [http://127.0.0.1:8000/](http://127.0.0.1:8000/) — you should see the Dj
 
 ---
 
+## Running the frontend
+
+### Prerequisites
+- Node.js 18+ and npm
+
+### 1. Install frontend dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### 2. Configure environment variables (optional)
+
+By default, the frontend points to the local Django dev server at `http://127.0.0.1:8000`. To customize the API base URL, create `frontend/.env`:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+### 3. Start the Vite development server
+
+```bash
+npm run dev
+```
+
+Visit [http://localhost:5173/](http://localhost:5173/) to access the application.
+
+### 4. Production build and type checking
+
+```bash
+npm run build
+```
+
+---
+
 ## Settings modules
 
 | Module | Purpose | `DJANGO_SETTINGS_MODULE` value |

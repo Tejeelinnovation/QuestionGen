@@ -28,10 +28,14 @@ introduced.
 | Web framework | Django | 6.0.3 |
 | REST API | Django REST Framework | 3.15.2 |
 | JWT auth | djangorestframework-simplejwt | 5.4.0 |
+| CORS headers | django-cors-headers | 4.7.0 |
 | Database | PostgreSQL | 14+ |
 | DB driver | psycopg2-binary | 2.9.12 |
 | Env management | django-environ | 0.13.0 |
-| Frontend *(future)* | React + TypeScript + Tailwind | TBD |
+| Frontend framework | React (TypeScript) + Vite | React 19.2.0, Vite 8.2.2 |
+| Frontend routing | react-router-dom | 7.18.3 |
+| Frontend HTTP client | Axios | 1.20.0 |
+| Frontend styling | Tailwind CSS | 4.3.3 |
 
 ---
 
@@ -56,6 +60,21 @@ question-generation-system/       ← repo root
 ├── content/                      ← Question bank (Books, Chapters, Topics, Questions)
 ├── papers/                       ← Question papers, versions, delivery
 ├── attempts/                     ← Student attempts and results
+│
+├── frontend/                     ← React + TypeScript frontend shell
+│   ├── src/
+│   │   ├── api/                  ← Axios instance & domain endpoints (auth, users, papers, deliveries, attempts)
+│   │   ├── auth/                 ← AuthContext, useAuth, RequireCapability
+│   │   ├── layouts/              ← AppLayout with minimal navbar and logout
+│   │   ├── pages/                ← LoginPage, PaperBuilderPlaceholder, AttemptPlaceholder
+│   │   │   └── dashboards/       ← SuperAdmin, SchoolAdmin, Teacher, Student dashboards
+│   │   ├── types/                ← TypeScript interfaces matching backend serializers
+│   │   ├── routes.tsx            ← Central routes & capability-based index redirect
+│   │   ├── App.tsx
+│   │   └── index.css             ← Tailwind CSS utility entrypoint
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tsconfig.json
 │
 ├── .env                          ← Local secrets (NOT committed)
 ├── .env.example                  ← Template with all required variables
@@ -259,6 +278,30 @@ Computed from granted capabilities — display only, never used for authz:
 
 ---
 
+## Frontend Architecture (P1 Shell)
+
+### Core Principles
+- **Capability-Gated UI**: The frontend **NEVER** branches routing or action permissions on `role_label`. UI logic strictly invokes `hasCapability("CAPABILITY_NAME")` (e.g. `CREATE_PAPER`, `ATTEMPT_TEST`), mirroring the backend DRF authorization architecture. `role_label` is treated strictly as display-only metadata.
+- **Minimal & Near-Unstyled**: Semantic HTML elements with basic flex/grid layouts via Tailwind CSS utility classes. No custom themes or heavy component libraries, ensuring clean future UI redesigns.
+- **Unified API Client**: All HTTP requests flow through a configured Axios instance (`src/api/client.ts`) with request interceptors (attaching `Authorization: Bearer <token>`) and response interceptors (handling 401 refresh queuing via `/api/auth/token/refresh/`).
+- **Session Security**: In compliance with web application security recommendations, JWT tokens are maintained in React state with `sessionStorage` fallback (avoiding persistent `localStorage` XSS vulnerabilities while surviving in-tab page refreshes).
+
+### Folder Structure
+```
+frontend/src/
+  ├── api/          — Axios instance, refresh interceptor, API functions by domain (auth, users, papers, deliveries, attempts)
+  ├── auth/         — AuthContext, useAuth hook, RequireCapability guard component
+  ├── layouts/      — AppLayout (header with user display, role_label, and logout button)
+  ├── pages/        — LoginPage, PaperBuilderPlaceholder, AttemptPlaceholder
+  │   └── dashboards/ — SuperAdmin, SchoolAdmin, Teacher, Student dashboards
+  ├── routes.tsx    — Route tree with capability gates & dynamic index redirect
+  ├── types/        — TypeScript interfaces matching backend models and serializers
+  ├── App.tsx       — Root component with AuthProvider and RouterProvider
+  └── index.css     — Tailwind CSS utility entrypoint
+```
+
+---
+
 ## Built So Far
 
 - [x] **P0 — Project Skeleton & Environment**
@@ -289,6 +332,17 @@ Computed from granted capabilities — display only, never used for authz:
   - [x] All endpoints log audit entries (user.created, capability.granted/revoked, user.login, user.logout)
   - [x] `create_super_admin` management command (bootstrap)
   - [x] All acceptance criteria verified via live API calls
+
+- [x] **P1 — Frontend Shell (React + TypeScript + Tailwind)**
+  - [x] Vite + React 19 + TypeScript + Tailwind CSS setup in `frontend/`
+  - [x] Backend CORS headers configured via `django-cors-headers`
+  - [x] Axios instance with automatic 401 token refresh queue & `sessionStorage` fallback
+  - [x] Auth context with user profile, capabilities normalization, `login()`, `logout()`, `hasCapability()`
+  - [x] `RequireCapability` route guard for enforcing atomic capability checks on direct URL navigation
+  - [x] Dynamic `/` capability index routing dispatching to correct dashboard without checking `role_label`
+  - [x] Minimal functional dashboards: Super Admin (user counts & table, schools pending notice), School Admin (teacher list, create teacher form), Teacher (papers list, student list, create test button), Student (assigned deliveries list, start/resume test link)
+  - [x] Placeholder routes for `/papers/new` and `/deliveries/:id/attempt`
+  - [x] Verified via browser subagent across all 4 user roles with direct capability boundary enforcement
 
 - [x] **P2 — Content / Question Bank**
   - [x] `Book` model: title, subject, grade, publisher, is_active + TimestampedModel
@@ -340,5 +394,4 @@ Computed from granted capabilities — display only, never used for authz:
 ## Not Yet Built
 
 - [ ] **P5 — Generation Service Boundary** (`generation` app: LLM/RAG integration — plan only, not logic)
-- [ ] **Frontend** (React + TypeScript + Tailwind — separate directory, added later)
 - [ ] **Deployment** (Docker, CI/CD, production PostgreSQL, static files with WhiteNoise or S3)

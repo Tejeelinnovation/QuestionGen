@@ -16,6 +16,13 @@ from .base import *  # noqa: F401, F403
 
 ALLOWED_HOSTS = ALLOWED_HOSTS + ["testserver"]
 
+# CORS configuration for Vite frontend
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+
 # Show all SQL queries in the console.
 LOGGING = {
     "version": 1,

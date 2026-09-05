@@ -17,3 +17,6 @@ psycopg2-binary==2.9.12
 
 # Environment variable management (reads .env files)
 django-environ==0.13.0
+
+# CORS headers for frontend integration
+django-cors-headers==4.7.0
