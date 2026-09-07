@@ -116,7 +116,7 @@ export const TestAttemptPage: React.FC = () => {
     }, 600);
   };
 
-  // Immediate handler for radio option select (MCQ)
+  // Immediate handler for option select (MCQ)
   const handleOptionSelect = (questionId: number, optionKey: string) => {
     if (isExpired || isSubmitting || !attemptData) return;
 
@@ -157,20 +157,27 @@ export const TestAttemptPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="p-4 text-sm text-gray-600">Loading test attempt...</div>;
+    return (
+      <div className="max-w-3xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
+        Preparing examination environment...
+      </div>
+    );
   }
 
   if (!attemptData) {
     return (
-      <div className="p-4 space-y-4 max-w-2xl">
+      <div className="max-w-2xl mx-auto p-6 space-y-4 font-body">
         {errorMessage && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
             {errorMessage}
           </div>
         )}
         <div>
-          <Link to="/dashboard/student" className="text-blue-600 underline text-sm">
-            &larr; Return to Student Dashboard
+          <Link
+            to="/dashboard/student"
+            className="text-xs font-heading font-semibold text-forest hover:underline"
+          >
+            ← Return to Student Portal
           </Link>
         </div>
       </div>
@@ -179,90 +186,138 @@ export const TestAttemptPage: React.FC = () => {
 
   const answeredCount = Object.values(answers).filter((val) => val && val.trim().length > 0).length;
   const totalQuestions = attemptData.questions.length;
+  const isAllAnswered = answeredCount === totalQuestions && totalQuestions > 0;
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-16">
-      {/* Test Header */}
-      <div className="border border-gray-300 bg-white p-5 space-y-2">
-        <div className="flex justify-between items-baseline">
-          <h1 className="text-2xl font-bold">{attemptData.paper_title}</h1>
-          <span className="text-xs border border-gray-300 px-2 py-0.5 bg-gray-100 font-semibold">
-            Version {attemptData.version_label}
-          </span>
+    <div className="max-w-3xl mx-auto pb-24 font-body space-y-8">
+      {/* ── CALM, RESTRAINED EXAMINATION HEADER ── */}
+      <div className="bg-surface border border-border rounded-card p-6 sm:p-8 shadow-card space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-border/70 pb-4">
+          <div className="space-y-1">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-ink/50 block">
+              Active Assessment Session
+            </span>
+            <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight">
+              {attemptData.paper_title}
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="pill pill-forest text-[11px] font-semibold">
+              Version {attemptData.version_label}
+            </span>
+          </div>
         </div>
 
         {attemptData.instructions && (
-          <p className="text-xs text-gray-700 italic border-t border-gray-200 pt-2">
-            <strong>Instructions:</strong> {attemptData.instructions}
-          </p>
+          <div className="text-xs text-ink/70 leading-relaxed bg-bg p-3.5 rounded-card border border-border/60">
+            <span className="font-heading font-semibold text-ink block mb-0.5">
+              Candidate Guidelines:
+            </span>
+            {attemptData.instructions}
+          </div>
         )}
 
-        <div className="flex justify-between items-center text-xs text-gray-600 border-t border-gray-200 pt-2">
-          <span>
-            Progress: <strong>{answeredCount} of {totalQuestions} answered</strong>
-          </span>
-          <span>
-            Total Marks: <strong>{attemptData.total_marks}</strong>
-          </span>
+        {/* Understated typographic progress in header area (no loud progress bars) */}
+        <div className="flex items-center justify-between text-xs pt-1">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-ink/60">Answered:</span>
+            <span className="font-heading font-bold text-sm text-ink">
+              {answeredCount} of {totalQuestions}
+            </span>
+            <span className="text-ink/40 font-mono">questions completed</span>
+          </div>
+
+          <div className="font-mono text-xs text-ink/70">
+            Total Value: <span className="font-bold text-forest">{attemptData.total_marks} Marks</span>
+          </div>
         </div>
       </div>
 
       {isExpired && (
-        <div className="border border-yellow-300 bg-yellow-50 text-yellow-900 p-4 text-sm font-medium">
-          The submission window for this test has closed. Further changes and submission are disabled.
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+          The scheduled submission window for this assessment has closed. Further changes and answers are disabled.
         </div>
       )}
 
       {errorMessage && (
-        <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
           {errorMessage}
         </div>
       )}
 
-      {/* Questions List */}
-      <div className="space-y-4">
+      {/* ── QUESTIONS STREAM (GENEROUS WHITESPACE, UNAMBIGUOUS INPUTS) ── */}
+      <div className="space-y-6">
         {attemptData.questions.map((q: AttemptQuestionItem, idx: number) => {
           const currentAnswer = answers[q.question_id] || '';
           const saveStatus = saveStatuses[q.question_id] || 'idle';
 
           return (
-            <div key={q.question_id} className="border border-gray-300 bg-white p-5 space-y-3">
-              <div className="flex justify-between items-center text-xs border-b border-gray-100 pb-2">
-                <span className="font-bold text-sm text-black">
-                  Question {idx + 1}
-                </span>
-                <div className="flex items-center space-x-3">
-                  {/* Inline Save Status Indicator */}
-                  {saveStatus === 'saving' && (
-                    <span className="text-blue-600 font-medium animate-pulse">Saving...</span>
-                  )}
-                  {saveStatus === 'saved' && (
-                    <span className="text-green-700 font-medium">Saved</span>
-                  )}
-                  {saveStatus === 'error' && (
-                    <span className="text-red-600 font-medium">Error saving</span>
-                  )}
+            <div
+              key={q.question_id}
+              className="bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card space-y-4 transition-all"
+            >
+              {/* Question Header Bar with subtle peripheral auto-save indicator */}
+              <div className="flex items-center justify-between border-b border-border/70 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono font-bold text-xs bg-bg border border-border px-2.5 py-1 rounded-sm text-ink">
+                    Q{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                  </span>
+                  <span className="pill pill-muted text-[10px]">
+                    {q.question_type}
+                  </span>
+                </div>
 
-                  <span className="font-semibold text-black">[{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]</span>
+                <div className="flex items-center gap-3">
+                  {/* Subtle, peripheral auto-save feedback at top-right */}
+                  <div className="text-[11px] font-mono">
+                    {saveStatus === 'saving' && (
+                      <span className="text-ink/50 animate-pulse flex items-center gap-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-forest animate-ping" />
+                        Saving...
+                      </span>
+                    )}
+                    {saveStatus === 'saved' && (
+                      <span className="text-forest font-medium flex items-center gap-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-forest" />
+                        Saved
+                      </span>
+                    )}
+                    {saveStatus === 'error' && (
+                      <span className="text-ember font-medium flex items-center gap-1">
+                        ! Save error
+                      </span>
+                    )}
+                  </div>
+
+                  <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-pill">
+                    {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
+                  </span>
                 </div>
               </div>
 
-              <p className="text-sm font-medium">{q.question_text}</p>
+              {/* Question Text */}
+              <p className="font-body text-base font-medium text-ink leading-relaxed">
+                {q.question_text}
+              </p>
 
-              {/* MCQ Options */}
+              {/* MCQ Options: Large, clearly clickable tactile blocks with FOREST fill on selected state */}
               {q.question_type === 'MCQ' && q.options && (
-                <div className="space-y-2 pt-1">
+                <div className="space-y-2.5 pt-2">
                   {Object.entries(q.options).map(([key, label]) => {
                     const isSelected = currentAnswer.trim().toUpperCase() === key.trim().toUpperCase();
+
                     return (
-                      <label
+                      <div
                         key={key}
-                        className={`flex items-baseline space-x-3 p-2 text-sm border rounded cursor-pointer ${
+                        onClick={() => !isExpired && !isSubmitting && handleOptionSelect(q.question_id, key)}
+                        className={`p-4 rounded-card border-2 transition-all cursor-pointer flex items-center gap-3.5 ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50 font-medium'
-                            : 'border-gray-200 hover:bg-gray-50'
+                            ? 'bg-forest text-white border-forest shadow-sm'
+                            : 'bg-bg text-ink border-border hover:bg-surface-muted hover:border-border-strong'
                         }`}
                       >
+                        {/* Hidden accessible radio */}
                         <input
                           type="radio"
                           name={`q_${q.question_id}`}
@@ -270,41 +325,60 @@ export const TestAttemptPage: React.FC = () => {
                           checked={isSelected}
                           onChange={() => handleOptionSelect(q.question_id, key)}
                           disabled={isExpired || isSubmitting}
-                          className="cursor-pointer"
+                          className="sr-only"
                         />
-                        <span>
-                          <strong>({key})</strong> {label}
+
+                        {/* Distinct Key Indicator */}
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center font-mono font-bold text-xs shrink-0 transition-colors ${
+                            isSelected
+                              ? 'bg-white text-forest'
+                              : 'bg-surface border border-border text-ink'
+                          }`}
+                        >
+                          {key}
+                        </div>
+
+                        {/* Option text */}
+                        <span className="text-sm font-medium leading-normal flex-1">
+                          {label}
                         </span>
-                      </label>
+
+                        {isSelected && (
+                          <span className="font-mono text-xs font-bold text-lime shrink-0">
+                            ✓ Selected
+                          </span>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
               )}
 
-              {/* SHORT_ANSWER input */}
+              {/* SHORT_ANSWER Input */}
               {q.question_type === 'SHORT_ANSWER' && (
-                <div className="pt-1">
+                <div className="pt-2">
                   <input
                     type="text"
                     value={currentAnswer}
                     onChange={(e) => handleTextChange(q.question_id, e.target.value)}
                     disabled={isExpired || isSubmitting}
-                    placeholder="Type your short answer here..."
-                    className="w-full border border-gray-400 p-2 text-sm"
+                    placeholder="Type your answer response here..."
+                    className="w-full rounded-card border border-border bg-bg px-4 py-3 text-sm text-ink placeholder:text-ink/40 focus:bg-surface focus:border-forest focus:outline-none transition-colors"
                   />
                 </div>
               )}
 
-              {/* LONG_ANSWER textarea */}
+              {/* LONG_ANSWER Textarea */}
               {q.question_type === 'LONG_ANSWER' && (
-                <div className="pt-1">
+                <div className="pt-2">
                   <textarea
-                    rows={4}
+                    rows={5}
                     value={currentAnswer}
                     onChange={(e) => handleTextChange(q.question_id, e.target.value)}
                     disabled={isExpired || isSubmitting}
-                    placeholder="Type your answer explanation here..."
-                    className="w-full border border-gray-400 p-2 text-sm"
+                    placeholder="Provide your complete analytical explanation and solution steps here..."
+                    className="w-full rounded-card border border-border bg-bg px-4 py-3 text-sm text-ink placeholder:text-ink/40 focus:bg-surface focus:border-forest focus:outline-none transition-colors leading-relaxed"
                   />
                 </div>
               )}
@@ -313,28 +387,36 @@ export const TestAttemptPage: React.FC = () => {
         })}
       </div>
 
-      {/* Footer Submit Toolbar */}
-      <div className="border border-gray-300 bg-gray-50 p-4 flex justify-between items-center sticky bottom-0 shadow-sm">
-        <Link to="/dashboard/student" className="text-xs text-blue-600 underline">
-          &larr; Exit to Dashboard
+      {/* ── WEIGHTY COMMITTED SUBMIT ACTION STRIP (STICKY BOTTOM) ── */}
+      <div className="sticky bottom-4 z-30 bg-surface/95 backdrop-blur-sm border border-border rounded-card p-4 sm:p-5 shadow-float flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <Link
+          to="/dashboard/student"
+          className="text-xs font-heading font-semibold text-ink/60 hover:text-ink transition-colors self-start sm:self-auto"
+        >
+          ← Pause & Return to Portal
         </Link>
 
-        <div className="flex items-center space-x-4">
-          <span className="text-xs text-gray-600">
-            {answeredCount === totalQuestions ? (
-              <strong className="text-green-700">All questions answered</strong>
-            ) : (
-              <span>{totalQuestions - answeredCount} question(s) remaining</span>
-            )}
-          </span>
+        <div className="flex items-center gap-4 self-end sm:self-auto">
+          <div className="text-right">
+            <span className="text-xs font-mono text-ink/70 block">
+              {isAllAnswered ? (
+                <span className="text-forest font-bold">All {totalQuestions} Questions Answered</span>
+              ) : (
+                <span>{totalQuestions - answeredCount} question(s) uncompleted</span>
+              )}
+            </span>
+            <span className="text-[10px] text-ink/40 block">Answers auto-saved to cloud</span>
+          </div>
 
+          {/* Heavy, high-contrast committed submit button */}
           <button
             onClick={handleSubmit}
             id="submit-test-btn"
             disabled={isSubmitting || isExpired}
-            className="border border-green-600 bg-green-600 hover:bg-green-700 text-white font-medium px-5 py-2 text-sm cursor-pointer disabled:opacity-50"
+            className="px-7 py-3 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
           >
-            {isSubmitting ? 'Submitting Test...' : 'Submit Test'}
+            <span>{isSubmitting ? 'Submitting Assessment...' : 'Submit Final Test'}</span>
+            <span>✓</span>
           </button>
         </div>
       </div>

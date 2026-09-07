@@ -33,19 +33,26 @@ export const ResultPage: React.FC = () => {
   }, [attemptId]);
 
   if (isLoading) {
-    return <div className="p-4 text-sm text-gray-600">Loading test results...</div>;
+    return (
+      <div className="max-w-3xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
+        Compiling assessment evaluation report...
+      </div>
+    );
   }
 
   if (errorMessage || !result) {
     return (
-      <div className="p-4 space-y-4 max-w-2xl">
+      <div className="max-w-2xl mx-auto p-6 space-y-4 font-body">
         {errorMessage && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
+          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
             {errorMessage}
           </div>
         )}
-        <Link to="/dashboard/student" className="text-blue-600 underline text-sm">
-          &larr; Return to Student Dashboard
+        <Link
+          to="/dashboard/student"
+          className="text-xs font-heading font-semibold text-forest hover:underline"
+        >
+          ← Return to Student Portal
         </Link>
       </div>
     );
@@ -56,122 +63,200 @@ export const ResultPage: React.FC = () => {
   const percentage =
     result.max_score > 0 ? ((result.score / result.max_score) * 100).toFixed(1) : '0.0';
 
+  const pendingQuestionsCount = result.answers?.filter((a) => a.pending_manual_review).length || 0;
+
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold">{result.paper_title || `Attempt #${result.id}`}</h1>
-          <p className="text-xs text-gray-500 mt-1">
+    <div className="max-w-3xl mx-auto pb-16 font-body space-y-8">
+      {/* ── HEADER NAVIGATION ── */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 border-b border-border pb-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+            <span className="w-2 h-2 rounded-full bg-forest" />
+            Evaluation Report • Attempt #{result.id}
+          </div>
+          <h1 className="font-heading font-bold text-3xl text-ink tracking-tight">
+            {result.paper_title || `Assessment #${result.id}`}
+          </h1>
+          <p className="text-xs text-ink/60 font-mono">
             Submitted on {result.submitted_at ? new Date(result.submitted_at).toLocaleString() : '—'}
           </p>
         </div>
 
-        <Link to="/dashboard/student" className="text-sm text-blue-600 underline">
-          &larr; Student Dashboard
+        <Link
+          to="/dashboard/student"
+          className="text-xs font-heading font-semibold text-ink/70 hover:text-ink px-4 py-2 rounded-pill border border-border bg-surface hover:bg-surface-muted transition-colors self-start sm:self-auto"
+        >
+          ← Student Portal
         </Link>
       </div>
 
-      {/* Pending review banner */}
-      {isSubmitted && (
+      {/* ── INFORMATIONAL PENDING REVIEW BANNER (NON-ALARMING GRAPE ACCENT) ── */}
+      {(isSubmitted || pendingQuestionsCount > 0) && (
         <div
           id="pending-review-banner"
-          className="border border-yellow-300 bg-yellow-50 text-yellow-900 p-4 text-sm font-medium"
+          className="rounded-card border border-grape/30 bg-grape/10 p-5 text-ink space-y-1 shadow-card animate-card-enter"
         >
-          Some answers are pending teacher review — your final score may change.
+          <div className="flex items-center gap-2">
+            <span className="pill pill-grape text-[10px] font-semibold">
+              Subjective Evaluation Pending
+            </span>
+          </div>
+          <p className="text-xs text-ink/80 leading-relaxed pt-1">
+            Some answers are currently pending manual teacher review. Your objective MCQ score is tabulated below; your final grade will update once your instructor evaluates open-ended responses.
+          </p>
         </div>
       )}
 
-      {/* Score Summary Card */}
-      <div className="border border-gray-300 bg-gray-50 p-6 flex justify-around items-center text-center">
-        <div>
-          <div className="text-xs text-gray-500 uppercase tracking-wide">Status</div>
-          <div className="text-lg font-bold mt-1">
+      {/* ── SCORE AS VISUAL HERO (BOLD SPACE GROTESK TYPOGRAPHY) ── */}
+      <div className="bg-surface border border-border rounded-card p-7 sm:p-8 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50">
+            Total Assessment Score
+          </div>
+          <div className="flex items-baseline gap-2" id="result-score-display">
+            <span className="font-heading font-bold text-5xl sm:text-6xl text-forest tracking-tight">
+              {result.score % 1 === 0 ? result.score : result.score.toFixed(1)}
+            </span>
+            <span className="font-heading font-normal text-2xl text-ink/40">
+              / {result.max_score}
+            </span>
+            <span className="text-xs font-mono font-semibold text-ink/60 pl-1">Marks</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-8 border-t md:border-t-0 md:border-l border-border pt-4 md:pt-0 md:pl-8">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
+              Percentage
+            </div>
+            <div className="font-heading font-bold text-3xl sm:text-4xl text-ink">
+              {percentage}%
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
+              Attempt Status
+            </div>
+            {/* Consistent status badges */}
             <span
-              className={`px-2 py-0.5 text-xs border ${
-                isEvaluated
-                  ? 'border-green-400 bg-green-100 text-green-900 font-semibold'
-                  : 'border-yellow-400 bg-yellow-100 text-yellow-900 font-semibold'
+              className={`pill text-xs font-semibold ${
+                isEvaluated ? 'pill-forest' : 'pill-grape'
               }`}
             >
-              {result.status}
+              {isEvaluated ? 'Evaluated' : 'Submitted'}
             </span>
           </div>
         </div>
-
-        <div className="border-l border-gray-300 pl-6">
-          <div className="text-xs text-gray-500 uppercase tracking-wide">Total Score</div>
-          <div className="text-3xl font-extrabold mt-1 text-black" id="result-score-display">
-            {result.score} <span className="text-sm font-normal text-gray-500">/ {result.max_score}</span>
-          </div>
-        </div>
-
-        <div className="border-l border-gray-300 pl-6">
-          <div className="text-xs text-gray-500 uppercase tracking-wide">Percentage</div>
-          <div className="text-2xl font-bold mt-1 text-gray-800">{percentage}%</div>
-        </div>
       </div>
 
-      {/* Detailed Question Answers Breakdown */}
+      {/* ── DETAILED QUESTION BREAKDOWN (COLOR-CODED LEFT BORDERS) ── */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold">Question Breakdown</h2>
+        <div className="flex items-center justify-between border-b border-border/80 pb-3">
+          <div>
+            <h2 className="font-heading font-bold text-xl text-ink">
+              Detailed Question Analysis
+            </h2>
+            <p className="text-xs text-ink/60">
+              Review answers, awarded marks, and official solution guides
+            </p>
+          </div>
+          <span className="font-mono text-xs text-ink/50">
+            {result.answers?.length || 0} Questions
+          </span>
+        </div>
 
-        <div className="space-y-3">
-          {result.answers?.map((a, idx) => (
-            <div key={a.question_id || idx} className="border border-gray-300 bg-white p-4 space-y-2">
-              <div className="flex justify-between items-center text-xs border-b border-gray-100 pb-2">
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-sm text-black">Q{idx + 1}.</span>
-                  <span className="border border-gray-200 px-1.5 py-0.5 bg-gray-100">
-                    {a.question_type}
-                  </span>
+        <div className="space-y-4">
+          {result.answers?.map((a, idx) => {
+            const delayMs = idx * 45;
+            const isIncorrect = a.is_correct === false;
+            const isPending = a.pending_manual_review;
 
-                  {/* Correctness Badges */}
-                  {a.is_correct === true && (
-                    <span className="border border-green-300 bg-green-100 text-green-800 px-2 py-0.5 font-bold">
-                      Correct
-                    </span>
-                  )}
-                  {a.is_correct === false && (
-                    <span className="border border-red-300 bg-red-100 text-red-800 px-2 py-0.5 font-bold">
-                      Incorrect
-                    </span>
-                  )}
-                  {a.pending_manual_review && (
-                    <span className="border border-yellow-300 bg-yellow-100 text-yellow-800 px-2 py-0.5 font-semibold">
-                      Pending review
-                    </span>
-                  )}
-                </div>
+            // Color-coded left-border treatment:
+            // forest for correct, ember for incorrect, grape for pending review
+            let borderTreatment = 'border-l-4 border-forest';
+            let statusBadge = (
+              <span className="pill pill-forest text-[10px] font-semibold">
+                ✓ Correct
+              </span>
+            );
 
-                <span className="font-bold text-black text-sm">
-                  {a.marks_awarded !== null ? a.marks_awarded : '—'} / {a.max_marks} Marks
+            if (isIncorrect) {
+              borderTreatment = 'border-l-4 border-ember';
+              statusBadge = (
+                <span className="pill pill-ember text-[10px] font-semibold">
+                  ✗ Incorrect
                 </span>
-              </div>
+              );
+            } else if (isPending) {
+              borderTreatment = 'border-l-4 border-grape';
+              statusBadge = (
+                <span className="pill pill-grape text-[10px] font-semibold">
+                  Pending Review
+                </span>
+              );
+            }
 
-              <p className="text-sm font-medium pt-1">{a.question_text}</p>
+            return (
+              <div
+                key={a.question_id || idx}
+                style={{ animationDelay: `${delayMs}ms` }}
+                className={`animate-card-enter bg-surface border border-border ${borderTreatment} rounded-card p-5 sm:p-6 shadow-card space-y-3.5`}
+              >
+                {/* Header row */}
+                <div className="flex items-center justify-between border-b border-border/70 pb-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono font-bold text-xs bg-bg border border-border px-2 py-0.5 rounded-sm">
+                      Q{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                    </span>
+                    <span className="pill pill-muted text-[10px]">
+                      {a.question_type}
+                    </span>
+                    {statusBadge}
+                  </div>
 
-              {/* Student Response */}
-              <div className="text-xs bg-gray-50 border border-gray-200 p-2 rounded">
-                <span className="text-gray-500">Your Answer: </span>
-                <strong className="text-black">
-                  {a.student_response ? a.student_response : <em className="text-gray-400">No response provided</em>}
-                </strong>
-              </div>
-
-              {/* Correct Answer if available */}
-              {a.correct_answer && (
-                <div className="text-xs bg-green-50 border border-green-200 p-2 text-green-900 rounded">
-                  <span>Correct Answer: </span>
-                  <strong>{a.correct_answer}</strong>
+                  <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-pill">
+                    {a.marks_awarded !== null ? a.marks_awarded : '—'} / {a.max_marks} Marks
+                  </span>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Question prompt */}
+                <p className="font-body text-sm sm:text-base font-medium text-ink leading-relaxed">
+                  {a.question_text}
+                </p>
+
+                {/* Student's recorded answer */}
+                <div className="p-3.5 rounded-card bg-bg border border-border/80 text-xs space-y-1">
+                  <span className="font-mono uppercase text-[10px] tracking-wider text-ink/50 block">
+                    Your Response:
+                  </span>
+                  <div className="font-mono text-ink font-semibold whitespace-pre-wrap">
+                    {a.student_response ? (
+                      a.student_response
+                    ) : (
+                      <em className="text-ink/40 font-normal">No response submitted</em>
+                    )}
+                  </div>
+                </div>
+
+                {/* Correct solution reference if available */}
+                {a.correct_answer && (
+                  <div className="p-3.5 rounded-card bg-forest/5 border border-forest/20 text-xs space-y-1">
+                    <span className="font-mono uppercase text-[10px] tracking-wider text-forest font-semibold block">
+                      Official Reference Answer:
+                    </span>
+                    <div className="font-mono text-forest font-medium">
+                      {a.correct_answer}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {(!result.answers || result.answers.length === 0) && (
-            <div className="border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-              No individual answer breakdown records available for this attempt.
+            <div className="bg-surface border-2 border-dashed border-border rounded-card p-10 text-center text-xs text-ink/50">
+              No individual question breakdown records stored for this attempt.
             </div>
           )}
         </div>

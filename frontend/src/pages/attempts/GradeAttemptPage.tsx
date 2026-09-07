@@ -80,6 +80,27 @@ export const GradeAttemptPage: React.FC = () => {
     }));
   };
 
+  const handleQuickPreset = (questionId: number, maxMarks: number, preset: 'zero' | 'half' | 'full') => {
+    let marksVal = '0';
+    let isCorrectVal = false;
+    if (preset === 'full') {
+      marksVal = String(maxMarks);
+      isCorrectVal = true;
+    } else if (preset === 'half') {
+      marksVal = String(maxMarks / 2);
+      isCorrectVal = false;
+    }
+    setGradingState((prev) => ({
+      ...prev,
+      [questionId]: {
+        ...prev[questionId],
+        marks: marksVal,
+        isCorrect: isCorrectVal,
+        error: null,
+      },
+    }));
+  };
+
   const handleSaveGrade = async (ans: TeacherAttemptAnswerItem) => {
     const qState = gradingState[ans.question_id];
     if (!qState) return;
@@ -172,17 +193,24 @@ export const GradeAttemptPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="p-4 text-sm text-gray-600">Loading attempt for grading...</div>;
+    return (
+      <div className="max-w-4xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
+        Opening grading desk for attempt #{attemptId}...
+      </div>
+    );
   }
 
   if (errorMessage || !attempt) {
     return (
-      <div className="p-4 space-y-4 max-w-2xl">
-        <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-          {errorMessage || 'Attempt not found.'}
+      <div className="max-w-2xl mx-auto p-6 space-y-4 font-body">
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+          {errorMessage || 'Attempt record not found.'}
         </div>
-        <Link to="/dashboard/teacher" className="text-blue-600 underline text-sm">
-          &larr; Return to Teacher Dashboard
+        <Link
+          to="/dashboard/teacher"
+          className="text-xs font-heading font-semibold text-forest hover:underline"
+        >
+          ← Return to Teacher Dashboard
         </Link>
       </div>
     );
@@ -192,72 +220,70 @@ export const GradeAttemptPage: React.FC = () => {
   const pendingCount = attempt.answers.filter((a) => a.marks_awarded === null).length;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-16">
-      {/* Navigation Breadcrumb */}
-      <div className="flex justify-between items-center text-sm">
+    <div className="max-w-4xl mx-auto pb-20 font-body space-y-8">
+      {/* ── TOP UTILITY NAVIGATION ── */}
+      <div className="flex items-center justify-between text-xs">
         <Link
           to={`/deliveries/${attempt.delivery}/results`}
-          className="text-blue-600 underline"
+          className="font-heading font-semibold text-forest hover:underline flex items-center gap-1"
         >
-          &larr; Back to Results Roster
+          ← Return to Results Roster
         </Link>
-        <Link to="/dashboard/teacher" className="text-gray-500 underline text-xs">
-          Teacher Dashboard
+        <Link
+          to="/dashboard/teacher"
+          className="font-heading font-medium text-ink/60 hover:text-ink transition-colors"
+        >
+          Teacher Studio
         </Link>
       </div>
 
-      {/* Header Info Card */}
-      <div className="border border-gray-300 bg-gray-50 p-4 space-y-2">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-bold">
-              Grading Attempt #{attempt.id}: {attempt.paper_title || 'Paper'}
-            </h1>
-            <p className="text-sm text-gray-600">
-              Student: <strong className="font-semibold text-gray-800">{attempt.student_username}</strong> (ID: {attempt.student_id})
-            </p>
-          </div>
-          <div className="text-right">
+      {/* ── STICKY RUNNING SCORE & PROGRESS TICKER ── */}
+      <div className="sticky top-20 z-30 bg-surface/95 backdrop-blur-sm border border-border rounded-card p-5 shadow-float flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-heading font-bold text-base text-ink">
+              {attempt.paper_title || 'Question Paper'}
+            </span>
             <span
-              className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${
-                isEvaluated
-                  ? 'bg-green-100 text-green-800 border border-green-300'
-                  : 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+              className={`pill text-[10px] font-semibold ${
+                isEvaluated ? 'pill-forest' : 'pill-grape'
               }`}
             >
-              {attempt.status}
+              {isEvaluated ? 'Evaluated' : 'Pending Grading'}
             </span>
-            <p className="text-xs text-gray-500 mt-1">
-              Submitted:{' '}
-              {attempt.submitted_at
-                ? new Date(attempt.submitted_at).toLocaleString()
-                : '—'}
-            </p>
+          </div>
+
+          <div className="text-xs text-ink/60 font-mono">
+            Candidate: <strong className="text-ink font-semibold">{attempt.student_username}</strong> (ID #{attempt.student_id})
           </div>
         </div>
 
-        {/* Score and Progress Summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-gray-200 text-sm">
+        {/* Live Running Score Ticker */}
+        <div className="flex items-center gap-6 self-end sm:self-auto border-t sm:border-t-0 sm:border-l border-border pt-2 sm:pt-0 sm:pl-6">
           <div>
-            <span className="text-gray-500 text-xs block">Current Score</span>
-            <span className="text-lg font-bold text-gray-900">
-              {attempt.score !== null ? attempt.score : 0} / {attempt.max_score}
-            </span>
+            <div className="text-[10px] font-mono uppercase text-ink/50 mb-0.5">
+              Current Score Total
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-heading font-bold text-2xl sm:text-3xl text-forest">
+                {attempt.score !== null ? attempt.score : 0}
+              </span>
+              <span className="font-heading font-normal text-sm text-ink/40">
+                / {attempt.max_score} Marks
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="text-gray-500 text-xs block">Pending Manual Review</span>
+
+          <div className="text-right">
+            <div className="text-[10px] font-mono uppercase text-ink/50 mb-0.5">
+              Evaluation Progress
+            </div>
             <span
-              className={`text-lg font-bold ${
-                pendingCount > 0 ? 'text-amber-600' : 'text-green-600'
+              className={`pill text-xs font-semibold ${
+                pendingCount > 0 ? 'pill-ember' : 'pill-forest'
               }`}
             >
-              {pendingCount} {pendingCount === 1 ? 'question' : 'questions'}
-            </span>
-          </div>
-          <div className="col-span-2 sm:col-span-1">
-            <span className="text-gray-500 text-xs block">Total Questions</span>
-            <span className="text-lg font-bold text-gray-900">
-              {attempt.answers.length}
+              {pendingCount === 0 ? '✓ Complete' : `${pendingCount} Left to Grade`}
             </span>
           </div>
         </div>
@@ -265,19 +291,29 @@ export const GradeAttemptPage: React.FC = () => {
 
       {/* Notifications */}
       {successBanner && (
-        <div className="border border-green-300 bg-green-50 text-green-800 p-3 text-sm">
-          {successBanner}
-        </div>
-      )}
-      {isEvaluated && (
-        <div className="border border-green-300 bg-green-50 text-green-800 p-3 text-sm">
-          ✓ All questions have been graded! This attempt is marked as <strong>EVALUATED</strong>.
+        <div className="rounded-card border border-forest/30 bg-forest/10 text-forest p-4 text-xs font-semibold flex items-start gap-2">
+          <span className="font-bold text-sm">✓</span>
+          <span>{successBanner}</span>
         </div>
       )}
 
-      {/* Questions Section */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-bold">Responses & Grading</h2>
+      {isEvaluated && (
+        <div className="rounded-card border border-forest/30 bg-forest/10 text-forest p-4 text-xs font-semibold flex items-center gap-2">
+          <span>✓</span>
+          <span>All candidate responses evaluated. This attempt is marked as <strong>EVALUATED</strong>.</span>
+        </div>
+      )}
+
+      {/* ── QUESTION RESPONSES & LOW-FRICTION GRADING CONTROLS ── */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between border-b border-border/80 pb-2">
+          <h2 className="font-heading font-bold text-xl text-ink">
+            Responses & Grading Rubric
+          </h2>
+          <span className="font-mono text-xs text-ink/50">
+            {attempt.answers.length} Total Questions
+          </span>
+        </div>
 
         {attempt.answers.map((ans, idx) => {
           const qState = gradingState[ans.question_id] || {
@@ -289,91 +325,103 @@ export const GradeAttemptPage: React.FC = () => {
           };
           const isObjective = ans.question_type === 'MCQ';
           const isGraded = ans.marks_awarded !== null;
+          const isPending = !isGraded;
 
           return (
             <div
               key={ans.question_id}
-              className={`border p-4 space-y-3 ${
-                ans.marks_awarded === null
-                  ? 'border-amber-300 bg-amber-50/20'
-                  : 'border-gray-300 bg-white'
+              className={`bg-surface border rounded-card p-6 shadow-card space-y-4 transition-all ${
+                isPending
+                  ? 'border-ember/40 bg-surface'
+                  : 'border-border'
               }`}
             >
               {/* Question Header */}
-              <div className="flex justify-between items-start">
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-sm">Q{idx + 1}.</span>
-                  <span className="text-xs px-2 py-0.5 bg-gray-100 border text-gray-700">
+              <div className="flex items-center justify-between border-b border-border/70 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono font-bold text-xs bg-bg border border-border px-2.5 py-1 rounded-sm text-ink">
+                    Q{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                  </span>
+                  <span className="pill pill-muted text-[10px]">
                     {ans.question_type}
                   </span>
-                  <span className="text-xs text-gray-500">
-                    Max Marks: {ans.max_marks}
+                  <span className="font-mono text-xs text-ink/50">
+                    Max: {ans.max_marks} {ans.max_marks === 1 ? 'Mark' : 'Marks'}
                   </span>
                 </div>
 
-                <div className="text-right">
+                <div>
                   {isGraded ? (
-                    <span className="text-sm font-semibold text-gray-800">
+                    <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-3 py-1 rounded-pill">
                       Awarded: {ans.marks_awarded} / {ans.max_marks} pts
                     </span>
                   ) : (
-                    <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 border border-amber-300">
-                      Pending Grading
+                    <span className="pill pill-ember text-[10px] font-semibold">
+                      Needs Teacher Grading
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Question Text */}
-              <p className="text-sm text-gray-900 whitespace-pre-line">
+              {/* Question Prompt */}
+              <p className="font-body text-sm sm:text-base font-medium text-ink leading-relaxed">
                 {ans.question_text}
               </p>
 
-              {/* Student's Response */}
-              <div className="bg-gray-50 border border-gray-200 p-3">
-                <span className="text-xs font-semibold text-gray-500 block mb-1">
-                  Student's Response:
-                </span>
+              {/* ── VISUALLY DOMINANT: STUDENT'S SUBMITTED RESPONSE ── */}
+              <div className="bg-bg border-2 border-border/80 rounded-card p-5 space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-ink/50">
+                  <span>Student's Submitted Response</span>
+                  <span className="text-forest font-bold font-heading">Primary Reading Target</span>
+                </div>
+
                 {ans.student_response ? (
-                  <p className="text-sm font-mono whitespace-pre-wrap text-gray-800">
+                  <div className="font-mono text-sm sm:text-base font-semibold text-ink whitespace-pre-wrap leading-relaxed">
                     {ans.student_response}
-                  </p>
+                  </div>
                 ) : (
-                  <p className="text-sm italic text-gray-400">
-                    (No answer provided)
-                  </p>
+                  <div className="text-xs italic text-ink/40 font-mono">
+                    (No response submitted by candidate)
+                  </div>
                 )}
               </div>
 
-              {/* Correct Reference / Answer Key if available */}
+              {/* Compact Reference Solution block */}
               {ans.correct_answer !== undefined && ans.correct_answer !== null && (
-                <div className="text-xs text-gray-600 bg-gray-100/70 p-2 border border-dashed border-gray-300">
-                  <strong className="font-medium text-gray-700">Reference / Correct Answer:</strong>{' '}
-                  {typeof ans.correct_answer === 'object'
-                    ? JSON.stringify(ans.correct_answer)
-                    : String(ans.correct_answer)}
+                <div className="bg-forest/5 border border-forest/20 rounded-card p-3.5 text-xs text-forest space-y-1">
+                  <span className="font-mono uppercase text-[10px] tracking-wider font-semibold block">
+                    Solution Key Reference:
+                  </span>
+                  <div className="font-mono font-medium">
+                    {typeof ans.correct_answer === 'object'
+                      ? JSON.stringify(ans.correct_answer)
+                      : String(ans.correct_answer)}
+                  </div>
                 </div>
               )}
 
-              {/* Grading Controls / Display */}
+              {/* ── FAST, LOW-FRICTION GRADING CONTROLS ── */}
               {isObjective ? (
-                <div className="pt-2 border-t border-gray-200 text-xs text-gray-600 flex items-center justify-between">
-                  <span>Auto-graded (Objective MCQ)</span>
+                <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-ink/60 font-mono">
+                  <span>Auto-evaluated Objective Question</span>
                   <span
-                    className={`font-semibold ${
-                      ans.is_correct ? 'text-green-600' : 'text-red-600'
+                    className={`font-bold ${
+                      ans.is_correct ? 'text-forest' : 'text-ember'
                     }`}
                   >
-                    {ans.is_correct ? '✓ Correct' : '✗ Incorrect'} ({ans.marks_awarded} pts)
+                    {ans.is_correct ? '✓ Correct Answer' : '✗ Incorrect Answer'} ({ans.marks_awarded} pts)
                   </span>
                 </div>
               ) : (
-                <div className="pt-2 border-t border-gray-200">
+                <div className="pt-3 border-t border-border">
                   {qState.isEditing ? (
-                    <div className="space-y-3 bg-gray-50 p-3 border border-gray-200">
-                      <div className="flex flex-wrap items-center gap-4 text-sm">
-                        <label className="flex items-center space-x-2">
-                          <span className="font-medium text-gray-700">Marks Awarded:</span>
+                    <div className="bg-surface-muted border border-border rounded-card p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        {/* Marks Input & Quick Presets */}
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-heading font-semibold text-ink uppercase">
+                            Award Marks:
+                          </label>
                           <input
                             type="number"
                             step="0.5"
@@ -383,75 +431,108 @@ export const GradeAttemptPage: React.FC = () => {
                             onChange={(e) =>
                               handleGradeChange(ans.question_id, 'marks', e.target.value)
                             }
-                            className="border border-gray-300 px-2 py-1 w-20 text-sm"
                             disabled={qState.isSaving}
+                            className="w-20 rounded-card border border-border bg-surface px-3 py-1.5 text-sm font-bold text-ink text-center focus:border-forest focus:outline-none"
                           />
-                          <span className="text-xs text-gray-500">
-                            / {ans.max_marks}
+                          <span className="text-xs font-mono text-ink/50">
+                            / {ans.max_marks} max
                           </span>
-                        </label>
 
-                        <label className="flex items-center space-x-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={qState.isCorrect}
-                            onChange={(e) =>
-                              handleGradeChange(ans.question_id, 'isCorrect', e.target.checked)
-                            }
-                            disabled={qState.isSaving}
-                            className="h-4 w-4"
-                          />
-                          <span className="text-gray-700 font-medium">Mark as Correct</span>
-                        </label>
-
-                        <div className="flex items-center space-x-2 ml-auto">
-                          {isGraded && (
+                          {/* Fast Preset Buttons for Repetitive Speed */}
+                          <div className="flex items-center gap-1.5 pl-2 border-l border-border">
                             <button
                               type="button"
-                              onClick={() => handleToggleEdit(ans.question_id, false)}
-                              disabled={qState.isSaving}
-                              className="px-3 py-1 text-xs border border-gray-300 bg-white hover:bg-gray-100 disabled:opacity-50"
+                              onClick={() => handleQuickPreset(ans.question_id, ans.max_marks, 'zero')}
+                              className="px-2 py-1 text-[10px] font-mono rounded bg-surface border border-border text-ink hover:bg-surface-muted cursor-pointer"
+                              title="Set 0 marks"
                             >
-                              Cancel
+                              0
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleSaveGrade(ans)}
-                            disabled={qState.isSaving}
-                            className="px-4 py-1 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                          >
-                            {qState.isSaving ? 'Saving...' : 'Save Grade'}
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickPreset(ans.question_id, ans.max_marks, 'half')}
+                              className="px-2 py-1 text-[10px] font-mono rounded bg-surface border border-border text-ink hover:bg-surface-muted cursor-pointer"
+                              title="Set half marks"
+                            >
+                              ½
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickPreset(ans.question_id, ans.max_marks, 'full')}
+                              className="px-2 py-1 text-[10px] font-mono rounded bg-forest/10 border border-forest/30 text-forest font-bold hover:bg-forest/20 cursor-pointer"
+                              title="Set full marks"
+                            >
+                              Full ({ans.max_marks})
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Correct Toggle & Actions */}
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer text-xs font-heading font-medium text-ink">
+                            <input
+                              type="checkbox"
+                              checked={qState.isCorrect}
+                              onChange={(e) =>
+                                handleGradeChange(ans.question_id, 'isCorrect', e.target.checked)
+                              }
+                              disabled={qState.isSaving}
+                              className="rounded text-forest focus:ring-forest accent-forest"
+                            />
+                            <span>Mark Correct</span>
+                          </label>
+
+                          <div className="flex items-center gap-2">
+                            {isGraded && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleEdit(ans.question_id, false)}
+                                disabled={qState.isSaving}
+                                className="px-3 py-1.5 text-xs font-heading font-medium rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleSaveGrade(ans)}
+                              disabled={qState.isSaving}
+                              className="px-5 py-1.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                            >
+                              {qState.isSaving ? 'Saving...' : 'Save Grade'}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
                       {qState.error && (
-                        <p className="text-xs text-red-600">{qState.error}</p>
+                        <p className="text-xs text-ember font-medium pt-1">
+                          {qState.error}
+                        </p>
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between text-sm py-1">
-                      <div className="flex items-center space-x-3">
-                        <span className="font-semibold text-gray-800">
-                          Awarded: {ans.marks_awarded} / {ans.max_marks} pts
+                    <div className="flex items-center justify-between text-xs py-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono font-bold text-forest">
+                          Graded: {ans.marks_awarded} / {ans.max_marks} pts
                         </span>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded font-medium ${
-                            ans.is_correct
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
+                          className={`pill text-[10px] ${
+                            ans.is_correct ? 'pill-forest' : 'pill-ember'
                           }`}
                         >
-                          {ans.is_correct ? 'Correct' : 'Incorrect / Partial'}
+                          {ans.is_correct ? 'Correct' : 'Partial / Incorrect'}
                         </span>
                       </div>
+
                       <button
                         type="button"
                         onClick={() => handleToggleEdit(ans.question_id, true)}
-                        className="text-xs text-blue-600 underline hover:text-blue-800"
+                        className="font-heading font-semibold text-xs text-forest hover:underline cursor-pointer"
                       >
-                        Edit Grade
+                        Edit Grade ✎
                       </button>
                     </div>
                   )}
@@ -462,19 +543,20 @@ export const GradeAttemptPage: React.FC = () => {
         })}
       </div>
 
-      {/* Bottom Footer Actions */}
-      <div className="pt-4 border-t border-gray-300 flex justify-between items-center">
+      {/* ── FOOTER NAVIGATION ── */}
+      <div className="pt-6 border-t border-border flex items-center justify-between">
         <Link
           to={`/deliveries/${attempt.delivery}/results`}
-          className="border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          className="px-5 py-2.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors"
         >
-          &larr; Back to Results Roster
+          ← Return to Results Roster
         </Link>
+
         <Link
           to="/dashboard/teacher"
-          className="text-sm text-gray-600 underline hover:text-gray-800"
+          className="text-xs font-heading font-medium text-ink/60 hover:text-ink transition-colors"
         >
-          Return to Teacher Dashboard
+          Teacher Dashboard
         </Link>
       </div>
     </div>
