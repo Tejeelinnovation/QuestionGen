@@ -4,8 +4,15 @@ import { contentApi } from '../../api/content';
 import { papersApi, type SelectQuestionsConstraints } from '../../api/papers';
 import type { Paper, Topic } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { PaperConfigurePageTablet } from '../tablet/papers/PaperConfigurePageTablet';
 
 export const PaperConfigurePage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <PaperConfigurePageTablet />;
+  }
+
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const navigate = useNavigate();

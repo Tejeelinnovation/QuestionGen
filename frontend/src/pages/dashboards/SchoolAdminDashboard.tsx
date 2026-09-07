@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { SchoolAdminDashboardTablet } from '../tablet/dashboards/SchoolAdminDashboardTablet';
 import type { User } from '../../types';
 
 export const SchoolAdminDashboard: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <SchoolAdminDashboardTablet />;
+  }
+
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

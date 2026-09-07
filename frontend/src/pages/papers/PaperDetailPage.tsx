@@ -4,8 +4,15 @@ import { papersApi } from '../../api/papers';
 import { useAuth } from '../../auth/AuthContext';
 import type { Paper } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { PaperDetailPageTablet } from '../tablet/papers/PaperDetailPageTablet';
 
 export const PaperDetailPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <PaperDetailPageTablet />;
+  }
+
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const { hasCapability } = useAuth();

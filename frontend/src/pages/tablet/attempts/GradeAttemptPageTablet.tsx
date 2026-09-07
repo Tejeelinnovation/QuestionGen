@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { attemptsApi } from '../../api/attempts';
-import type { TeacherAttemptDetail, TeacherAttemptAnswerItem } from '../../types';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
-import { GradeAttemptPageTablet } from '../tablet/attempts/GradeAttemptPageTablet';
+import { attemptsApi } from '../../../api/attempts';
+import type { TeacherAttemptDetail, TeacherAttemptAnswerItem } from '../../../types';
 
 interface GradeFormState {
   marks: string;
@@ -13,12 +11,7 @@ interface GradeFormState {
   error: string | null;
 }
 
-export const GradeAttemptPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <GradeAttemptPageTablet />;
-  }
-
+export const GradeAttemptPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const attemptId = Number(id);
 
@@ -27,7 +20,6 @@ export const GradeAttemptPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
-  // Per-question form state indexed by question_id
   const [gradingState, setGradingState] = useState<Record<number, GradeFormState>>({});
 
   const fetchAttempt = async (showLoading = true) => {
@@ -37,7 +29,6 @@ export const GradeAttemptPage: React.FC = () => {
       const data = await attemptsApi.getTeacherAttemptDetail(attemptId);
       setAttempt(data);
 
-      // Initialize grading state for answers
       const initialMap: Record<number, GradeFormState> = {};
       data.answers.forEach((ans) => {
         const isGraded = ans.marks_awarded !== null;
@@ -147,7 +138,6 @@ export const GradeAttemptPage: React.FC = () => {
         is_correct: qState.isCorrect,
       });
 
-      // Update attempt in state with new score and status
       setAttempt((prev) => {
         if (!prev) return null;
         const updatedAnswers = prev.answers.map((a) => {
@@ -201,21 +191,21 @@ export const GradeAttemptPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
-        Opening grading desk for attempt #{attemptId}...
+      <div className="py-20 text-center text-ink/60 font-body text-base">
+        Opening tablet grading desk for attempt #{attemptId}...
       </div>
     );
   }
 
   if (errorMessage || !attempt) {
     return (
-      <div className="max-w-2xl mx-auto p-6 space-y-4 font-body">
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+      <div className="p-6 space-y-4 font-body">
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-5 text-sm font-medium">
           {errorMessage || 'Attempt record not found.'}
         </div>
         <Link
           to="/dashboard/teacher"
-          className="text-xs font-heading font-semibold text-forest hover:underline"
+          className="min-h-[48px] inline-flex items-center text-sm font-heading font-semibold text-forest hover:underline"
         >
           ← Return to Teacher Dashboard
         </Link>
@@ -227,32 +217,32 @@ export const GradeAttemptPage: React.FC = () => {
   const pendingCount = attempt.answers.filter((a) => a.marks_awarded === null).length;
 
   return (
-    <div className="max-w-4xl mx-auto pb-20 font-body space-y-8">
+    <div className="pb-24 font-body space-y-6">
       {/* ── TOP UTILITY NAVIGATION ── */}
-      <div className="flex items-center justify-between text-xs">
+      <div className="flex items-center justify-between text-xs sm:text-sm">
         <Link
           to={`/deliveries/${attempt.delivery}/results`}
-          className="font-heading font-semibold text-forest hover:underline flex items-center gap-1"
+          className="font-heading font-semibold text-forest hover:underline flex items-center gap-1.5 py-1"
         >
           ← Return to Results Roster
         </Link>
         <Link
           to="/dashboard/teacher"
-          className="font-heading font-medium text-ink/60 hover:text-ink transition-colors"
+          className="font-heading font-medium text-ink/60 hover:text-ink transition-colors py-1"
         >
           Teacher Studio
         </Link>
       </div>
 
-      {/* ── STICKY RUNNING SCORE & PROGRESS TICKER ── */}
-      <div className="sticky top-20 z-30 bg-surface/95 backdrop-blur-sm border border-border rounded-card p-5 shadow-float flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ── STICKY SCORE & PROGRESS TICKER (TABLET ADAPTED) ── */}
+      <div className="sticky top-16 z-30 bg-surface/95 backdrop-blur-md border border-border rounded-card p-5 shadow-float flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-heading font-bold text-base text-ink">
+          <div className="flex items-center gap-2.5">
+            <span className="font-heading font-bold text-base sm:text-lg text-ink">
               {attempt.paper_title || 'Question Paper'}
             </span>
             <span
-              className={`pill text-[10px] font-semibold ${
+              className={`pill text-[11px] font-semibold ${
                 isEvaluated ? 'pill-forest' : 'pill-grape'
               }`}
             >
@@ -269,7 +259,7 @@ export const GradeAttemptPage: React.FC = () => {
         <div className="flex items-center gap-6 self-end sm:self-auto border-t sm:border-t-0 sm:border-l border-border pt-2 sm:pt-0 sm:pl-6">
           <div>
             <div className="text-[10px] font-mono uppercase text-ink/50 mb-0.5">
-              Current Score Total
+              Current Score
             </div>
             <div className="flex items-baseline gap-1.5">
               <span className="font-heading font-bold text-2xl sm:text-3xl text-forest">
@@ -283,7 +273,7 @@ export const GradeAttemptPage: React.FC = () => {
 
           <div className="text-right">
             <div className="text-[10px] font-mono uppercase text-ink/50 mb-0.5">
-              Evaluation Progress
+              Pending Items
             </div>
             <span
               className={`pill text-xs font-semibold ${
@@ -298,24 +288,24 @@ export const GradeAttemptPage: React.FC = () => {
 
       {/* Notifications */}
       {successBanner && (
-        <div className="rounded-card border border-forest/30 bg-forest/10 text-forest p-4 text-xs font-semibold flex items-start gap-2">
-          <span className="font-bold text-sm">✓</span>
+        <div className="rounded-card border border-forest/30 bg-forest/10 text-forest p-4 text-xs sm:text-sm font-semibold flex items-center gap-2">
+          <span className="font-bold">✓</span>
           <span>{successBanner}</span>
         </div>
       )}
 
       {isEvaluated && (
-        <div className="rounded-card border border-forest/30 bg-forest/10 text-forest p-4 text-xs font-semibold flex items-center gap-2">
+        <div className="rounded-card border border-forest/30 bg-forest/10 text-forest p-4 text-xs sm:text-sm font-semibold flex items-center gap-2">
           <span>✓</span>
           <span>All candidate responses evaluated. This attempt is marked as <strong>EVALUATED</strong>.</span>
         </div>
       )}
 
-      {/* ── QUESTION RESPONSES & LOW-FRICTION GRADING CONTROLS ── */}
+      {/* ── QUESTION RESPONSES & TOUCH GRADING CONTROLS ── */}
       <div className="space-y-6">
         <div className="flex items-center justify-between border-b border-border/80 pb-2">
           <h2 className="font-heading font-bold text-xl text-ink">
-            Responses & Grading Rubric
+            Responses & Touch Grading Rubric
           </h2>
           <span className="font-mono text-xs text-ink/50">
             {attempt.answers.length} Total Questions
@@ -338,9 +328,7 @@ export const GradeAttemptPage: React.FC = () => {
             <div
               key={ans.question_id}
               className={`bg-surface border rounded-card p-6 shadow-card space-y-4 transition-all ${
-                isPending
-                  ? 'border-ember/40 bg-surface'
-                  : 'border-border'
+                isPending ? 'border-ember/40' : 'border-border'
               }`}
             >
               {/* Question Header */}
@@ -371,11 +359,11 @@ export const GradeAttemptPage: React.FC = () => {
               </div>
 
               {/* Question Prompt */}
-              <p className="font-body text-sm sm:text-base font-medium text-ink leading-relaxed">
+              <p className="font-body text-base font-medium text-ink leading-relaxed">
                 {ans.question_text}
               </p>
 
-              {/* ── VISUALLY DOMINANT: STUDENT'S SUBMITTED RESPONSE ── */}
+              {/* ── PRIMARY READING TARGET: STUDENT'S SUBMITTED RESPONSE ── */}
               <div className="bg-bg border-2 border-border/80 rounded-card p-5 space-y-2">
                 <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-ink/50">
                   <span>Student's Submitted Response</span>
@@ -383,7 +371,7 @@ export const GradeAttemptPage: React.FC = () => {
                 </div>
 
                 {ans.student_response ? (
-                  <div className="font-mono text-sm sm:text-base font-semibold text-ink whitespace-pre-wrap leading-relaxed">
+                  <div className="font-mono text-base font-semibold text-ink whitespace-pre-wrap leading-relaxed">
                     {ans.student_response}
                   </div>
                 ) : (
@@ -393,7 +381,7 @@ export const GradeAttemptPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Compact Reference Solution block */}
+              {/* Reference Solution */}
               {ans.correct_answer !== undefined && ans.correct_answer !== null && (
                 <div className="bg-forest/5 border border-forest/20 rounded-card p-3.5 text-xs text-forest space-y-1">
                   <span className="font-mono uppercase text-[10px] tracking-wider font-semibold block">
@@ -407,7 +395,7 @@ export const GradeAttemptPage: React.FC = () => {
                 </div>
               )}
 
-              {/* ── FAST, LOW-FRICTION GRADING CONTROLS ── */}
+              {/* ── TOUCH-OPTIMIZED GRADING CONTROLS ── */}
               {isObjective ? (
                 <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-ink/60 font-mono">
                   <span>Auto-evaluated Objective Question</span>
@@ -422,12 +410,13 @@ export const GradeAttemptPage: React.FC = () => {
               ) : (
                 <div className="pt-3 border-t border-border">
                   {qState.isEditing ? (
-                    <div className="bg-surface-muted border border-border rounded-card p-4 space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        {/* Marks Input & Quick Presets */}
-                        <div className="flex items-center gap-3">
+                    <div className="bg-surface-muted border border-border rounded-card p-4 sm:p-5 space-y-4">
+                      {/* Responsive / 2-column touch control row */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        {/* Marks Input & Touch Quick Presets */}
+                        <div className="flex flex-wrap items-center gap-3">
                           <label className="text-xs font-heading font-semibold text-ink uppercase">
-                            Award Marks:
+                            Award:
                           </label>
                           <input
                             type="number"
@@ -439,18 +428,18 @@ export const GradeAttemptPage: React.FC = () => {
                               handleGradeChange(ans.question_id, 'marks', e.target.value)
                             }
                             disabled={qState.isSaving}
-                            className="w-20 rounded-card border border-border bg-surface px-3 py-1.5 text-sm font-bold text-ink text-center focus:border-forest focus:outline-none"
+                            className="w-24 min-h-[44px] rounded-card border border-border bg-surface px-3 py-2 text-base font-bold text-ink text-center focus:border-forest focus:outline-none"
                           />
                           <span className="text-xs font-mono text-ink/50">
-                            / {ans.max_marks} max
+                            / {ans.max_marks} pts
                           </span>
 
-                          {/* Fast Preset Buttons for Repetitive Speed */}
-                          <div className="flex items-center gap-1.5 pl-2 border-l border-border">
+                          {/* Large Touch Quick Presets */}
+                          <div className="flex items-center gap-2 pl-2 border-l border-border">
                             <button
                               type="button"
                               onClick={() => handleQuickPreset(ans.question_id, ans.max_marks, 'zero')}
-                              className="px-2 py-1 text-[10px] font-mono rounded bg-surface border border-border text-ink hover:bg-surface-muted cursor-pointer"
+                              className="min-h-[44px] px-3.5 py-2 text-xs font-mono font-bold rounded-card bg-surface border border-border text-ink hover:bg-surface-muted active:scale-95 cursor-pointer"
                               title="Set 0 marks"
                             >
                               0
@@ -458,7 +447,7 @@ export const GradeAttemptPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleQuickPreset(ans.question_id, ans.max_marks, 'half')}
-                              className="px-2 py-1 text-[10px] font-mono rounded bg-surface border border-border text-ink hover:bg-surface-muted cursor-pointer"
+                              className="min-h-[44px] px-3.5 py-2 text-xs font-mono font-bold rounded-card bg-surface border border-border text-ink hover:bg-surface-muted active:scale-95 cursor-pointer"
                               title="Set half marks"
                             >
                               ½
@@ -466,7 +455,7 @@ export const GradeAttemptPage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleQuickPreset(ans.question_id, ans.max_marks, 'full')}
-                              className="px-2 py-1 text-[10px] font-mono rounded bg-forest/10 border border-forest/30 text-forest font-bold hover:bg-forest/20 cursor-pointer"
+                              className="min-h-[44px] px-4 py-2 text-xs font-mono rounded-card bg-forest/15 border border-forest/30 text-forest font-bold hover:bg-forest/25 active:scale-95 cursor-pointer"
                               title="Set full marks"
                             >
                               Full ({ans.max_marks})
@@ -474,9 +463,9 @@ export const GradeAttemptPage: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Correct Toggle & Actions */}
-                        <div className="flex items-center gap-4">
-                          <label className="flex items-center gap-2 cursor-pointer text-xs font-heading font-medium text-ink">
+                        {/* Checkbox & Save Actions */}
+                        <div className="flex items-center gap-4 self-end md:self-auto">
+                          <label className="min-h-[44px] flex items-center gap-2.5 cursor-pointer text-xs sm:text-sm font-heading font-medium text-ink px-2 select-none">
                             <input
                               type="checkbox"
                               checked={qState.isCorrect}
@@ -484,18 +473,18 @@ export const GradeAttemptPage: React.FC = () => {
                                 handleGradeChange(ans.question_id, 'isCorrect', e.target.checked)
                               }
                               disabled={qState.isSaving}
-                              className="rounded text-forest focus:ring-forest accent-forest"
+                              className="w-4 h-4 rounded text-forest focus:ring-forest accent-forest"
                             />
                             <span>Mark Correct</span>
                           </label>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5">
                             {isGraded && (
                               <button
                                 type="button"
                                 onClick={() => handleToggleEdit(ans.question_id, false)}
                                 disabled={qState.isSaving}
-                                className="px-3 py-1.5 text-xs font-heading font-medium rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+                                className="min-h-[44px] px-4 py-2 text-xs font-heading font-medium rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer active:scale-95"
                               >
                                 Cancel
                               </button>
@@ -505,7 +494,7 @@ export const GradeAttemptPage: React.FC = () => {
                               type="button"
                               onClick={() => handleSaveGrade(ans)}
                               disabled={qState.isSaving}
-                              className="px-5 py-1.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                              className="min-h-[44px] px-6 py-2 text-xs sm:text-sm font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 active:scale-95"
                             >
                               {qState.isSaving ? 'Saving...' : 'Save Grade'}
                             </button>
@@ -520,9 +509,9 @@ export const GradeAttemptPage: React.FC = () => {
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between text-xs py-1">
+                    <div className="flex items-center justify-between text-xs py-2">
                       <div className="flex items-center gap-3">
-                        <span className="font-mono font-bold text-forest">
+                        <span className="font-mono font-bold text-forest text-sm">
                           Graded: {ans.marks_awarded} / {ans.max_marks} pts
                         </span>
                         <span
@@ -537,7 +526,7 @@ export const GradeAttemptPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleToggleEdit(ans.question_id, true)}
-                        className="font-heading font-semibold text-xs text-forest hover:underline cursor-pointer"
+                        className="min-h-[40px] px-3 inline-flex items-center font-heading font-semibold text-xs text-forest hover:underline cursor-pointer"
                       >
                         Edit Grade ✎
                       </button>
@@ -554,14 +543,14 @@ export const GradeAttemptPage: React.FC = () => {
       <div className="pt-6 border-t border-border flex items-center justify-between">
         <Link
           to={`/deliveries/${attempt.delivery}/results`}
-          className="px-5 py-2.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors"
+          className="min-h-[44px] px-5 py-2.5 inline-flex items-center text-xs sm:text-sm font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors active:scale-95"
         >
           ← Return to Results Roster
         </Link>
 
         <Link
           to="/dashboard/teacher"
-          className="text-xs font-heading font-medium text-ink/60 hover:text-ink transition-colors"
+          className="min-h-[44px] px-4 inline-flex items-center text-xs sm:text-sm font-heading font-medium text-ink/60 hover:text-ink transition-colors"
         >
           Teacher Dashboard
         </Link>

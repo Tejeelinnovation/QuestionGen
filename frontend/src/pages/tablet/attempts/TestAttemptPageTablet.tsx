@@ -1,18 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { attemptsApi } from '../../api/attempts';
-import type { AttemptQuestionItem, AttemptStartResponse } from '../../types';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
-import { TestAttemptPageTablet } from '../tablet/attempts/TestAttemptPageTablet';
+import { attemptsApi } from '../../../api/attempts';
+import type { AttemptQuestionItem, AttemptStartResponse } from '../../../types';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-export const TestAttemptPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <TestAttemptPageTablet />;
-  }
-
+export const TestAttemptPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
   const navigate = useNavigate();
@@ -25,10 +18,8 @@ export const TestAttemptPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
 
-  // Debounce timers map
   const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
-  // Clean up timers on unmount
   useEffect(() => {
     return () => {
       Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
@@ -42,10 +33,8 @@ export const TestAttemptPage: React.FC = () => {
       try {
         const data = await attemptsApi.startOrResumeAttempt(deliveryId);
 
-        // Store attempt id mapping for quick navigation & double submit handling
         sessionStorage.setItem(`delivery_${deliveryId}_attempt`, String(data.attempt_id));
 
-        // If already submitted or evaluated, redirect straight to result
         if (data.status === 'SUBMITTED' || data.status === 'EVALUATED') {
           navigate(`/attempts/${data.attempt_id}/result`, { replace: true });
           return;
@@ -53,7 +42,6 @@ export const TestAttemptPage: React.FC = () => {
 
         setAttemptData(data);
 
-        // Initialize answers map from existing student_responses
         const initialAnswers: Record<number, string> = {};
         const initialStatuses: Record<number, SaveStatus> = {};
         data.questions.forEach((q) => {
@@ -63,7 +51,6 @@ export const TestAttemptPage: React.FC = () => {
         setAnswers(initialAnswers);
         setSaveStatuses(initialStatuses);
 
-        // Check if delivery available_until has already passed
         if (data.available_until && new Date() > new Date(data.available_until)) {
           setIsExpired(true);
         }
@@ -92,7 +79,6 @@ export const TestAttemptPage: React.FC = () => {
     }
   }, [deliveryId, navigate]);
 
-  // Actual API save function
   const performSave = useCallback(
     async (attemptId: number, questionId: number, responseText: string) => {
       setSaveStatuses((prev) => ({ ...prev, [questionId]: 'saving' }));
@@ -107,7 +93,6 @@ export const TestAttemptPage: React.FC = () => {
     []
   );
 
-  // Debounced handler for text inputs
   const handleTextChange = (questionId: number, value: string) => {
     if (isExpired || isSubmitting || !attemptData) return;
 
@@ -123,7 +108,6 @@ export const TestAttemptPage: React.FC = () => {
     }, 600);
   };
 
-  // Immediate handler for option select (MCQ)
   const handleOptionSelect = (questionId: number, optionKey: string) => {
     if (isExpired || isSubmitting || !attemptData) return;
 
@@ -165,24 +149,24 @@ export const TestAttemptPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
-        Preparing examination environment...
+      <div className="py-20 text-center text-ink/60 font-body text-base">
+        Preparing examination environment for tablet...
       </div>
     );
   }
 
   if (!attemptData) {
     return (
-      <div className="max-w-2xl mx-auto p-6 space-y-4 font-body">
+      <div className="p-6 space-y-5 font-body">
         {errorMessage && (
-          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-5 text-sm font-medium">
             {errorMessage}
           </div>
         )}
         <div>
           <Link
             to="/dashboard/student"
-            className="text-xs font-heading font-semibold text-forest hover:underline"
+            className="text-sm font-heading font-semibold text-forest hover:underline inline-flex items-center gap-1.5 py-2"
           >
             ← Return to Student Portal
           </Link>
@@ -196,64 +180,70 @@ export const TestAttemptPage: React.FC = () => {
   const isAllAnswered = answeredCount === totalQuestions && totalQuestions > 0;
 
   return (
-    <div className="max-w-3xl mx-auto pb-24 font-body space-y-8">
-      {/* ── CALM, RESTRAINED EXAMINATION HEADER ── */}
-      <div className="bg-surface border border-border rounded-card p-6 sm:p-8 shadow-card space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-border/70 pb-4">
-          <div className="space-y-1">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-ink/50 block">
-              Active Assessment Session
-            </span>
+    <div className="pb-32 font-body space-y-6">
+      {/* ── TABLET ASSESSMENT HERO (2-COLUMN BENTO) ── */}
+      <div className="bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+          <div className="md:col-span-8 space-y-2">
+            <div className="flex items-center gap-2.5">
+              <span className="font-mono text-[11px] uppercase tracking-widest text-ink/50 block">
+                Active Assessment Session
+              </span>
+              <span className="pill pill-forest text-xs font-semibold">
+                Version {attemptData.version_label}
+              </span>
+            </div>
             <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight">
               {attemptData.paper_title}
             </h1>
+            {attemptData.instructions && (
+              <p className="text-xs sm:text-sm text-ink/70 leading-relaxed pt-1 bg-bg p-3.5 rounded-card border border-border/60">
+                <span className="font-heading font-semibold text-ink block mb-0.5">
+                  Candidate Guidelines:
+                </span>
+                {attemptData.instructions}
+              </p>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="pill pill-forest text-[11px] font-semibold">
-              Version {attemptData.version_label}
-            </span>
-          </div>
-        </div>
+          <div className="md:col-span-4 bg-bg border border-border/70 rounded-card p-4 space-y-3">
+            <div>
+              <span className="text-[11px] font-mono text-ink/50 uppercase tracking-wider block">
+                Completion Progress
+              </span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="font-heading font-bold text-2xl text-ink">
+                  {answeredCount}
+                </span>
+                <span className="text-xs text-ink/40 font-mono">
+                  / {totalQuestions} answered
+                </span>
+              </div>
+            </div>
 
-        {attemptData.instructions && (
-          <div className="text-xs text-ink/70 leading-relaxed bg-bg p-3.5 rounded-card border border-border/60">
-            <span className="font-heading font-semibold text-ink block mb-0.5">
-              Candidate Guidelines:
-            </span>
-            {attemptData.instructions}
-          </div>
-        )}
-
-        {/* Understated typographic progress in header area (no loud progress bars) */}
-        <div className="flex items-center justify-between text-xs pt-1">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-ink/60">Answered:</span>
-            <span className="font-heading font-bold text-sm text-ink">
-              {answeredCount} of {totalQuestions}
-            </span>
-            <span className="text-ink/40 font-mono">questions completed</span>
-          </div>
-
-          <div className="font-mono text-xs text-ink/70">
-            Total Value: <span className="font-bold text-forest">{attemptData.total_marks} Marks</span>
+            <div className="pt-2 border-t border-border/60 flex items-center justify-between">
+              <span className="text-xs font-mono text-ink/60">Exam Value:</span>
+              <span className="font-mono text-xs font-bold text-forest">
+                {attemptData.total_marks} Marks
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
       {isExpired && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
           The scheduled submission window for this assessment has closed. Further changes and answers are disabled.
         </div>
       )}
 
       {errorMessage && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
           {errorMessage}
         </div>
       )}
 
-      {/* ── QUESTIONS STREAM (GENEROUS WHITESPACE, UNAMBIGUOUS INPUTS) ── */}
+      {/* ── QUESTIONS STREAM (TOUCH-OPTIMIZED, SPACIOUS TARGETS) ── */}
       <div className="space-y-6">
         {attemptData.questions.map((q: AttemptQuestionItem, idx: number) => {
           const currentAnswer = answers[q.question_id] || '';
@@ -262,55 +252,55 @@ export const TestAttemptPage: React.FC = () => {
           return (
             <div
               key={q.question_id}
-              className="bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card space-y-4 transition-all"
+              className="bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card space-y-5 transition-all"
             >
-              {/* Question Header Bar with subtle peripheral auto-save indicator */}
-              <div className="flex items-center justify-between border-b border-border/70 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="font-mono font-bold text-xs bg-bg border border-border px-2.5 py-1 rounded-sm text-ink">
+              {/* Question Header */}
+              <div className="flex items-center justify-between border-b border-border/70 pb-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-bold text-sm bg-bg border border-border px-3 py-1 rounded-sm text-ink">
                     Q{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
                   </span>
-                  <span className="pill pill-muted text-[10px]">
+                  <span className="pill pill-muted text-xs">
                     {q.question_type}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  {/* Subtle, peripheral auto-save feedback at top-right */}
-                  <div className="text-[11px] font-mono">
+                <div className="flex items-center gap-4">
+                  {/* Auto-save status */}
+                  <div className="text-xs font-mono">
                     {saveStatus === 'saving' && (
-                      <span className="text-ink/50 animate-pulse flex items-center gap-1">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-forest animate-ping" />
+                      <span className="text-ink/50 animate-pulse flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-full bg-forest animate-ping" />
                         Saving...
                       </span>
                     )}
                     {saveStatus === 'saved' && (
-                      <span className="text-forest font-medium flex items-center gap-1">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-forest" />
+                      <span className="text-forest font-medium flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-full bg-forest" />
                         Saved
                       </span>
                     )}
                     {saveStatus === 'error' && (
-                      <span className="text-ember font-medium flex items-center gap-1">
+                      <span className="text-ember font-medium flex items-center gap-1.5">
                         ! Save error
                       </span>
                     )}
                   </div>
 
-                  <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-pill">
+                  <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-3 py-1 rounded-pill">
                     {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
                   </span>
                 </div>
               </div>
 
-              {/* Question Text */}
-              <p className="font-body text-base font-medium text-ink leading-relaxed">
+              {/* Question Body */}
+              <p className="font-body text-base sm:text-lg font-medium text-ink leading-relaxed">
                 {q.question_text}
               </p>
 
-              {/* MCQ Options: Large, clearly clickable tactile blocks with FOREST fill on selected state */}
+              {/* MCQ Options: Minimum 56px touch target, tactile feedback on touch */}
               {q.question_type === 'MCQ' && q.options && (
-                <div className="space-y-2.5 pt-2">
+                <div className="space-y-3 pt-1">
                   {Object.entries(q.options).map(([key, label]) => {
                     const isSelected = currentAnswer.trim().toUpperCase() === key.trim().toUpperCase();
 
@@ -318,13 +308,12 @@ export const TestAttemptPage: React.FC = () => {
                       <div
                         key={key}
                         onClick={() => !isExpired && !isSubmitting && handleOptionSelect(q.question_id, key)}
-                        className={`p-4 rounded-card border-2 transition-all cursor-pointer flex items-center gap-3.5 ${
+                        className={`min-h-[56px] p-4 sm:p-5 rounded-card border-2 transition-all cursor-pointer flex items-center gap-4 active:scale-[0.99] select-none ${
                           isSelected
                             ? 'bg-forest text-white border-forest shadow-sm'
-                            : 'bg-bg text-ink border-border hover:bg-surface-muted hover:border-border-strong'
+                            : 'bg-bg text-ink border-border hover:border-border-strong active:bg-surface-muted'
                         }`}
                       >
-                        {/* Hidden accessible radio */}
                         <input
                           type="radio"
                           name={`q_${q.question_id}`}
@@ -335,9 +324,9 @@ export const TestAttemptPage: React.FC = () => {
                           className="sr-only"
                         />
 
-                        {/* Distinct Key Indicator */}
+                        {/* Large Touch Key Indicator */}
                         <div
-                          className={`w-7 h-7 rounded-full flex items-center justify-center font-mono font-bold text-xs shrink-0 transition-colors ${
+                          className={`w-9 h-9 rounded-full flex items-center justify-center font-mono font-bold text-sm shrink-0 transition-colors ${
                             isSelected
                               ? 'bg-white text-forest'
                               : 'bg-surface border border-border text-ink'
@@ -347,12 +336,12 @@ export const TestAttemptPage: React.FC = () => {
                         </div>
 
                         {/* Option text */}
-                        <span className="text-sm font-medium leading-normal flex-1">
+                        <span className="text-sm sm:text-base font-medium leading-normal flex-1">
                           {label}
                         </span>
 
                         {isSelected && (
-                          <span className="font-mono text-xs font-bold text-lime shrink-0">
+                          <span className="font-mono text-xs font-bold text-lime shrink-0 px-2 py-1 bg-white/10 rounded">
                             ✓ Selected
                           </span>
                         )}
@@ -364,28 +353,28 @@ export const TestAttemptPage: React.FC = () => {
 
               {/* SHORT_ANSWER Input */}
               {q.question_type === 'SHORT_ANSWER' && (
-                <div className="pt-2">
+                <div className="pt-1">
                   <input
                     type="text"
                     value={currentAnswer}
                     onChange={(e) => handleTextChange(q.question_id, e.target.value)}
                     disabled={isExpired || isSubmitting}
-                    placeholder="Type your answer response here..."
-                    className="w-full rounded-card border border-border bg-bg px-4 py-3 text-sm text-ink placeholder:text-ink/40 focus:bg-surface focus:border-forest focus:outline-none transition-colors"
+                    placeholder="Tap to enter your answer..."
+                    className="w-full min-h-[52px] rounded-card border border-border bg-bg px-4 py-3.5 text-base text-ink placeholder:text-ink/40 focus:bg-surface focus:border-forest focus:outline-none transition-colors"
                   />
                 </div>
               )}
 
               {/* LONG_ANSWER Textarea */}
               {q.question_type === 'LONG_ANSWER' && (
-                <div className="pt-2">
+                <div className="pt-1">
                   <textarea
-                    rows={5}
+                    rows={6}
                     value={currentAnswer}
                     onChange={(e) => handleTextChange(q.question_id, e.target.value)}
                     disabled={isExpired || isSubmitting}
                     placeholder="Provide your complete analytical explanation and solution steps here..."
-                    className="w-full rounded-card border border-border bg-bg px-4 py-3 text-sm text-ink placeholder:text-ink/40 focus:bg-surface focus:border-forest focus:outline-none transition-colors leading-relaxed"
+                    className="w-full min-h-[160px] rounded-card border border-border bg-bg p-4 text-base text-ink placeholder:text-ink/40 focus:bg-surface focus:border-forest focus:outline-none transition-colors leading-relaxed"
                   />
                 </div>
               )}
@@ -394,35 +383,34 @@ export const TestAttemptPage: React.FC = () => {
         })}
       </div>
 
-      {/* ── WEIGHTY COMMITTED SUBMIT ACTION STRIP (STICKY BOTTOM) ── */}
-      <div className="sticky bottom-4 z-30 bg-surface/95 backdrop-blur-sm border border-border rounded-card p-4 sm:p-5 shadow-float flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ── STICKY COMMITTED SUBMIT ACTION STRIP (TABLET SPECIFIC) ── */}
+      <div className="sticky bottom-6 z-30 bg-surface/95 backdrop-blur-md border border-border rounded-card p-4 sm:p-5 shadow-float flex items-center justify-between gap-4">
         <Link
           to="/dashboard/student"
-          className="text-xs font-heading font-semibold text-ink/60 hover:text-ink transition-colors self-start sm:self-auto"
+          className="min-h-[48px] px-4 inline-flex items-center text-xs sm:text-sm font-heading font-semibold text-ink/70 hover:text-ink transition-colors"
         >
-          ← Pause & Return to Portal
+          ← Pause Test
         </Link>
 
-        <div className="flex items-center gap-4 self-end sm:self-auto">
-          <div className="text-right">
+        <div className="flex items-center gap-5">
+          <div className="text-right hidden sm:block">
             <span className="text-xs font-mono text-ink/70 block">
               {isAllAnswered ? (
-                <span className="text-forest font-bold">All {totalQuestions} Questions Answered</span>
+                <span className="text-forest font-bold">All {totalQuestions} Answered</span>
               ) : (
                 <span>{totalQuestions - answeredCount} question(s) uncompleted</span>
               )}
             </span>
-            <span className="text-[10px] text-ink/40 block">Answers auto-saved to cloud</span>
+            <span className="text-[10px] text-ink/40 block">Cloud auto-saved</span>
           </div>
 
-          {/* Heavy, high-contrast committed submit button */}
           <button
             onClick={handleSubmit}
             id="submit-test-btn"
             disabled={isSubmitting || isExpired}
-            className="px-7 py-3 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+            className="min-h-[48px] px-8 py-3 text-sm font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2 active:scale-95"
           >
-            <span>{isSubmitting ? 'Submitting Assessment...' : 'Submit Final Test'}</span>
+            <span>{isSubmitting ? 'Submitting...' : 'Submit Final Test'}</span>
             <span>✓</span>
           </button>
         </div>

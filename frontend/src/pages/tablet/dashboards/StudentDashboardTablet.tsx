@@ -1,17 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { deliveriesApi } from '../../api/deliveries';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
-import { StudentDashboardTablet } from '../tablet/dashboards/StudentDashboardTablet';
-import { AnimatedCard } from '../../components/ui/animated-card';
-import type { Delivery } from '../../types';
+import { deliveriesApi } from '../../../api/deliveries';
+import type { Delivery } from '../../../types';
 
-export const StudentDashboard: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <StudentDashboardTablet />;
-  }
-
+export const StudentDashboardTablet: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -42,89 +34,86 @@ export const StudentDashboard: React.FC = () => {
   const pendingCount = deliveries.length - completedCount;
 
   return (
-    <div className="space-y-10">
-      {/* ── Top Typographic Headline with embedded stats ── */}
-      <div className="border-b border-border pb-6 space-y-2">
+    <div className="space-y-8 font-body">
+      {/* ── Top Header ── */}
+      <div className="border-b border-border pb-5 space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
           <span className="w-2 h-2 rounded-full bg-forest" />
-          Student Testing Portal
+          Student Testing Portal • Tablet
         </div>
-        <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+        <h1 className="font-heading font-bold text-3xl text-ink tracking-tight">
           Assigned Assessments Desk
         </h1>
-        <p className="font-body text-ink/75 text-base max-w-2xl leading-relaxed">
+        <p className="text-sm text-ink/75 leading-relaxed">
           You currently have{' '}
-          <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
-            {pendingCount} test{pendingCount === 1 ? '' : 's'} ready for examination
+          <span className="font-heading font-bold text-forest underline decoration-forest/40">
+            {pendingCount} test{pendingCount === 1 ? '' : 's'} ready
           </span>{' '}
           and{' '}
-          <span className="font-heading font-bold text-grape text-lg underline decoration-grape/40 underline-offset-2">
+          <span className="font-heading font-bold text-grape underline decoration-grape/40">
             {completedCount} submitted attempt{completedCount === 1 ? '' : 's'}
           </span>.
         </p>
       </div>
 
       {isLoading && (
-        <div className="p-10 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium">
+        <div className="p-8 text-center bg-surface border border-border rounded-card text-ink/60 text-sm">
           Loading assigned assessments...
         </div>
       )}
 
       {errorMessage && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
           {errorMessage}
         </div>
       )}
 
       {!isLoading && !errorMessage && deliveries.length === 0 && (
-        <div className="bg-surface border-2 border-dashed border-border rounded-lg p-12 text-center space-y-3">
+        <div className="bg-surface border-2 border-dashed border-border rounded-card p-10 text-center space-y-3">
           <span className="pill pill-forest text-xs">Queue Clear</span>
-          <h3 className="font-heading font-bold text-xl text-ink">No Assessments Assigned</h3>
+          <h3 className="font-heading font-bold text-lg text-ink">No Assessments Assigned</h3>
           <p className="text-xs text-ink/70 max-w-md mx-auto">
-            When your instructors schedule an online or proctored test session, it will appear right here with full access controls.
+            When your instructors schedule an online or proctored test session, it will appear here.
           </p>
         </div>
       )}
 
       {!isLoading && !errorMessage && deliveries.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-heading font-bold text-xl text-ink">
               Available Test Deliveries
             </h2>
-            <span className="font-mono text-xs text-ink/60 bg-surface px-3 py-1 rounded-pill border border-border">
-              {deliveries.length} Total Deliveries
+            <span className="pill pill-forest text-xs font-mono">
+              {deliveries.length} Deliveries
             </span>
           </div>
 
-          {/* Staggered AnimatedCards for deliveries (Requirements: status as colored badges grape/forest/ember) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {deliveries.map((d, index) => {
+          {/* ── 2-Column Bento Reflow for Delivery Cards ── */}
+          <div className="grid grid-cols-2 gap-4">
+            {deliveries.map((d) => {
               const cachedAttemptId = sessionStorage.getItem(`delivery_${d.id}_attempt`);
 
-              // Status badges: Forest for submitted/completed, Ember for active/window expiring, Grape for assigned/ready
               const statusPill = cachedAttemptId ? (
-                <span className="pill pill-forest">
+                <span className="pill pill-forest text-[10px]">
                   ✓ Submitted
                 </span>
               ) : d.mode === 'ONLINE' ? (
-                <span className="pill pill-grape">
+                <span className="pill pill-grape text-[10px]">
                   Ready to Attempt
                 </span>
               ) : (
-                <span className="pill pill-ember">
+                <span className="pill pill-ember text-[10px]">
                   In-Person / Print
                 </span>
               );
 
               return (
-                <AnimatedCard
+                <div
                   key={d.id}
-                  staggerIndex={index}
-                  hoverAccent={cachedAttemptId ? 'forest' : 'ember'}
-                  className="p-6 flex flex-col justify-between min-h-[250px] shadow-card border border-border"
+                  className="bg-surface border border-border rounded-card p-5 shadow-card active:scale-[0.99] transition-transform flex flex-col justify-between space-y-4"
                 >
-                  <div className="space-y-3.5">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-mono text-xs text-ink/50">
                         Delivery #{d.id}
@@ -137,23 +126,21 @@ export const StudentDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <h3 className="font-heading font-bold text-xl text-ink leading-snug">
+                    <h3 className="font-heading font-bold text-lg text-ink leading-snug line-clamp-2">
                       {d.paper_title || `Delivery Session #${d.id}`}
                     </h3>
 
-                    <div className="text-xs text-ink/65 space-y-1 pt-1">
-                      <div className="font-mono text-[11px] text-ink/70">
-                        {d.available_from ? new Date(d.available_from).toLocaleDateString() : 'Now'}
-                        {' — '}
-                        {d.available_until ? new Date(d.available_until).toLocaleDateString() : 'No deadline'}
-                      </div>
+                    <div className="text-xs text-ink/65 font-mono">
+                      {d.available_from ? new Date(d.available_from).toLocaleDateString() : 'Now'}
+                      {' — '}
+                      {d.available_until ? new Date(d.available_until).toLocaleDateString() : 'No deadline'}
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-4 border-t border-border/70 flex flex-wrap items-center gap-2">
+                  <div className="pt-3 border-t border-border flex flex-wrap items-center gap-2">
                     <Link
                       to={`/deliveries/${d.id}/attempt`}
-                      className={`px-4 py-2 rounded-pill font-heading font-semibold text-xs transition-all ${
+                      className={`px-4 py-2.5 rounded-pill font-heading font-semibold text-xs transition-all min-h-[44px] flex items-center justify-center ${
                         cachedAttemptId
                           ? 'bg-surface-muted text-ink hover:bg-ink hover:text-white border border-border'
                           : 'bg-forest text-white hover:bg-forest/90 shadow-sm'
@@ -165,30 +152,29 @@ export const StudentDashboard: React.FC = () => {
                     {cachedAttemptId && (
                       <Link
                         to={`/attempts/${cachedAttemptId}/result`}
-                        className="px-4 py-2 rounded-pill bg-grape text-white font-heading font-semibold text-xs hover:bg-grape/90 transition-all shadow-sm"
+                        className="px-4 py-2.5 rounded-pill bg-grape text-white font-heading font-semibold text-xs hover:bg-grape/90 transition-all shadow-sm min-h-[44px] flex items-center justify-center"
                       >
                         View Result
                       </Link>
                     )}
                   </div>
-                </AnimatedCard>
+                </div>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* ── Asymmetric Bottom Review Panel ── */}
-      <section className="bg-surface border border-border rounded-lg p-6 sm:p-8 shadow-card space-y-3">
+      {/* Academic Records Card */}
+      <section className="bg-surface border border-border rounded-card p-6 shadow-card space-y-2">
         <div className="flex items-center gap-2">
           <span className="pill pill-forest text-[10px]">Academic Records</span>
-          <h2 className="font-heading font-bold text-lg text-ink">
-            Assessment Results & Review Archive
+          <h2 className="font-heading font-bold text-base text-ink">
+            Assessment Results Archive
           </h2>
         </div>
-        <p className="text-xs sm:text-sm text-ink/75 leading-relaxed max-w-3xl">
-          Individual evaluation reports and scoring feedback are issued immediately upon online test submission.
-          Historical score cards, answer sheet reviews, and class performance distribution will expand automatically as you complete scheduled terms.
+        <p className="text-xs text-ink/70 leading-relaxed">
+          Individual evaluation reports and scoring feedback are issued immediately upon online test submission. Historical cards expand as you complete scheduled terms.
         </p>
       </section>
     </div>

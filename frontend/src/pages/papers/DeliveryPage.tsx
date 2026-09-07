@@ -4,8 +4,15 @@ import { papersApi } from '../../api/papers';
 import { usersApi } from '../../api/users';
 import type { Delivery, PaperVersion, User } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { DeliveryPageTablet } from '../tablet/papers/DeliveryPageTablet';
 
 export const DeliveryPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <DeliveryPageTablet />;
+  }
+
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);

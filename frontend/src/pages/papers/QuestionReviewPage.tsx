@@ -3,8 +3,15 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { papersApi } from '../../api/papers';
 import type { QuestionPreview, Paper } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { QuestionReviewPageTablet } from '../tablet/papers/QuestionReviewPageTablet';
 
 export const QuestionReviewPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <QuestionReviewPageTablet />;
+  }
+
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const navigate = useNavigate();

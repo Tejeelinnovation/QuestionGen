@@ -4,6 +4,8 @@ import { contentApi } from '../../api/content';
 import { papersApi } from '../../api/papers';
 import type { Chapter } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { PaperSetupPageTablet } from '../tablet/papers/PaperSetupPageTablet';
 import {
   Select,
   SelectContent,
@@ -13,6 +15,11 @@ import {
 } from '../../components/ui/select';
 
 export const PaperSetupPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <PaperSetupPageTablet />;
+  }
+
   const navigate = useNavigate();
 
   const [chapters, setChapters] = useState<Chapter[]>([]);

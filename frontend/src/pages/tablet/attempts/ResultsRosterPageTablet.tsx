@@ -1,16 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { attemptsApi } from '../../api/attempts';
-import type { DeliveryResultsRoster } from '../../types';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
-import { ResultsRosterPageTablet } from '../tablet/attempts/ResultsRosterPageTablet';
+import { attemptsApi } from '../../../api/attempts';
+import type { DeliveryResultsRoster } from '../../../types';
 
-export const ResultsRosterPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <ResultsRosterPageTablet />;
-  }
-
+export const ResultsRosterPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
 
@@ -41,23 +34,23 @@ export const ResultsRosterPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
-        Loading delivery results roster...
+      <div className="py-20 text-center text-ink/60 font-body text-base">
+        Loading delivery results roster for tablet...
       </div>
     );
   }
 
   if (errorMessage || !roster) {
     return (
-      <div className="max-w-2xl mx-auto p-6 space-y-4 font-body">
+      <div className="p-6 space-y-4 font-body">
         {errorMessage && (
-          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-5 text-sm font-medium">
             {errorMessage}
           </div>
         )}
         <Link
           to="/dashboard/teacher"
-          className="text-xs font-heading font-semibold text-forest hover:underline"
+          className="min-h-[48px] inline-flex items-center text-sm font-heading font-semibold text-forest hover:underline"
         >
           ← Return to Teacher Dashboard
         </Link>
@@ -79,15 +72,15 @@ export const ResultsRosterPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto pb-16 font-body space-y-8">
-      {/* ── HEADER ── */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-4">
+    <div className="pb-20 font-body space-y-6">
+      {/* ── TABLET HEADER ── */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-4">
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
             <span className="w-2 h-2 rounded-full bg-forest" />
             Delivery Results Assessment Hub
           </div>
-          <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+          <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight">
             {roster.paper_title}
           </h1>
           <div className="flex items-center gap-3 text-xs text-ink/65 font-mono">
@@ -99,25 +92,25 @@ export const ResultsRosterPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-end md:self-auto">
+        <div className="flex items-center gap-3">
           <button
             onClick={fetchRoster}
             disabled={isLoading}
-            className="px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer disabled:opacity-50"
+            className="min-h-[44px] px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer disabled:opacity-50 active:scale-95"
           >
             Refresh Roster ↻
           </button>
           <Link
             to="/dashboard/teacher"
-            className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-surface-muted border border-border text-ink hover:bg-ink hover:text-white transition-colors"
+            className="min-h-[44px] px-5 py-2 inline-flex items-center text-xs font-heading font-semibold rounded-pill bg-surface-muted border border-border text-ink hover:bg-ink hover:text-white transition-colors active:scale-95"
           >
             ← Teacher Studio
           </Link>
         </div>
       </div>
 
-      {/* ── ASYMMETRIC METRIC TILES ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── 2-COLUMN BENTO METRICS REFLOW ── */}
+      <div className="grid grid-cols-2 gap-4">
         <div className="bg-surface border border-border rounded-card p-5 shadow-card">
           <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
             Assigned Candidates
@@ -155,7 +148,7 @@ export const ResultsRosterPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── STACKED CANDIDATE ATTEMPT CARDS (Ref: 09_blog_cards.jpg) ── */}
+      {/* ── CANDIDATE EXAMINATION ROSTER (TABLET TOUCH CARDS) ── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-border/80 pb-3">
           <div>
@@ -171,9 +164,8 @@ export const ResultsRosterPage: React.FC = () => {
           </span>
         </div>
 
-        <div className="space-y-3">
-          {roster.attempts.map((a, idx) => {
-            const delayMs = idx * 45;
+        <div className="space-y-3.5">
+          {roster.attempts.map((a) => {
             const isEvaluated = a.status === 'EVALUATED';
             const isSubmitted = a.status === 'SUBMITTED';
             const initials = a.student_username.slice(0, 2).toUpperCase();
@@ -181,13 +173,11 @@ export const ResultsRosterPage: React.FC = () => {
             return (
               <div
                 key={a.attempt_id}
-                style={{ animationDelay: `${delayMs}ms` }}
-                className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-0.5 hover:border-forest transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                className="bg-surface border border-border rounded-card p-5 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 active:border-forest/70 transition-all"
               >
-                {/* Student Info & Visual Status Anchor */}
+                {/* Student Info */}
                 <div className="flex items-center gap-4">
-                  {/* Initials badge */}
-                  <div className="w-10 h-10 rounded-full bg-bg border border-border flex items-center justify-center font-heading font-bold text-xs text-ink shrink-0">
+                  <div className="w-11 h-11 rounded-full bg-bg border border-border flex items-center justify-center font-heading font-bold text-sm text-ink shrink-0">
                     {initials}
                   </div>
 
@@ -196,7 +186,6 @@ export const ResultsRosterPage: React.FC = () => {
                       <span className="font-heading font-bold text-base text-ink">
                         {a.student_username}
                       </span>
-                      {/* Consistent Status Badge as Visual Anchor */}
                       {getStatusBadge(a.status)}
                     </div>
 
@@ -205,22 +194,24 @@ export const ResultsRosterPage: React.FC = () => {
                       <span>•</span>
                       <span>
                         {a.submitted_at
-                          ? `Submitted ${new Date(a.submitted_at).toLocaleString()}`
-                          : 'In progress / unsubmitted'}
+                          ? `Submitted ${new Date(a.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                          : 'In progress'}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Score & Action Cluster */}
-                <div className="flex items-center gap-6 self-end sm:self-auto">
-                  <div className="text-right">
+                <div className="flex items-center gap-5 justify-between sm:justify-end border-t sm:border-t-0 border-border/70 pt-3 sm:pt-0">
+                  <div className="text-left sm:text-right">
                     <div className="text-[10px] font-mono uppercase text-ink/40">
                       Score Awarded
                     </div>
                     <div className="font-heading font-bold text-lg text-ink">
                       {a.score !== null && a.score !== undefined ? (
-                        <span className="text-forest">{a.score} <span className="text-xs font-normal text-ink/50">/ {a.max_score}</span></span>
+                        <span className="text-forest">
+                          {a.score} <span className="text-xs font-normal text-ink/50">/ {a.max_score}</span>
+                        </span>
                       ) : (
                         <span className="text-ink/40 font-mono text-sm">— / {a.max_score}</span>
                       )}
@@ -230,15 +221,15 @@ export const ResultsRosterPage: React.FC = () => {
                   <Link
                     to={`/attempts/${a.attempt_id}/grade`}
                     id={`grade-attempt-${a.attempt_id}-link`}
-                    className={`px-5 py-2.5 text-xs font-heading font-semibold rounded-pill transition-all shadow-sm flex items-center gap-2 ${
+                    className={`min-h-[48px] px-6 py-2.5 text-xs font-heading font-semibold rounded-pill transition-all shadow-sm inline-flex items-center gap-2 active:scale-95 ${
                       isSubmitted
                         ? 'bg-forest text-white hover:bg-forest/90'
                         : isEvaluated
-                        ? 'bg-surface-muted border border-border text-ink hover:bg-forest hover:text-white hover:border-forest'
+                        ? 'bg-surface-muted border border-border text-ink hover:bg-forest hover:text-white'
                         : 'bg-bg border border-border text-ink/70 hover:text-ink'
                     }`}
                   >
-                    <span>{isEvaluated ? 'Review / Edit Grade' : 'Grade Attempt'}</span>
+                    <span>{isEvaluated ? 'Review Grade' : 'Grade Attempt'}</span>
                     <span>→</span>
                   </Link>
                 </div>

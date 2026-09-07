@@ -2,9 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { papersApi } from '../../api/papers';
 import { usersApi } from '../../api/users';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { TeacherDashboardTablet } from '../tablet/dashboards/TeacherDashboardTablet';
 import type { Paper, User, Delivery } from '../../types';
 
 export const TeacherDashboard: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <TeacherDashboardTablet />;
+  }
+
   const [papers, setPapers] = useState<Paper[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [students, setStudents] = useState<User[]>([]);

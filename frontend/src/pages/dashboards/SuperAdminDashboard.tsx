@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { SuperAdminDashboardTablet } from '../tablet/dashboards/SuperAdminDashboardTablet';
 import type { User } from '../../types';
 
 export const SuperAdminDashboard: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <SuperAdminDashboardTablet />;
+  }
+
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

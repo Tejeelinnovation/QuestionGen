@@ -2,8 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../api/papers';
 import type { PaperPrintData } from '../../types';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { PrintViewPageTablet } from '../tablet/papers/PrintViewPageTablet';
 
 export const PrintViewPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'tablet') {
+    return <PrintViewPageTablet />;
+  }
+
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);

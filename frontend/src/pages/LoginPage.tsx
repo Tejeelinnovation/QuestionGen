@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { LoginPageTablet } from './tablet/LoginPageTablet';
 
 export const LoginPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
   const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,6 +61,10 @@ export const LoginPage: React.FC = () => {
     setPassword(pass);
     setErrorMessage(null);
   };
+
+  if (breakpoint === 'tablet') {
+    return <LoginPageTablet />;
+  }
 
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col justify-between selection:bg-lime selection:text-ink">

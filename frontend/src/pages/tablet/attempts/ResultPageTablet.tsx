@@ -1,16 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { attemptsApi } from '../../api/attempts';
-import type { StudentAttemptResult } from '../../types';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
-import { ResultPageTablet } from '../tablet/attempts/ResultPageTablet';
+import { attemptsApi } from '../../../api/attempts';
+import type { StudentAttemptResult } from '../../../types';
 
-export const ResultPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <ResultPageTablet />;
-  }
-
+export const ResultPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const attemptId = Number(id);
 
@@ -41,23 +34,23 @@ export const ResultPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-3xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
-        Compiling assessment evaluation report...
+      <div className="py-20 text-center text-ink/60 font-body text-base">
+        Compiling assessment evaluation report for tablet...
       </div>
     );
   }
 
   if (errorMessage || !result) {
     return (
-      <div className="max-w-2xl mx-auto p-6 space-y-4 font-body">
+      <div className="p-6 space-y-4 font-body">
         {errorMessage && (
-          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-5 text-sm font-medium">
             {errorMessage}
           </div>
         )}
         <Link
           to="/dashboard/student"
-          className="text-xs font-heading font-semibold text-forest hover:underline"
+          className="min-h-[48px] inline-flex items-center text-sm font-heading font-semibold text-forest hover:underline"
         >
           ← Return to Student Portal
         </Link>
@@ -73,15 +66,15 @@ export const ResultPage: React.FC = () => {
   const pendingQuestionsCount = result.answers?.filter((a) => a.pending_manual_review).length || 0;
 
   return (
-    <div className="max-w-3xl mx-auto pb-16 font-body space-y-8">
-      {/* ── HEADER NAVIGATION ── */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 border-b border-border pb-4">
+    <div className="pb-20 font-body space-y-6">
+      {/* ── TABLET HEADER ── */}
+      <div className="flex items-center justify-between border-b border-border pb-4">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
             <span className="w-2 h-2 rounded-full bg-forest" />
             Evaluation Report • Attempt #{result.id}
           </div>
-          <h1 className="font-heading font-bold text-3xl text-ink tracking-tight">
+          <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight">
             {result.paper_title || `Assessment #${result.id}`}
           </h1>
           <p className="text-xs text-ink/60 font-mono">
@@ -91,36 +84,37 @@ export const ResultPage: React.FC = () => {
 
         <Link
           to="/dashboard/student"
-          className="text-xs font-heading font-semibold text-ink/70 hover:text-ink px-4 py-2 rounded-pill border border-border bg-surface hover:bg-surface-muted transition-colors self-start sm:self-auto"
+          className="min-h-[44px] px-5 inline-flex items-center text-xs sm:text-sm font-heading font-semibold text-ink/80 hover:text-ink rounded-pill border border-border bg-surface hover:bg-surface-muted transition-colors active:scale-95"
         >
           ← Student Portal
         </Link>
       </div>
 
-      {/* ── INFORMATIONAL PENDING REVIEW BANNER (NON-ALARMING GRAPE ACCENT) ── */}
+      {/* ── PENDING REVIEW BANNER (NON-ALARMING GRAPE) ── */}
       {(isSubmitted || pendingQuestionsCount > 0) && (
         <div
           id="pending-review-banner"
-          className="rounded-card border border-grape/30 bg-grape/10 p-5 text-ink space-y-1 shadow-card animate-card-enter"
+          className="rounded-card border border-grape/30 bg-grape/10 p-5 text-ink space-y-1.5 shadow-card animate-card-enter"
         >
           <div className="flex items-center gap-2">
-            <span className="pill pill-grape text-[10px] font-semibold">
+            <span className="pill pill-grape text-xs font-semibold">
               Subjective Evaluation Pending
             </span>
           </div>
-          <p className="text-xs text-ink/80 leading-relaxed pt-1">
+          <p className="text-xs sm:text-sm text-ink/80 leading-relaxed pt-0.5">
             Some answers are currently pending manual teacher review. Your objective MCQ score is tabulated below; your final grade will update once your instructor evaluates open-ended responses.
           </p>
         </div>
       )}
 
-      {/* ── SCORE AS VISUAL HERO (BOLD SPACE GROTESK TYPOGRAPHY) ── */}
-      <div className="bg-surface border border-border rounded-card p-7 sm:p-8 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50">
+      {/* ── 2-COLUMN BENTO SCORE HERO ── */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+        {/* Left Bento: Big Score Display */}
+        <div className="md:col-span-7 bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card space-y-2">
+          <div className="text-xs font-mono uppercase tracking-widest text-ink/50">
             Total Assessment Score
           </div>
-          <div className="flex items-baseline gap-2" id="result-score-display">
+          <div className="flex items-baseline gap-2.5" id="result-score-display">
             <span className="font-heading font-bold text-5xl sm:text-6xl text-forest tracking-tight">
               {result.score % 1 === 0 ? result.score : result.score.toFixed(1)}
             </span>
@@ -129,35 +123,42 @@ export const ResultPage: React.FC = () => {
             </span>
             <span className="text-xs font-mono font-semibold text-ink/60 pl-1">Marks</span>
           </div>
+          <p className="text-xs text-ink/60 font-mono pt-1">
+            Calculated from auto-graded and verified teacher scores
+          </p>
         </div>
 
-        <div className="flex items-center gap-8 border-t md:border-t-0 md:border-l border-border pt-4 md:pt-0 md:pl-8">
-          <div>
-            <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
+        {/* Right Bento: Percentage & Status Stack */}
+        <div className="md:col-span-5 grid grid-cols-2 gap-4">
+          <div className="bg-surface border border-border rounded-card p-5 shadow-card flex flex-col justify-between">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50">
               Percentage
             </div>
-            <div className="font-heading font-bold text-3xl sm:text-4xl text-ink">
+            <div className="font-heading font-bold text-3xl sm:text-4xl text-ink mt-2">
               {percentage}%
             </div>
+            <span className="text-[10px] text-ink/40 font-mono">Performance ratio</span>
           </div>
 
-          <div>
-            <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
+          <div className="bg-surface border border-border rounded-card p-5 shadow-card flex flex-col justify-between">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50">
               Attempt Status
             </div>
-            {/* Consistent status badges */}
-            <span
-              className={`pill text-xs font-semibold ${
-                isEvaluated ? 'pill-forest' : 'pill-grape'
-              }`}
-            >
-              {isEvaluated ? 'Evaluated' : 'Submitted'}
-            </span>
+            <div className="mt-2">
+              <span
+                className={`pill text-xs font-semibold ${
+                  isEvaluated ? 'pill-forest' : 'pill-grape'
+                }`}
+              >
+                {isEvaluated ? 'Evaluated' : 'Submitted'}
+              </span>
+            </div>
+            <span className="text-[10px] text-ink/40 font-mono">Current state</span>
           </div>
         </div>
       </div>
 
-      {/* ── DETAILED QUESTION BREAKDOWN (COLOR-CODED LEFT BORDERS) ── */}
+      {/* ── QUESTION BREAKDOWN (COLOR-CODED LEFT BORDERS) ── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-border/80 pb-3">
           <div>
@@ -175,15 +176,12 @@ export const ResultPage: React.FC = () => {
 
         <div className="space-y-4">
           {result.answers?.map((a, idx) => {
-            const delayMs = idx * 45;
             const isIncorrect = a.is_correct === false;
             const isPending = a.pending_manual_review;
 
-            // Color-coded left-border treatment:
-            // forest for correct, ember for incorrect, grape for pending review
             let borderTreatment = 'border-l-4 border-forest';
             let statusBadge = (
-              <span className="pill pill-forest text-[10px] font-semibold">
+              <span className="pill pill-forest text-[11px] font-semibold">
                 ✓ Correct
               </span>
             );
@@ -191,14 +189,14 @@ export const ResultPage: React.FC = () => {
             if (isIncorrect) {
               borderTreatment = 'border-l-4 border-ember';
               statusBadge = (
-                <span className="pill pill-ember text-[10px] font-semibold">
+                <span className="pill pill-ember text-[11px] font-semibold">
                   ✗ Incorrect
                 </span>
               );
             } else if (isPending) {
               borderTreatment = 'border-l-4 border-grape';
               statusBadge = (
-                <span className="pill pill-grape text-[10px] font-semibold">
+                <span className="pill pill-grape text-[11px] font-semibold">
                   Pending Review
                 </span>
               );
@@ -207,33 +205,29 @@ export const ResultPage: React.FC = () => {
             return (
               <div
                 key={a.question_id || idx}
-                style={{ animationDelay: `${delayMs}ms` }}
-                className={`animate-card-enter bg-surface border border-border ${borderTreatment} rounded-card p-5 sm:p-6 shadow-card space-y-3.5`}
+                className={`bg-surface border border-border ${borderTreatment} rounded-card p-6 shadow-card space-y-4`}
               >
-                {/* Header row */}
-                <div className="flex items-center justify-between border-b border-border/70 pb-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono font-bold text-xs bg-bg border border-border px-2 py-0.5 rounded-sm">
+                <div className="flex items-center justify-between border-b border-border/70 pb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-bold text-xs bg-bg border border-border px-2.5 py-1 rounded-sm">
                       Q{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
                     </span>
-                    <span className="pill pill-muted text-[10px]">
+                    <span className="pill pill-muted text-[11px]">
                       {a.question_type}
                     </span>
                     {statusBadge}
                   </div>
 
-                  <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-pill">
+                  <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-3 py-1 rounded-pill">
                     {a.marks_awarded !== null ? a.marks_awarded : '—'} / {a.max_marks} Marks
                   </span>
                 </div>
 
-                {/* Question prompt */}
-                <p className="font-body text-sm sm:text-base font-medium text-ink leading-relaxed">
+                <p className="font-body text-base font-medium text-ink leading-relaxed">
                   {a.question_text}
                 </p>
 
-                {/* Student's recorded answer */}
-                <div className="p-3.5 rounded-card bg-bg border border-border/80 text-xs space-y-1">
+                <div className="p-4 rounded-card bg-bg border border-border/80 text-sm space-y-1.5">
                   <span className="font-mono uppercase text-[10px] tracking-wider text-ink/50 block">
                     Your Response:
                   </span>
@@ -246,9 +240,8 @@ export const ResultPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Correct solution reference if available */}
                 {a.correct_answer && (
-                  <div className="p-3.5 rounded-card bg-forest/5 border border-forest/20 text-xs space-y-1">
+                  <div className="p-4 rounded-card bg-forest/5 border border-forest/20 text-sm space-y-1.5">
                     <span className="font-mono uppercase text-[10px] tracking-wider text-forest font-semibold block">
                       Official Reference Answer:
                     </span>
@@ -262,7 +255,7 @@ export const ResultPage: React.FC = () => {
           })}
 
           {(!result.answers || result.answers.length === 0) && (
-            <div className="bg-surface border-2 border-dashed border-border rounded-card p-10 text-center text-xs text-ink/50">
+            <div className="bg-surface border-2 border-dashed border-border rounded-card p-12 text-center text-xs text-ink/50">
               No individual question breakdown records stored for this attempt.
             </div>
           )}
