@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { papersApi } from '../../api/papers';
-import type { QuestionPreview } from '../../types';
+import type { QuestionPreview, Paper } from '../../types';
+import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 
 export const QuestionReviewPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -9,10 +10,26 @@ export const QuestionReviewPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [paper, setPaper] = useState<Paper | null>(null);
   const [questions, setQuestions] = useState<QuestionPreview[]>([]);
   const [constraints, setConstraints] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load paper details for header context
+    const loadPaper = async () => {
+      try {
+        const pData = await papersApi.getPaper(paperId);
+        setPaper(pData);
+      } catch (err) {
+        console.error('Failed to load paper context:', err);
+      }
+    };
+    if (paperId) {
+      loadPaper();
+    }
+  }, [paperId]);
 
   useEffect(() => {
     const extractQuestions = (val: any): QuestionPreview[] => {
@@ -108,136 +125,241 @@ export const QuestionReviewPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Review Candidate Questions (Step 3)</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Reorder questions, remove unwanted ones, and save as a formal version.
+    <div className="space-y-8">
+      {/* Workflow Navigation */}
+      <PaperWorkflowNav
+        currentStep="review"
+        paperId={paperId}
+        paperTitle={paper?.title}
+        chapterTitle={paper?.chapter_title}
+      />
+
+      {/* Header section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+            <span className="w-2 h-2 rounded-full bg-forest" />
+            Stage 03 • Sequence & Curation
+          </div>
+          <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+            Review Candidate Pool
+          </h1>
+          <p className="font-body text-ink/70 text-sm max-w-2xl leading-relaxed">
+            Reorder the question presentation order, remove items that do not fit pedagogical intent, and freeze the candidate pool into an immutable version snapshot.
           </p>
         </div>
-        <Link to={`/papers/${paperId}/configure`} className="text-sm text-blue-600 underline">
-          &larr; Reconfigure Filters
+
+        <Link
+          to={`/papers/${paperId}/configure`}
+          className="text-xs font-heading font-semibold text-ink/70 hover:text-ink px-4 py-2 rounded-pill border border-border bg-surface hover:bg-surface-muted transition-colors self-start md:self-auto"
+        >
+          ← Reconfigure Filters
         </Link>
       </div>
 
       {errorMessage && (
         <div
           id="review-error-banner"
-          className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm"
+          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium flex items-start gap-2"
         >
-          {errorMessage}
+          <span className="font-bold text-sm">!</span>
+          <span>{errorMessage}</span>
         </div>
       )}
 
-      {/* Summary card */}
-      <div className="border border-gray-300 bg-gray-50 p-4 flex justify-between items-center text-sm">
-        <div>
-          <span>Total Selected Questions: <strong>{questions.length}</strong></span>
-          <span className="mx-3 text-gray-400">|</span>
-          <span>
-            Running Total Marks: <strong>{runningTotalMarks.toFixed(1)}</strong>
-          </span>
+      {/* ── BOLD RUNNING METRICS & ACTION STRIP ── */}
+      <div className="bg-surface border border-border rounded-card p-6 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-6">
+        {/* Bold prominent numbers (Requirement: running total marks as bold typography) */}
+        <div className="flex items-center gap-8 sm:gap-12">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-wider text-ink/50 mb-1">
+              Running Total Marks
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="font-heading font-bold text-4xl sm:text-5xl text-forest tracking-tight">
+                {runningTotalMarks % 1 === 0 ? runningTotalMarks : runningTotalMarks.toFixed(1)}
+              </span>
+              <span className="font-mono text-xs font-semibold text-ink/50">Marks</span>
+            </div>
+          </div>
+
+          <div className="border-l border-border pl-8 sm:pl-12">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-ink/50 mb-1">
+              Candidate Questions
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="font-heading font-bold text-4xl sm:text-5xl text-ink tracking-tight">
+                {questions.length}
+              </span>
+              <span className="font-mono text-xs font-semibold text-ink/50">Items</span>
+            </div>
+          </div>
         </div>
 
-        <button
-          onClick={handleSaveAsVersion}
-          id="save-version-btn"
-          disabled={isSaving}
-          className="border border-gray-400 bg-gray-200 hover:bg-gray-300 px-4 py-2 font-medium cursor-pointer disabled:opacity-50"
-        >
-          {isSaving ? 'Saving Version...' : 'Save as Version &rarr;'}
-        </button>
+        {/* Primary Action Button */}
+        <div className="flex items-center gap-3 self-end md:self-auto">
+          <button
+            onClick={handleSaveAsVersion}
+            id="save-version-btn"
+            disabled={isSaving || questions.length === 0}
+            className="px-6 py-3 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+          >
+            <span>{isSaving ? 'Creating Version Snapshot...' : 'Save as Formal Version'}</span>
+            <span>→</span>
+          </button>
+        </div>
       </div>
 
-      {/* Questions list */}
-      <div className="space-y-3">
-        {questions.map((q, idx) => (
-          <div
-            key={q.id}
-            className="border border-gray-300 p-4 bg-white flex justify-between items-start space-x-4"
-          >
-            <div className="space-y-2 flex-1">
-              <div className="flex items-center space-x-2 text-xs text-gray-600">
-                <span className="font-bold text-sm text-black">#{idx + 1}</span>
-                <span className="border border-gray-300 px-1.5 py-0.5 bg-gray-100">
-                  {q.question_type_display || q.question_type}
-                </span>
-                <span className="border border-gray-300 px-1.5 py-0.5 bg-gray-100">
-                  {q.difficulty_display || q.difficulty}
-                </span>
-                {q.topic_name && <span>Topic: {q.topic_name}</span>}
-                <span className="font-bold text-black ml-auto">Marks: {q.marks}</span>
+      {/* ── QUESTION CANDIDATE CARDS (STAGGERED ENTRANCE MOTION) ── */}
+      <div className="space-y-4">
+        {questions.map((q, idx) => {
+          const delayMs = idx * 45;
+          const isMcq = q.question_type === 'MCQ';
+
+          return (
+            <div
+              key={q.id}
+              style={{ animationDelay: `${delayMs}ms` }}
+              className="animate-card-enter bg-surface border border-border rounded-card p-5 sm:p-6 shadow-card hover:border-forest/50 transition-all duration-200 space-y-4"
+            >
+              {/* Top Card Bar: Sequence, Tags & Integrated Controls */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {/* Sequence Badge */}
+                  <span className="font-mono font-bold text-xs bg-bg border border-border px-2.5 py-1 rounded-sm text-ink">
+                    #{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                  </span>
+
+                  {/* Format Pill */}
+                  <span
+                    className={`pill text-[10px] ${
+                      isMcq
+                        ? 'pill-forest'
+                        : q.question_type === 'SHORT_ANSWER'
+                        ? 'pill-ember'
+                        : 'pill-grape'
+                    }`}
+                  >
+                    {q.question_type_display || q.question_type}
+                  </span>
+
+                  {/* Difficulty Pill */}
+                  <span className="pill pill-muted text-[10px]">
+                    {q.difficulty_display || q.difficulty}
+                  </span>
+
+                  {/* Topic name */}
+                  {q.topic_name && (
+                    <span className="text-xs text-ink/60 font-medium">
+                      Topic: <span className="text-ink">{q.topic_name}</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Integrated Reorder & Remove Controls */}
+                <div className="flex items-center gap-1.5 self-end sm:self-auto bg-bg p-1 rounded-pill border border-border">
+                  {/* Marks indicator badge */}
+                  <span className="font-mono text-xs font-bold text-forest px-2.5 py-0.5">
+                    {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
+                  </span>
+
+                  <span className="text-border-strong">|</span>
+
+                  {/* Move Up */}
+                  <button
+                    type="button"
+                    onClick={() => handleMoveUp(idx)}
+                    disabled={idx === 0 || isSaving}
+                    title="Move up in sequence"
+                    className="p-1 px-2 text-xs font-heading font-medium rounded-pill text-ink/70 hover:text-ink hover:bg-surface disabled:opacity-30 cursor-pointer transition-colors"
+                  >
+                    ↑ Up
+                  </button>
+
+                  {/* Move Down */}
+                  <button
+                    type="button"
+                    onClick={() => handleMoveDown(idx)}
+                    disabled={idx === questions.length - 1 || isSaving}
+                    title="Move down in sequence"
+                    className="p-1 px-2 text-xs font-heading font-medium rounded-pill text-ink/70 hover:text-ink hover:bg-surface disabled:opacity-30 cursor-pointer transition-colors"
+                  >
+                    ↓ Down
+                  </button>
+
+                  <span className="text-border-strong">|</span>
+
+                  {/* Remove Question */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveQuestion(q.id)}
+                    disabled={isSaving}
+                    title="Remove question from paper"
+                    className="p-1 px-2.5 text-xs font-heading font-semibold rounded-pill text-ember hover:bg-ember/10 cursor-pointer transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
 
-              <p className="text-sm font-medium">{q.question_text}</p>
+              {/* Question Text */}
+              <p className="font-body text-sm sm:text-base font-medium text-ink leading-relaxed">
+                {q.question_text}
+              </p>
 
-              {q.options && Object.keys(q.options).length > 0 && (
-                <div className="grid grid-cols-2 gap-1 text-xs text-gray-700 pl-2">
+              {/* MCQ Options Grid */}
+              {isMcq && q.options && Object.keys(q.options).length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   {Object.entries(q.options).map(([optKey, optVal]) => (
-                    <div key={optKey}>
-                      <strong>({optKey})</strong> {optVal}
+                    <div
+                      key={optKey}
+                      className="p-2.5 rounded-card border border-border/80 bg-bg text-xs flex items-start gap-2"
+                    >
+                      <span className="font-mono font-bold text-forest shrink-0">
+                        ({optKey})
+                      </span>
+                      <span className="text-ink/80">{optVal}</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-
-            {/* Actions: Reorder & Remove */}
-            <div className="flex flex-col space-y-1 text-xs shrink-0">
-              <button
-                type="button"
-                onClick={() => handleMoveUp(idx)}
-                disabled={idx === 0 || isSaving}
-                className="border border-gray-300 px-2 py-1 bg-gray-50 hover:bg-gray-100 disabled:opacity-30 cursor-pointer"
-                title="Move up"
-              >
-                &uarr; Up
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMoveDown(idx)}
-                disabled={idx === questions.length - 1 || isSaving}
-                className="border border-gray-300 px-2 py-1 bg-gray-50 hover:bg-gray-100 disabled:opacity-30 cursor-pointer"
-                title="Move down"
-              >
-                &darr; Down
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRemoveQuestion(q.id)}
-                disabled={isSaving}
-                className="border border-red-300 text-red-700 px-2 py-1 bg-red-50 hover:bg-red-100 cursor-pointer"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         {questions.length === 0 && (
-          <div className="border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
-            No questions in this review set.
-            <div className="mt-3">
-              <Link
-                to={`/papers/${paperId}/configure`}
-                className="text-blue-600 underline font-medium"
-              >
-                Configure questions again
-              </Link>
-            </div>
+          <div className="bg-surface border-2 border-dashed border-border rounded-card p-12 text-center space-y-4">
+            <span className="pill pill-ember text-xs">Zero Questions Remaining</span>
+            <h3 className="font-heading font-bold text-xl text-ink">
+              All candidate questions have been removed
+            </h3>
+            <p className="text-xs text-ink/65 max-w-md mx-auto">
+              You can re-query the question bank with different constraint parameters or topic coverage.
+            </p>
+            <Link
+              to={`/papers/${paperId}/configure`}
+              className="inline-block mt-2 px-5 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-colors"
+            >
+              Reconfigure Questions →
+            </Link>
           </div>
         )}
       </div>
 
+      {/* Bottom Save Action */}
       {questions.length > 0 && (
-        <div className="pt-2 flex justify-end">
+        <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div className="text-xs text-ink/60">
+            Saving creates an immutable version record that can be finalized and scheduled.
+          </div>
+
           <button
             onClick={handleSaveAsVersion}
             disabled={isSaving}
-            className="border border-gray-400 bg-gray-200 hover:bg-gray-300 px-5 py-2 font-medium text-sm cursor-pointer disabled:opacity-50"
+            className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
           >
-            {isSaving ? 'Saving Version...' : 'Save as Version &rarr;'}
+            <span>{isSaving ? 'Saving Version Snapshot...' : 'Save as Formal Version'}</span>
+            <span>→</span>
           </button>
         </div>
       )}

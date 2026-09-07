@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../api/papers';
 import { useAuth } from '../../auth/AuthContext';
 import type { Paper } from '../../types';
+import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 
 export const PaperDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,124 +36,213 @@ export const PaperDetailPage: React.FC = () => {
   }, [paperId]);
 
   if (isLoading) {
-    return <div className="p-4 text-sm text-gray-600">Loading paper details...</div>;
+    return (
+      <div className="space-y-6">
+        <PaperWorkflowNav currentStep="version" paperId={paperId} />
+        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60">
+          Loading paper blueprint and version archive...
+        </div>
+      </div>
+    );
   }
 
   if (errorMessage || !paper) {
     return (
-      <div className="p-4 space-y-4">
-        {errorMessage && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm">
-            {errorMessage}
-          </div>
-        )}
-        <Link to="/dashboard/teacher" className="text-blue-600 underline text-sm">
-          &larr; Return to Teacher Dashboard
-        </Link>
+      <div className="space-y-6">
+        <PaperWorkflowNav currentStep="version" paperId={paperId} />
+        <div className="p-4 space-y-4">
+          {errorMessage && (
+            <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
+              {errorMessage}
+            </div>
+          )}
+          <Link
+            to="/dashboard/teacher"
+            className="text-xs font-heading font-semibold text-forest hover:underline"
+          >
+            ← Return to Teacher Dashboard
+          </Link>
+        </div>
       </div>
     );
   }
 
   const canCreatePaper = hasCapability('CREATE_PAPER');
+  const versions = paper.versions || [];
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold">{paper.title}</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Chapter: {paper.chapter_title || `Chapter #${paper.chapter}`} &bull; Status:{' '}
-            <strong>{paper.status}</strong>
-          </p>
+    <div className="space-y-8">
+      {/* Workflow Navigation */}
+      <PaperWorkflowNav
+        currentStep="version"
+        paperId={paperId}
+        paperTitle={paper.title}
+        chapterTitle={paper.chapter_title}
+      />
+
+      {/* Asymmetric 2-Column Layout (Ref 09: Blog Cards Stacked Rhythm) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Column: Blueprint Metadata Card & Action (4 cols) */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-5">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-bg border border-border text-xs font-semibold text-forest">
+                <span className="w-2 h-2 rounded-full bg-forest" />
+                Paper Blueprint #{paper.id}
+              </div>
+              <h1 className="font-heading font-bold text-2xl text-ink tracking-tight">
+                {paper.title}
+              </h1>
+              <div className="text-xs text-ink/70 flex items-center gap-1.5 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-forest" />
+                <span>{paper.chapter_title || `Chapter #${paper.chapter}`}</span>
+              </div>
+            </div>
+
+            {paper.instructions && (
+              <div className="p-3.5 bg-bg rounded-card border border-border/80 text-xs text-ink/75 leading-relaxed">
+                <span className="font-heading font-semibold block text-ink mb-1">
+                  Examination Guidelines:
+                </span>
+                {paper.instructions}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="bg-bg p-3 rounded-card border border-border/70">
+                <div className="text-[10px] font-mono uppercase text-ink/50">
+                  Total Versions
+                </div>
+                <div className="font-heading font-bold text-xl text-forest">
+                  {versions.length}
+                </div>
+              </div>
+              <div className="bg-bg p-3 rounded-card border border-border/70">
+                <div className="text-[10px] font-mono uppercase text-ink/50">
+                  Paper Status
+                </div>
+                <div className="font-heading font-bold text-base text-ink truncate">
+                  {paper.status || 'ACTIVE'}
+                </div>
+              </div>
+            </div>
+
+            {canCreatePaper && (
+              <div className="pt-2 border-t border-border">
+                <Link
+                  to={`/papers/${paperId}/configure`}
+                  id="new-version-btn"
+                  className="w-full py-2.5 px-4 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm flex items-center justify-center gap-2"
+                >
+                  <span>+ Configure New Version</span>
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex space-x-3 text-sm">
-          <Link to="/dashboard/teacher" className="text-blue-600 underline">
-            &larr; Teacher Dashboard
-          </Link>
-          {canCreatePaper && (
-            <Link
-              to={`/papers/${paperId}/configure`}
-              id="new-version-btn"
-              className="border border-gray-400 bg-gray-100 hover:bg-gray-200 px-3 py-1 font-medium"
-            >
-              + Configure New Version
-            </Link>
-          )}
-        </div>
-      </div>
+        {/* Right Column: Stacked Version Cards (Ref: 09_blog_cards.jpg - 8 cols) */}
+        <div className="lg:col-span-8 space-y-4">
+          <div className="flex items-center justify-between border-b border-border/80 pb-3">
+            <div>
+              <h2 className="font-heading font-bold text-xl text-ink">
+                Generated Version Blueprints
+              </h2>
+              <p className="text-xs text-ink/60">
+                Distinct question sets, difficulty calibrations & examination shifts
+              </p>
+            </div>
+            <span className="pill pill-forest text-xs">
+              {versions.length} {versions.length === 1 ? 'Version' : 'Versions'}
+            </span>
+          </div>
 
-      {paper.instructions && (
-        <div className="border border-gray-200 bg-gray-50 p-3 text-sm">
-          <strong>Instructions:</strong> {paper.instructions}
-        </div>
-      )}
+          <div className="space-y-3">
+            {versions.map((v, idx) => {
+              const delayMs = idx * 50;
+              const isFinal = v.status === 'FINALIZED';
 
-      {/* Paper Versions List */}
-      <section className="border border-gray-300 p-4 space-y-3">
-        <h2 className="text-lg font-semibold">Versions of this Paper</h2>
+              return (
+                <div
+                  key={v.id}
+                  style={{ animationDelay: `${delayMs}ms` }}
+                  className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-0.5 hover:border-forest transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-heading font-bold text-lg text-ink">
+                        Version {v.version_label}
+                      </span>
+                      <span
+                        className={`pill text-[10px] ${
+                          isFinal ? 'pill-forest' : 'pill-ember'
+                        }`}
+                      >
+                        {v.status}
+                      </span>
+                      <span className="font-mono text-[11px] text-ink/40">
+                        #{v.id}
+                      </span>
+                    </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse border border-gray-300">
-            <thead>
-              <tr className="bg-gray-100 text-left">
-                <th className="border border-gray-300 p-2">Version</th>
-                <th className="border border-gray-300 p-2">Status</th>
-                <th className="border border-gray-300 p-2">Total Marks</th>
-                <th className="border border-gray-300 p-2">Questions</th>
-                <th className="border border-gray-300 p-2">Created</th>
-                <th className="border border-gray-300 p-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paper.versions?.map((v) => (
-                <tr key={v.id} className="hover:bg-gray-50">
-                  <td className="border border-gray-300 p-2 font-bold">
-                    Version {v.version_label}
-                  </td>
-                  <td className="border border-gray-300 p-2">
-                    <span
-                      className={`text-xs px-2 py-0.5 border ${
-                        v.status === 'FINALIZED'
-                          ? 'border-green-400 bg-green-50 text-green-800'
-                          : 'border-yellow-400 bg-yellow-50 text-yellow-800'
-                      }`}
-                    >
-                      {v.status}
-                    </span>
-                  </td>
-                  <td className="border border-gray-300 p-2">{v.total_marks}</td>
-                  <td className="border border-gray-300 p-2">{v.question_count}</td>
-                  <td className="border border-gray-300 p-2 text-xs text-gray-500">
-                    {new Date(v.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="border border-gray-300 p-2">
+                    <div className="flex items-center gap-4 text-xs text-ink/70 font-mono">
+                      <div>
+                        Total Marks: <span className="font-bold text-forest">{v.total_marks}</span>
+                      </div>
+                      <div>•</div>
+                      <div>
+                        Questions: <span className="font-bold text-ink">{v.question_count}</span>
+                      </div>
+                      <div>•</div>
+                      <div className="text-ink/50">
+                        {new Date(v.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    {isFinal && (
+                      <Link
+                        to={`/papers/${paperId}/versions/${v.id}/deliver`}
+                        className="px-3.5 py-1.5 rounded-pill bg-ember text-white font-heading font-semibold text-xs hover:bg-ember/90 transition-colors"
+                      >
+                        Deliver →
+                      </Link>
+                    )}
+
                     <Link
                       to={`/papers/${paperId}/versions/${v.id}`}
-                      className="border border-gray-300 bg-gray-50 hover:bg-gray-100 px-2 py-1 text-xs font-medium inline-block"
+                      className="px-3.5 py-1.5 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors"
                     >
-                      View Version &rarr;
+                      Open Version →
                     </Link>
-                  </td>
-                </tr>
-              ))}
-              {(!paper.versions || paper.versions.length === 0) && (
-                <tr>
-                  <td colSpan={6} className="border border-gray-300 p-4 text-center text-gray-500">
-                    No versions created yet for this paper.{' '}
-                    <Link
-                      to={`/papers/${paperId}/configure`}
-                      className="text-blue-600 underline font-medium"
-                    >
-                      Configure questions now &rarr;
-                    </Link>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              );
+            })}
+
+            {versions.length === 0 && (
+              <div className="bg-surface border-2 border-dashed border-border rounded-card p-10 text-center space-y-3">
+                <span className="pill pill-forest text-xs">Awaiting First Version</span>
+                <h3 className="font-heading font-bold text-lg text-ink">
+                  No versions created yet for this paper
+                </h3>
+                <p className="text-xs text-ink/70 max-w-sm mx-auto">
+                  Filter questions from the chapter question bank and freeze your first exam version.
+                </p>
+                <Link
+                  to={`/papers/${paperId}/configure`}
+                  className="inline-block mt-2 px-5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90"
+                >
+                  Configure Questions Now →
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
-      </section>
+
+      </div>
     </div>
   );
 };

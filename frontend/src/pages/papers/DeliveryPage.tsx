@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../api/papers';
 import { usersApi } from '../../api/users';
 import type { Delivery, PaperVersion, User } from '../../types';
+import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 
 export const DeliveryPage: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -15,6 +16,7 @@ export const DeliveryPage: React.FC = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [availableFrom, setAvailableFrom] = useState('');
   const [availableUntil, setAvailableUntil] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,7 +32,6 @@ export const DeliveryPage: React.FC = () => {
         setVersion(vData);
 
         const usersData = await usersApi.getUsers();
-        // Filter students in teacher scope
         const studentList = usersData.filter((u) => u.role_label === 'Student');
         setStudents(studentList);
       } catch (err: any) {
@@ -54,10 +55,10 @@ export const DeliveryPage: React.FC = () => {
   };
 
   const handleSelectAllStudents = () => {
-    if (selectedStudentIds.length === students.length) {
+    if (selectedStudentIds.length === filteredStudents.length) {
       setSelectedStudentIds([]);
     } else {
-      setSelectedStudentIds(students.map((s) => s.id));
+      setSelectedStudentIds(filteredStudents.map((s) => s.id));
     }
   };
 
@@ -102,216 +103,403 @@ export const DeliveryPage: React.FC = () => {
     }
   };
 
+  const filteredStudents = students.filter((s) => {
+    if (!studentSearch.trim()) return true;
+    const query = studentSearch.toLowerCase();
+    const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+    return (
+      s.username.toLowerCase().includes(query) ||
+      fullName.includes(query) ||
+      (s.email && s.email.toLowerCase().includes(query))
+    );
+  });
+
   if (isLoading) {
-    return <div className="p-4 text-sm text-gray-600">Loading delivery configuration...</div>;
+    return (
+      <div className="space-y-6">
+        <PaperWorkflowNav currentStep="deliver" paperId={paperId} versionId={vId} />
+        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60">
+          Loading delivery parameters and student rosters...
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Deliver Question Paper</h1>
-          {version && (
-            <p className="text-sm text-gray-600 mt-1">
-              Version: <strong>Version {version.version_label}</strong> &bull; Total Marks:{' '}
-              {version.total_marks}
-            </p>
-          )}
+    <div className="space-y-8">
+      {/* Workflow Navigation */}
+      <PaperWorkflowNav
+        currentStep="deliver"
+        paperId={paperId}
+        paperTitle={version?.paper_title}
+        versionId={vId}
+        versionLabel={version?.version_label}
+      />
+
+      {/* Header section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+            <span className="w-2 h-2 rounded-full bg-forest" />
+            Stage 05 • Examination Deployment
+          </div>
+          <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+            Schedule & Deliver Test
+          </h1>
+          <p className="font-body text-ink/70 text-sm max-w-2xl leading-relaxed">
+            Choose between physical print packaging or an online interactive exam session assigned directly to enrolled students.
+          </p>
         </div>
+
         <Link
           to={`/papers/${paperId}/versions/${vId}`}
-          className="text-sm text-blue-600 underline"
+          className="text-xs font-heading font-semibold text-ink/70 hover:text-ink px-4 py-2 rounded-pill border border-border bg-surface hover:bg-surface-muted transition-colors self-start md:self-auto"
         >
-          &larr; Version Detail
+          ← Version Snapshot
         </Link>
       </div>
 
       {errorMessage && (
         <div
           id="delivery-error-banner"
-          className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm"
+          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium flex items-start gap-2"
         >
-          {errorMessage}
+          <span className="font-bold text-sm">!</span>
+          <span>{errorMessage}</span>
         </div>
       )}
 
+      {/* ── SUCCESS STATE BANNER ── */}
       {createdDelivery && (
         <div
           id="delivery-success-banner"
-          className="border border-green-300 bg-green-50 text-green-900 p-5 space-y-4"
+          className="bg-forest text-white rounded-card p-7 sm:p-8 shadow-float space-y-5"
         >
-          <h2 className="text-lg font-bold">Test Delivery Created Successfully!</h2>
-          <p className="text-sm">
-            Delivery #{createdDelivery.id} has been created in <strong>{createdDelivery.mode}</strong>{' '}
-            mode for Version {createdDelivery.version_label}.
-            {createdDelivery.mode === 'ONLINE' && (
-              <span> Assigned to {createdDelivery.assigned_students?.length || 0} student(s).</span>
-            )}
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-lime animate-ping" />
+            <span className="pill pill-lime text-xs font-bold uppercase tracking-wider">
+              Delivery #{createdDelivery.id} Dispatched
+            </span>
+          </div>
 
-          <div className="flex items-center space-x-4 pt-2">
+          <div className="space-y-1">
+            <h2 className="font-heading font-bold text-2xl sm:text-3xl tracking-tight text-white">
+              {createdDelivery.mode === 'ONLINE'
+                ? 'Online Test Session Deployed'
+                : 'Print Examination Package Generated'}
+            </h2>
+            <p className="text-white/80 text-sm max-w-xl">
+              Delivery #{createdDelivery.id} is now registered under Version {createdDelivery.version_label}.
+              {createdDelivery.mode === 'ONLINE' && (
+                <span> Assigned to {createdDelivery.assigned_students?.length || 0} candidate(s).</span>
+              )}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-white/20">
             <Link
               to="/dashboard/teacher"
-              className="border border-gray-400 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-100"
+              className="px-5 py-2.5 text-xs font-heading font-semibold rounded-pill bg-surface text-ink hover:bg-bg transition-colors"
             >
-              Return to Teacher Dashboard
+              Teacher Studio Dashboard
             </Link>
 
             {createdDelivery.mode === 'ONLINE' && (
               <Link
                 to={`/deliveries/${createdDelivery.id}/results`}
-                className="border border-blue-600 bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700"
+                className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-ember text-white hover:bg-ember/90 transition-colors shadow-sm flex items-center gap-2"
               >
-                View Results Roster &rarr;
+                <span>View Results Roster</span>
+                <span>→</span>
               </Link>
             )}
 
             {createdDelivery.mode === 'PRINT' && (
               <Link
                 to={`/papers/${paperId}/versions/${vId}/print`}
-                className="border border-blue-500 bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700"
+                className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-lime text-ink hover:bg-lime/90 transition-colors shadow-sm flex items-center gap-2"
               >
-                View Print Layout &rarr;
+                <span>Open Restrained Print View</span>
+                <span>↗</span>
               </Link>
             )}
           </div>
         </div>
       )}
 
+      {/* ── DELIVERY CONFIGURATION FORM ── */}
       {!createdDelivery && (
-        <form onSubmit={handleSubmit} className="border border-gray-300 p-5 space-y-5">
-          {/* Mode Selector */}
-          <div>
-            <label className="block text-sm font-semibold mb-2">Delivery Mode *</label>
-            <div className="flex space-x-6">
-              <label className="flex items-center space-x-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="delivery-mode"
-                  value="ONLINE"
-                  checked={mode === 'ONLINE'}
-                  onChange={() => setMode('ONLINE')}
-                  disabled={isSubmitting}
-                />
-                <span>Online Test (Students sit online)</span>
-              </label>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          
+          {/* REQUIREMENT: TACTILE MODE SELECTION CARDS (NOT GENERIC RADIOS) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-heading text-xs font-semibold text-ink uppercase tracking-wider">
+                Select Delivery Mode *
+              </span>
+              <span className="font-mono text-[11px] text-ink/50">Tactile Choice</span>
+            </div>
 
-              <label className="flex items-center space-x-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="delivery-mode"
-                  value="PRINT"
-                  checked={mode === 'PRINT'}
-                  onChange={() => setMode('PRINT')}
-                  disabled={isSubmitting}
-                />
-                <span>Print Paper (In-person physical paper)</span>
-              </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Online Examination Card */}
+              <div
+                onClick={() => setMode('ONLINE')}
+                className={`p-6 rounded-card border-2 transition-all cursor-pointer space-y-3 ${
+                  mode === 'ONLINE'
+                    ? 'border-forest bg-surface shadow-card scale-101'
+                    : 'border-border bg-bg hover:bg-surface-muted'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-heading font-bold text-lg text-ink">
+                    Interactive Online Test
+                  </span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="delivery-mode"
+                      value="ONLINE"
+                      checked={mode === 'ONLINE'}
+                      onChange={() => setMode('ONLINE')}
+                      disabled={isSubmitting}
+                      className="accent-forest"
+                    />
+                    <span
+                      className={`pill text-[10px] ${
+                        mode === 'ONLINE' ? 'pill-forest' : 'pill-muted'
+                      }`}
+                    >
+                      Online
+                    </span>
+                  </label>
+                </div>
+                <p className="text-xs text-ink/70 leading-relaxed">
+                  Students log in to sit the exam digitally with live countdown timers, randomized option display, and immediate objective grading.
+                </p>
+              </div>
+
+              {/* Physical Print Paper Card */}
+              <div
+                onClick={() => setMode('PRINT')}
+                className={`p-6 rounded-card border-2 transition-all cursor-pointer space-y-3 ${
+                  mode === 'PRINT'
+                    ? 'border-ember bg-surface shadow-card scale-101'
+                    : 'border-border bg-bg hover:bg-surface-muted'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-heading font-bold text-lg text-ink">
+                    Physical Paper Printout
+                  </span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="delivery-mode"
+                      value="PRINT"
+                      checked={mode === 'PRINT'}
+                      onChange={() => setMode('PRINT')}
+                      disabled={isSubmitting}
+                      className="accent-ember"
+                    />
+                    <span
+                      className={`pill text-[10px] ${
+                        mode === 'PRINT' ? 'pill-ember' : 'pill-muted'
+                      }`}
+                    >
+                      Print Ready
+                    </span>
+                  </label>
+                </div>
+                <p className="text-xs text-ink/70 leading-relaxed">
+                  Generates high-contrast, formal academic question sheets with writing rules and student roll number headers for in-person proctored testing.
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* ONLINE specific fields */}
+          {/* ── ONLINE MODE: HUMAN-CENTRIC STUDENT MULTI-SELECT ── */}
           {mode === 'ONLINE' && (
-            <div className="space-y-4 border-t border-gray-200 pt-4">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-medium">Assign Students *</label>
-                  {students.length > 0 && (
+            <div className="bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card space-y-6 animate-card-enter">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-4">
+                <div>
+                  <h3 className="font-heading font-bold text-lg text-ink">
+                    Assign Enrolled Candidates *
+                  </h3>
+                  <p className="text-xs text-ink/60">
+                    Pick students who are authorized to sit this exam session
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="pill pill-grape text-xs">
+                    {selectedStudentIds.length} Candidate{selectedStudentIds.length === 1 ? '' : 's'} Selected
+                  </span>
+                  {filteredStudents.length > 0 && (
                     <button
                       type="button"
                       onClick={handleSelectAllStudents}
-                      className="text-xs text-blue-600 underline cursor-pointer"
+                      className="text-xs font-heading font-semibold text-forest hover:underline cursor-pointer"
                     >
-                      {selectedStudentIds.length === students.length ? 'Deselect All' : 'Select All'}
+                      {selectedStudentIds.length === filteredStudents.length
+                        ? 'Deselect All'
+                        : 'Select All Filtered'}
                     </button>
-                  )}
-                </div>
-
-                <div className="border border-gray-300 p-3 max-h-48 overflow-y-auto space-y-1 bg-gray-50">
-                  {students.map((s) => (
-                    <label
-                      key={s.id}
-                      className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-100 p-1 rounded"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedStudentIds.includes(s.id)}
-                        onChange={() => handleStudentToggle(s.id)}
-                        disabled={isSubmitting}
-                      />
-                      <span>
-                        <strong>{s.username}</strong>{' '}
-                        {s.first_name || s.last_name
-                          ? `(${[s.first_name, s.last_name].filter(Boolean).join(' ')})`
-                          : ''}
-                      </span>
-                    </label>
-                  ))}
-                  {students.length === 0 && (
-                    <div className="text-xs text-gray-500">
-                      No students found in your school scope.
-                    </div>
                   )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium mb-1" htmlFor="avail-from">
-                    Available From (Optional)
-                  </label>
-                  <input
-                    id="avail-from"
-                    type="datetime-local"
-                    value={availableFrom}
-                    onChange={(e) => setAvailableFrom(e.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full border border-gray-400 px-2 py-1 text-sm bg-white"
-                  />
+              {/* Search bar */}
+              <div>
+                <input
+                  type="text"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="Search students by name or username..."
+                  disabled={isSubmitting}
+                  className="w-full rounded-card border border-border bg-bg px-4 py-2 text-xs text-ink placeholder:text-ink/40 focus:bg-surface focus:border-grape focus:outline-none"
+                />
+              </div>
+
+              {/* Student Cards Grid (Feels like picking real people, not generic multi-select) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
+                {filteredStudents.map((s) => {
+                  const isSelected = selectedStudentIds.includes(s.id);
+                  const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
+                  const initials = (
+                    (s.first_name?.[0] || '') + (s.last_name?.[0] || s.username[0] || '?')
+                  ).toUpperCase();
+
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => handleStudentToggle(s.id)}
+                      className={`p-3 rounded-card border transition-all cursor-pointer flex items-center gap-3 ${
+                        isSelected
+                          ? 'border-grape bg-grape/10 shadow-sm'
+                          : 'border-border bg-bg hover:bg-surface-muted'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleStudentToggle(s.id)}
+                        disabled={isSubmitting}
+                        className="sr-only"
+                      />
+
+                      {/* Avatar initials badge */}
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center font-heading font-bold text-xs shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-grape text-white'
+                            : 'bg-surface border border-border text-ink/70'
+                        }`}
+                      >
+                        {initials}
+                      </div>
+
+                      <div className="flex-1 min-w-0 text-xs">
+                        <div className="font-heading font-semibold text-ink truncate">
+                          {fullName || s.username}
+                        </div>
+                        <div className="font-mono text-[10px] text-ink/50 truncate">
+                          @{s.username}
+                        </div>
+                      </div>
+
+                      {isSelected && (
+                        <span className="pill pill-grape text-[10px] py-0.5 px-1.5 shrink-0">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {filteredStudents.length === 0 && (
+                  <div className="col-span-full py-8 text-center text-xs text-ink/50 italic">
+                    No enrolled students matched your search query.
+                  </div>
+                )}
+              </div>
+
+              {/* ── Scheduling Window ── */}
+              <div className="pt-4 border-t border-border space-y-3">
+                <div className="font-heading font-semibold text-xs text-ink uppercase tracking-wider">
+                  Test Availability Window (Optional)
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium mb-1" htmlFor="avail-until">
-                    Available Until (Optional)
-                  </label>
-                  <input
-                    id="avail-until"
-                    type="datetime-local"
-                    value={availableUntil}
-                    onChange={(e) => setAvailableUntil(e.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full border border-gray-400 px-2 py-1 text-sm bg-white"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="avail-from"
+                      className="block text-[11px] font-mono text-ink/60"
+                    >
+                      Available From
+                    </label>
+                    <input
+                      id="avail-from"
+                      type="datetime-local"
+                      value={availableFrom}
+                      onChange={(e) => setAvailableFrom(e.target.value)}
+                      disabled={isSubmitting}
+                      className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="avail-until"
+                      className="block text-[11px] font-mono text-ink/60"
+                    >
+                      Available Until
+                    </label>
+                    <input
+                      id="avail-until"
+                      type="datetime-local"
+                      value={availableUntil}
+                      onChange={(e) => setAvailableUntil(e.target.value)}
+                      disabled={isSubmitting}
+                      className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* PRINT mode explanation */}
+          {/* ── PRINT MODE EXPLANATION CARD ── */}
           {mode === 'PRINT' && (
-            <div className="border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-              <p>
-                <strong>Print Delivery:</strong> Creates a formal test delivery record and enables
-                generating print-ready paper layouts for physical exam distribution. No individual
-                student account assignment is required.
+            <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="pill pill-ember text-xs">Print Delivery</span>
+              </div>
+              <h3 className="font-heading font-bold text-base text-ink">
+                Ready for High-Contrast Institutional Printing
+              </h3>
+              <p className="text-xs text-ink/70 leading-relaxed max-w-xl">
+                Creating a Print Delivery logs an official proctored test session in your academic records. You will immediately be routed to the clean, formal print layout view.
               </p>
             </div>
           )}
 
-          <div className="pt-2 flex justify-between items-center">
+          {/* Action Toolbar */}
+          <div className="flex items-center justify-between pt-2">
             <Link
               to={`/papers/${paperId}/versions/${vId}`}
-              className="border border-gray-300 px-4 py-2 text-sm hover:bg-gray-100"
+              className="px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors"
             >
               Cancel
             </Link>
+
             <button
               type="submit"
               id="submit-delivery-btn"
               disabled={isSubmitting}
-              className="border border-gray-400 bg-gray-100 hover:bg-gray-200 px-5 py-2 text-sm font-medium cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
-              {isSubmitting ? 'Delivering...' : 'Confirm & Deliver Test'}
+              <span>{isSubmitting ? 'Creating Test Delivery...' : 'Confirm & Deploy Test'}</span>
+              <span>→</span>
             </button>
           </div>
         </form>
