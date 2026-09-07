@@ -2,14 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { SchoolAdminDashboardTablet } from '../tablet/dashboards/SchoolAdminDashboardTablet';
+import { SchoolAdminDashboardMobile } from '../mobile/dashboards/SchoolAdminDashboardMobile';
 import type { User } from '../../types';
 
-export const SchoolAdminDashboard: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <SchoolAdminDashboardTablet />;
-  }
-
+const SchoolAdminDashboardDesktop: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -327,4 +323,15 @@ export const SchoolAdminDashboard: React.FC = () => {
       </div>
     </div>
   );
+};
+
+export const SchoolAdminDashboard: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <SchoolAdminDashboardMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <SchoolAdminDashboardTablet key="tablet" />;
+  }
+  return <SchoolAdminDashboardDesktop key="desktop" />;
 };

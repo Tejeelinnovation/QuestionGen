@@ -5,13 +5,9 @@ import type { QuestionPreview, Paper } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { QuestionReviewPageTablet } from '../tablet/papers/QuestionReviewPageTablet';
+import { QuestionReviewPageMobile } from '../mobile/papers/QuestionReviewPageMobile';
 
-export const QuestionReviewPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <QuestionReviewPageTablet />;
-  }
-
+const QuestionReviewPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const navigate = useNavigate();
@@ -373,3 +369,15 @@ export const QuestionReviewPage: React.FC = () => {
     </div>
   );
 };
+
+export const QuestionReviewPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <QuestionReviewPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <QuestionReviewPageTablet key="tablet" />;
+  }
+  return <QuestionReviewPageDesktop key="desktop" />;
+};
+

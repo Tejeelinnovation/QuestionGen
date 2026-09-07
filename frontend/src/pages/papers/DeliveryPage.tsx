@@ -6,13 +6,9 @@ import type { Delivery, PaperVersion, User } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { DeliveryPageTablet } from '../tablet/papers/DeliveryPageTablet';
+import { DeliveryPageMobile } from '../mobile/papers/DeliveryPageMobile';
 
-export const DeliveryPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <DeliveryPageTablet />;
-  }
-
+const DeliveryPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);
@@ -514,3 +510,15 @@ export const DeliveryPage: React.FC = () => {
     </div>
   );
 };
+
+export const DeliveryPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <DeliveryPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <DeliveryPageTablet key="tablet" />;
+  }
+  return <DeliveryPageDesktop key="desktop" />;
+};
+

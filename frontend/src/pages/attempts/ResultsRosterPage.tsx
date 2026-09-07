@@ -4,13 +4,9 @@ import { attemptsApi } from '../../api/attempts';
 import type { DeliveryResultsRoster } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { ResultsRosterPageTablet } from '../tablet/attempts/ResultsRosterPageTablet';
+import { ResultsRosterPageMobile } from '../mobile/attempts/ResultsRosterPageMobile';
 
-export const ResultsRosterPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <ResultsRosterPageTablet />;
-  }
-
+const ResultsRosterPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
 
@@ -262,3 +258,15 @@ export const ResultsRosterPage: React.FC = () => {
     </div>
   );
 };
+
+export const ResultsRosterPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <ResultsRosterPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <ResultsRosterPageTablet key="tablet" />;
+  }
+  return <ResultsRosterPageDesktop key="desktop" />;
+};
+

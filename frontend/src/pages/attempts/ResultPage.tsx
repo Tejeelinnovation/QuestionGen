@@ -4,13 +4,9 @@ import { attemptsApi } from '../../api/attempts';
 import type { StudentAttemptResult } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { ResultPageTablet } from '../tablet/attempts/ResultPageTablet';
+import { ResultPageMobile } from '../mobile/attempts/ResultPageMobile';
 
-export const ResultPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <ResultPageTablet />;
-  }
-
+const ResultPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const attemptId = Number(id);
 
@@ -271,3 +267,15 @@ export const ResultPage: React.FC = () => {
     </div>
   );
 };
+
+export const ResultPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <ResultPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <ResultPageTablet key="tablet" />;
+  }
+  return <ResultPageDesktop key="desktop" />;
+};
+

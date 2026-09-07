@@ -4,13 +4,9 @@ import { papersApi } from '../../api/papers';
 import type { PaperPrintData } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { PrintViewPageTablet } from '../tablet/papers/PrintViewPageTablet';
+import { PrintViewPageMobile } from '../mobile/papers/PrintViewPageMobile';
 
-export const PrintViewPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <PrintViewPageTablet />;
-  }
-
+const PrintViewPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);
@@ -201,3 +197,15 @@ export const PrintViewPage: React.FC = () => {
     </div>
   );
 };
+
+export const PrintViewPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <PrintViewPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <PrintViewPageTablet key="tablet" />;
+  }
+  return <PrintViewPageDesktop key="desktop" />;
+};
+

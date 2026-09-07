@@ -6,13 +6,9 @@ import type { PaperVersion } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { VersionDetailPageTablet } from '../tablet/papers/VersionDetailPageTablet';
+import { VersionDetailPageMobile } from '../mobile/papers/VersionDetailPageMobile';
 
-export const VersionDetailPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <VersionDetailPageTablet />;
-  }
-
+const VersionDetailPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);
@@ -406,3 +402,15 @@ export const VersionDetailPage: React.FC = () => {
     </div>
   );
 };
+
+export const VersionDetailPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <VersionDetailPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <VersionDetailPageTablet key="tablet" />;
+  }
+  return <VersionDetailPageDesktop key="desktop" />;
+};
+

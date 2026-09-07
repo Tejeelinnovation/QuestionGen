@@ -6,13 +6,9 @@ import type { Paper, Topic } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { PaperConfigurePageTablet } from '../tablet/papers/PaperConfigurePageTablet';
+import { PaperConfigurePageMobile } from '../mobile/papers/PaperConfigurePageMobile';
 
-export const PaperConfigurePage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <PaperConfigurePageTablet />;
-  }
-
+const PaperConfigurePageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const navigate = useNavigate();
@@ -562,3 +558,15 @@ export const PaperConfigurePage: React.FC = () => {
     </div>
   );
 };
+
+export const PaperConfigurePage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <PaperConfigurePageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <PaperConfigurePageTablet key="tablet" />;
+  }
+  return <PaperConfigurePageDesktop key="desktop" />;
+};
+

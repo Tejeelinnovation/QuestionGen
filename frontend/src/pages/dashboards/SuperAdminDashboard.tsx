@@ -2,14 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { SuperAdminDashboardTablet } from '../tablet/dashboards/SuperAdminDashboardTablet';
+import { SuperAdminDashboardMobile } from '../mobile/dashboards/SuperAdminDashboardMobile';
 import type { User } from '../../types';
 
-export const SuperAdminDashboard: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <SuperAdminDashboardTablet />;
-  }
-
+const SuperAdminDashboardDesktop: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -334,4 +330,15 @@ export const SuperAdminDashboard: React.FC = () => {
       )}
     </div>
   );
+};
+
+export const SuperAdminDashboard: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <SuperAdminDashboardMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <SuperAdminDashboardTablet key="tablet" />;
+  }
+  return <SuperAdminDashboardDesktop key="desktop" />;
 };

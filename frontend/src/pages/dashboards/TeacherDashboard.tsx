@@ -4,14 +4,10 @@ import { papersApi } from '../../api/papers';
 import { usersApi } from '../../api/users';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { TeacherDashboardTablet } from '../tablet/dashboards/TeacherDashboardTablet';
+import { TeacherDashboardMobile } from '../mobile/dashboards/TeacherDashboardMobile';
 import type { Paper, User, Delivery } from '../../types';
 
-export const TeacherDashboard: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <TeacherDashboardTablet />;
-  }
-
+const TeacherDashboardDesktop: React.FC = () => {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [students, setStudents] = useState<User[]>([]);
@@ -353,4 +349,15 @@ export const TeacherDashboard: React.FC = () => {
       </div>
     </div>
   );
+};
+
+export const TeacherDashboard: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <TeacherDashboardMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <TeacherDashboardTablet key="tablet" />;
+  }
+  return <TeacherDashboardDesktop key="desktop" />;
 };

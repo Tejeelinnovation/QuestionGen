@@ -4,15 +4,11 @@ import { attemptsApi } from '../../api/attempts';
 import type { AttemptQuestionItem, AttemptStartResponse } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { TestAttemptPageTablet } from '../tablet/attempts/TestAttemptPageTablet';
+import { TestAttemptPageMobile } from '../mobile/attempts/TestAttemptPageMobile';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-export const TestAttemptPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <TestAttemptPageTablet />;
-  }
-
+const TestAttemptPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
   const navigate = useNavigate();
@@ -430,3 +426,15 @@ export const TestAttemptPage: React.FC = () => {
     </div>
   );
 };
+
+export const TestAttemptPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <TestAttemptPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <TestAttemptPageTablet key="tablet" />;
+  }
+  return <TestAttemptPageDesktop key="desktop" />;
+};
+

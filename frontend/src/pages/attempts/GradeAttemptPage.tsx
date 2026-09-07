@@ -4,6 +4,7 @@ import { attemptsApi } from '../../api/attempts';
 import type { TeacherAttemptDetail, TeacherAttemptAnswerItem } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { GradeAttemptPageTablet } from '../tablet/attempts/GradeAttemptPageTablet';
+import { GradeAttemptPageMobile } from '../mobile/attempts/GradeAttemptPageMobile';
 
 interface GradeFormState {
   marks: string;
@@ -13,12 +14,7 @@ interface GradeFormState {
   error: string | null;
 }
 
-export const GradeAttemptPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <GradeAttemptPageTablet />;
-  }
-
+const GradeAttemptPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const attemptId = Number(id);
 
@@ -569,3 +565,15 @@ export const GradeAttemptPage: React.FC = () => {
     </div>
   );
 };
+
+export const GradeAttemptPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <GradeAttemptPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <GradeAttemptPageTablet key="tablet" />;
+  }
+  return <GradeAttemptPageDesktop key="desktop" />;
+};
+

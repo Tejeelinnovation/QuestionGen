@@ -6,13 +6,9 @@ import type { Paper } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { PaperDetailPageTablet } from '../tablet/papers/PaperDetailPageTablet';
+import { PaperDetailPageMobile } from '../mobile/papers/PaperDetailPageMobile';
 
-export const PaperDetailPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <PaperDetailPageTablet />;
-  }
-
+const PaperDetailPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const { hasCapability } = useAuth();
@@ -253,3 +249,15 @@ export const PaperDetailPage: React.FC = () => {
     </div>
   );
 };
+
+export const PaperDetailPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <PaperDetailPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <PaperDetailPageTablet key="tablet" />;
+  }
+  return <PaperDetailPageDesktop key="desktop" />;
+};
+

@@ -6,6 +6,7 @@ import type { Chapter } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { PaperSetupPageTablet } from '../tablet/papers/PaperSetupPageTablet';
+import { PaperSetupPageMobile } from '../mobile/papers/PaperSetupPageMobile';
 import {
   Select,
   SelectContent,
@@ -14,12 +15,7 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 
-export const PaperSetupPage: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <PaperSetupPageTablet />;
-  }
-
+const PaperSetupPageDesktop: React.FC = () => {
   const navigate = useNavigate();
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -336,3 +332,15 @@ export const PaperSetupPage: React.FC = () => {
     </div>
   );
 };
+
+export const PaperSetupPage: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <PaperSetupPageMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <PaperSetupPageTablet key="tablet" />;
+  }
+  return <PaperSetupPageDesktop key="desktop" />;
+};
+

@@ -3,15 +3,11 @@ import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../api/deliveries';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { StudentDashboardTablet } from '../tablet/dashboards/StudentDashboardTablet';
+import { StudentDashboardMobile } from '../mobile/dashboards/StudentDashboardMobile';
 import { AnimatedCard } from '../../components/ui/animated-card';
 import type { Delivery } from '../../types';
 
-export const StudentDashboard: React.FC = () => {
-  const breakpoint = useBreakpoint();
-  if (breakpoint === 'tablet') {
-    return <StudentDashboardTablet />;
-  }
-
+const StudentDashboardDesktop: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -193,4 +189,15 @@ export const StudentDashboard: React.FC = () => {
       </section>
     </div>
   );
+};
+
+export const StudentDashboard: React.FC = () => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') {
+    return <StudentDashboardMobile key="mobile" />;
+  }
+  if (breakpoint === 'tablet') {
+    return <StudentDashboardTablet key="tablet" />;
+  }
+  return <StudentDashboardDesktop key="desktop" />;
 };
