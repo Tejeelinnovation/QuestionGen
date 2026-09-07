@@ -30,7 +30,7 @@ auth_urlpatterns = [
 
 # User management URL patterns — mounted at /api/users/ in root urls.py
 user_list_create = UserViewSet.as_view({"get": "list", "post": "create"})
-user_detail = UserViewSet.as_view({"patch": "partial_update"})
+user_detail = UserViewSet.as_view({"get": "retrieve", "patch": "partial_update"})
 user_grant_permission = UserViewSet.as_view({"post": "grant_permission"})
 user_revoke_permission = UserViewSet.as_view({"delete": "revoke_permission"})
 

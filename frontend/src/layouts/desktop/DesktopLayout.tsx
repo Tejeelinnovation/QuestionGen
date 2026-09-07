@@ -1,31 +1,10 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 
 export const DesktopLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const { user, role_label, logout, hasCapability } = useAuth();
-  const navigate = useNavigate();
+  const { user, hasCapability } = useAuth();
   const location = useLocation();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login', { replace: true });
-  };
-
-  const getRolePillClass = () => {
-    switch (user?.role_label) {
-      case 'Super Admin':
-        return 'pill-forest';
-      case 'School Admin':
-        return 'pill-ember';
-      case 'Teacher':
-        return 'pill-grape';
-      case 'Student':
-        return 'pill-lime';
-      default:
-        return 'pill-muted';
-    }
-  };
 
   // Determine active navigation links based on user capabilities
   const navItems = [
@@ -74,37 +53,31 @@ export const DesktopLayout: React.FC<{ children?: React.ReactNode }> = ({ childr
             </nav>
           </div>
 
-          {/* User Identity & Logout */}
-          <div className="flex items-center gap-4 text-xs">
+          {/* Single Profile Nav Entry Point (Replaces navbar clutter) */}
+          <div className="flex items-center gap-3">
             {user && (
-              <div className="flex items-center gap-3 bg-surface-muted border border-border px-3 py-1.5 rounded-pill">
-                <span className={`pill ${getRolePillClass()}`}>
-                  {role_label || 'User'}
-                </span>
-
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-ink/60">user:</span>
-                  <span className="font-mono font-semibold text-ink">{user.username}</span>
+              <Link
+                to="/profile"
+                id="desktop-profile-btn"
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-pill border text-xs font-heading font-semibold transition-all ${
+                  location.pathname === '/profile'
+                    ? 'bg-ink text-white border-ink shadow-sm'
+                    : 'bg-surface border-border text-ink hover:border-forest/50 hover:bg-surface-muted'
+                }`}
+                title="View Profile & Account Settings"
+              >
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-heading font-bold shrink-0 ${
+                    location.pathname === '/profile'
+                      ? 'bg-lime text-ink'
+                      : 'bg-forest text-white'
+                  }`}
+                >
+                  {user.username.charAt(0).toUpperCase()}
                 </div>
-
-                {user.school_name && (
-                  <div className="hidden xl:flex items-center gap-1 text-ink/60 border-l border-border pl-2.5">
-                    <span>at</span>
-                    <span className="font-medium text-ink truncate max-w-[140px]">
-                      {user.school_name}
-                    </span>
-                  </div>
-                )}
-              </div>
+                <span>Profile</span>
+              </Link>
             )}
-
-            <button
-              id="logout-btn"
-              onClick={handleLogout}
-              className="px-3.5 py-1.5 text-xs font-semibold font-heading rounded-pill border border-border bg-surface text-ink hover:bg-ink hover:text-white transition-colors cursor-pointer"
-            >
-              Sign out
-            </button>
           </div>
         </div>
       </header>

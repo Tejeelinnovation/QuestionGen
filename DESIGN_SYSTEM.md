@@ -181,3 +181,38 @@ import { getStaggerDelay, MOTION, CARD_MOTION } from '@/lib/motion';
 </div>
 ```
 
+---
+
+## User Management & Profile Patterns
+
+### 1. Slide-in Drawer & Update Modal Pattern (`UpdateUserModal`, `CreateUserDrawer`, `CreateSchoolDrawer`)
+
+- **Anatomy**:
+  - Avoids the banned "centered floating card" cliché. Uses right-anchored slide-in sheet / drawer on Desktop, high-elevation full modal on Tablet, and full-screen overlay sheet on Mobile (`max-w-xl` slide-in panel).
+  - Pre-fills current entity data by retrieving the user/school details via `GET /api/users/{id}/`.
+  - Submits via `PATCH /api/users/{id}/` without sending immutable fields (e.g. username/role).
+  - Scoped Edit Affordance: creator scoping logic is encapsulated in `canEditUser(currentUser, targetUser)`. Edit buttons across all roster cards are conditionally rendered so users cannot attempt out-of-scope modifications.
+  - Super Admin Privilege: Super Admin sees a dedicated "Permissions" tab in `UpdateUserModal` to manage user capabilities dynamically.
+
+### 2. Permission Management Pattern (`PermissionManager`)
+
+- **Anatomy & Gating**:
+  - Exclusively available to users holding `CREATE_SCHOOL_ADMIN` capability (Super Admin).
+  - Displays all 10 canonical capabilities categorized by domain (`Administration`, `Curriculum`, `Execution`, `Grading`).
+  - Distinguishes baseline default profile permissions (e.g., `grant_teacher_defaults`) from custom granted capabilities via visual badge tags (`Default Profile` vs `Custom Granted`).
+  - Instant toggle switches: Each toggle click immediately issues `POST /api/users/{id}/permissions/` (grant) or `DELETE /api/users/{id}/permissions/{cap}/` (revoke) with optimistic state feedback and error rollback, eliminating redundant "save changes" friction.
+
+### 3. Profile Page & Navigation Architecture (`/profile`)
+
+- **Navbar Clutter Removal**:
+  - Replaced inline cluttered username, role badges, and floating sign-out buttons in top/side headers with a single unified Profile entry point:
+    - **Desktop**: Clean interactive avatar pill at top right of persistent navbar (`/profile`).
+    - **Tablet**: Touch-friendly profile avatar pill in top bar and collapsible menu item.
+    - **Mobile**: Dedicated `/profile` navigation icon in bottom tab bar.
+- **Profile Screen Layout**:
+  - Displays user identity (Full Name, Username, Email, School branch, Role label, User ID, Date Joined).
+  - Contextual Provenance: Displays "Created by @creator" when user was provisioned by an admin/teacher.
+  - Read-Only Capability Matrix: Transparently lists all granted capabilities for the user without self-granting affordances.
+  - Primary Session Termination: Houses the official, styled Sign Out button with full modal confirmation.
+
+

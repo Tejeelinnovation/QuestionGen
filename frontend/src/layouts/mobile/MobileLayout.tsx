@@ -1,42 +1,17 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import {
   LayoutDashboard,
   FilePlus,
   BookOpen,
   User as UserIcon,
-  LogOut,
-  X,
   ClipboardList,
 } from 'lucide-react';
 
 export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const { user, role_label, logout, hasCapability } = useAuth();
-  const navigate = useNavigate();
+  const { user, hasCapability } = useAuth();
   const location = useLocation();
-  const [isAccountOpen, setIsAccountOpen] = useState(false);
-
-  const handleLogout = async () => {
-    setIsAccountOpen(false);
-    await logout();
-    navigate('/login', { replace: true });
-  };
-
-  const getRolePillClass = () => {
-    switch (user?.role_label) {
-      case 'Super Admin':
-        return 'pill-forest';
-      case 'School Admin':
-        return 'pill-ember';
-      case 'Teacher':
-        return 'pill-grape';
-      case 'Student':
-        return 'pill-lime';
-      default:
-        return 'pill-muted';
-    }
-  };
 
   // Mobile Bottom Tab Items tailored by capability
   const isTeacher = hasCapability('CREATE_PAPER');
@@ -96,20 +71,32 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
           </span>
         </Link>
 
+        {/* Single Profile Nav Entry Point */}
         <div className="flex items-center gap-2">
           {user && (
-            <button
-              onClick={() => setIsAccountOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-pill bg-surface-muted border border-border text-xs active:scale-95 transition-transform"
-              aria-label="Open Account Menu"
+            <Link
+              to="/profile"
+              id="mobile-header-profile-btn"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-pill border text-xs active:scale-95 transition-all ${
+                location.pathname === '/profile'
+                  ? 'bg-ink text-white border-ink'
+                  : 'bg-surface-muted border-border'
+              }`}
+              aria-label="Profile Settings"
             >
-              <span className={`pill text-[10px] py-0.5 px-2 ${getRolePillClass()}`}>
-                {role_label || 'User'}
-              </span>
-              <span className="font-mono text-[11px] font-medium text-ink/70 max-w-[80px] truncate">
+              <div
+                className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-heading font-bold ${
+                  location.pathname === '/profile'
+                    ? 'bg-lime text-ink'
+                    : 'bg-forest text-white'
+                }`}
+              >
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+              <span className="font-mono text-[11px] font-medium max-w-[80px] truncate">
                 {user.username}
               </span>
-            </button>
+            </Link>
           )}
         </div>
       </header>
@@ -146,91 +133,28 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
             );
           })}
 
-          {/* Account Tab */}
-          <button
-            type="button"
-            id="mobile-account-tab-btn"
-            onClick={() => setIsAccountOpen(true)}
-            className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-card transition-colors min-h-[48px] cursor-pointer ${
-              isAccountOpen ? 'text-forest font-semibold' : 'text-ink/60 hover:text-ink'
+          {/* Dedicated Profile Tab (Replaces cluttered bottom sheet) */}
+          <Link
+            to="/profile"
+            id="mobile-profile-tab-btn"
+            className={`flex-1 flex flex-col items-center justify-center py-2 px-1 rounded-card transition-colors min-h-[48px] ${
+              location.pathname === '/profile'
+                ? 'text-forest font-semibold'
+                : 'text-ink/60 hover:text-ink'
             }`}
-            aria-label="Account Settings"
+            aria-label="Profile Settings"
           >
-            <UserIcon className="w-5 h-5 mb-1 stroke-[1.75]" />
+            <UserIcon
+              className={`w-5 h-5 mb-1 ${
+                location.pathname === '/profile' ? 'stroke-[2.5]' : 'stroke-[1.75]'
+              }`}
+            />
             <span className="text-[11px] font-heading tracking-tight leading-none">
-              Account
+              Profile
             </span>
-          </button>
+          </Link>
         </div>
       </nav>
-
-      {/* ── Account Bottom Sheet Drawer ── */}
-      {isAccountOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-ink/40 backdrop-blur-xs transition-opacity duration-200"
-            onClick={() => setIsAccountOpen(false)}
-            aria-hidden="true"
-          />
-
-          {/* Sheet Body */}
-          <div className="relative z-10 w-full bg-surface border-t border-border rounded-t-lg p-5 shadow-float space-y-4 max-w-lg mx-auto animate-in slide-in-from-bottom duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-forest" />
-                <span className="font-heading font-bold text-base text-ink">
-                  Account Details
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsAccountOpen(false)}
-                className="w-8 h-8 rounded-card border border-border bg-surface-muted flex items-center justify-center text-ink/70 hover:text-ink active:scale-95"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {user && (
-              <div className="p-3.5 rounded-card bg-bg border border-border space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className={`pill ${getRolePillClass()}`}>
-                    {role_label || 'User'}
-                  </span>
-                  <span className="font-mono text-xs text-ink/50">ID #{user.id}</span>
-                </div>
-                <div className="font-heading font-bold text-base text-ink">
-                  {user.username}
-                </div>
-                {user.email && (
-                  <div className="text-xs text-ink/70 font-mono">
-                    {user.email}
-                  </div>
-                )}
-                {user.school_name && (
-                  <div className="text-xs text-forest font-semibold pt-1 border-t border-border/60">
-                    School: {user.school_name}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="pt-2">
-              <button
-                type="button"
-                id="mobile-logout-btn"
-                onClick={handleLogout}
-                className="w-full py-3 px-4 rounded-pill border border-border bg-surface-muted text-ink font-heading font-semibold text-sm hover:bg-ink hover:text-white active:scale-95 transition-all flex items-center justify-center gap-2 min-h-[48px] cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign out of System
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

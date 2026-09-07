@@ -5,10 +5,15 @@ import { usersApi } from '../../api/users';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { TeacherDashboardTablet } from '../tablet/dashboards/TeacherDashboardTablet';
 import { TeacherDashboardMobile } from '../mobile/dashboards/TeacherDashboardMobile';
+import { useAuth } from '../../auth/AuthContext';
+import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
+import { UpdateUserModal, canEditUser } from '../../components/users/UpdateUserModal';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
+import { Plus, Edit2 } from 'lucide-react';
 import type { Paper, User, Delivery } from '../../types';
 
 const TeacherDashboardDesktop: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [students, setStudents] = useState<User[]>([]);
@@ -18,6 +23,23 @@ const TeacherDashboardDesktop: React.FC = () => {
   const [papersError, setPapersError] = useState<string | null>(null);
   const [deliveriesError, setDeliveriesError] = useState<string | null>(null);
   const [studentsError, setStudentsError] = useState<string | null>(null);
+
+  // Student create / edit modal states
+  const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
+  const [editUserId, setEditUserId] = useState<number | null>(null);
+
+  const fetchStudents = async () => {
+    setIsLoadingStudents(true);
+    setStudentsError(null);
+    try {
+      const data = await usersApi.getUsers();
+      setStudents(data.filter((u) => u.role_label === 'Student'));
+    } catch (err: any) {
+      setStudentsError(err.response?.data?.detail || 'Failed to load students.');
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  };
 
   useEffect(() => {
     const fetchPapers = async () => {
@@ -43,19 +65,6 @@ const TeacherDashboardDesktop: React.FC = () => {
         setDeliveriesError(err.response?.data?.detail || 'Failed to load deliveries.');
       } finally {
         setIsLoadingDeliveries(false);
-      }
-    };
-
-    const fetchStudents = async () => {
-      setIsLoadingStudents(true);
-      setStudentsError(null);
-      try {
-        const data = await usersApi.getUsers();
-        setStudents(data.filter((u) => u.role_label === 'Student'));
-      } catch (err: any) {
-        setStudentsError(err.response?.data?.detail || 'Failed to load students.');
-      } finally {
-        setIsLoadingStudents(false);
       }
     };
 
@@ -298,9 +307,20 @@ const TeacherDashboardDesktop: React.FC = () => {
                 Students in your teaching scope
               </p>
             </div>
-            <span className="pill pill-grape text-xs">
-              {students.length} Students
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                id="teacher-create-student-btn"
+                onClick={() => setIsCreateStudentOpen(true)}
+                className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill bg-grape text-white hover:bg-grape/90 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Student</span>
+              </button>
+              <span className="pill pill-grape text-xs">
+                {students.length} Students
+              </span>
+            </div>
           </div>
 
           {isLoadingStudents && (
@@ -325,19 +345,35 @@ const TeacherDashboardDesktop: React.FC = () => {
                 <div className="divide-y divide-border/60">
                   {students.map((s) => {
                     const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
+                    const canEdit = canEditUser(currentUser, s);
+
                     return (
-                      <div key={s.id} className="py-2.5 flex items-center justify-between text-xs">
-                        <div>
-                          <div className="font-heading font-semibold text-ink">
+                      <div key={s.id} className="py-2.5 flex items-center justify-between text-xs gap-2">
+                        <div className="min-w-0">
+                          <div className="font-heading font-semibold text-ink truncate">
                             {fullName || s.username}
                           </div>
-                          <div className="font-mono text-[11px] text-ink/50">
+                          <div className="font-mono text-[11px] text-ink/50 truncate">
                             @{s.username} {s.email ? `• ${s.email}` : ''}
                           </div>
                         </div>
-                        <span className="font-mono text-[10px] text-ink/50 bg-bg px-2 py-0.5 rounded-sm">
-                          #{s.id}
-                        </span>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {canEdit && (
+                            <button
+                              type="button"
+                              id={`edit-student-${s.id}`}
+                              onClick={() => setEditUserId(s.id)}
+                              className="px-2 py-0.5 rounded-pill border border-border bg-surface text-ink hover:bg-forest hover:text-white transition-all text-[11px] font-heading font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                          <span className="font-mono text-[10px] text-ink/50 bg-bg px-2 py-0.5 rounded-sm">
+                            #{s.id}
+                          </span>
+                        </div>
                       </div>
                     );
                   })}
@@ -348,6 +384,21 @@ const TeacherDashboardDesktop: React.FC = () => {
         </section>
 
       </div>
+
+      {/* Drawers & Modals */}
+      <CreateUserDrawer
+        isOpen={isCreateStudentOpen}
+        targetProfile="student"
+        onClose={() => setIsCreateStudentOpen(false)}
+        onUserCreated={() => fetchStudents()}
+      />
+
+      <UpdateUserModal
+        userId={editUserId}
+        isOpen={editUserId !== null}
+        onClose={() => setEditUserId(null)}
+        onUserUpdated={() => fetchStudents()}
+      />
     </div>
   );
 };

@@ -4,30 +4,44 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { SuperAdminDashboardTablet } from '../tablet/dashboards/SuperAdminDashboardTablet';
 import { SuperAdminDashboardMobile } from '../mobile/dashboards/SuperAdminDashboardMobile';
 import { getStaggerDelay } from '../../lib/motion';
-import type { User } from '../../types';
+import { CreateSchoolDrawer } from '../../components/schools/CreateSchoolDrawer';
+import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
+import { UpdateUserModal } from '../../components/users/UpdateUserModal';
+import { Plus, Edit2, Building2 } from 'lucide-react';
+import type { User, School } from '../../types';
 
 const SuperAdminDashboardDesktop: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-      try {
-        const data = await usersApi.getUsers();
-        setUsers(data);
-      } catch (err: any) {
-        setErrorMessage(
-          err.response?.data?.detail || 'Failed to load user accounts from the server.'
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Drawer / modal states
+  const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
+  const [createUserProfile, setCreateUserProfile] = useState<'school_admin' | 'teacher' | null>(null);
+  const [editUserId, setEditUserId] = useState<number | null>(null);
 
-    fetchUsers();
+  const fetchData = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const [usersData, schoolsData] = await Promise.all([
+        usersApi.getUsers(),
+        usersApi.getSchools().catch(() => [] as School[]),
+      ]);
+      setUsers(usersData);
+      setSchools(schoolsData);
+    } catch (err: any) {
+      setErrorMessage(
+        err.response?.data?.detail || 'Failed to load accounts directory from the server.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
   const countsByRole = users.reduce<Record<string, number>>((acc, u) => {
@@ -43,22 +57,61 @@ const SuperAdminDashboardDesktop: React.FC = () => {
 
   return (
     <div className="space-y-10">
-      {/* ── Top Typographic Headline with embedded stats ── */}
-      <div className="space-y-2 border-b border-border pb-6">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
-          <span className="w-2 h-2 rounded-full bg-forest" />
-          Global Tenant Control
+      {/* ── Top Typographic Headline with embedded stats & primary create triggers ── */}
+      <div className="border-b border-border pb-6 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+            <span className="w-2 h-2 rounded-full bg-forest" />
+            Global Tenant Control
+          </div>
+          <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+            Super Admin Directory
+          </h1>
+          <p className="font-body text-ink/75 text-base max-w-2xl leading-relaxed">
+            Overseeing{' '}
+            <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
+              {users.length} active system accounts
+            </span>{' '}
+            and{' '}
+            <span className="font-heading font-bold text-ember text-lg underline decoration-ember/40 underline-offset-2">
+              {schools.length} institutions
+            </span>{' '}
+            with full atomic capability governance.
+          </p>
         </div>
-        <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
-          Super Admin Directory
-        </h1>
-        <p className="font-body text-ink/75 text-base max-w-3xl leading-relaxed">
-          Overseeing{' '}
-          <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
-            {users.length} active system user accounts
-          </span>{' '}
-          spanning all school institutions and global permissions.
-        </p>
+
+        {/* Primary Action Buttons (Part A) */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+          <button
+            type="button"
+            id="superadmin-create-school-btn"
+            onClick={() => setIsCreateSchoolOpen(true)}
+            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-ink hover:text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>New School</span>
+          </button>
+
+          <button
+            type="button"
+            id="superadmin-create-schooladmin-btn"
+            onClick={() => setCreateUserProfile('school_admin')}
+            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-ember text-white hover:bg-ember/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>School Admin</span>
+          </button>
+
+          <button
+            type="button"
+            id="superadmin-create-teacher-btn"
+            onClick={() => setCreateUserProfile('teacher')}
+            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Teacher</span>
+          </button>
+        </div>
       </div>
 
       {isLoading && (
@@ -254,7 +307,8 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                       <th className="py-3 px-3">Username</th>
                       <th className="py-3 px-3">Role</th>
                       <th className="py-3 px-3">School ID</th>
-                      <th className="py-3 px-3 text-right">Capabilities</th>
+                      <th className="py-3 px-3 text-center">Capabilities</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -282,16 +336,27 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                         <td className="py-3 px-3 font-mono text-ink/70">
                           {u.school ? `School #${u.school}` : <span className="italic text-ink/40">Global</span>}
                         </td>
-                        <td className="py-3 px-3 text-right">
+                        <td className="py-3 px-3 text-center">
                           <span className="font-mono font-semibold bg-surface-muted border border-border px-2 py-0.5 rounded-sm">
                             {u.capabilities?.length || 0} caps
                           </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            type="button"
+                            id={`edit-user-${u.id}`}
+                            onClick={() => setEditUserId(u.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-pill border border-border bg-surface text-ink hover:bg-forest hover:text-white transition-all font-heading font-semibold text-[11px] cursor-pointer"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
                         </td>
                       </tr>
                     ))}
                     {users.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-ink/50 italic">
+                        <td colSpan={6} className="py-8 text-center text-ink/50 italic">
                           No users registered in directory.
                         </td>
                       </tr>
@@ -304,38 +369,64 @@ const SuperAdminDashboardDesktop: React.FC = () => {
             {/* Right narrow column: Schools Infrastructure Panel (4 cols) */}
             <div className="lg:col-span-4 space-y-6">
               <div className="bg-surface border border-border rounded-lg p-6 shadow-card space-y-4">
-                <div className="border-b border-border pb-3">
-                  <span className="pill pill-forest text-[10px] mb-2">Cluster Config</span>
-                  <h3 className="font-heading font-bold text-lg text-ink">
-                    Schools Management
-                  </h3>
-                  <p className="text-xs text-ink/65 mt-1">
-                    Multi-tenant institutional infrastructure status
-                  </p>
-                </div>
-
-                <div className="bg-bg rounded-card border border-border p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-ink">
-                    <span className="w-2 h-2 rounded-full bg-forest" />
-                    REST Endpoint Status
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div>
+                    <span className="pill pill-forest text-[10px] mb-1">Tenant Clusters</span>
+                    <h3 className="font-heading font-bold text-lg text-ink">
+                      Registered Institutions
+                    </h3>
                   </div>
-                  <p className="text-xs text-ink/70 leading-relaxed">
-                    Schools list backend endpoint pending integration. Scoped school admin creation and paper segregation active.
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateSchoolOpen(true)}
+                    className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-colors cursor-pointer"
+                  >
+                    + New
+                  </button>
                 </div>
 
-                <div className="space-y-2 pt-2 text-xs text-ink/80">
-                  <div className="flex justify-between py-1.5 border-b border-border/60">
+                {/* Schools List */}
+                <div className="space-y-2.5 max-h-[360px] overflow-y-auto">
+                  {schools.map((s) => (
+                    <div
+                      key={s.id}
+                      className="p-3 rounded-card bg-bg border border-border hover:border-border-strong transition-colors space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-heading font-semibold text-xs text-ink truncate">
+                          {s.name}
+                        </span>
+                        <span className="font-mono text-[10px] text-ink/50 bg-surface px-1.5 py-0.5 rounded-sm">
+                          #{s.id}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-ink/65 font-mono">
+                        <span>Board: {s.config?.board || 'Standard'}</span>
+                        <span>•</span>
+                        <span>{s.config?.curriculum || 'NCERT'}</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {schools.length === 0 && (
+                    <div className="p-6 text-center text-xs text-ink/50 italic bg-bg rounded-card border border-border">
+                      No schools registered yet.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 pt-3 border-t border-border text-xs text-ink/80">
+                  <div className="flex justify-between py-1 border-b border-border/60">
                     <span className="text-ink/60">Tenant Isolation</span>
                     <span className="font-mono font-semibold text-forest">ENFORCED</span>
                   </div>
-                  <div className="flex justify-between py-1.5 border-b border-border/60">
+                  <div className="flex justify-between py-1 border-b border-border/60">
                     <span className="text-ink/60">Capability RBAC</span>
                     <span className="font-mono font-semibold text-forest">ACTIVE</span>
                   </div>
-                  <div className="flex justify-between py-1.5">
-                    <span className="text-ink/60">Database Seed</span>
-                    <span className="font-mono font-semibold text-ink">Demo Set v1</span>
+                  <div className="flex justify-between py-1">
+                    <span className="text-ink/60">Total Institutions</span>
+                    <span className="font-mono font-semibold text-ink">{schools.length} registered</span>
                   </div>
                 </div>
               </div>
@@ -344,6 +435,35 @@ const SuperAdminDashboardDesktop: React.FC = () => {
           </div>
         </>
       )}
+
+      {/* ── Modals & Drawers ── */}
+      <CreateSchoolDrawer
+        isOpen={isCreateSchoolOpen}
+        onClose={() => setIsCreateSchoolOpen(false)}
+        onSchoolCreated={() => {
+          fetchData();
+        }}
+      />
+
+      {createUserProfile && (
+        <CreateUserDrawer
+          isOpen={true}
+          targetProfile={createUserProfile}
+          onClose={() => setCreateUserProfile(null)}
+          onUserCreated={() => {
+            fetchData();
+          }}
+        />
+      )}
+
+      <UpdateUserModal
+        userId={editUserId}
+        isOpen={editUserId !== null}
+        onClose={() => setEditUserId(null)}
+        onUserUpdated={() => {
+          fetchData();
+        }}
+      />
     </div>
   );
 };

@@ -4,12 +4,15 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { SchoolAdminDashboardTablet } from '../tablet/dashboards/SchoolAdminDashboardTablet';
 import { SchoolAdminDashboardMobile } from '../mobile/dashboards/SchoolAdminDashboardMobile';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
+import { UpdateUserModal } from '../../components/users/UpdateUserModal';
+import { Edit2 } from 'lucide-react';
 import type { User } from '../../types';
 
 const SchoolAdminDashboardDesktop: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [editUserId, setEditUserId] = useState<number | null>(null);
 
   // Create Teacher form state
   const [username, setUsername] = useState('');
@@ -189,8 +192,17 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="hidden sm:flex flex-col items-end justify-center">
-                        <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-pill bg-bg border border-border text-ink/70">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          id={`edit-teacher-${t.id}`}
+                          onClick={() => setEditUserId(t.id)}
+                          className="px-3 py-1 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-forest hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                        <span className="hidden sm:inline-block font-mono text-xs font-semibold px-2.5 py-1 rounded-pill bg-bg border border-border text-ink/70">
                           Active
                         </span>
                       </div>
@@ -321,6 +333,13 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
         </div>
 
       </div>
+
+      <UpdateUserModal
+        userId={editUserId}
+        isOpen={editUserId !== null}
+        onClose={() => setEditUserId(null)}
+        onUserUpdated={() => fetchUsers()}
+      />
     </div>
   );
 };

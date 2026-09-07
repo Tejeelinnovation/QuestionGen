@@ -25,4 +25,7 @@ urlpatterns = [
 
     # Attempts, answers, scoring, results
     path("api/", include(("attempts.urls", "attempts"), namespace="attempts")),
+
+    # Schools tenant management
+    path("api/schools/", include(("schools.urls", "schools"), namespace="schools")),
 ]

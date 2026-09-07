@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
 import type { User } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
-import { Building2, UserPlus, CheckCircle2 } from 'lucide-react';
+import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
+import { Building2, UserPlus, CheckCircle2, Edit2 } from 'lucide-react';
 
 export const SchoolAdminDashboardMobile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [editUserId, setEditUserId] = useState<number | null>(null);
 
   // Create Teacher form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -128,7 +130,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
             className="flex items-center gap-1 px-3 py-1 rounded-pill bg-ember text-white font-heading font-semibold text-xs active:scale-95 transition-transform cursor-pointer"
           >
             <UserPlus className="w-3.5 h-3.5" />
-            <span>{showAddForm ? 'Close Form' : '+ Add Teacher'}</span>
+            <span>{showAddForm ? 'Close Form' : 'Add Teacher'}</span>
           </button>
         </div>
       </div>
@@ -256,13 +258,31 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                 </span>
                 <span className="pill pill-grape text-[10px] py-0.5">Faculty</span>
               </div>
-              <div className="text-xs text-ink/60 font-mono">
-                @{t.username} {t.email && `• ${t.email}`}
+              <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
+                <div className="text-xs text-ink/60 font-mono truncate max-w-[170px]">
+                  @{t.username} {t.email && `• ${t.email}`}
+                </div>
+                <button
+                  type="button"
+                  id={`mobile-edit-teacher-${t.id}`}
+                  onClick={() => setEditUserId(t.id)}
+                  className="px-2.5 py-1 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  <span>Edit</span>
+                </button>
               </div>
             </div>
           ))
         )}
       </div>
+
+      <UpdateUserModal
+        userId={editUserId}
+        isOpen={editUserId !== null}
+        onClose={() => setEditUserId(null)}
+        onUserUpdated={() => fetchUsers()}
+      />
     </div>
   );
 };

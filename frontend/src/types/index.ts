@@ -33,7 +33,18 @@ export interface User {
   role_label: RoleLabel;
   school: number | null;
   school_name?: string;
+  created_by?: number | null;
+  created_by_username?: string | null;
   capabilities: CapabilityName[];
+  is_active?: boolean;
+  date_joined?: string;
+}
+
+export interface UserUpdateInput {
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  is_active?: boolean;
 }
 
 export interface AuthTokens {
@@ -325,8 +336,18 @@ export interface GradeAnswerResponse {
 export interface School {
   id: number;
   name: string;
-  code: string;
-  is_active: boolean;
-  created_at: string;
+  config?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SchoolCreateInput {
+  name: string;
+  config?: Record<string, any>;
+}
+
+export interface SchoolUpdateInput {
+  name?: string;
+  config?: Record<string, any>;
 }
 

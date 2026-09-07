@@ -1,17 +1,11 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 
 export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const { user, role_label, logout, hasCapability } = useAuth();
-  const navigate = useNavigate();
+  const { user, hasCapability } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login', { replace: true });
-  };
 
   const getRolePillClass = () => {
     switch (user?.role_label) {
@@ -60,24 +54,33 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
             </Link>
           </div>
 
-          {/* User Badge & Fast Logout */}
+          {/* Single Profile Nav Entry Point (Replaces navbar clutter) */}
           <div className="flex items-center gap-3">
             {user && (
-              <div className="hidden sm:flex items-center gap-2 bg-surface-muted border border-border px-3 py-1.5 rounded-pill text-xs">
-                <span className={`pill ${getRolePillClass()}`}>
-                  {role_label || 'User'}
+              <Link
+                to="/profile"
+                id="tablet-profile-btn"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-pill border transition-all ${
+                  location.pathname === '/profile'
+                    ? 'bg-ink text-white border-ink'
+                    : 'bg-surface border-border text-ink hover:bg-surface-muted'
+                }`}
+                aria-label="Profile Settings"
+              >
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-heading font-bold shrink-0 ${
+                    location.pathname === '/profile'
+                      ? 'bg-lime text-ink'
+                      : 'bg-forest text-white'
+                  }`}
+                >
+                  {user.username.charAt(0).toUpperCase()}
+                </div>
+                <span className="font-heading font-semibold text-xs max-w-[100px] truncate">
+                  {user.username}
                 </span>
-                <span className="font-mono font-semibold text-ink">{user.username}</span>
-              </div>
+              </Link>
             )}
-
-            <button
-              id="logout-btn"
-              onClick={handleLogout}
-              className="px-4 py-2 text-xs font-semibold font-heading rounded-pill border border-border bg-surface text-ink hover:bg-ink hover:text-white transition-colors cursor-pointer min-h-[40px] flex items-center"
-            >
-              Sign out
-            </button>
           </div>
         </div>
       </header>
@@ -121,7 +124,7 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
             <div className="p-4 rounded-card bg-bg border border-border space-y-2">
               <div className="flex items-center justify-between">
                 <span className={`pill ${getRolePillClass()}`}>
-                  {role_label || 'User'}
+                  {user.role_label || 'User'}
                 </span>
                 <span className="font-mono text-xs text-ink/50">#{user.id}</span>
               </div>
@@ -159,20 +162,35 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
                 </Link>
               );
             })}
+
+            {/* Profile Entry in Drawer */}
+            <Link
+              to="/profile"
+              onClick={() => setSidebarOpen(false)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-card text-sm font-heading font-semibold transition-all min-h-[48px] ${
+                location.pathname === '/profile'
+                  ? 'bg-forest text-white shadow-sm'
+                  : 'text-ink/80 hover:bg-surface-muted hover:text-ink border border-border/60'
+              }`}
+            >
+              <span>Profile & Capabilities</span>
+              <span className="text-xs opacity-70">→</span>
+            </Link>
           </nav>
         </div>
 
         {/* Drawer Footer */}
-        <div className="p-6 border-t border-border space-y-3">
+        <div className="p-6 border-t border-border space-y-2">
           <div className="font-mono text-[11px] text-ink/40 uppercase">
             Question Generation System • Tablet
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-full py-3 rounded-pill border border-border bg-surface text-ink text-xs font-heading font-semibold hover:bg-ink hover:text-white transition-colors cursor-pointer min-h-[44px]"
+          <Link
+            to="/profile"
+            onClick={() => setSidebarOpen(false)}
+            className="w-full py-2.5 px-3 rounded-pill border border-border bg-surface text-ink/80 text-xs font-heading font-medium hover:text-ink flex items-center justify-center gap-1.5 transition-colors"
           >
-            Sign out
-          </button>
+            <span>Account & Sign Out</span>
+          </Link>
         </div>
       </aside>
 

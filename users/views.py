@@ -143,7 +143,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
             # based on the requested profile, so we only require authentication here.
             return [IsAuthenticated()]
 
-        if self.action == "partial_update":
+        if self.action in ("retrieve", "partial_update"):
             return [IsAuthenticated(), IsWithinSchoolScope(), IsWithinCreatedByScope()]
 
         if self.action == "grant_permission":
@@ -228,6 +228,20 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
             UserSerializer(user, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+    # ------------------------------------------------------------------
+    # retrieve — GET /api/users/{id}/
+    # ------------------------------------------------------------------
+
+    def retrieve(self, request, pk=None):
+        """Retrieve a scoped user profile."""
+        user = self._get_scoped_user(request, pk)
+        if isinstance(user, Response):
+            return user
+        for perm in [IsWithinSchoolScope(), IsWithinCreatedByScope()]:
+            if not perm.has_object_permission(request, self, user):
+                return Response({"detail": perm.message}, status=status.HTTP_403_FORBIDDEN)
+        return Response(UserSerializer(user, context={"request": request}).data)
 
     # ------------------------------------------------------------------
     # partial_update — PATCH /api/users/{id}/
