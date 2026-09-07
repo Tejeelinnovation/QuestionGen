@@ -6,6 +6,7 @@ import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { QuestionReviewPageTablet } from '../tablet/papers/QuestionReviewPageTablet';
 import { QuestionReviewPageMobile } from '../mobile/papers/QuestionReviewPageMobile';
+import { getStaggerDelay, MOTION } from '../../lib/motion';
 
 const QuestionReviewPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -216,14 +217,13 @@ const QuestionReviewPageDesktop: React.FC = () => {
       {/* ── QUESTION CANDIDATE CARDS (STAGGERED ENTRANCE MOTION) ── */}
       <div className="space-y-4">
         {questions.map((q, idx) => {
-          const delayMs = idx * 45;
           const isMcq = q.question_type === 'MCQ';
 
           return (
             <div
               key={q.id}
-              style={{ animationDelay: `${delayMs}ms` }}
-              className="animate-card-enter bg-surface border border-border rounded-card p-5 sm:p-6 shadow-card hover:border-forest/50 transition-all duration-200 space-y-4"
+              style={getStaggerDelay(idx)}
+              className={`animate-card-enter bg-surface border border-border rounded-card p-5 sm:p-6 shadow-card hover:border-forest/50 space-y-4 ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}
             >
               {/* Top Card Bar: Sequence, Tags & Integrated Controls */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/70 pb-3">

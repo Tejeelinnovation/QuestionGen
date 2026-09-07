@@ -5,6 +5,7 @@ import type { StudentAttemptResult } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { ResultPageTablet } from '../tablet/attempts/ResultPageTablet';
 import { ResultPageMobile } from '../mobile/attempts/ResultPageMobile';
+import { getStaggerDelay } from '../../lib/motion';
 
 const ResultPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -171,7 +172,6 @@ const ResultPageDesktop: React.FC = () => {
 
         <div className="space-y-4">
           {result.answers?.map((a, idx) => {
-            const delayMs = idx * 45;
             const isIncorrect = a.is_correct === false;
             const isPending = a.pending_manual_review;
 
@@ -203,7 +203,7 @@ const ResultPageDesktop: React.FC = () => {
             return (
               <div
                 key={a.question_id || idx}
-                style={{ animationDelay: `${delayMs}ms` }}
+                style={getStaggerDelay(idx)}
                 className={`animate-card-enter bg-surface border border-border ${borderTreatment} rounded-card p-5 sm:p-6 shadow-card space-y-3.5`}
               >
                 {/* Header row */}

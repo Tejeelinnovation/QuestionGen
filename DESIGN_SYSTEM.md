@@ -1,4 +1,4 @@
-﻿# Design System Reference
+# Design System Reference
 **Question Generation System — UI Redesign**
 
 > This is the authoritative reference for all redesign prompts (2-8).
@@ -127,4 +127,57 @@ Icon library: lucide-react (Nova preset)
 
 ### Utility
 - `src/lib/utils.ts` - cn() helper (clsx + tailwind-merge)
+- `src/lib/motion.ts` - Single source of truth for motion tokens, physics & utilities
 - `src/hooks/useBreakpoint.ts` - Breakpoint detection hook
+
+---
+
+## Motion & Animation System
+
+All motion across desktop, tablet, and mobile is centralized in `src/lib/motion.ts` and `src/index.css`.
+Components must NEVER scatter hardcoded duration, delay, or easing values.
+
+### Motion Tokens Summary
+
+| Token | Desktop / Tablet | Mobile (Touch) | Purpose |
+|---|---|---|---|
+| **Stagger Delay** | `60ms` per item | `40ms` per item | Sequential list/grid entrance pacing |
+| **Entrance Duration** | `300ms` | `200ms` | Smooth card & section entrance |
+| **Entrance Easing** | `cubic-bezier(0.16, 1, 0.3, 1)` | `ease-out` | Decelerating natural arrival |
+| **Entrance Transform** | `translateY(12px) -> 0` | `translateY(6px) -> 0` | Lighter vertical displacement on mobile |
+| **Hover-Lift Transform** | `-translate-y-1` (-4px) | N/A (Touch) | Standard elevation on mouse hover |
+| **Hover-Lift Shadow** | `hover:shadow-md` | N/A (Touch) | Elevated card depth on hover |
+| **Hover-Lift Timing** | `200ms ease-out` | N/A (Touch) | Snappy, non-sluggish hover response |
+| **Card Touch Press** | `active:scale-[0.99]` | `active:scale-[0.99]` | Tactile compression on touch tap |
+| **Button Touch Press** | `active:scale-95` | `active:scale-95` | Instant tactile feedback on button clicks |
+| **Press Duration** | `100ms ease-out` | `100ms ease-out` | Snappy tap return |
+
+### Explicitly Non-Animated Scope
+
+To preserve performance, clarity, and focus, the following elements MUST NOT have entrance or morphing animations:
+1. **Action Buttons**: Buttons must feel crisp and instant. No sluggish transitions or width morphing (`duration-100` active press only).
+2. **Form Inputs**: Focus rings and borders switch with instant feedback (`transition-colors duration-100`). No sliding labels or layout morphs.
+3. **Test Attempt Screen**: Under strict minimal-motion constraints (Prompt 4). Deliberately **no** card entrance animations and **no** hover-lifts during exams to prevent visual fatigue and support cognitive calm.
+
+### Usage in Components
+
+```tsx
+import { getStaggerDelay, MOTION, CARD_MOTION } from '@/lib/motion';
+
+// 1. Staggered list items
+{items.map((item, idx) => (
+  <div
+    key={item.id}
+    style={getStaggerDelay(idx)}
+    className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}
+  >
+    ...
+  </div>
+))}
+
+// 2. Or using pre-bundled classes:
+<div className={`animate-card-enter ${CARD_MOTION.interactive}`}>
+  ...
+</div>
+```
+

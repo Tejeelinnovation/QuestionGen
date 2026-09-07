@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
 import type { User } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { Building2, UserPlus, CheckCircle2 } from 'lucide-react';
 
 export const SchoolAdminDashboardMobile: React.FC = () => {
@@ -241,10 +242,11 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
             No teachers registered yet. Use the form above to add faculty.
           </div>
         ) : (
-          teachers.map((t) => (
+          teachers.map((t, idx) => (
             <div
               key={t.id}
-              className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-1.5"
+              style={getStaggerDelay(idx, true)}
+              className={`animate-card-enter p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-1.5 ${MOTION.touch.card.className}`}
             >
               <div className="flex items-center justify-between">
                 <span className="font-heading font-bold text-sm text-ink">

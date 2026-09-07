@@ -3,6 +3,7 @@ import { usersApi } from '../../api/users';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { SchoolAdminDashboardTablet } from '../tablet/dashboards/SchoolAdminDashboardTablet';
 import { SchoolAdminDashboardMobile } from '../mobile/dashboards/SchoolAdminDashboardMobile';
+import { getStaggerDelay, MOTION } from '../../lib/motion';
 import type { User } from '../../types';
 
 const SchoolAdminDashboardDesktop: React.FC = () => {
@@ -151,13 +152,12 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
             <div className="space-y-3.5">
               {teachers.map((t, idx) => {
                 const fullName = [t.first_name, t.last_name].filter(Boolean).join(' ');
-                const delayMs = idx * 60;
 
                 return (
                   <div
                     key={t.id}
-                    style={{ animationDelay: `${delayMs}ms` }}
-                    className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-1 hover:border-border-strong transition-all duration-200 group"
+                    style={getStaggerDelay(idx)}
+                    className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:border-border-strong group ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1.5 flex-1">

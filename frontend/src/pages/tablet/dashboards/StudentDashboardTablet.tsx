@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../../api/deliveries';
 import type { Delivery } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 
 export const StudentDashboardTablet: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -91,7 +92,7 @@ export const StudentDashboardTablet: React.FC = () => {
 
           {/* ── 2-Column Bento Reflow for Delivery Cards ── */}
           <div className="grid grid-cols-2 gap-4">
-            {deliveries.map((d) => {
+            {deliveries.map((d, index) => {
               const cachedAttemptId = sessionStorage.getItem(`delivery_${d.id}_attempt`);
 
               const statusPill = cachedAttemptId ? (
@@ -111,7 +112,8 @@ export const StudentDashboardTablet: React.FC = () => {
               return (
                 <div
                   key={d.id}
-                  className="bg-surface border border-border rounded-card p-5 shadow-card active:scale-[0.99] transition-transform flex flex-col justify-between space-y-4"
+                  style={getStaggerDelay(index)}
+                  className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card flex flex-col justify-between space-y-4 ${MOTION.touch.card.className}`}
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-2">

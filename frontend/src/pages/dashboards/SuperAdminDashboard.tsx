@@ -3,6 +3,7 @@ import { usersApi } from '../../api/users';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { SuperAdminDashboardTablet } from '../tablet/dashboards/SuperAdminDashboardTablet';
 import { SuperAdminDashboardMobile } from '../mobile/dashboards/SuperAdminDashboardMobile';
+import { getStaggerDelay } from '../../lib/motion';
 import type { User } from '../../types';
 
 const SuperAdminDashboardDesktop: React.FC = () => {
@@ -89,7 +90,10 @@ const SuperAdminDashboardDesktop: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-3 items-end pt-6">
               
               {/* Card 1: Super Admins (Forest Green Accent) - tilted left */}
-              <div className="transform lg:-rotate-2 lg:translate-y-2 hover:-translate-y-2 hover:rotate-0 transition-all duration-300 bg-forest text-white rounded-card p-5 shadow-card flex flex-col justify-between min-h-[220px]">
+              <div
+                style={getStaggerDelay(0)}
+                className="animate-card-enter transform lg:-rotate-2 lg:translate-y-2 hover:-translate-y-2 hover:rotate-0 transition-all duration-200 ease-out hover:shadow-md active:scale-[0.99] bg-forest text-white rounded-card p-5 shadow-card flex flex-col justify-between min-h-[220px]"
+              >
                 <div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="pill pill-lime text-[10px] uppercase tracking-wide">
@@ -113,7 +117,10 @@ const SuperAdminDashboardDesktop: React.FC = () => {
               </div>
 
               {/* Card 2: School Admins (Burnt Ember Accent) - tilted slight right, taller */}
-              <div className="transform lg:rotate-1 lg:-translate-y-3 hover:-translate-y-3 hover:rotate-0 transition-all duration-300 bg-ember text-white rounded-card p-5 shadow-card flex flex-col justify-between min-h-[245px]">
+              <div
+                style={getStaggerDelay(1)}
+                className="animate-card-enter transform lg:rotate-1 lg:-translate-y-3 hover:-translate-y-3 hover:rotate-0 transition-all duration-200 ease-out hover:shadow-md active:scale-[0.99] bg-ember text-white rounded-card p-5 shadow-card flex flex-col justify-between min-h-[245px]"
+              >
                 <div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="pill bg-white text-ink text-[10px] uppercase tracking-wide">
@@ -137,7 +144,10 @@ const SuperAdminDashboardDesktop: React.FC = () => {
               </div>
 
               {/* Card 3: Teachers (Dusty Grape Accent) - tilted slight left */}
-              <div className="transform lg:-rotate-1 lg:translate-y-1 hover:-translate-y-2 hover:rotate-0 transition-all duration-300 bg-grape text-white rounded-card p-5 shadow-card flex flex-col justify-between min-h-[230px]">
+              <div
+                style={getStaggerDelay(2)}
+                className="animate-card-enter transform lg:-rotate-1 lg:translate-y-1 hover:-translate-y-2 hover:rotate-0 transition-all duration-200 ease-out hover:shadow-md active:scale-[0.99] bg-grape text-white rounded-card p-5 shadow-card flex flex-col justify-between min-h-[230px]"
+              >
                 <div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="pill pill-muted text-[10px] uppercase tracking-wide">
@@ -161,7 +171,10 @@ const SuperAdminDashboardDesktop: React.FC = () => {
               </div>
 
               {/* Card 4: Students (Lime Accent) - tilted right */}
-              <div className="transform lg:rotate-2 lg:-translate-y-1 hover:-translate-y-2 hover:rotate-0 transition-all duration-300 bg-lime text-ink rounded-card p-5 shadow-card flex flex-col justify-between min-h-[225px]">
+              <div
+                style={getStaggerDelay(3)}
+                className="animate-card-enter transform lg:rotate-2 lg:-translate-y-1 hover:-translate-y-2 hover:rotate-0 transition-all duration-200 ease-out hover:shadow-md active:scale-[0.99] bg-lime text-ink rounded-card p-5 shadow-card flex flex-col justify-between min-h-[225px]"
+              >
                 <div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="pill bg-ink text-white text-[10px] uppercase tracking-wide">
@@ -185,7 +198,10 @@ const SuperAdminDashboardDesktop: React.FC = () => {
               </div>
 
               {/* Card 5: Institutions (Surface Accent) - upright, staggered */}
-              <div className="transform lg:rotate-0 lg:translate-y-3 hover:-translate-y-1 transition-all duration-300 bg-surface border-2 border-border text-ink rounded-card p-5 shadow-card flex flex-col justify-between min-h-[215px]">
+              <div
+                style={getStaggerDelay(4)}
+                className="animate-card-enter transform lg:rotate-0 lg:translate-y-3 hover:-translate-y-1 transition-all duration-200 ease-out hover:shadow-md active:scale-[0.99] bg-surface border-2 border-border text-ink rounded-card p-5 shadow-card flex flex-col justify-between min-h-[215px]"
+              >
                 <div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="pill pill-forest text-[10px] uppercase tracking-wide">

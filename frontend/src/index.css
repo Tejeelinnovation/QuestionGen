@@ -49,12 +49,18 @@
   --shadow-float: 0 8px 24px -4px rgb(17 17 17 / 0.12);
   --shadow-none:  none;
 
-  /* ── Animation ── */
-  --animate-card-enter: card-enter 0.35s ease-out both;
+  /* ── Motion & Animation Tokens ── */
+  --duration-enter:        300ms;
+  --duration-enter-mobile: 200ms;
+  --duration-hover:        200ms;
+  --duration-press:        100ms;
+  --ease-entrance:         cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-hover:            ease-out;
+  --animate-card-enter:    card-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   KEYFRAMES
+   KEYFRAMES & MOTION MEDIA QUERIES
    ───────────────────────────────────────────────────────────────── */
 
 @keyframes card-enter {
@@ -65,6 +71,25 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Mobile motion is genuinely lighter/faster (200ms, 6px rise) */
+@media (max-width: 767px) {
+  @keyframes card-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-card-enter {
+    animation-duration: 200ms !important;
+    animation-timing-function: ease-out !important;
   }
 }
 
@@ -162,4 +187,28 @@
   .breakpoint-badge-desktop { background: var(--color-forest); color: #fff; }
   .breakpoint-badge-tablet  { background: var(--color-ember);  color: #fff; }
   .breakpoint-badge-mobile  { background: var(--color-grape);  color: #fff; }
+
+  /* ── Motion Utilities ── */
+  .card-lift {
+    transition: all 200ms ease-out;
+  }
+  .card-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 6px -1px rgb(17 17 17 / 0.1), 0 2px 4px -2px rgb(17 17 17 / 0.1);
+  }
+
+  .card-touch-active {
+    transition: transform 100ms ease-out;
+  }
+  .card-touch-active:active {
+    transform: scale(0.99);
+  }
+
+  .btn-press {
+    transition: transform 100ms ease-out;
+  }
+  .btn-press:active {
+    transform: scale(0.95);
+  }
 }
+

@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { MOTION } from '@/lib/motion';
 
 /**
  * BentoGrid — asymmetric grid layout component.
@@ -66,10 +67,9 @@ export const BentoCard: React.FC<BentoCardProps> = ({
       onClick={onClick}
       className={cn(
         // Base card styles matching our design token radius (12px = rounded-xl)
-        'relative rounded-xl border p-5 overflow-hidden',
-        'transition-transform duration-300 ease-out',
-        // Hover lift — purposeful, not generic fade
-        onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-md' : '',
+        'relative rounded-xl border p-5 overflow-hidden shadow-card',
+        // Hover lift and touch active press
+        onClick ? `cursor-pointer ${MOTION.hoverLift.className} ${MOTION.touch.card.className}` : '',
         accentClasses[accent],
         className
       )}

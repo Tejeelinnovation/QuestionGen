@@ -5,6 +5,7 @@ import { usersApi } from '../../api/users';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { TeacherDashboardTablet } from '../tablet/dashboards/TeacherDashboardTablet';
 import { TeacherDashboardMobile } from '../mobile/dashboards/TeacherDashboardMobile';
+import { getStaggerDelay, MOTION } from '../../lib/motion';
 import type { Paper, User, Delivery } from '../../types';
 
 const TeacherDashboardDesktop: React.FC = () => {
@@ -149,12 +150,11 @@ const TeacherDashboardDesktop: React.FC = () => {
         {!isLoadingPapers && !papersError && papers.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {papers.map((p, idx) => {
-              const delayMs = idx * 50;
               return (
                 <div
                   key={p.id}
-                  style={{ animationDelay: `${delayMs}ms` }}
-                  className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-1 hover:border-forest transition-all duration-200 flex flex-col justify-between"
+                  style={getStaggerDelay(idx)}
+                  className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:border-forest flex flex-col justify-between ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -235,10 +235,11 @@ const TeacherDashboardDesktop: React.FC = () => {
 
           {!isLoadingDeliveries && !deliveriesError && deliveries.length > 0 && (
             <div className="space-y-3">
-              {deliveries.map((d) => (
+              {deliveries.map((d, idx) => (
                 <div
                   key={d.id}
-                  className="bg-surface border border-border rounded-card p-4 shadow-card hover:-translate-y-0.5 transition-transform flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  style={getStaggerDelay(idx)}
+                  className={`animate-card-enter bg-surface border border-border rounded-card p-4 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">

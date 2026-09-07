@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
 import type { User } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { ShieldCheck, Search, RefreshCw } from 'lucide-react';
 
 export const SuperAdminDashboardMobile: React.FC = () => {
@@ -169,10 +170,11 @@ export const SuperAdminDashboardMobile: React.FC = () => {
             No accounts match your criteria.
           </div>
         ) : (
-          filteredUsers.map((u) => (
+          filteredUsers.map((u, idx) => (
             <div
               key={u.id}
-              className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2 hover:border-forest/40 transition-colors"
+              style={getStaggerDelay(idx, true)}
+              className={`animate-card-enter p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2 ${MOTION.touch.card.className}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-0.5">

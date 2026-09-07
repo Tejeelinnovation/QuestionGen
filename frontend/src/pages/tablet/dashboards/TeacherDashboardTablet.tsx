@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import { usersApi } from '../../../api/users';
 import type { Paper, User, Delivery } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 
 export const TeacherDashboardTablet: React.FC = () => {
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -137,10 +138,11 @@ export const TeacherDashboardTablet: React.FC = () => {
 
         {!isLoadingPapers && !papersError && papers.length > 0 && (
           <div className="grid grid-cols-2 gap-4">
-            {papers.map((p) => (
+            {papers.map((p, idx) => (
               <div
                 key={p.id}
-                className="bg-surface border border-border rounded-card p-5 shadow-card active:scale-[0.99] transition-transform flex flex-col justify-between space-y-4"
+                style={getStaggerDelay(idx)}
+                className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card flex flex-col justify-between space-y-4 ${MOTION.touch.card.className}`}
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -211,10 +213,11 @@ export const TeacherDashboardTablet: React.FC = () => {
 
           {!isLoadingDeliveries && !deliveriesError && (
             <div className="space-y-3">
-              {deliveries.map((d) => (
+              {deliveries.map((d, idx) => (
                 <div
                   key={d.id}
-                  className="bg-surface border border-border rounded-card p-4 shadow-card active:scale-[0.99] transition-transform space-y-3"
+                  style={getStaggerDelay(idx)}
+                  className={`animate-card-enter bg-surface border border-border rounded-card p-4 shadow-card space-y-3 ${MOTION.touch.card.className}`}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">

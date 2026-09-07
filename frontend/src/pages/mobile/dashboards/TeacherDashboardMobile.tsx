@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import { usersApi } from '../../../api/users';
 import type { Paper, User, Delivery } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import {
   FilePlus,
   Sparkles,
@@ -138,13 +139,14 @@ export const TeacherDashboardMobile: React.FC = () => {
             </Link>
           </div>
         ) : (
-          papers.map((p) => {
+          papers.map((p, idx) => {
             const isFinal = p.status === 'FINALIZED';
             return (
               <Link
                 key={p.id}
                 to={`/papers/${p.id}`}
-                className="block p-4 rounded-card bg-surface border border-border shadow-xs hover:border-forest/40 active:scale-[0.99] transition-all space-y-2.5"
+                style={getStaggerDelay(idx, true)}
+                className={`animate-card-enter block p-4 rounded-card bg-surface border border-border shadow-xs space-y-2.5 ${MOTION.touch.card.className}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-0.5">
@@ -164,8 +166,8 @@ export const TeacherDashboardMobile: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[11px] text-ink/60">
-                  <span className="font-mono">
+                <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[11px]">
+                  <span className="font-mono text-ink/50">
                     {p.versions?.length || 1} Version{(p.versions?.length || 1) === 1 ? '' : 's'}
                   </span>
                   <div className="flex items-center gap-1 text-forest font-heading font-semibold text-xs">
@@ -194,10 +196,11 @@ export const TeacherDashboardMobile: React.FC = () => {
             No active test deliveries. Finalize a paper to schedule one.
           </div>
         ) : (
-          deliveries.map((d) => (
+          deliveries.map((d, idx) => (
             <div
               key={d.id}
-              className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2"
+              style={getStaggerDelay(idx, true)}
+              className={`animate-card-enter p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2 ${MOTION.touch.card.className}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-0.5">

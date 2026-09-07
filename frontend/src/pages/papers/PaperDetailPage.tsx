@@ -7,6 +7,7 @@ import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { PaperDetailPageTablet } from '../tablet/papers/PaperDetailPageTablet';
 import { PaperDetailPageMobile } from '../mobile/papers/PaperDetailPageMobile';
+import { getStaggerDelay, MOTION } from '../../lib/motion';
 
 const PaperDetailPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -163,14 +164,13 @@ const PaperDetailPageDesktop: React.FC = () => {
 
           <div className="space-y-3">
             {versions.map((v, idx) => {
-              const delayMs = idx * 50;
               const isFinal = v.status === 'FINALIZED';
 
               return (
                 <div
                   key={v.id}
-                  style={{ animationDelay: `${delayMs}ms` }}
-                  className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-0.5 hover:border-forest transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  style={getStaggerDelay(idx)}
+                  className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:border-forest flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center gap-2.5">

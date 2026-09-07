@@ -7,6 +7,7 @@ import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { PaperConfigurePageTablet } from '../tablet/papers/PaperConfigurePageTablet';
 import { PaperConfigurePageMobile } from '../mobile/papers/PaperConfigurePageMobile';
+import { MOTION } from '../../lib/motion';
 
 const PaperConfigurePageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -444,7 +445,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
             </div>
 
             {/* Staggered Card 1: Marks per Question */}
-            <div className="bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-0.5 transition-transform space-y-2">
+            <div className={`bg-surface border border-border rounded-card p-5 shadow-card space-y-2 ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}>
               <div className="flex items-center justify-between">
                 <label
                   htmlFor="filter-marks-per-q"
@@ -471,7 +472,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
             </div>
 
             {/* Staggered Card 2: Target Total Marks */}
-            <div className="bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-0.5 transition-transform space-y-2 mt-1">
+            <div className={`bg-surface border border-border rounded-card p-5 shadow-card space-y-2 mt-1 ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}>
               <div className="flex items-center justify-between">
                 <label
                   htmlFor="filter-total-marks"
@@ -497,7 +498,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
             </div>
 
             {/* Staggered Card 3: Max Quantity */}
-            <div className="bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-0.5 transition-transform space-y-2 mt-1">
+            <div className={`bg-surface border border-border rounded-card p-5 shadow-card space-y-2 mt-1 ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}>
               <div className="flex items-center justify-between">
                 <label
                   htmlFor="filter-quantity"

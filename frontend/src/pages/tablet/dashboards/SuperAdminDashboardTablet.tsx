@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
 import type { User } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 
 export const SuperAdminDashboardTablet: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -117,10 +118,11 @@ export const SuperAdminDashboardTablet: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {roleDeck.map((role) => (
+              {roleDeck.map((role, idx) => (
                 <div
                   key={role.title}
-                  className={`rounded-card p-5 shadow-card flex flex-col justify-between min-h-[160px] active:scale-[0.99] transition-all ${role.cardClass}`}
+                  style={getStaggerDelay(idx)}
+                  className={`animate-card-enter rounded-card p-5 shadow-card flex flex-col justify-between min-h-[160px] ${MOTION.touch.card.className} ${role.cardClass}`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">

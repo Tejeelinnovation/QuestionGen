@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
 import type { User } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 
 export const SchoolAdminDashboardTablet: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -233,12 +234,13 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
             </div>
 
             <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
-              {teachers.map((t) => {
+              {teachers.map((t, idx) => {
                 const fullName = [t.first_name, t.last_name].filter(Boolean).join(' ');
                 return (
                   <div
                     key={t.id}
-                    className="p-3.5 rounded-card bg-bg border border-border/80 flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
+                    style={getStaggerDelay(idx)}
+                    className={`animate-card-enter p-3.5 rounded-card bg-bg border border-border/80 flex items-center justify-between gap-3 ${MOTION.touch.card.className}`}
                   >
                     <div className="space-y-0.5 min-w-0">
                       <div className="font-heading font-bold text-sm text-ink truncate">

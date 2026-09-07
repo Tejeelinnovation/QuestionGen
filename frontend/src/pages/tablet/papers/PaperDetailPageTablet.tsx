@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import { useAuth } from '../../../auth/AuthContext';
 import type { Paper } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 
 export const PaperDetailPageTablet: React.FC = () => {
@@ -142,12 +143,13 @@ export const PaperDetailPageTablet: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {versions.map((v) => {
+            {versions.map((v, idx) => {
               const isFinal = v.status === 'FINALIZED';
               return (
                 <div
                   key={v.id}
-                  className="bg-surface border border-border rounded-card p-4 shadow-card active:scale-[0.99] transition-transform flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  style={getStaggerDelay(idx)}
+                  className={`animate-card-enter bg-surface border border-border rounded-card p-4 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${MOTION.touch.card.className}`}
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">

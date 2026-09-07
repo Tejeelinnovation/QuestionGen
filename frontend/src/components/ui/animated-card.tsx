@@ -14,12 +14,14 @@ import { cn } from '@/lib/utils';
  * NOT glassmorphism. NOT uniform shadow on every card.
  */
 
+import { getStaggerDelay, MOTION } from '@/lib/motion';
+
 interface AnimatedCardProps {
   className?: string;
   children: React.ReactNode;
   /**
    * Stagger index for entrance animation (0-based).
-   * Automatically multiplies into animation-delay.
+   * Automatically multiplies into standard 60ms animation-delay.
    */
   staggerIndex?: number;
   /** Hover accent border color */
@@ -41,20 +43,18 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   hoverAccent = 'forest',
   onClick,
 }) => {
-  const delayMs = staggerIndex * 60; // 60ms stagger between cards
-
   return (
     <div
       onClick={onClick}
-      style={{ animationDelay: `${delayMs}ms` }}
+      style={getStaggerDelay(staggerIndex)}
       className={cn(
         // Base
-        'rounded-xl border border-ink/10 bg-white overflow-hidden',
-        // Entrance animation — slides up from 12px below, fades in
-        'animate-card-enter',
-        // Hover lift + border accent swap
-        'transition-all duration-250 ease-out',
-        'hover:-translate-y-1',
+        'rounded-xl border border-ink/10 bg-white overflow-hidden shadow-card',
+        // Standard entrance animation
+        MOTION.enter.desktop.className,
+        // Standard unified hover-lift physics & touch active press
+        MOTION.hoverLift.className,
+        MOTION.touch.card.className,
         onClick ? 'cursor-pointer' : '',
         hoverBorderMap[hoverAccent],
         className

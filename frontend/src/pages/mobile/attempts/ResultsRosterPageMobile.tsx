@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
 import type { DeliveryResultsRoster, DeliveryRosterAttempt } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
 
 export const ResultsRosterPageMobile: React.FC = () => {
@@ -113,7 +114,7 @@ export const ResultsRosterPageMobile: React.FC = () => {
             No students assigned to this delivery.
           </div>
         ) : (
-          submissions.map((item) => {
+          submissions.map((item, idx) => {
             const hasAttempt = !!item.attempt_id;
             const isEvaluated = item.status === 'EVALUATED';
             const isSubmitted = item.status === 'SUBMITTED';
@@ -121,7 +122,8 @@ export const ResultsRosterPageMobile: React.FC = () => {
             return (
               <div
                 key={item.student_id}
-                className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5"
+                style={getStaggerDelay(idx, true)}
+                className={`animate-card-enter p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5 ${MOTION.touch.card.className}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-0.5">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../../api/deliveries';
 import type { Delivery } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { BookOpen, Clock, ArrowRight, Award } from 'lucide-react';
 
 export const StudentDashboardMobile: React.FC = () => {
@@ -92,14 +93,15 @@ export const StudentDashboardMobile: React.FC = () => {
             No tests assigned to you at this time. Check back later!
           </div>
         ) : (
-          deliveries.map((d) => {
+          deliveries.map((d, idx) => {
             const cachedAttemptId = sessionStorage.getItem(`delivery_${d.id}_attempt`);
             const isCompleted = !!cachedAttemptId;
 
             return (
               <div
                 key={d.id}
-                className="p-4 rounded-card bg-surface border border-border shadow-xs space-y-3"
+                style={getStaggerDelay(idx, true)}
+                className={`animate-card-enter p-4 rounded-card bg-surface border border-border shadow-xs space-y-3 ${MOTION.touch.card.className}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-0.5">

@@ -5,6 +5,7 @@ import type { DeliveryResultsRoster } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { ResultsRosterPageTablet } from '../tablet/attempts/ResultsRosterPageTablet';
 import { ResultsRosterPageMobile } from '../mobile/attempts/ResultsRosterPageMobile';
+import { getStaggerDelay, MOTION } from '../../lib/motion';
 
 const ResultsRosterPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -169,7 +170,6 @@ const ResultsRosterPageDesktop: React.FC = () => {
 
         <div className="space-y-3">
           {roster.attempts.map((a, idx) => {
-            const delayMs = idx * 45;
             const isEvaluated = a.status === 'EVALUATED';
             const isSubmitted = a.status === 'SUBMITTED';
             const initials = a.student_username.slice(0, 2).toUpperCase();
@@ -177,8 +177,8 @@ const ResultsRosterPageDesktop: React.FC = () => {
             return (
               <div
                 key={a.attempt_id}
-                style={{ animationDelay: `${delayMs}ms` }}
-                className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-0.5 hover:border-forest transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                style={getStaggerDelay(idx)}
+                className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:border-forest flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}
               >
                 {/* Student Info & Visual Status Anchor */}
                 <div className="flex items-center gap-4">

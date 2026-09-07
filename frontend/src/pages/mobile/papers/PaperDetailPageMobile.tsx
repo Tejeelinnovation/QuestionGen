@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import { useAuth } from '../../../auth/AuthContext';
 import type { Paper } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { FilePlus, ChevronRight } from 'lucide-react';
 
@@ -120,13 +121,14 @@ export const PaperDetailPageMobile: React.FC = () => {
             </Link>
           </div>
         ) : (
-          paper.versions.map((v) => {
+          paper.versions.map((v, idx) => {
             const isFinal = v.status === 'FINALIZED';
             return (
               <Link
                 key={v.id}
                 to={`/papers/${paperId}/versions/${v.id}`}
-                className="block p-3.5 rounded-card bg-surface border border-border shadow-xs hover:border-forest/40 active:scale-[0.99] transition-all space-y-2"
+                style={getStaggerDelay(idx, true)}
+                className={`animate-card-enter block p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2 ${MOTION.touch.card.className}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

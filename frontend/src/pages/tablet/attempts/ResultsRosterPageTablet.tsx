@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
 import type { DeliveryResultsRoster } from '../../../types';
+import { getStaggerDelay, MOTION } from '../../../lib/motion';
 
 export const ResultsRosterPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -165,7 +166,7 @@ export const ResultsRosterPageTablet: React.FC = () => {
         </div>
 
         <div className="space-y-3.5">
-          {roster.attempts.map((a) => {
+          {roster.attempts.map((a, idx) => {
             const isEvaluated = a.status === 'EVALUATED';
             const isSubmitted = a.status === 'SUBMITTED';
             const initials = a.student_username.slice(0, 2).toUpperCase();
@@ -173,7 +174,8 @@ export const ResultsRosterPageTablet: React.FC = () => {
             return (
               <div
                 key={a.attempt_id}
-                className="bg-surface border border-border rounded-card p-5 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 active:border-forest/70 transition-all"
+                style={getStaggerDelay(idx)}
+                className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${MOTION.touch.card.className}`}
               >
                 {/* Student Info */}
                 <div className="flex items-center gap-4">
