@@ -47,7 +47,6 @@ export const TeacherDashboard: React.FC = () => {
       setStudentsError(null);
       try {
         const data = await usersApi.getUsers();
-        // Backend scopes users for teacher to students
         setStudents(data.filter((u) => u.role_label === 'Student'));
       } catch (err: any) {
         setStudentsError(err.response?.data?.detail || 'Failed to load students.');
@@ -62,214 +61,289 @@ export const TeacherDashboard: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Teacher Dashboard</h1>
+    <div className="space-y-10">
+      {/* ── Top Typographic Headline & Primary Action ── */}
+      <div className="border-b border-border pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+            <span className="w-2 h-2 rounded-full bg-forest" />
+            Teacher Examination Workspace
+          </div>
+          <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+            Academic Studio
+          </h1>
+          <p className="font-body text-ink/75 text-base max-w-2xl leading-relaxed">
+            Directing{' '}
+            <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
+              {papers.length} question papers
+            </span>{' '}
+            and{' '}
+            <span className="font-heading font-bold text-ember text-lg underline decoration-ember/40 underline-offset-2">
+              {deliveries.length} test deliveries
+            </span>{' '}
+            for{' '}
+            <span className="font-heading font-bold text-grape text-lg underline decoration-grape/40 underline-offset-2">
+              {students.length} enrolled students
+            </span>.
+          </p>
+        </div>
+
         <Link
           to="/papers/new"
           id="create-test-btn"
-          className="border border-gray-400 bg-gray-100 hover:bg-gray-200 px-4 py-2 text-sm font-medium"
+          className="self-start md:self-auto px-5 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 shadow-sm transition-all cursor-pointer flex items-center gap-2"
         >
-          Create Test
+          <span>+ Create New Paper</span>
         </Link>
       </div>
 
-      {/* Papers Section */}
-      <section className="border border-gray-300 p-4">
-        <h2 className="text-lg font-semibold mb-3">My Question Papers</h2>
+      {/* ── Category Separation Architecture (Ref: 01 Color Blocked Functional Sections) ── */}
 
-        {isLoadingPapers && <div className="text-sm text-gray-600 py-2">Loading papers...</div>}
+      {/* Category 1: Question Papers (Forest Color Block) */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between border-l-4 border-forest pl-3">
+          <div>
+            <h2 className="font-heading font-bold text-xl text-ink">
+              Authored Question Papers
+            </h2>
+            <p className="text-xs text-ink/65">
+              Drafted curriculum papers, syllabus blueprints & generated versions
+            </p>
+          </div>
+          <span className="pill pill-forest text-xs">
+            {papers.length} Papers in Archive
+          </span>
+        </div>
+
+        {isLoadingPapers && (
+          <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
+            Loading papers repository...
+          </div>
+        )}
 
         {papersError && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm mb-4">
+          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
             {papersError}
           </div>
         )}
 
-        {!isLoadingPapers && !papersError && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100 text-left">
-                  <th className="border border-gray-300 p-2">ID</th>
-                  <th className="border border-gray-300 p-2">Title</th>
-                  <th className="border border-gray-300 p-2">Chapter</th>
-                  <th className="border border-gray-300 p-2">Versions</th>
-                  <th className="border border-gray-300 p-2">Created At</th>
-                  <th className="border border-gray-300 p-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {papers.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 p-2">{p.id}</td>
-                    <td className="border border-gray-300 p-2 font-medium">
-                      <Link
-                        to={`/papers/${p.id}`}
-                        className="text-blue-600 hover:underline font-medium"
-                      >
+        {!isLoadingPapers && !papersError && papers.length === 0 && (
+          <div className="bg-surface border-2 border-dashed border-border rounded-lg p-10 text-center space-y-3">
+            <span className="pill pill-forest text-xs">Repository Ready</span>
+            <h3 className="font-heading font-bold text-lg text-ink">No Question Papers Created Yet</h3>
+            <p className="text-xs text-ink/70 max-w-sm mx-auto">
+              Synthesize your first exam using Bloom’s taxonomy balancing and textbook syllabus mapping.
+            </p>
+            <Link
+              to="/papers/new"
+              className="inline-block mt-2 px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90"
+            >
+              Start First Paper
+            </Link>
+          </div>
+        )}
+
+        {!isLoadingPapers && !papersError && papers.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {papers.map((p, idx) => {
+              const delayMs = idx * 50;
+              return (
+                <div
+                  key={p.id}
+                  style={{ animationDelay: `${delayMs}ms` }}
+                  className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-1 hover:border-forest transition-all duration-200 flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs text-ink/50">
+                        Paper #{p.id}
+                      </span>
+                      <span className="pill pill-muted text-[10px]">
+                        {p.version_count ?? 0} {p.version_count === 1 ? 'Version' : 'Versions'}
+                      </span>
+                    </div>
+
+                    <h3 className="font-heading font-bold text-lg text-ink line-clamp-2">
+                      <Link to={`/papers/${p.id}`} className="hover:text-forest transition-colors">
                         {p.title}
                       </Link>
-                    </td>
-                    <td className="border border-gray-300 p-2">{p.chapter_title || `Chapter #${p.chapter}`}</td>
-                    <td className="border border-gray-300 p-2">
-                      <span className="border border-gray-300 px-2 py-0.5 text-xs bg-gray-100 font-semibold">
-                        {p.version_count ?? 0}
-                      </span>
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-gray-600">
+                    </h3>
+
+                    <div className="text-xs text-ink/70 flex items-center gap-1.5 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-forest" />
+                      <span>{p.chapter_title || `Chapter #${p.chapter}`}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-border/70 flex items-center justify-between text-xs">
+                    <span className="font-mono text-[11px] text-ink/50">
                       {new Date(p.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="border border-gray-300 p-2">
-                      <Link
-                        to={`/papers/${p.id}`}
-                        className="border border-gray-300 bg-gray-50 hover:bg-gray-100 px-2 py-1 text-xs inline-block font-medium"
-                      >
-                        View &rarr;
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-                {papers.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="border border-gray-300 p-4 text-center text-gray-500">
-                      No question papers created yet. Click &quot;Create Test&quot; above to start.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                    </span>
+                    <Link
+                      to={`/papers/${p.id}`}
+                      className="px-3 py-1.5 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors"
+                    >
+                      Open Studio →
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
 
-      {/* Deliveries & Results Section */}
-      <section className="border border-gray-300 p-4">
-        <h2 className="text-lg font-semibold mb-3">Test Deliveries & Results</h2>
-
-        {isLoadingDeliveries && (
-          <div className="text-sm text-gray-600 py-2">Loading deliveries...</div>
-        )}
-
-        {deliveriesError && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm mb-4">
-            {deliveriesError}
+      {/* Category 2 & 3: Asymmetric Split for Deliveries (Ember) and Enrolled Students (Grape) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Category 2: Deliveries & Assessment (Ember Block - 7 cols) */}
+        <section className="lg:col-span-7 space-y-4">
+          <div className="flex items-center justify-between border-l-4 border-ember pl-3">
+            <div>
+              <h2 className="font-heading font-bold text-xl text-ink">
+                Test Deliveries & Results
+              </h2>
+              <p className="text-xs text-ink/65">
+                Active test instances, student delivery sessions & rosters
+              </p>
+            </div>
+            <span className="pill pill-ember text-xs">
+              {deliveries.length} Deliveries
+            </span>
           </div>
-        )}
 
-        {!isLoadingDeliveries && !deliveriesError && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100 text-left">
-                  <th className="border border-gray-300 p-2">Delivery ID</th>
-                  <th className="border border-gray-300 p-2">Paper / Version</th>
-                  <th className="border border-gray-300 p-2">Mode</th>
-                  <th className="border border-gray-300 p-2">Assigned Students</th>
-                  <th className="border border-gray-300 p-2">Created</th>
-                  <th className="border border-gray-300 p-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deliveries.map((d) => (
-                  <tr key={d.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 p-2 font-mono">#{d.id}</td>
-                    <td className="border border-gray-300 p-2 font-medium">
-                      {d.paper_title || 'Paper'} (Ver. {d.version_label})
-                    </td>
-                    <td className="border border-gray-300 p-2">
+          {isLoadingDeliveries && (
+            <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
+              Loading test deliveries...
+            </div>
+          )}
+
+          {deliveriesError && (
+            <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
+              {deliveriesError}
+            </div>
+          )}
+
+          {!isLoadingDeliveries && !deliveriesError && deliveries.length === 0 && (
+            <div className="bg-surface border border-border rounded-lg p-6 text-center text-xs text-ink/60">
+              No deliveries scheduled yet. Deliver a finalized paper version to view student performance.
+            </div>
+          )}
+
+          {!isLoadingDeliveries && !deliveriesError && deliveries.length > 0 && (
+            <div className="space-y-3">
+              {deliveries.map((d) => (
+                <div
+                  key={d.id}
+                  className="bg-surface border border-border rounded-card p-4 shadow-card hover:-translate-y-0.5 transition-transform flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-ink">
+                        Delivery #{d.id}
+                      </span>
                       <span
-                        className={`text-xs px-2 py-0.5 border font-semibold ${
-                          d.mode === 'ONLINE'
-                            ? 'bg-blue-50 text-blue-800 border-blue-200'
-                            : 'bg-gray-100 text-gray-800 border-gray-300'
+                        className={`pill text-[10px] ${
+                          d.mode === 'ONLINE' ? 'pill-lime' : 'pill-muted'
                         }`}
                       >
                         {d.mode}
                       </span>
-                    </td>
-                    <td className="border border-gray-300 p-2">
-                      {d.assigned_students?.length || 0} student(s)
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-gray-600">
-                      {new Date(d.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 space-x-2">
-                      {d.mode === 'ONLINE' ? (
-                        <Link
-                          to={`/deliveries/${d.id}/results`}
-                          className="border border-blue-500 bg-blue-50 hover:bg-blue-100 text-blue-800 px-2 py-1 text-xs inline-block font-medium"
-                        >
-                          Results Roster &rarr;
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-gray-500 italic">Print Only</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {deliveries.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="border border-gray-300 p-4 text-center text-gray-500"
-                    >
-                      No deliveries scheduled yet. Deliver a finalized paper version to view results.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      <span className="pill pill-muted text-[10px]">
+                        Ver. {d.version_label}
+                      </span>
+                    </div>
+
+                    <h4 className="font-heading font-semibold text-sm text-ink">
+                      {d.paper_title || 'Question Paper'}
+                    </h4>
+
+                    <div className="text-[11px] text-ink/60 font-mono">
+                      {d.assigned_students?.length || 0} candidates assigned • Scheduled {new Date(d.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <div>
+                    {d.mode === 'ONLINE' ? (
+                      <Link
+                        to={`/deliveries/${d.id}/results`}
+                        className="inline-block px-3.5 py-1.5 rounded-pill bg-ember text-white font-heading font-semibold text-xs hover:bg-ember/90 transition-colors"
+                      >
+                        Results Roster →
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-ink/50 italic px-3 py-1">
+                        Print Ready
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Category 3: Students Roster (Grape Block - 5 cols) */}
+        <section className="lg:col-span-5 space-y-4">
+          <div className="flex items-center justify-between border-l-4 border-grape pl-3">
+            <div>
+              <h2 className="font-heading font-bold text-xl text-ink">
+                Enrolled Students
+              </h2>
+              <p className="text-xs text-ink/65">
+                Students in your teaching scope
+              </p>
+            </div>
+            <span className="pill pill-grape text-xs">
+              {students.length} Students
+            </span>
           </div>
-        )}
-      </section>
 
-      {/* Students Section */}
-      <section className="border border-gray-300 p-4">
-        <h2 className="text-lg font-semibold mb-3">Assigned Students</h2>
+          {isLoadingStudents && (
+            <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
+              Loading student roster...
+            </div>
+          )}
 
-        {isLoadingStudents && <div className="text-sm text-gray-600 py-2">Loading students...</div>}
+          {studentsError && (
+            <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
+              {studentsError}
+            </div>
+          )}
 
-        {studentsError && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm mb-4">
-            {studentsError}
-          </div>
-        )}
+          {!isLoadingStudents && !studentsError && (
+            <div className="bg-surface border border-border rounded-lg p-4 shadow-card">
+              {students.length === 0 ? (
+                <div className="text-center py-6 text-xs text-ink/50 italic">
+                  No students assigned to your current classroom scope.
+                </div>
+              ) : (
+                <div className="divide-y divide-border/60">
+                  {students.map((s) => {
+                    const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
+                    return (
+                      <div key={s.id} className="py-2.5 flex items-center justify-between text-xs">
+                        <div>
+                          <div className="font-heading font-semibold text-ink">
+                            {fullName || s.username}
+                          </div>
+                          <div className="font-mono text-[11px] text-ink/50">
+                            @{s.username} {s.email ? `• ${s.email}` : ''}
+                          </div>
+                        </div>
+                        <span className="font-mono text-[10px] text-ink/50 bg-bg px-2 py-0.5 rounded-sm">
+                          #{s.id}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
 
-        {!isLoadingStudents && !studentsError && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100 text-left">
-                  <th className="border border-gray-300 p-2">ID</th>
-                  <th className="border border-gray-300 p-2">Username</th>
-                  <th className="border border-gray-300 p-2">Full Name</th>
-                  <th className="border border-gray-300 p-2">Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 p-2">{s.id}</td>
-                    <td className="border border-gray-300 p-2 font-medium">{s.username}</td>
-                    <td className="border border-gray-300 p-2">
-                      {[s.first_name, s.last_name].filter(Boolean).join(' ') || '—'}
-                    </td>
-                    <td className="border border-gray-300 p-2">{s.email || '—'}</td>
-                  </tr>
-                ))}
-                {students.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="border border-gray-300 p-4 text-center text-gray-500">
-                      No students found in your scope.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      </div>
     </div>
   );
 };

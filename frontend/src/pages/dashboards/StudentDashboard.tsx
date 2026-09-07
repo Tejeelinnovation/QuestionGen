@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../api/deliveries';
+import { AnimatedCard } from '../../components/ui/animated-card';
 import type { Delivery } from '../../types';
 
 export const StudentDashboard: React.FC = () => {
@@ -27,103 +28,160 @@ export const StudentDashboard: React.FC = () => {
     fetchDeliveries();
   }, []);
 
+  const completedCount = deliveries.filter((d) =>
+    sessionStorage.getItem(`delivery_${d.id}_attempt`)
+  ).length;
+
+  const pendingCount = deliveries.length - completedCount;
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Student Dashboard</h1>
+    <div className="space-y-10">
+      {/* ── Top Typographic Headline with embedded stats ── */}
+      <div className="border-b border-border pb-6 space-y-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+          <span className="w-2 h-2 rounded-full bg-forest" />
+          Student Testing Portal
+        </div>
+        <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+          Assigned Assessments Desk
+        </h1>
+        <p className="font-body text-ink/75 text-base max-w-2xl leading-relaxed">
+          You currently have{' '}
+          <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
+            {pendingCount} test{pendingCount === 1 ? '' : 's'} ready for examination
+          </span>{' '}
+          and{' '}
+          <span className="font-heading font-bold text-grape text-lg underline decoration-grape/40 underline-offset-2">
+            {completedCount} submitted attempt{completedCount === 1 ? '' : 's'}
+          </span>.
+        </p>
+      </div>
 
-      {/* Assigned Tests Section */}
-      <section className="border border-gray-300 p-4">
-        <h2 className="text-lg font-semibold mb-3">Assigned Tests</h2>
+      {isLoading && (
+        <div className="p-10 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium">
+          Loading assigned assessments...
+        </div>
+      )}
 
-        {isLoading && <div className="text-sm text-gray-600 py-2">Loading assigned tests...</div>}
+      {errorMessage && (
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
+          {errorMessage}
+        </div>
+      )}
 
-        {errorMessage && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm mb-4">
-            {errorMessage}
+      {!isLoading && !errorMessage && deliveries.length === 0 && (
+        <div className="bg-surface border-2 border-dashed border-border rounded-lg p-12 text-center space-y-3">
+          <span className="pill pill-forest text-xs">Queue Clear</span>
+          <h3 className="font-heading font-bold text-xl text-ink">No Assessments Assigned</h3>
+          <p className="text-xs text-ink/70 max-w-md mx-auto">
+            When your instructors schedule an online or proctored test session, it will appear right here with full access controls.
+          </p>
+        </div>
+      )}
+
+      {!isLoading && !errorMessage && deliveries.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading font-bold text-xl text-ink">
+              Available Test Deliveries
+            </h2>
+            <span className="font-mono text-xs text-ink/60 bg-surface px-3 py-1 rounded-pill border border-border">
+              {deliveries.length} Total Deliveries
+            </span>
           </div>
-        )}
 
-        {!isLoading && !errorMessage && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100 text-left">
-                  <th className="border border-gray-300 p-2">Delivery ID</th>
-                  <th className="border border-gray-300 p-2">Test Title</th>
-                  <th className="border border-gray-300 p-2">Mode</th>
-                  <th className="border border-gray-300 p-2">Status</th>
-                  <th className="border border-gray-300 p-2">Available Window</th>
-                  <th className="border border-gray-300 p-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deliveries.map((d) => {
-                  const cachedAttemptId = sessionStorage.getItem(`delivery_${d.id}_attempt`);
-                  return (
-                    <tr key={d.id} className="hover:bg-gray-50">
-                      <td className="border border-gray-300 p-2">{d.id}</td>
-                      <td className="border border-gray-300 p-2 font-medium">
-                        {d.paper_title || `Delivery #${d.id}`}
-                      </td>
-                      <td className="border border-gray-300 p-2">
-                        <span className="border border-gray-400 px-2 py-0.5 text-xs">
+          {/* Staggered AnimatedCards for deliveries (Requirements: status as colored badges grape/forest/ember) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {deliveries.map((d, index) => {
+              const cachedAttemptId = sessionStorage.getItem(`delivery_${d.id}_attempt`);
+
+              // Status badges: Forest for submitted/completed, Ember for active/window expiring, Grape for assigned/ready
+              const statusPill = cachedAttemptId ? (
+                <span className="pill pill-forest">
+                  ✓ Submitted
+                </span>
+              ) : d.mode === 'ONLINE' ? (
+                <span className="pill pill-grape">
+                  Ready to Attempt
+                </span>
+              ) : (
+                <span className="pill pill-ember">
+                  In-Person / Print
+                </span>
+              );
+
+              return (
+                <AnimatedCard
+                  key={d.id}
+                  staggerIndex={index}
+                  hoverAccent={cachedAttemptId ? 'forest' : 'ember'}
+                  className="p-6 flex flex-col justify-between min-h-[250px] shadow-card border border-border"
+                >
+                  <div className="space-y-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs text-ink/50">
+                        Delivery #{d.id}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`pill text-[10px] ${d.mode === 'ONLINE' ? 'pill-lime' : 'pill-muted'}`}>
                           {d.mode}
                         </span>
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {cachedAttemptId ? (
-                          <span className="border border-green-300 bg-green-50 text-green-800 px-1.5 py-0.5 font-medium">
-                            Submitted
-                          </span>
-                        ) : (
-                          <span className="border border-gray-300 bg-gray-100 text-gray-700 px-1.5 py-0.5">
-                            Assigned
-                          </span>
-                        )}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-gray-600">
-                        {d.available_from ? new Date(d.available_from).toLocaleString() : 'Now'}
-                        {' - '}
-                        {d.available_until ? new Date(d.available_until).toLocaleString() : 'No expiry'}
-                      </td>
-                      <td className="border border-gray-300 p-2 space-x-2">
-                        <Link
-                          to={`/deliveries/${d.id}/attempt`}
-                          className="inline-block border border-gray-400 bg-gray-100 hover:bg-gray-200 px-3 py-1 text-xs font-medium"
-                        >
-                          {cachedAttemptId ? 'Re-open' : 'Start / Resume'}
-                        </Link>
-                        {cachedAttemptId && (
-                          <Link
-                            to={`/attempts/${cachedAttemptId}/result`}
-                            className="inline-block border border-blue-400 bg-blue-50 hover:bg-blue-100 text-blue-900 px-3 py-1 text-xs font-medium"
-                          >
-                            View Result
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {deliveries.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="border border-gray-300 p-4 text-center text-gray-500">
-                      No active tests assigned to you.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                        {statusPill}
+                      </div>
+                    </div>
 
-      {/* Past Results Section */}
-      <section className="border border-gray-300 p-4">
-        <h2 className="text-lg font-semibold mb-2">Past Results</h2>
-        <p className="text-sm text-gray-600 bg-gray-100 p-3 border border-gray-200">
-          Individual attempt results and feedback are available directly after submission.
-          Comprehensive test results review screen will be expanded in upcoming iterations.
+                    <h3 className="font-heading font-bold text-xl text-ink leading-snug">
+                      {d.paper_title || `Delivery Session #${d.id}`}
+                    </h3>
+
+                    <div className="text-xs text-ink/65 space-y-1 pt-1">
+                      <div className="font-mono text-[11px] text-ink/70">
+                        {d.available_from ? new Date(d.available_from).toLocaleDateString() : 'Now'}
+                        {' — '}
+                        {d.available_until ? new Date(d.available_until).toLocaleDateString() : 'No deadline'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-5 mt-4 border-t border-border/70 flex flex-wrap items-center gap-2">
+                    <Link
+                      to={`/deliveries/${d.id}/attempt`}
+                      className={`px-4 py-2 rounded-pill font-heading font-semibold text-xs transition-all ${
+                        cachedAttemptId
+                          ? 'bg-surface-muted text-ink hover:bg-ink hover:text-white border border-border'
+                          : 'bg-forest text-white hover:bg-forest/90 shadow-sm'
+                      }`}
+                    >
+                      {cachedAttemptId ? 'Re-open Attempt' : 'Start Assessment →'}
+                    </Link>
+
+                    {cachedAttemptId && (
+                      <Link
+                        to={`/attempts/${cachedAttemptId}/result`}
+                        className="px-4 py-2 rounded-pill bg-grape text-white font-heading font-semibold text-xs hover:bg-grape/90 transition-all shadow-sm"
+                      >
+                        View Result
+                      </Link>
+                    )}
+                  </div>
+                </AnimatedCard>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Asymmetric Bottom Review Panel ── */}
+      <section className="bg-surface border border-border rounded-lg p-6 sm:p-8 shadow-card space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="pill pill-forest text-[10px]">Academic Records</span>
+          <h2 className="font-heading font-bold text-lg text-ink">
+            Assessment Results & Review Archive
+          </h2>
+        </div>
+        <p className="text-xs sm:text-sm text-ink/75 leading-relaxed max-w-3xl">
+          Individual evaluation reports and scoring feedback are issued immediately upon online test submission.
+          Historical score cards, answer sheet reviews, and class performance distribution will expand automatically as you complete scheduled terms.
         </p>
       </section>
     </div>

@@ -63,7 +63,6 @@ export const SchoolAdminDashboard: React.FC = () => {
       setFirstName('');
       setLastName('');
       setEmail('');
-      // Refresh user list
       fetchUsers();
     } catch (err: any) {
       const detail =
@@ -80,167 +79,245 @@ export const SchoolAdminDashboard: React.FC = () => {
   const teachers = users.filter((u) => u.role_label === 'Teacher');
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">School Admin Dashboard</h1>
-
-      {/* Teachers List */}
-      <section className="border border-gray-300 p-4">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold">School Teachers</h2>
-          <button
-            onClick={fetchUsers}
-            disabled={isLoading}
-            className="border border-gray-400 px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 cursor-pointer"
-          >
-            Refresh
-          </button>
+    <div className="space-y-8">
+      {/* ── Top Typographic Headline with embedded stats ── */}
+      <div className="border-b border-border pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-ember">
+            <span className="w-2 h-2 rounded-full bg-ember" />
+            School Administration
+          </div>
+          <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+            Faculty & Department Management
+          </h1>
+          <p className="font-body text-ink/75 text-base max-w-2xl leading-relaxed">
+            Directing{' '}
+            <span className="font-heading font-bold text-ember text-lg underline decoration-ember/40 underline-offset-2">
+              {teachers.length} certified teachers
+            </span>{' '}
+            in this school branch with question authoring and delivery permissions.
+          </p>
         </div>
 
-        {isLoading && <div className="text-sm text-gray-600 py-2">Loading teachers...</div>}
+        <button
+          onClick={fetchUsers}
+          disabled={isLoading}
+          className="self-start md:self-auto px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-ink hover:text-white transition-all cursor-pointer disabled:opacity-50"
+        >
+          {isLoading ? 'Refreshing...' : '↻ Refresh Roster'}
+        </button>
+      </div>
 
-        {errorMessage && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm mb-4">
-            {errorMessage}
-          </div>
-        )}
+      {errorMessage && (
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
+          {errorMessage}
+        </div>
+      )}
 
-        {!isLoading && !errorMessage && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100 text-left">
-                  <th className="border border-gray-300 p-2">ID</th>
-                  <th className="border border-gray-300 p-2">Username</th>
-                  <th className="border border-gray-300 p-2">Name</th>
-                  <th className="border border-gray-300 p-2">Email</th>
-                  <th className="border border-gray-300 p-2">Role</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teachers.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-300 p-2">{t.id}</td>
-                    <td className="border border-gray-300 p-2 font-medium">{t.username}</td>
-                    <td className="border border-gray-300 p-2">
-                      {[t.first_name, t.last_name].filter(Boolean).join(' ') || '—'}
-                    </td>
-                    <td className="border border-gray-300 p-2">{t.email || '—'}</td>
-                    <td className="border border-gray-300 p-2">{t.role_label}</td>
-                  </tr>
-                ))}
-                {teachers.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500">
-                      No teachers found in this school.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* Create Teacher Form */}
-      <section className="border border-gray-300 p-4 max-w-lg">
-        <h2 className="text-lg font-semibold mb-3">Create New Teacher</h2>
-
-        {formSuccess && (
-          <div className="border border-green-300 bg-green-50 text-green-800 p-3 text-sm mb-3">
-            {formSuccess}
-          </div>
-        )}
-
-        {formError && (
-          <div className="border border-red-300 bg-red-50 text-red-700 p-3 text-sm mb-3">
-            {formError}
-          </div>
-        )}
-
-        <form onSubmit={handleCreateTeacher} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium mb-1" htmlFor="t-username">
-              Username *
-            </label>
-            <input
-              id="t-username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={isCreating}
-              className="w-full border border-gray-400 px-2 py-1 text-sm"
-              required
-            />
+      {/* ── Asymmetric Layout: Stacked Faculty Cards (Left) vs Onboarding Panel (Right) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left: Stacked Teacher Cards (Ref: 09_blog_cards.jpg rhythm) (62% width = 7.5 cols) */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="flex items-center justify-between pb-1">
+            <h2 className="font-heading font-bold text-xl text-ink">
+              Faculty Roster
+            </h2>
+            <span className="font-mono text-xs text-ink/60 bg-surface px-2.5 py-1 rounded-pill border border-border">
+              {teachers.length} Active Faculty
+            </span>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium mb-1" htmlFor="t-password">
-              Password *
-            </label>
-            <input
-              id="t-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isCreating}
-              className="w-full border border-gray-400 px-2 py-1 text-sm"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-medium mb-1" htmlFor="t-fname">
-                First Name
-              </label>
-              <input
-                id="t-fname"
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                disabled={isCreating}
-                className="w-full border border-gray-400 px-2 py-1 text-sm"
-              />
+          {isLoading && (
+            <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
+              Loading faculty records...
             </div>
-            <div>
-              <label className="block text-xs font-medium mb-1" htmlFor="t-lname">
-                Last Name
-              </label>
-              <input
-                id="t-lname"
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                disabled={isCreating}
-                className="w-full border border-gray-400 px-2 py-1 text-sm"
-              />
+          )}
+
+          {!isLoading && teachers.length === 0 && (
+            <div className="bg-surface border-2 border-dashed border-border rounded-lg p-10 text-center space-y-3">
+              <span className="pill pill-ember text-xs">Roster Empty</span>
+              <h3 className="font-heading font-bold text-lg text-ink">No Teachers Registered</h3>
+              <p className="text-xs text-ink/70 max-w-sm mx-auto">
+                Use the form on the right to onboard your first faculty member to this institution.
+              </p>
             </div>
-          </div>
+          )}
 
-          <div>
-            <label className="block text-xs font-medium mb-1" htmlFor="t-email">
-              Email
-            </label>
-            <input
-              id="t-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isCreating}
-              className="w-full border border-gray-400 px-2 py-1 text-sm"
-            />
-          </div>
+          {!isLoading && (
+            <div className="space-y-3.5">
+              {teachers.map((t, idx) => {
+                const fullName = [t.first_name, t.last_name].filter(Boolean).join(' ');
+                const delayMs = idx * 60;
 
-          <button
-            type="submit"
-            id="create-teacher-btn"
-            disabled={isCreating}
-            className="border border-gray-400 bg-gray-100 px-4 py-2 text-sm font-medium hover:bg-gray-200 cursor-pointer disabled:opacity-50"
-          >
-            {isCreating ? 'Creating Teacher...' : 'Create Teacher'}
-          </button>
-        </form>
-      </section>
+                return (
+                  <div
+                    key={t.id}
+                    style={{ animationDelay: `${delayMs}ms` }}
+                    className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:-translate-y-1 hover:border-border-strong transition-all duration-200 group"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="pill pill-ember text-[10px]">
+                            Teacher #{t.id}
+                          </span>
+                          <span className="font-mono text-xs text-ink/50">
+                            @{t.username}
+                          </span>
+                        </div>
+
+                        <h3 className="font-heading font-bold text-lg text-ink group-hover:text-ember transition-colors">
+                          {fullName || t.username}
+                        </h3>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink/70 pt-1">
+                          {t.email ? (
+                            <span className="flex items-center gap-1 font-mono">
+                              ✉ {t.email}
+                            </span>
+                          ) : (
+                            <span className="text-ink/40 italic">No email recorded</span>
+                          )}
+                          <span className="text-ink/40">•</span>
+                          <span className="font-medium text-forest">
+                            Authoring Authorized
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="hidden sm:flex flex-col items-end justify-center">
+                        <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-pill bg-bg border border-border text-ink/70">
+                          Active
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Sticky "Create New Teacher" Onboarding Form (38% width = 5 cols) */}
+        <div className="lg:col-span-5 sticky top-24">
+          <div className="bg-surface border border-border rounded-lg p-6 sm:p-7 shadow-card space-y-5">
+            <div className="border-b border-border pb-4">
+              <span className="pill pill-forest text-[10px] uppercase mb-2">Onboarding</span>
+              <h2 className="font-heading font-bold text-xl text-ink">
+                Create New Teacher
+              </h2>
+              <p className="text-xs text-ink/65 mt-1">
+                Provision authoring credentials scoped strictly to this school
+              </p>
+            </div>
+
+            {formSuccess && (
+              <div className="rounded-card border border-forest/30 bg-forest/10 text-forest p-3.5 text-xs font-medium flex items-center gap-2">
+                <span className="font-bold">✓</span>
+                <span>{formSuccess}</span>
+              </div>
+            )}
+
+            {formError && (
+              <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-3.5 text-xs font-medium flex items-start gap-2">
+                <span className="font-bold">!</span>
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateTeacher} className="space-y-4">
+              <div>
+                <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1" htmlFor="t-username">
+                  Username *
+                </label>
+                <input
+                  id="t-username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={isCreating}
+                  placeholder="e.g. math_faculty_01"
+                  required
+                  className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1" htmlFor="t-password">
+                  Password *
+                </label>
+                <input
+                  id="t-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isCreating}
+                  placeholder="Set initial password..."
+                  required
+                  className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1" htmlFor="t-fname">
+                    First Name
+                  </label>
+                  <input
+                    id="t-fname"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    disabled={isCreating}
+                    placeholder="First name"
+                    className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1" htmlFor="t-lname">
+                    Last Name
+                  </label>
+                  <input
+                    id="t-lname"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    disabled={isCreating}
+                    placeholder="Last name"
+                    className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1" htmlFor="t-email">
+                  Email Address
+                </label>
+                <input
+                  id="t-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isCreating}
+                  placeholder="teacher@institution.edu"
+                  className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                id="create-teacher-btn"
+                disabled={isCreating}
+                className="w-full mt-2 rounded-pill bg-ember text-white py-2.5 px-4 text-xs font-heading font-semibold hover:bg-ember/90 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isCreating ? 'Provisioning Teacher...' : 'Provision Teacher Account →'}
+              </button>
+            </form>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 };

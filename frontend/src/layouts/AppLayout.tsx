@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { DesktopLayout } from './desktop/DesktopLayout';
 
 export const AppLayout: React.FC = () => {
   const { user, role_label, logout } = useAuth();
@@ -13,11 +14,21 @@ export const AppLayout: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
+  // On desktop breakpoint (>1024px), use the persistent desktop layout
+  if (breakpoint === 'desktop') {
+    return (
+      <DesktopLayout>
+        <Outlet />
+      </DesktopLayout>
+    );
+  }
+
+  // Fallback shell for tablet/mobile (to be redesigned in future prompts)
   return (
-    <div className="min-h-screen bg-white text-black">
-      <header className="border-b border-gray-300 px-4 py-3 flex justify-between items-center">
+    <div className="min-h-screen bg-bg text-ink">
+      <header className="border-b border-border bg-surface px-4 py-3 flex justify-between items-center">
         <div className="flex items-center space-x-4">
-          <Link to="/" className="font-bold text-lg">
+          <Link to="/" className="font-heading font-bold text-lg text-ink">
             Question Generation System
           </Link>
         </div>
@@ -39,7 +50,7 @@ export const AppLayout: React.FC = () => {
               <button
                 id="logout-btn"
                 onClick={handleLogout}
-                className="border border-gray-400 px-3 py-1 bg-gray-100 hover:bg-gray-200 cursor-pointer"
+                className="border border-border px-3 py-1 bg-surface-muted hover:bg-surface rounded-pill text-xs font-semibold cursor-pointer"
               >
                 Logout
               </button>
@@ -51,22 +62,6 @@ export const AppLayout: React.FC = () => {
       <main className="p-6">
         <Outlet />
       </main>
-
-      {/* ── Breakpoint indicator badge (dev tool only — removed in Prompt 2) ──
-          Non-invasive: fixed position, pointer-events: none, does not affect layout.
-          Verifies that useBreakpoint() correctly detects viewport width changes. */}
-      <div
-        className={`breakpoint-badge breakpoint-badge-${breakpoint}`}
-        aria-hidden="true"
-        title={`Current breakpoint: ${breakpoint} (${
-          breakpoint === 'mobile' ? '≤767px' :
-          breakpoint === 'tablet' ? '768–1024px' : '>1024px'
-        })`}
-      >
-        {breakpoint === 'desktop' && '⬛ Desktop Layout Active'}
-        {breakpoint === 'tablet'  && '▪ Tablet Layout Active'}
-        {breakpoint === 'mobile'  && '· Mobile Layout Active'}
-      </div>
     </div>
   );
 };
