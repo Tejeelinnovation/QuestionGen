@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { SuperAdminDashboardTablet } from '../tablet/dashboards/SuperAdminDashboardTablet';
@@ -139,7 +139,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
               </span>
             </div>
 
-            {/* Fanned Card Row — staggered Y offsets, unequal heights, rotation, flat saturated token colors */}
+            {/* Fanned Card Row - staggered Y offsets, unequal heights, rotation, flat saturated token colors */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-3 items-end pt-6">
               
               {/* Card 1: Super Admins (Forest Green Accent) - tilted left */}

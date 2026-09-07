@@ -1,23 +1,23 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────────
    DESIGN SYSTEM TOKENS
-   Question Generation System — UI Redesign
+   Question Generation System - UI Redesign
    Reference: DESIGN_SYSTEM.md at project root
 
    All tokens are defined here as Tailwind v4 @theme CSS variables.
    Use the named utility classes (bg-forest, text-ember, etc.) in
-   components — NEVER scatter raw hex values through components.
+   components - NEVER scatter raw hex values through components.
    ───────────────────────────────────────────────────────────────── */
 
 @theme {
   /* ── Color Palette ── */
   --color-bg:     #F7F5F1;   /* warm off-white background */
   --color-ink:    #111111;   /* near-black text */
-  --color-forest: #1F4D3A;   /* primary accent — deep forest green */
-  --color-ember:  #E8632C;   /* secondary accent — burnt orange */
-  --color-lime:   #D4F547;   /* tertiary accent — electric lime (SPARINGLY) */
-  --color-grape:  #8B7BC7;   /* muted accent — dusty purple (tags/pills only) */
+  --color-forest: #1F4D3A;   /* primary accent - deep forest green */
+  --color-ember:  #E8632C;   /* secondary accent - burnt orange */
+  --color-lime:   #D4F547;   /* tertiary accent - electric lime (SPARINGLY) */
+  --color-grape:  #8B7BC7;   /* muted accent - dusty purple (tags/pills only) */
 
   /* Semantic color aliases */
   --color-surface:        #FFFFFF;   /* card surfaces */
@@ -43,7 +43,7 @@
   --spacing-22: 5.5rem;
   --spacing-26: 6.5rem;
 
-  /* ── Shadows — purposeful, not uniform ──
+  /* ── Shadows - purposeful, not uniform ──
      Only specific card types get shadows. Not applied to everything. */
   --shadow-card:  0 1px 3px 0 rgb(17 17 17 / 0.06), 0 1px 2px -1px rgb(17 17 17 / 0.06);
   --shadow-float: 0 8px 24px -4px rgb(17 17 17 / 0.12);
@@ -126,7 +126,7 @@
     letter-spacing: -0.02em;
   }
 
-  /* Focus ring — forest green for accessibility, no default blue ring */
+  /* Focus ring - forest green for accessibility, no default blue ring */
   :focus-visible {
     outline: 2px solid var(--color-forest);
     outline-offset: 2px;
@@ -148,7 +148,7 @@
   .font-heading { font-family: var(--font-heading); }
   .font-body    { font-family: var(--font-body); }
 
-  /* Pill tag base — use for category/difficulty/status chips */
+  /* Pill tag base - use for category/difficulty/status chips */
   .pill {
     display: inline-flex;
     align-items: center;

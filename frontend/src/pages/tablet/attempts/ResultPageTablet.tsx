@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
 import type { StudentAttemptResult } from '../../../types';
@@ -78,7 +78,7 @@ export const ResultPageTablet: React.FC = () => {
             {result.paper_title || `Assessment #${result.id}`}
           </h1>
           <p className="text-xs text-ink/60 font-mono">
-            Submitted on {result.submitted_at ? new Date(result.submitted_at).toLocaleString() : '—'}
+            Submitted on {result.submitted_at ? new Date(result.submitted_at).toLocaleString() : '-'}
           </p>
         </div>
 
@@ -219,7 +219,7 @@ export const ResultPageTablet: React.FC = () => {
                   </div>
 
                   <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-3 py-1 rounded-pill">
-                    {a.marks_awarded !== null ? a.marks_awarded : '—'} / {a.max_marks} Marks
+                    {a.marks_awarded !== null ? a.marks_awarded : '-'} / {a.max_marks} Marks
                   </span>
                 </div>
 

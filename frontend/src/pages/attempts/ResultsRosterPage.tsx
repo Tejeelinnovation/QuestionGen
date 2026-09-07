@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../api/attempts';
 import type { DeliveryResultsRoster } from '../../types';
@@ -218,7 +218,7 @@ const ResultsRosterPageDesktop: React.FC = () => {
                       {a.score !== null && a.score !== undefined ? (
                         <span className="text-forest">{a.score} <span className="text-xs font-normal text-ink/50">/ {a.max_score}</span></span>
                       ) : (
-                        <span className="text-ink/40 font-mono text-sm">— / {a.max_score}</span>
+                        <span className="text-ink/40 font-mono text-sm">- / {a.max_score}</span>
                       )}
                     </div>
                   </div>

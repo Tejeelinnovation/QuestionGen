@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { contentApi } from '../../api/content';
 import { papersApi } from '../../api/papers';
@@ -143,7 +143,7 @@ const PaperSetupPageDesktop: React.FC = () => {
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. Grade 10 Mid-Term — Real Numbers & Polynomials"
+                    placeholder="e.g. Grade 10 Mid-Term - Real Numbers & Polynomials"
                     disabled={isSubmitting}
                     className="w-full rounded-card border border-border bg-bg px-4 py-2.5 text-sm text-ink placeholder:text-ink/40 focus:bg-surface focus:border-forest focus:outline-none transition-colors"
                     required

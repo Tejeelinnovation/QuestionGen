@@ -1,9 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
 import { cn } from '@/lib/utils';
 import { MOTION } from '@/lib/motion';
 
 /**
- * BentoGrid — asymmetric grid layout component.
+ * BentoGrid - asymmetric grid layout component.
  *
  * Inspired by Aceternity UI's Bento Grid pattern.
  * Adapted for our design system: forest green, ember orange, warm off-white palette.

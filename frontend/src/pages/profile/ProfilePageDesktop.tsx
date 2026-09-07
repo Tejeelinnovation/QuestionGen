@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ALL_CAPABILITIES } from '../../components/users/PermissionManager';
@@ -216,33 +216,24 @@ export const ProfilePageDesktop: React.FC = () => {
             <span className="pill pill-forest text-xs font-mono">
               {userCaps.length} Active Rights
             </span>
+
           </div>
 
-          {/* Capability Grid */}
+          {/* Capability Grid - only show granted caps */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-            {ALL_CAPABILITIES.map((cap, idx) => {
-              const hasCap = userCaps.includes(cap.name);
-
+            {ALL_CAPABILITIES.filter((cap) => userCaps.includes(cap.name)).map((cap, idx) => {
               return (
                 <div
                   key={cap.name}
                   style={getStaggerDelay(idx)}
-                  className={`animate-card-enter p-4 rounded-card border transition-all flex flex-col justify-between ${
-                    hasCap
-                      ? 'bg-surface border-border shadow-xs'
-                      : 'bg-surface-muted/40 border-border/60 opacity-50'
-                  }`}
+                  className="animate-card-enter p-4 rounded-card border bg-surface border-border shadow-xs transition-all flex flex-col justify-between"
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="font-heading font-semibold text-xs text-ink">
                         {cap.label}
                       </span>
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          hasCap ? 'bg-forest' : 'bg-ink/20'
-                        }`}
-                      />
+                      <span className="w-2 h-2 rounded-full bg-forest" />
                     </div>
                     <p className="text-[11px] text-ink/65 leading-snug">
                       {cap.description}
@@ -251,14 +242,13 @@ export const ProfilePageDesktop: React.FC = () => {
 
                   <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between text-[10px] font-mono text-ink/50">
                     <span>{cap.category}</span>
-                    <span className={hasCap ? 'text-forest font-semibold' : 'text-ink/40'}>
-                      {hasCap ? 'GRANTED' : 'REVOKED'}
-                    </span>
+                    <span className="text-forest font-semibold">GRANTED</span>
                   </div>
                 </div>
               );
             })}
           </div>
+
         </div>
 
       </div>

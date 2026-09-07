@@ -1,8 +1,8 @@
-import React from 'react';
+﻿import React from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * AnimatedCard — hover-lift card with staggered entrance animation.
+ * AnimatedCard - hover-lift card with staggered entrance animation.
  *
  * Inspired by MagicUI's animated card pattern.
  * Follows the blog cards reference (image 09) and staggered selectors (image 11):
@@ -66,7 +66,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
 };
 
 /**
- * AnimatedCardHeader — top section with optional accent color strip.
+ * AnimatedCardHeader - top section with optional accent color strip.
  */
 interface AnimatedCardHeaderProps {
   accent?: 'forest' | 'ember' | 'grape' | 'lime' | 'none';
@@ -93,7 +93,7 @@ export const AnimatedCardHeader: React.FC<AnimatedCardHeaderProps> = ({
 );
 
 /**
- * AnimatedCardBody — padded body section.
+ * AnimatedCardBody - padded body section.
  */
 export const AnimatedCardBody: React.FC<{ className?: string; children: React.ReactNode }> = ({
   className,

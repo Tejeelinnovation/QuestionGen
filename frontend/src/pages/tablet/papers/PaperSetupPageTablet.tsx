@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { contentApi } from '../../../api/content';
 import { papersApi } from '../../../api/papers';
@@ -119,7 +119,7 @@ export const PaperSetupPageTablet: React.FC = () => {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Class 10 Mid-Term — Calculus & Vectors"
+                placeholder="e.g. Class 10 Mid-Term - Calculus & Vectors"
                 disabled={isSubmitting}
                 required
                 className="w-full rounded-card border border-border bg-bg px-4 py-3 text-sm text-ink focus:bg-surface focus:border-forest focus:outline-none min-h-[48px]"

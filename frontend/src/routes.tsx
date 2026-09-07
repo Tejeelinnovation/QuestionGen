@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/LoginPage';
@@ -23,7 +23,7 @@ import { useAuth } from './auth/AuthContext';
 
 /**
  * Root index redirector: resolves the starting dashboard based on the user's
- * specific capabilities — NEVER on role_label.
+ * specific capabilities - NEVER on role_label.
  */
 const DashboardIndexRedirect: React.FC = () => {
   const { user, isLoading, hasCapability } = useAuth();

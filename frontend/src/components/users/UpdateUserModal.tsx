@@ -35,7 +35,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
   onClose,
   onUserUpdated,
 }) => {
-  const { hasCapability } = useAuth();
+  const { hasCapability, user: authUser } = useAuth();
   const [userData, setUserData] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'permissions'>('details');
   const [isLoading, setIsLoading] = useState(false);
@@ -331,7 +331,8 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
 
               {/* TAB 2: Permission Management (Super Admin only) */}
               {activeTab === 'permissions' && canManagePermissions && (
-                <PermissionManager user={userData} onCapabilityChange={handleCapabilityChange} />
+                <PermissionManager user={userData} editorRole={authUser?.role_label} onCapabilityChange={handleCapabilityChange} />
+
               )}
             </>
           )}

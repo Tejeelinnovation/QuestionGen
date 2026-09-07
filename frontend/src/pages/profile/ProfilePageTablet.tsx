@@ -107,30 +107,25 @@ export const ProfilePageTablet: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 gap-2.5">
-          {ALL_CAPABILITIES.map((cap, idx) => {
-            const hasCap = userCaps.includes(cap.name);
-
-            return (
-              <div
-                key={cap.name}
-                style={getStaggerDelay(idx)}
-                className={`animate-card-enter p-3 rounded-card border text-xs flex flex-col justify-between min-h-[72px] ${
-                  hasCap ? 'bg-surface border-border' : 'bg-surface-muted/30 border-border/50 opacity-50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-heading font-semibold text-xs text-ink">
-                    {cap.label}
-                  </span>
-                  <span className={`w-2 h-2 rounded-full ${hasCap ? 'bg-forest' : 'bg-ink/20'}`} />
-                </div>
-                <span className="font-mono text-[10px] text-ink/50 pt-1">
-                  {cap.name}
+          {ALL_CAPABILITIES.filter((cap) => userCaps.includes(cap.name)).map((cap, idx) => (
+            <div
+              key={cap.name}
+              style={getStaggerDelay(idx)}
+              className="animate-card-enter p-3 rounded-card border text-xs flex flex-col justify-between min-h-[72px] bg-surface border-border"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-heading font-semibold text-xs text-ink">
+                  {cap.label}
                 </span>
+                <span className="w-2 h-2 rounded-full bg-forest" />
               </div>
-            );
-          })}
+              <span className="font-mono text-[10px] text-ink/50 pt-1">
+                {cap.name}
+              </span>
+            </div>
+          ))}
         </div>
+
       </div>
 
       {/* Sign Out Card */}

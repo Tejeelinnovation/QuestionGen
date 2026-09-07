@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../../api/deliveries';
 import type { Delivery } from '../../../types';
@@ -134,7 +134,7 @@ export const StudentDashboardTablet: React.FC = () => {
 
                     <div className="text-xs text-ink/65 font-mono">
                       {d.available_from ? new Date(d.available_from).toLocaleDateString() : 'Now'}
-                      {' — '}
+                      {' - '}
                       {d.available_until ? new Date(d.available_until).toLocaleDateString() : 'No deadline'}
                     </div>
                   </div>

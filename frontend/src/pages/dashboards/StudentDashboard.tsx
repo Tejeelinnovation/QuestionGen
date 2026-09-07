@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../api/deliveries';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
@@ -140,7 +140,7 @@ const StudentDashboardDesktop: React.FC = () => {
                     <div className="text-xs text-ink/65 space-y-1 pt-1">
                       <div className="font-mono text-[11px] text-ink/70">
                         {d.available_from ? new Date(d.available_from).toLocaleDateString() : 'Now'}
-                        {' — '}
+                        {' - '}
                         {d.available_until ? new Date(d.available_until).toLocaleDateString() : 'No deadline'}
                       </div>
                     </div>

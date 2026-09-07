@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 
 export type Breakpoint = 'mobile' | 'tablet' | 'desktop';
 
@@ -12,7 +12,7 @@ function getBreakpoint(width: number): Breakpoint {
 }
 
 /**
- * useBreakpoint — returns the current viewport breakpoint based on real
+ * useBreakpoint - returns the current viewport breakpoint based on real
  * window width, not CSS classes.
  *
  * Breakpoints:
