@@ -151,7 +151,7 @@ export const routes: RouteObject[] = [
       {
         path: 'deliveries/:id/results',
         element: (
-          <RequireCapability anyOf={['ASSIGN_TEST', 'CREATE_PAPER']}>
+          <RequireCapability anyOf={['ASSIGN_TEST', 'CREATE_PAPER', 'VIEW_SCHOOL_WIDE_CONTROLS']}>
             <ResultsRosterPage />
           </RequireCapability>
         ),
@@ -159,7 +159,7 @@ export const routes: RouteObject[] = [
       {
         path: 'attempts/:id/grade',
         element: (
-          <RequireCapability anyOf={['ASSIGN_TEST', 'CREATE_PAPER']}>
+          <RequireCapability anyOf={['ASSIGN_TEST', 'CREATE_PAPER', 'VIEW_SCHOOL_WIDE_CONTROLS']}>
             <GradeAttemptPage />
           </RequireCapability>
         ),
@@ -167,7 +167,7 @@ export const routes: RouteObject[] = [
       {
         path: 'attempts/:id/result',
         element: (
-          <RequireCapability capability="VIEW_OWN_RESULT">
+          <RequireCapability anyOf={['VIEW_OWN_RESULT', 'ASSIGN_TEST', 'CREATE_PAPER', 'VIEW_SCHOOL_WIDE_CONTROLS']}>
             <ResultPage />
           </RequireCapability>
         ),
