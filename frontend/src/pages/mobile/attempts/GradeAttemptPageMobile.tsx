@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
+import { useAuth } from '../../../auth/AuthContext';
 import type { TeacherAttemptDetail } from '../../../types';
 import { ArrowLeft, CheckCircle2, Save, Check, X } from 'lucide-react';
 
@@ -16,6 +17,7 @@ interface GradeFormState {
 export const GradeAttemptPageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const attemptId = Number(id);
+  const { dashboardPath } = useAuth();
 
   const [attempt, setAttempt] = useState<TeacherAttemptDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -139,10 +141,10 @@ export const GradeAttemptPageMobile: React.FC = () => {
           {errorMessage || 'Attempt not found.'}
         </div>
         <Link
-          to="/dashboard/teacher"
+          to={dashboardPath}
           className="w-full py-3 px-4 rounded-pill border border-border bg-surface text-ink text-xs font-heading font-semibold flex items-center justify-center"
         >
-          ← Return to Teacher Studio
+          ← Return to Dashboard
         </Link>
       </div>
     );

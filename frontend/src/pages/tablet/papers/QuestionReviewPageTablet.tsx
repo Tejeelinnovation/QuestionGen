@@ -99,9 +99,16 @@ export const QuestionReviewPageTablet: React.FC = () => {
     setErrorMessage(null);
     setIsSaving(true);
     try {
+      const updatedConstraints = {
+        ...constraints,
+        ...(constraints.total_marks !== undefined && constraints.total_marks !== null
+          ? { total_marks: runningTotalMarks }
+          : {}),
+      };
+
       const newVersion = await papersApi.createVersion(paperId, {
         question_ids: questions.map((q) => q.id),
-        constraints_used: constraints,
+        constraints_used: updatedConstraints,
       });
 
       sessionStorage.removeItem(`paper_${paperId}_review`);
@@ -130,18 +137,18 @@ export const QuestionReviewPageTablet: React.FC = () => {
         chapterTitle={paper?.chapter_title}
       />
 
-      {/* Header */}
-      <div className="flex items-end justify-between gap-4">
+      {/* Header section */}
+      <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
-            <span className="w-2 h-2 rounded-full bg-forest" />
-            Stage 03 • Sequence & Curation
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-surface border border-border text-[11px] font-semibold text-forest">
+            <span className="w-1.5 h-1.5 rounded-full bg-forest" />
+            Stage 03 • Curation
           </div>
-          <h1 className="font-heading font-bold text-3xl text-ink tracking-tight">
+          <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight">
             Review Candidate Pool
           </h1>
-          <p className="text-xs sm:text-sm text-ink/70 leading-relaxed">
-            Reorder question order, remove items, and lock into a version snapshot.
+          <p className="text-ink/70 text-xs max-w-xl">
+            Reorder presentation order, remove questions, and lock into an immutable version snapshot.
           </p>
         </div>
 
@@ -161,6 +168,18 @@ export const QuestionReviewPageTablet: React.FC = () => {
           {errorMessage}
         </div>
       )}
+
+      {constraints.total_marks !== undefined &&
+        constraints.total_marks !== null &&
+        Number(constraints.total_marks) !== runningTotalMarks && (
+          <div
+            id="quota-sync-info"
+            className="rounded-card border border-forest/30 bg-forest/5 text-forest p-3 text-xs font-medium"
+          >
+            Target was <strong>{constraints.total_marks} marks</strong>. Curated selection totals{' '}
+            <strong>{runningTotalMarks} marks</strong> (will finalize at {runningTotalMarks} marks).
+          </div>
+        )}
 
       {/* ── Running Total Metrics Banner ── */}
       <div className="bg-surface border border-border rounded-card p-5 shadow-card flex items-center justify-between gap-4">

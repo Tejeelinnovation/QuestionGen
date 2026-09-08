@@ -17,7 +17,7 @@ export const DesktopLayout: React.FC<{ children?: React.ReactNode }> = ({ childr
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col font-body selection:bg-lime selection:text-ink">
       {/* ── Persistent Desktop Top Navigation ── */}
-      <header className="sticky top-0 z-40 w-full border-b border-border bg-surface/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-surface/95 backdrop-blur-sm print:hidden">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Brand & Context */}
           <div className="flex items-center gap-6">

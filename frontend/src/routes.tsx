@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Navigate, type RouteObject } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/LoginPage';
@@ -26,7 +26,7 @@ import { useAuth } from './auth/AuthContext';
  * specific capabilities - NEVER on role_label.
  */
 const DashboardIndexRedirect: React.FC = () => {
-  const { user, isLoading, hasCapability } = useAuth();
+  const { user, dashboardPath, isLoading } = useAuth();
 
   if (isLoading) {
     return <div className="p-4 text-gray-600">Loading session...</div>;
@@ -36,25 +36,7 @@ const DashboardIndexRedirect: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  if (hasCapability('CREATE_SCHOOL')) {
-    return <Navigate to="/dashboard/super-admin" replace />;
-  }
-  if (hasCapability('VIEW_SCHOOL_WIDE_CONTROLS')) {
-    return <Navigate to="/dashboard/school-admin" replace />;
-  }
-  if (hasCapability('CREATE_PAPER')) {
-    return <Navigate to="/dashboard/teacher" replace />;
-  }
-  if (hasCapability('ATTEMPT_TEST')) {
-    return <Navigate to="/dashboard/student" replace />;
-  }
-
-  return (
-    <div className="p-6">
-      <h2 className="text-xl font-bold mb-2">Welcome</h2>
-      <p>No dashboard mapped for your current capability set.</p>
-    </div>
-  );
+  return <Navigate to={dashboardPath} replace />;
 };
 
 export const routes: RouteObject[] = [

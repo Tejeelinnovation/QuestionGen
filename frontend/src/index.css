@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────────
    DESIGN SYSTEM TOKENS
@@ -211,4 +211,85 @@
     transform: scale(0.95);
   }
 }
+
+/* ── Proctored Print / PDF Styling ── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+
+  /* 1. Strictly hide all app navigation, headers, footers, sidebars, buttons, dev tools */
+  header,
+  nav,
+  aside,
+  footer,
+  #mobile-bottom-nav,
+  #tablet-sidebar-toggle,
+  #tablet-profile-btn,
+  #desktop-profile-btn,
+  #mobile-header-profile-btn,
+  #mobile-profile-tab-btn,
+  .print\:hidden,
+  .print-hidden,
+  .no-print,
+  button,
+  .breakpoint-badge {
+    display: none !important;
+  }
+
+  /* 2. Reset document root and layout containers to pure white full-width flow */
+  html,
+  body,
+  #root {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  /* Expand layout wrappers */
+  div.min-h-screen,
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    background: transparent !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  /* 3. Printable Paper Document Styling */
+  .printable-paper-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* 4. Avoid breaking questions across pages */
+  .break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* 5. Force high contrast reproduction */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
 

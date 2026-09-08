@@ -100,6 +100,14 @@ class User(AbstractUser):
         help_text="User who created this account (for scope enforcement).",
     )
 
+    # Explicit hierarchical role (Super Admin, School Admin, Teacher, Student)
+    role = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text="Explicit hierarchical role: Super Admin, School Admin, Teacher, Student.",
+    )
+
     objects = UserManager()
 
     class Meta(AbstractUser.Meta):
@@ -131,25 +139,28 @@ class User(AbstractUser):
         ).distinct()
 
     # ------------------------------------------------------------------
-    # Role label — display only, never used for access control
+    # Role label — display & scope resolution
     # ------------------------------------------------------------------
 
     @property
     def role_label(self) -> str:
         """
-        Computed display label based on capabilities.
-
-        Logic (first match wins — ordered from most to least privileged):
-          1. Has CREATE_SCHOOL             → "Super Admin"
-          2. Has VIEW_SCHOOL_WIDE_CONTROLS
-             AND school is set             → "School Admin"
-          3. Has CREATE_STUDENT
-             AND school is set             → "Teacher"
-          4. Has ATTEMPT_TEST              → "Student"
-          5. Otherwise                     → "Custom"
-
-        This is for display purposes ONLY. Never use it for access control.
+        Role label resolved from explicit role field if set, or computed
+        from capabilities if not set (legacy fallback).
         """
+        if self.role:
+            role_map = {
+                "super_admin": "Super Admin",
+                "school_admin": "School Admin",
+                "teacher": "Teacher",
+                "student": "Student",
+                "Super Admin": "Super Admin",
+                "School Admin": "School Admin",
+                "Teacher": "Teacher",
+                "Student": "Student",
+            }
+            return role_map.get(self.role, self.role)
+
         caps = set(
             self.user_capabilities.select_related("capability")
             .values_list("capability__name", flat=True)

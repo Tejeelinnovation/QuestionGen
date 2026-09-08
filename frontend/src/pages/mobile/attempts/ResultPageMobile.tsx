@@ -58,9 +58,11 @@ export const ResultPageMobile: React.FC = () => {
   }
 
   const isEvaluated = result.status === 'EVALUATED';
+  const scoreNum = Number(result.score) || 0;
+  const maxScoreNum = Number(result.max_score) || 0;
   const percentage =
-    result.max_score > 0
-      ? Math.round((result.score / result.max_score) * 100)
+    maxScoreNum > 0
+      ? Math.round((scoreNum / maxScoreNum) * 100)
       : 0;
 
   return (
@@ -98,10 +100,10 @@ export const ResultPageMobile: React.FC = () => {
           <div className="flex items-baseline justify-between pt-2 border-t border-border/50">
             <div className="flex items-baseline gap-1.5">
               <span className="font-heading font-bold text-4xl text-forest tracking-tight">
-                {result.score}
+                {scoreNum % 1 === 0 ? scoreNum : scoreNum.toFixed(1)}
               </span>
               <span className="font-mono text-sm text-ink/60">
-                / {result.max_score} Marks
+                / {maxScoreNum} Marks
               </span>
             </div>
             <div className="text-right">

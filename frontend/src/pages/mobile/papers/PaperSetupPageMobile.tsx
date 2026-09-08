@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contentApi } from '../../../api/content';
 import { papersApi } from '../../../api/papers';
+import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { ArrowRight } from 'lucide-react';
 
 export const PaperSetupPageMobile: React.FC = () => {
   const navigate = useNavigate();
+  const { dashboardPath } = useAuth();
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [title, setTitle] = useState('');
@@ -76,7 +78,7 @@ export const PaperSetupPageMobile: React.FC = () => {
 
   return (
     <div className="space-y-4 font-body">
-      <PaperWorkflowNavMobile currentStep="setup" backTo="/dashboard/teacher" />
+      <PaperWorkflowNavMobile currentStep="setup" backTo={dashboardPath} />
 
       {/* Header */}
       <div className="space-y-1">

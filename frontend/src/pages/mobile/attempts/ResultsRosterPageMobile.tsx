@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
+import { useAuth } from '../../../auth/AuthContext';
 import type { DeliveryResultsRoster, DeliveryRosterAttempt } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { ChevronRight, ArrowLeft } from 'lucide-react';
@@ -8,6 +9,7 @@ import { ChevronRight, ArrowLeft } from 'lucide-react';
 export const ResultsRosterPageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
+  const { dashboardPath } = useAuth();
 
   const [roster, setRoster] = useState<DeliveryResultsRoster | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,10 +51,10 @@ export const ResultsRosterPageMobile: React.FC = () => {
           {errorMessage || 'Roster not found.'}
         </div>
         <Link
-          to="/dashboard/teacher"
+          to={dashboardPath}
           className="w-full py-3 px-4 rounded-pill border border-border bg-surface text-ink text-xs font-heading font-semibold flex items-center justify-center"
         >
-          ← Return to Teacher Dashboard
+          ← Return to Dashboard
         </Link>
       </div>
     );
@@ -66,11 +68,11 @@ export const ResultsRosterPageMobile: React.FC = () => {
     <div className="space-y-4 font-body">
       {/* Top back link */}
       <Link
-        to="/dashboard/teacher"
+        to={dashboardPath}
         className="inline-flex items-center gap-1 text-xs font-heading font-semibold text-forest hover:underline"
       >
         <ArrowLeft className="w-4 h-4" />
-        <span>Return to Teacher Studio</span>
+        <span>Return to Dashboard</span>
       </Link>
 
       {/* ── Headline Summary Block ── */}

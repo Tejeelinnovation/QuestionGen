@@ -1,12 +1,14 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { contentApi } from '../../../api/content';
 import { papersApi } from '../../../api/papers';
+import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 
 export const PaperSetupPageTablet: React.FC = () => {
   const navigate = useNavigate();
+  const { dashboardPath } = useAuth();
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [title, setTitle] = useState('');
@@ -164,7 +166,7 @@ export const PaperSetupPageTablet: React.FC = () => {
 
             <div className="pt-2 flex items-center justify-between gap-3">
               <Link
-                to="/dashboard/teacher"
+                to={dashboardPath}
                 className="px-4 py-2.5 rounded-pill border border-border bg-surface text-ink text-xs font-heading font-semibold hover:bg-surface-muted min-h-[44px] flex items-center"
               >
                 Cancel

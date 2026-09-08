@@ -42,6 +42,7 @@ from .models import (
     VersionStatus,
     get_next_version_label,
 )
+from .selection import select_questions_for_quota
 from .permissions import (
     CanAssignTest,
     CanCreatePaper,
@@ -214,12 +215,27 @@ class PaperSelectQuestionsView(APIView):
         # Order consistently
         qs = qs.order_by("topic_id", "difficulty", "id")
 
-        # Limit by quantity if specified
+        total_marks = data.get("total_marks")
         quantity = data.get("quantity")
-        if quantity:
-            qs = qs[:quantity]
 
-        serializer = QuestionPreviewSerializer(qs, many=True)
+        if total_marks is not None:
+            pool = list(qs)
+            selected_questions, error_msg = select_questions_for_quota(
+                pool,
+                target_marks=float(total_marks),
+                max_quantity=quantity,
+            )
+            if error_msg:
+                return Response(
+                    {"detail": error_msg, "total_marks": [error_msg]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            serializer = QuestionPreviewSerializer(selected_questions, many=True)
+        else:
+            if quantity:
+                qs = qs[:quantity]
+            serializer = QuestionPreviewSerializer(qs, many=True)
+
         return Response(
             {
                 "paper_id": paper.id,
@@ -601,7 +617,7 @@ class PaperVersionDeliverView(APIView):
             )
 
         return Response(
-            DeliverySerializer(delivery).data,
+            DeliverySerializer(delivery, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -641,9 +657,16 @@ class PaperVersionPrintView(APIView):
                 "options": q_data.get("options"),
             })
 
+        school_name = ""
+        if paper.school:
+            school_name = paper.school.name
+        elif getattr(request.user, "school", None) and request.user.school:
+            school_name = request.user.school.name
+
         print_data = {
             "paper_id": paper.id,
             "title": paper.title,
+            "school_name": school_name,
             "instructions": paper.instructions,
             "version_label": version.version_label,
             "total_marks": version.total_marks,
@@ -674,7 +697,7 @@ class DeliveryListView(APIView):
 
     def get(self, request):
         deliveries = get_scoped_deliveries(request.user)
-        serializer = DeliverySerializer(deliveries, many=True)
+        serializer = DeliverySerializer(deliveries, many=True, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -689,5 +712,5 @@ class DeliveryDetailView(APIView):
         delivery = get_scoped_deliveries(request.user).filter(pk=pk).first()
         if not delivery:
             return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = DeliverySerializer(delivery)
+        serializer = DeliverySerializer(delivery, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../../api/deliveries';
 import type { Delivery } from '../../../types';
@@ -28,8 +28,8 @@ export const StudentDashboardTablet: React.FC = () => {
     fetchDeliveries();
   }, []);
 
-  const completedCount = deliveries.filter((d) =>
-    sessionStorage.getItem(`delivery_${d.id}_attempt`)
+  const completedCount = deliveries.filter(
+    (d) => d.my_attempt && (d.my_attempt.status === 'SUBMITTED' || d.my_attempt.status === 'EVALUATED')
   ).length;
 
   const pendingCount = deliveries.length - completedCount;
@@ -43,22 +43,15 @@ export const StudentDashboardTablet: React.FC = () => {
           Student Testing Portal • Tablet
         </div>
         <h1 className="font-heading font-bold text-3xl text-ink tracking-tight">
-          Assigned Assessments Desk
+          Assigned Assessments
         </h1>
-        <p className="text-sm text-ink/75 leading-relaxed">
-          You currently have{' '}
-          <span className="font-heading font-bold text-forest underline decoration-forest/40">
-            {pendingCount} test{pendingCount === 1 ? '' : 's'} ready
-          </span>{' '}
-          and{' '}
-          <span className="font-heading font-bold text-grape underline decoration-grape/40">
-            {completedCount} submitted attempt{completedCount === 1 ? '' : 's'}
-          </span>.
+        <p className="font-body text-ink/70 text-sm max-w-xl">
+          Track upcoming and submitted examination papers assigned to your student profile.
         </p>
       </div>
 
       {isLoading && (
-        <div className="p-8 text-center bg-surface border border-border rounded-card text-ink/60 text-sm">
+        <div className="p-8 text-center bg-surface border border-border rounded-card text-ink/60 font-medium">
           Loading assigned assessments...
         </div>
       )}
@@ -70,11 +63,11 @@ export const StudentDashboardTablet: React.FC = () => {
       )}
 
       {!isLoading && !errorMessage && deliveries.length === 0 && (
-        <div className="bg-surface border-2 border-dashed border-border rounded-card p-10 text-center space-y-3">
-          <span className="pill pill-forest text-xs">Queue Clear</span>
+        <div className="bg-surface border border-dashed border-border rounded-card p-10 text-center space-y-2">
+          <span className="pill pill-forest text-[10px]">Queue Clear</span>
           <h3 className="font-heading font-bold text-lg text-ink">No Assessments Assigned</h3>
-          <p className="text-xs text-ink/70 max-w-md mx-auto">
-            When your instructors schedule an online or proctored test session, it will appear here.
+          <p className="text-xs text-ink/65 max-w-sm mx-auto">
+            When tests are scheduled, they will appear here ready for examination.
           </p>
         </div>
       )}
@@ -82,32 +75,53 @@ export const StudentDashboardTablet: React.FC = () => {
       {!isLoading && !errorMessage && deliveries.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-heading font-bold text-xl text-ink">
+            <h2 className="font-heading font-bold text-lg text-ink">
               Available Test Deliveries
             </h2>
-            <span className="pill pill-forest text-xs font-mono">
-              {deliveries.length} Deliveries
+            <span className="font-mono text-xs text-ink/60 bg-surface px-3 py-1 rounded-pill border border-border">
+              {deliveries.length} Total
             </span>
           </div>
 
           {/* ── 2-Column Bento Reflow for Delivery Cards ── */}
           <div className="grid grid-cols-2 gap-4">
             {deliveries.map((d, index) => {
-              const cachedAttemptId = sessionStorage.getItem(`delivery_${d.id}_attempt`);
+              const myAttempt = d.my_attempt;
+              const hasSubmitted = myAttempt && (myAttempt.status === 'SUBMITTED' || myAttempt.status === 'EVALUATED');
+              const isInProgress = myAttempt && myAttempt.status === 'IN_PROGRESS';
 
-              const statusPill = cachedAttemptId ? (
-                <span className="pill pill-forest text-[10px]">
-                  ✓ Submitted
-                </span>
-              ) : d.mode === 'ONLINE' ? (
-                <span className="pill pill-grape text-[10px]">
-                  Ready to Attempt
-                </span>
-              ) : (
-                <span className="pill pill-ember text-[10px]">
-                  In-Person / Print
-                </span>
-              );
+              let statusPill: React.ReactNode;
+              if (myAttempt?.status === 'EVALUATED') {
+                statusPill = (
+                  <span className="pill pill-forest text-[10px]">
+                    ✓ Evaluated ({myAttempt.score}/{myAttempt.max_score})
+                  </span>
+                );
+              } else if (myAttempt?.status === 'SUBMITTED') {
+                statusPill = (
+                  <span className="pill pill-forest text-[10px]">
+                    ✓ Submitted
+                  </span>
+                );
+              } else if (isInProgress) {
+                statusPill = (
+                  <span className="pill pill-ember text-[10px]">
+                    In Progress
+                  </span>
+                );
+              } else if (d.mode === 'ONLINE') {
+                statusPill = (
+                  <span className="pill pill-grape text-[10px]">
+                    Ready to Attempt
+                  </span>
+                );
+              } else {
+                statusPill = (
+                  <span className="pill pill-muted text-[10px]">
+                    In-Person / Print
+                  </span>
+                );
+              }
 
               return (
                 <div
@@ -140,23 +154,27 @@ export const StudentDashboardTablet: React.FC = () => {
                   </div>
 
                   <div className="pt-3 border-t border-border flex flex-wrap items-center gap-2">
-                    <Link
-                      to={`/deliveries/${d.id}/attempt`}
-                      className={`px-4 py-2.5 rounded-pill font-heading font-semibold text-xs transition-all min-h-[44px] flex items-center justify-center ${
-                        cachedAttemptId
-                          ? 'bg-surface-muted text-ink hover:bg-ink hover:text-white border border-border'
-                          : 'bg-forest text-white hover:bg-forest/90 shadow-sm'
-                      }`}
-                    >
-                      {cachedAttemptId ? 'Re-open Attempt' : 'Start Assessment →'}
-                    </Link>
-
-                    {cachedAttemptId && (
+                    {hasSubmitted ? (
                       <Link
-                        to={`/attempts/${cachedAttemptId}/result`}
+                        to={`/attempts/${myAttempt.id}/result`}
+                        id={`view-result-btn-${d.id}`}
                         className="px-4 py-2.5 rounded-pill bg-grape text-white font-heading font-semibold text-xs hover:bg-grape/90 transition-all shadow-sm min-h-[44px] flex items-center justify-center"
                       >
-                        View Result
+                        View Result →
+                      </Link>
+                    ) : isInProgress ? (
+                      <Link
+                        to={`/deliveries/${d.id}/attempt`}
+                        className="px-4 py-2.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 shadow-sm min-h-[44px] flex items-center justify-center"
+                      >
+                        Resume Assessment →
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/deliveries/${d.id}/attempt`}
+                        className="px-4 py-2.5 rounded-pill bg-forest text-white hover:bg-forest/90 shadow-sm font-heading font-semibold text-xs transition-all min-h-[44px] flex items-center justify-center"
+                      >
+                        Start Assessment →
                       </Link>
                     )}
                   </div>

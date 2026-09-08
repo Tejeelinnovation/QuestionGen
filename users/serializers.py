@@ -70,6 +70,7 @@ class UserSerializer(serializers.ModelSerializer):
             "school_name",
             "created_by",
             "created_by_username",
+            "role",
             "role_label",
             "capabilities",
             "is_active",
@@ -87,10 +88,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 class CreateUserSerializer(serializers.ModelSerializer):
     """
-    Write serializer for creating a new User.
-
-    Callers must have the appropriate CREATE_* capability and the view
-    enforces scope before calling this serializer.
+    Input serializer for user creation with mandatory capability gating.
+    Requires password, username, and a target capability profile.
     """
 
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
@@ -140,7 +139,12 @@ class CreateUserSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password")
         validated_data.setdefault("is_active", True)
 
-        user = User(**validated_data)
+        role_map = {
+            "school_admin": "School Admin",
+            "teacher": "Teacher",
+            "student": "Student",
+        }
+        user = User(role=role_map.get(profile, profile), **validated_data)
         user.set_password(password)
         user.save()
 

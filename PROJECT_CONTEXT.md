@@ -254,9 +254,9 @@ Computed from granted capabilities — display only, never used for authz:
 | POST | `/api/papers/{id}/versions/{version_id}/clone/` | Yes | `CREATE_PAPER` | Clones to Version B/C from explicit IDs or constraints pool; leaves source version immutable |
 | POST | `/api/papers/{id}/versions/{version_id}/deliver/` | Yes | `ASSIGN_TEST` | Creates Delivery record (PRINT or ONLINE). Version must be FINALIZED. ONLINE requires students |
 | GET | `/api/papers/{id}/versions/{version_id}/print/` | Yes | — | Structured print layout from the version snapshot |
-| GET | `/api/deliveries/` | Yes | — | Scoped: student sees assigned, teacher sees created |
-| GET | `/api/deliveries/{id}/` | Yes | — | Delivery detail |
-| GET | `/api/deliveries/{id}/start/` | Yes | `ATTEMPT_TEST` | Start or resume online test attempt (student-facing, no correct answers) |
+| GET | `/api/deliveries/` | Yes | — | Scoped: student sees assigned (with `my_attempt: { id, status, score, max_score }`), teacher sees created |
+| GET | `/api/deliveries/{id}/` | Yes | — | Delivery detail (includes `my_attempt` for requesting student) |
+| GET | `/api/deliveries/{id}/start/` | Yes | `ATTEMPT_TEST` | Start or resume online test attempt (returns existing in-progress attempt; if already submitted, returns 400 with `attempt_id` and `status` for instant redirect) |
 | GET | `/api/deliveries/{id}/results/` | Yes | `ASSIGN_TEST` / `CREATE_PAPER` | Delivery results roster (teacher view) |
 | PATCH | `/api/attempts/{id}/answers/{question_id}/` | Yes | `ATTEMPT_TEST` | Save/update single question response incrementally (owning student only) |
 | POST | `/api/attempts/{id}/submit/` | Yes | `ATTEMPT_TEST` | Submit attempt: auto-grades MCQ, sets short/long to pending, computes score |
@@ -407,8 +407,8 @@ frontend/src/
 - [x] **P1 — Student Workflow UI (React + TypeScript)**
   - [x] `src/pages/attempts/TestAttemptPage.tsx` (`/deliveries/:id/attempt`): Replaces placeholder. Start/resume online exam sitting (`GET /api/deliveries/:id/start/`), scrollable question list (MCQ radio buttons, Short Answer text input, Long Answer textarea), debounced auto-save with inline "Saved" / "Saving..." / "Error" indicators (`PATCH /api/attempts/:id/answers/:qid/`), running answered count, available_until expiration detection and input disabling, browser confirm submit dialog (`POST /api/attempts/:id/submit/`), and double-submit auto-redirect.
   - [x] `src/pages/attempts/ResultPage.tsx` (`/attempts/:id/result`): Student test result viewer (`GET /api/attempts/:id/result/`) displaying score, max score, percentage, status badge, pending manual review banner, and individual question breakdown.
-  - [x] `src/pages/dashboards/StudentDashboard.tsx`: Enhanced assigned tests table with delivery attempt status and "View Result" links.
-  - [x] Gap Note: Backend `GET /api/deliveries/` does not currently include caller's attempt status in its payload; frontend leverages session state and start/resume redirect.
+  - [x] `src/pages/dashboards/StudentDashboard.tsx`: Enhanced assigned tests desk reading directly from `d.my_attempt` as the single source of truth for attempt status, eliminating all client-side `sessionStorage` reliance across desktop, tablet, and mobile layouts.
+  - [x] Backend-Driven Attempt State: `DeliverySerializer` returns `my_attempt: { id, status, score, max_score }` for the authenticated student; `AttemptStartResumeView` returns `attempt_id` and `status` in the 400 response on already-submitted attempts for immediate frontend redirection.
   - [x] **Completes ALL P1 Frontend Work** (Auth shell, 4 role dashboards, complete Teacher paper-builder workflow through print/delivery, and Student test attempt sitting through results).
 
 - [x] **P2 (Part 1) — Hardening: Teacher Grading UI, Results Roster & §9 Acceptance Verification**

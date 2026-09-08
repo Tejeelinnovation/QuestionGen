@@ -156,11 +156,19 @@ export interface PaperVersion {
 export interface PaperPrintData {
   paper_id: number;
   title: string;
+  school_name?: string;
   instructions: string;
   version_label: string;
   total_marks: number;
   question_count: number;
   questions: QuestionSnapshotItem[];
+}
+
+export interface StudentAttemptSummary {
+  id: number;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'SUBMITTED' | 'EVALUATED';
+  score: number;
+  max_score: number;
 }
 
 export interface Delivery {
@@ -175,6 +183,7 @@ export interface Delivery {
   assigned_students: number[];
   assigned_students_count?: number;
   assigned_students_details?: Array<{ id: number; username: string; email: string }>;
+  my_attempt?: StudentAttemptSummary | null;
   available_from: string | null;
   available_until: string | null;
   created_by: number;

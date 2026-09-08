@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import { usersApi } from '../../../api/users';
+import { useAuth } from '../../../auth/AuthContext';
 import type { Delivery, PaperVersion, User } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 
@@ -9,6 +10,7 @@ export const DeliveryPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);
+  const { dashboardPath } = useAuth();
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [students, setStudents] = useState<User[]>([]);
@@ -174,10 +176,10 @@ export const DeliveryPageTablet: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/20">
             <Link
-              to="/dashboard/teacher"
+              to={dashboardPath}
               className="px-5 py-2.5 rounded-pill bg-surface text-ink text-xs font-heading font-semibold hover:bg-bg min-h-[44px] flex items-center"
             >
-              Teacher Studio
+              Dashboard
             </Link>
 
             {createdDelivery.mode === 'ONLINE' && (

@@ -1,6 +1,7 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../api/attempts';
+import { useAuth } from '../../auth/AuthContext';
 import type { DeliveryResultsRoster } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { ResultsRosterPageTablet } from '../tablet/attempts/ResultsRosterPageTablet';
@@ -10,6 +11,7 @@ import { getStaggerDelay, MOTION } from '../../lib/motion';
 const ResultsRosterPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
+  const { dashboardPath } = useAuth();
 
   const [roster, setRoster] = useState<DeliveryResultsRoster | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,10 +55,10 @@ const ResultsRosterPageDesktop: React.FC = () => {
           </div>
         )}
         <Link
-          to="/dashboard/teacher"
+          to={dashboardPath}
           className="text-xs font-heading font-semibold text-forest hover:underline"
         >
-          ← Return to Teacher Dashboard
+          ← Return to Dashboard
         </Link>
       </div>
     );
@@ -105,10 +107,10 @@ const ResultsRosterPageDesktop: React.FC = () => {
             Refresh Roster ↻
           </button>
           <Link
-            to="/dashboard/teacher"
+            to={dashboardPath}
             className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-surface-muted border border-border text-ink hover:bg-ink hover:text-white transition-colors"
           >
-            ← Teacher Studio
+            ← Dashboard
           </Link>
         </div>
       </div>

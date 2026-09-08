@@ -197,6 +197,39 @@ class PapersWorkflowTests(APITestCase):
         # Verify no PaperVersion was saved
         self.assertEqual(paper.versions.count(), 0)
 
+    def test_select_questions_with_total_marks_quota_success(self):
+        paper = Paper.objects.create(
+            title="Math Test", created_by=self.teacher_1, school=self.school_a, chapter=self.chapter
+        )
+        self.client.force_authenticate(user=self.teacher_1)
+
+        # q1=2 marks, q2=3 marks. Total pool has at least 5 marks. Request total_marks=5
+        payload = {
+            "topic_ids": [self.topic_1.id],
+            "difficulty": "EASY",
+            "total_marks": 5,
+        }
+        res = self.client.post(f"/api/papers/{paper.id}/select-questions/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        returned_marks = sum(float(q["marks"]) for q in res.data["questions"])
+        self.assertEqual(returned_marks, 5.0)
+
+    def test_select_questions_with_total_marks_exceeding_pool_fails_gracefully(self):
+        paper = Paper.objects.create(
+            title="Math Test", created_by=self.teacher_1, school=self.school_a, chapter=self.chapter
+        )
+        self.client.force_authenticate(user=self.teacher_1)
+
+        # Request 999 marks which clearly exceeds available pool
+        payload = {
+            "topic_ids": [self.topic_1.id],
+            "difficulty": "EASY",
+            "total_marks": 999,
+        }
+        res = self.client.post(f"/api/papers/{paper.id}/select-questions/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("cannot meet your target", res.data["detail"])
+
     # ------------------------------------------------------------------
     # 3. Version Creation, Snapshot, Marks Computation, and Constraints
     # ------------------------------------------------------------------
@@ -480,6 +513,7 @@ class PapersWorkflowTests(APITestCase):
         # 1. Print layout
         print_res = self.client.get(f"/api/papers/{paper.id}/versions/{version.id}/print/")
         self.assertEqual(print_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(print_res.data["school_name"], self.school_a.name)
         self.assertEqual(print_res.data["version_label"], "A")
         self.assertEqual(print_res.data["total_marks"], 5)
         self.assertEqual(len(print_res.data["questions"]), 2)

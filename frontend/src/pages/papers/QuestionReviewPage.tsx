@@ -106,9 +106,16 @@ const QuestionReviewPageDesktop: React.FC = () => {
     setErrorMessage(null);
     setIsSaving(true);
     try {
+      const updatedConstraints = {
+        ...constraints,
+        ...(constraints.total_marks !== undefined && constraints.total_marks !== null
+          ? { total_marks: runningTotalMarks }
+          : {}),
+      };
+
       const newVersion = await papersApi.createVersion(paperId, {
         question_ids: questions.map((q) => q.id),
-        constraints_used: constraints,
+        constraints_used: updatedConstraints,
       });
 
       sessionStorage.removeItem(`paper_${paperId}_review`);
@@ -170,6 +177,26 @@ const QuestionReviewPageDesktop: React.FC = () => {
           <span>{errorMessage}</span>
         </div>
       )}
+
+      {constraints.total_marks !== undefined &&
+        constraints.total_marks !== null &&
+        Number(constraints.total_marks) !== runningTotalMarks && (
+          <div
+            id="quota-sync-info"
+            className="rounded-card border border-forest/30 bg-forest/5 text-forest p-4 text-xs font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-forest animate-pulse" />
+              <span>
+                Original target was <strong>{constraints.total_marks} marks</strong>. Your curated
+                question set currently totals <strong>{runningTotalMarks} marks</strong>.
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-ink/60 bg-surface px-2.5 py-1 rounded-pill border border-border">
+              Will finalize at {runningTotalMarks} Marks
+            </span>
+          </div>
+        )}
 
       {/* ── BOLD RUNNING METRICS & ACTION STRIP ── */}
       <div className="bg-surface border border-border rounded-card p-6 shadow-card flex flex-col md:flex-row md:items-center justify-between gap-6">

@@ -103,7 +103,11 @@ class AttemptStartResumeView(APIView):
         if attempt:
             if attempt.status in [AttemptStatus.SUBMITTED, AttemptStatus.EVALUATED]:
                 return Response(
-                    {"detail": "You have already submitted this test."},
+                    {
+                        "detail": "You have already submitted this test.",
+                        "attempt_id": attempt.id,
+                        "status": attempt.status,
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             # Resume existing in-progress attempt

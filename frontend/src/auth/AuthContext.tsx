@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   capabilities: CapabilityName[];
   role_label: string | null;
+  dashboardPath: string;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
@@ -100,12 +101,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const role_label = user?.role_label || null;
   const isAuthenticated = !!user;
 
+  const dashboardPath = user
+    ? hasCapability('CREATE_SCHOOL')
+      ? '/dashboard/super-admin'
+      : hasCapability('VIEW_SCHOOL_WIDE_CONTROLS')
+      ? '/dashboard/school-admin'
+      : hasCapability('CREATE_PAPER')
+      ? '/dashboard/teacher'
+      : hasCapability('ATTEMPT_TEST')
+      ? '/dashboard/student'
+      : '/'
+    : '/login';
+
   return (
     <AuthContext.Provider
       value={{
         user,
         capabilities,
         role_label,
+        dashboardPath,
         isAuthenticated,
         isLoading,
         login,

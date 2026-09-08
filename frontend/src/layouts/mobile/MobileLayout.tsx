@@ -63,7 +63,7 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col font-body selection:bg-lime selection:text-ink relative pb-20">
       {/* ── Mobile Top Header (Clean, Compact, Touch-Optimized) ── */}
-      <header className="sticky top-0 z-30 w-full border-b border-border bg-surface/95 backdrop-blur-md px-4 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-30 w-full border-b border-border bg-surface/95 backdrop-blur-md px-4 h-14 flex items-center justify-between print:hidden">
         <Link to="/" className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-forest" />
           <span className="font-heading font-bold text-base tracking-tight text-ink">
@@ -109,7 +109,7 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
       {/* ── Persistent Mobile Bottom Tab Bar ── */}
       <nav
         id="mobile-bottom-nav"
-        className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border px-2 py-1 shadow-float"
+        className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border px-2 py-1 shadow-float print:hidden"
         aria-label="Mobile Navigation"
       >
         <div className="flex items-center justify-around max-w-md mx-auto">

@@ -38,9 +38,6 @@ const TestAttemptPageDesktop: React.FC = () => {
       try {
         const data = await attemptsApi.startOrResumeAttempt(deliveryId);
 
-        // Store attempt id mapping for quick navigation & double submit handling
-        sessionStorage.setItem(`delivery_${deliveryId}_attempt`, String(data.attempt_id));
-
         // If already submitted or evaluated, redirect straight to result
         if (data.status === 'SUBMITTED' || data.status === 'EVALUATED') {
           navigate(`/attempts/${data.attempt_id}/result`, { replace: true });
@@ -64,13 +61,11 @@ const TestAttemptPageDesktop: React.FC = () => {
           setIsExpired(true);
         }
       } catch (err: any) {
-        const detail = err.response?.data?.detail;
-        if (detail === 'You have already submitted this test.') {
-          const cachedAttemptId = sessionStorage.getItem(`delivery_${deliveryId}_attempt`);
-          if (cachedAttemptId) {
-            navigate(`/attempts/${cachedAttemptId}/result`, { replace: true });
-            return;
-          }
+        const resData = err.response?.data;
+        const detail = resData?.detail;
+        if (resData?.attempt_id) {
+          navigate(`/attempts/${resData.attempt_id}/result`, { replace: true });
+          return;
         }
         if (detail === 'This test has expired.') {
           setIsExpired(true);
@@ -144,7 +139,6 @@ const TestAttemptPageDesktop: React.FC = () => {
     setErrorMessage(null);
     try {
       const result = await attemptsApi.submitAttempt(attemptData.attempt_id);
-      sessionStorage.setItem(`delivery_${deliveryId}_attempt`, String(result.id));
       navigate(`/attempts/${result.id}/result`);
     } catch (err: any) {
       const detail = err.response?.data?.detail;

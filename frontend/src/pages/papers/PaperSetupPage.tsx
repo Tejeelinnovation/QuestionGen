@@ -1,10 +1,11 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { contentApi } from '../../api/content';
 import { papersApi } from '../../api/papers';
 import type { Chapter } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useAuth } from '../../auth/AuthContext';
 import { PaperSetupPageTablet } from '../tablet/papers/PaperSetupPageTablet';
 import { PaperSetupPageMobile } from '../mobile/papers/PaperSetupPageMobile';
 import {
@@ -17,6 +18,7 @@ import {
 
 const PaperSetupPageDesktop: React.FC = () => {
   const navigate = useNavigate();
+  const { dashboardPath } = useAuth();
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [title, setTitle] = useState('');
@@ -244,7 +246,7 @@ const PaperSetupPageDesktop: React.FC = () => {
               {/* Form Action Controls */}
               <div className="flex items-center justify-between pt-2">
                 <Link
-                  to="/dashboard/teacher"
+                  to={dashboardPath}
                   className="px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors"
                 >
                   Cancel & Return

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../../auth/AuthContext';
 
 export type WorkflowStep = 'setup' | 'configure' | 'review' | 'version' | 'deliver' | 'print';
 
@@ -37,6 +38,7 @@ export const PaperWorkflowNav: React.FC<PaperWorkflowNavProps> = ({
   versionLabel,
 }) => {
   const currentIndex = STEPS.findIndex((s) => s.key === currentStep);
+  const { dashboardPath, role_label } = useAuth();
 
   const getStepLink = (step: StepDef, index: number): string | null => {
     // Only allow navigating backward to previously established steps
@@ -101,10 +103,10 @@ export const PaperWorkflowNav: React.FC<PaperWorkflowNavProps> = ({
             </Link>
           )}
           <Link
-            to="/dashboard/teacher"
+            to={dashboardPath}
             className="font-heading font-medium text-ink/60 hover:text-ink transition-colors flex items-center gap-1"
           >
-            ← Teacher Studio
+            ← {role_label ? `${role_label} Dashboard` : 'Dashboard'}
           </Link>
         </div>
       </div>

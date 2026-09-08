@@ -4,6 +4,7 @@ import { papersApi } from '../../api/papers';
 import { usersApi } from '../../api/users';
 import type { Delivery, PaperVersion, User } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
+import { useAuth } from '../../auth/AuthContext';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { DeliveryPageTablet } from '../tablet/papers/DeliveryPageTablet';
 import { DeliveryPageMobile } from '../mobile/papers/DeliveryPageMobile';
@@ -12,6 +13,7 @@ const DeliveryPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);
+  const { dashboardPath } = useAuth();
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [students, setStudents] = useState<User[]>([]);
@@ -201,10 +203,10 @@ const DeliveryPageDesktop: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-white/20">
             <Link
-              to="/dashboard/teacher"
+              to={dashboardPath}
               className="px-5 py-2.5 text-xs font-heading font-semibold rounded-pill bg-surface text-ink hover:bg-bg transition-colors"
             >
-              Teacher Studio Dashboard
+              Dashboard
             </Link>
 
             {createdDelivery.mode === 'ONLINE' && (

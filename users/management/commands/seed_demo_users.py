@@ -62,11 +62,13 @@ class Command(BaseCommand):
                     "email": "superadmin@system.local",
                     "first_name": "Super",
                     "last_name": "Admin",
+                    "role": "Super Admin",
                     "is_staff": True,
                     "is_superuser": True,
                     "school": None,
                 },
             )
+            superadmin.role = "Super Admin"
             superadmin.set_password("password123")
             superadmin.save()
             grant_super_admin_defaults(superadmin)
@@ -79,10 +81,12 @@ class Command(BaseCommand):
                     "email": "admin@greenwood.edu",
                     "first_name": "Sarah",
                     "last_name": "Admin",
+                    "role": "School Admin",
                     "school": school,
                     "created_by": superadmin,
                 },
             )
+            sa.role = "School Admin"
             sa.set_password("password123")
             sa.save()
             grant_school_admin_defaults(sa, granted_by=superadmin)
@@ -95,10 +99,12 @@ class Command(BaseCommand):
                     "email": "teacher1@greenwood.edu",
                     "first_name": "Thomas",
                     "last_name": "Teacher",
+                    "role": "Teacher",
                     "school": school,
                     "created_by": sa,
                 },
             )
+            teacher.role = "Teacher"
             teacher.set_password("password123")
             teacher.save()
             grant_teacher_defaults(teacher, granted_by=sa)
@@ -115,10 +121,12 @@ class Command(BaseCommand):
                         "email": f"{uname}@greenwood.edu",
                         "first_name": fname,
                         "last_name": lname,
+                        "role": "Student",
                         "school": school,
                         "created_by": teacher,
                     },
                 )
+                stu.role = "Student"
                 stu.set_password("password123")
                 stu.save()
                 grant_student_defaults(stu, granted_by=teacher)

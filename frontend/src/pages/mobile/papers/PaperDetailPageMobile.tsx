@@ -10,7 +10,7 @@ import { FilePlus, ChevronRight } from 'lucide-react';
 export const PaperDetailPageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
-  const { hasCapability } = useAuth();
+  const { hasCapability, dashboardPath } = useAuth();
 
   const [paper, setPaper] = useState<Paper | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +48,7 @@ export const PaperDetailPageMobile: React.FC = () => {
   if (errorMessage || !paper) {
     return (
       <div className="space-y-4 font-body">
-        <PaperWorkflowNavMobile currentStep="version" paperId={paperId} backTo="/dashboard/teacher" />
+        <PaperWorkflowNavMobile currentStep="version" paperId={paperId} backTo={dashboardPath} />
         <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-3 text-xs font-medium">
           {errorMessage || 'Paper not found.'}
         </div>
@@ -62,7 +62,7 @@ export const PaperDetailPageMobile: React.FC = () => {
         currentStep="version"
         paperId={paperId}
         paperTitle={paper.title}
-        backTo="/dashboard/teacher"
+        backTo={dashboardPath}
       />
 
       {/* Overview Card */}

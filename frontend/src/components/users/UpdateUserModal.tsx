@@ -50,7 +50,12 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
   const [email, setEmail] = useState('');
   const [isActive, setIsActive] = useState(true);
 
-  const canManagePermissions = hasCapability('CREATE_SCHOOL_ADMIN');
+  const isSuperAdmin = hasCapability('CREATE_SCHOOL_ADMIN') || hasCapability('CREATE_SCHOOL');
+  const isSchoolAdmin = hasCapability('VIEW_SCHOOL_WIDE_CONTROLS');
+  const targetIsManageableBySchoolAdmin = userData
+    ? userData.role_label === 'Teacher' || userData.role_label === 'Student'
+    : true;
+  const canManagePermissions = isSuperAdmin || (isSchoolAdmin && targetIsManageableBySchoolAdmin);
 
   useEffect(() => {
     if (isOpen && userId) {

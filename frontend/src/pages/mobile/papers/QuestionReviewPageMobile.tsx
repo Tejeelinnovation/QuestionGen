@@ -100,9 +100,16 @@ export const QuestionReviewPageMobile: React.FC = () => {
     setIsSaving(true);
     setErrorMessage(null);
     try {
+      const updatedConstraints = {
+        ...constraints,
+        ...(constraints.total_marks !== undefined && constraints.total_marks !== null
+          ? { total_marks: totalMarks }
+          : {}),
+      };
+
       const newVersion = await papersApi.createVersion(paperId, {
         question_ids: questions.map((q) => q.id),
-        constraints_used: constraints,
+        constraints_used: updatedConstraints,
       });
 
       sessionStorage.removeItem(`paper_${paperId}_review`);
@@ -126,12 +133,17 @@ export const QuestionReviewPageMobile: React.FC = () => {
         currentStep="review"
         paperId={paperId}
         paperTitle={paper?.title}
+        chapterTitle={paper?.chapter_title}
         backTo={`/papers/${paperId}/configure`}
       />
 
-      {/* Summary Header */}
+      {/* Header */}
       <div className="space-y-1">
-        <h1 className="font-heading font-bold text-lg text-ink tracking-tight">
+        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-pill bg-surface border border-border text-[10px] font-semibold text-forest">
+          <span className="w-1.5 h-1.5 rounded-full bg-forest" />
+          Review Questions
+        </div>
+        <h1 className="font-heading font-bold text-xl text-ink">
           Review Candidate Questions
         </h1>
         <p className="text-xs text-ink/70">
@@ -144,6 +156,17 @@ export const QuestionReviewPageMobile: React.FC = () => {
           {errorMessage}
         </div>
       )}
+
+      {constraints.total_marks !== undefined &&
+        constraints.total_marks !== null &&
+        Number(constraints.total_marks) !== totalMarks && (
+          <div
+            id="quota-sync-info"
+            className="rounded-card border border-forest/30 bg-forest/5 text-forest p-2.5 text-xs font-medium"
+          >
+            Target was {constraints.total_marks} marks. Finalizing at {totalMarks} marks.
+          </div>
+        )}
 
       {/* Quick Stat Pill Row */}
       <div className="flex items-center justify-between p-3 rounded-card bg-surface border border-border shadow-xs">

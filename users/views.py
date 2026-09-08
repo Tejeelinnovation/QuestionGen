@@ -146,11 +146,8 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         if self.action in ("retrieve", "partial_update"):
             return [IsAuthenticated(), IsWithinSchoolScope(), IsWithinCreatedByScope()]
 
-        if self.action == "grant_permission":
-            return [IsAuthenticated(), HasCapability("CREATE_SCHOOL_ADMIN")()]
-
-        if self.action == "revoke_permission":
-            return [IsAuthenticated(), HasCapability("CREATE_SCHOOL_ADMIN")()]
+        if self.action in ("grant_permission", "revoke_permission"):
+            return [IsAuthenticated()]
 
         return [IsAuthenticated()]
 
@@ -270,6 +267,63 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         )
         return Response(UserSerializer(user, context={"request": request}).data)
 
+    # Role-based scope boundaries: maps each role to its strictly allowed capability set.
+    ROLE_ALLOWED_CAPABILITIES = {
+        "Super Admin": [cap.value for cap in CapabilityName],
+        "School Admin": [
+            CapabilityName.CREATE_TEACHER,
+            CapabilityName.CREATE_STUDENT,
+            CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS,
+        ],
+        "Teacher": [
+            CapabilityName.CREATE_STUDENT,
+            CapabilityName.GENERATE_SELECT_QUESTIONS,
+            CapabilityName.CREATE_PAPER,
+            CapabilityName.ASSIGN_TEST,
+        ],
+        "Student": [
+            CapabilityName.ATTEMPT_TEST,
+            CapabilityName.VIEW_OWN_RESULT,
+        ],
+    }
+
+    def _check_permission_management_allowed(self, request_user, target_user) -> Response | None:
+        """
+        Enforce caller hierarchy for modifying capabilities:
+        - Super Admin: can modify School Admin, Teacher, Student.
+        - School Admin: can modify Teacher and Student within their own school.
+        - Teacher and Student: cannot modify permissions for anyone.
+        """
+        is_super_admin = (
+            request_user.is_superuser
+            or request_user.has_capability("CREATE_SCHOOL")
+            or request_user.has_capability("CREATE_SCHOOL_ADMIN")
+        )
+        if is_super_admin:
+            return None
+
+        is_school_admin = (
+            request_user.has_capability("VIEW_SCHOOL_WIDE_CONTROLS")
+            and request_user.school_id is not None
+        )
+        if is_school_admin:
+            if target_user.school_id != request_user.school_id:
+                return Response(
+                    {"detail": "You can only manage permissions for users in your own school."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if target_user.role_label not in ("Teacher", "Student"):
+                return Response(
+                    {"detail": "School Admins can only manage permissions for Teachers and Students."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            return None
+
+        return Response(
+            {"detail": "You do not have permission to manage user capabilities."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     # ------------------------------------------------------------------
     # grant_permission — POST /api/users/{id}/permissions/
     # ------------------------------------------------------------------
@@ -277,24 +331,37 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
     @action(detail=True, methods=["post"], url_path="permissions")
     def grant_permission(self, request, pk=None):
         """
-        Grant a capability to a user.
-
-        Caller must have CREATE_SCHOOL_ADMIN (i.e. be a Super Admin or a
-        privileged admin).  School Admins are further scoped to their school.
+        Grant a capability to a user, enforcing role scope boundaries:
+        - Super Admin can grant to School Admin (3 caps), Teacher (4 caps), Student (2 caps).
+        - School Admin can grant to Teacher (4 caps), Student (2 caps) within their school.
+        - Out-of-scope capabilities are strictly rejected with 400 Bad Request.
         """
         target_user = self._get_scoped_user(request, pk)
         if isinstance(target_user, Response):
             return target_user
 
-        # Object-level school scope.
-        scope_check = IsWithinSchoolScope()
-        if not scope_check.has_object_permission(request, self, target_user):
-            return Response({"detail": scope_check.message}, status=status.HTTP_403_FORBIDDEN)
+        auth_error = self._check_permission_management_allowed(request.user, target_user)
+        if auth_error is not None:
+            return auth_error
 
         serializer = CapabilityGrantSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         cap_name = serializer.validated_data["capability_name"]
+        target_role = target_user.role_label
+        allowed_caps = self.ROLE_ALLOWED_CAPABILITIES.get(target_role, [])
+
+        if cap_name not in allowed_caps:
+            return Response(
+                {
+                    "detail": (
+                        f"Capability '{cap_name}' is out of scope for role '{target_role}'. "
+                        f"Allowed capabilities for {target_role}: {allowed_caps}."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         cap = Capability.objects.get(name=cap_name)
 
         uc, created = UserCapability.objects.get_or_create(
@@ -330,14 +397,30 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         url_path=r"permissions/(?P<capability>[A-Z_]+)",
     )
     def revoke_permission(self, request, pk=None, capability=None):
-        """Revoke a capability from a user."""
+        """
+        Revoke a capability from a user, enforcing role scope boundaries.
+        """
         target_user = self._get_scoped_user(request, pk)
         if isinstance(target_user, Response):
             return target_user
 
-        scope_check = IsWithinSchoolScope()
-        if not scope_check.has_object_permission(request, self, target_user):
-            return Response({"detail": scope_check.message}, status=status.HTTP_403_FORBIDDEN)
+        auth_error = self._check_permission_management_allowed(request.user, target_user)
+        if auth_error is not None:
+            return auth_error
+
+        target_role = target_user.role_label
+        allowed_caps = self.ROLE_ALLOWED_CAPABILITIES.get(target_role, [])
+
+        if capability not in allowed_caps:
+            return Response(
+                {
+                    "detail": (
+                        f"Capability '{capability}' is out of scope for role '{target_role}'. "
+                        f"Allowed capabilities for {target_role}: {allowed_caps}."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         deleted_count, _ = UserCapability.objects.filter(
             user=target_user,

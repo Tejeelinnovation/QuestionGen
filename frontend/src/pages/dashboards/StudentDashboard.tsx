@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../api/deliveries';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
@@ -31,8 +31,8 @@ const StudentDashboardDesktop: React.FC = () => {
     fetchDeliveries();
   }, []);
 
-  const completedCount = deliveries.filter((d) =>
-    sessionStorage.getItem(`delivery_${d.id}_attempt`)
+  const completedCount = deliveries.filter(
+    (d) => d.my_attempt && (d.my_attempt.status === 'SUBMITTED' || d.my_attempt.status === 'EVALUATED')
   ).length;
 
   const pendingCount = deliveries.length - completedCount;
@@ -93,31 +93,52 @@ const StudentDashboardDesktop: React.FC = () => {
             </span>
           </div>
 
-          {/* Staggered AnimatedCards for deliveries (Requirements: status as colored badges grape/forest/ember) */}
+          {/* Staggered AnimatedCards for deliveries */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {deliveries.map((d, index) => {
-              const cachedAttemptId = sessionStorage.getItem(`delivery_${d.id}_attempt`);
+              const myAttempt = d.my_attempt;
+              const hasSubmitted = myAttempt && (myAttempt.status === 'SUBMITTED' || myAttempt.status === 'EVALUATED');
+              const isInProgress = myAttempt && myAttempt.status === 'IN_PROGRESS';
 
-              // Status badges: Forest for submitted/completed, Ember for active/window expiring, Grape for assigned/ready
-              const statusPill = cachedAttemptId ? (
-                <span className="pill pill-forest">
-                  ✓ Submitted
-                </span>
-              ) : d.mode === 'ONLINE' ? (
-                <span className="pill pill-grape">
-                  Ready to Attempt
-                </span>
-              ) : (
-                <span className="pill pill-ember">
-                  In-Person / Print
-                </span>
-              );
+              // Status badges: Forest for evaluated/submitted, Ember for in progress, Grape for ready
+              let statusPill: React.ReactNode;
+              if (myAttempt?.status === 'EVALUATED') {
+                statusPill = (
+                  <span className="pill pill-forest">
+                    ✓ Evaluated ({myAttempt.score}/{myAttempt.max_score})
+                  </span>
+                );
+              } else if (myAttempt?.status === 'SUBMITTED') {
+                statusPill = (
+                  <span className="pill pill-forest">
+                    ✓ Submitted
+                  </span>
+                );
+              } else if (isInProgress) {
+                statusPill = (
+                  <span className="pill pill-ember">
+                    In Progress
+                  </span>
+                );
+              } else if (d.mode === 'ONLINE') {
+                statusPill = (
+                  <span className="pill pill-grape">
+                    Ready to Attempt
+                  </span>
+                );
+              } else {
+                statusPill = (
+                  <span className="pill pill-muted">
+                    In-Person / Print
+                  </span>
+                );
+              }
 
               return (
                 <AnimatedCard
                   key={d.id}
                   staggerIndex={index}
-                  hoverAccent={cachedAttemptId ? 'forest' : 'ember'}
+                  hoverAccent={hasSubmitted ? 'forest' : isInProgress ? 'ember' : 'grape'}
                   className="p-6 flex flex-col justify-between min-h-[250px] shadow-card border border-border"
                 >
                   <div className="space-y-3.5">
@@ -147,23 +168,27 @@ const StudentDashboardDesktop: React.FC = () => {
                   </div>
 
                   <div className="pt-5 mt-4 border-t border-border/70 flex flex-wrap items-center gap-2">
-                    <Link
-                      to={`/deliveries/${d.id}/attempt`}
-                      className={`px-4 py-2 rounded-pill font-heading font-semibold text-xs transition-all ${
-                        cachedAttemptId
-                          ? 'bg-surface-muted text-ink hover:bg-ink hover:text-white border border-border'
-                          : 'bg-forest text-white hover:bg-forest/90 shadow-sm'
-                      }`}
-                    >
-                      {cachedAttemptId ? 'Re-open Attempt' : 'Start Assessment →'}
-                    </Link>
-
-                    {cachedAttemptId && (
+                    {hasSubmitted ? (
                       <Link
-                        to={`/attempts/${cachedAttemptId}/result`}
-                        className="px-4 py-2 rounded-pill bg-grape text-white font-heading font-semibold text-xs hover:bg-grape/90 transition-all shadow-sm"
+                        to={`/attempts/${myAttempt.id}/result`}
+                        id={`view-result-btn-${d.id}`}
+                        className="px-5 py-2 rounded-pill bg-grape text-white font-heading font-semibold text-xs hover:bg-grape/90 transition-all shadow-sm flex items-center gap-1.5"
                       >
-                        View Result
+                        View Result →
+                      </Link>
+                    ) : isInProgress ? (
+                      <Link
+                        to={`/deliveries/${d.id}/attempt`}
+                        className="px-4 py-2 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 shadow-sm"
+                      >
+                        Resume Assessment →
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/deliveries/${d.id}/attempt`}
+                        className="px-4 py-2 rounded-pill bg-forest text-white hover:bg-forest/90 shadow-sm font-heading font-semibold text-xs transition-all"
+                      >
+                        Start Assessment →
                       </Link>
                     )}
                   </div>

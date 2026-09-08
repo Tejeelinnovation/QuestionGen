@@ -77,6 +77,8 @@ class AnswerUpdateSerializer(serializers.Serializer):
 
 class AttemptSubmitResponseSerializer(serializers.ModelSerializer):
     paper_title = serializers.CharField(source="delivery.paper_version.paper.title", read_only=True)
+    score = serializers.FloatField(read_only=True, allow_null=True)
+    max_score = serializers.FloatField(read_only=True)
     message = serializers.SerializerMethodField()
 
     class Meta:
@@ -104,6 +106,8 @@ class AttemptSubmitResponseSerializer(serializers.ModelSerializer):
 
 class StudentAttemptResultSerializer(serializers.ModelSerializer):
     paper_title = serializers.CharField(source="delivery.paper_version.paper.title", read_only=True)
+    score = serializers.FloatField(read_only=True, allow_null=True)
+    max_score = serializers.FloatField(read_only=True)
     answers = serializers.SerializerMethodField()
 
     class Meta:

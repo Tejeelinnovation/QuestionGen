@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { usersApi } from '../../api/users';
 import type { CapabilityName, User } from '../../types';
 import { Shield, ShieldAlert, Check, RefreshCw, Lock } from 'lucide-react';
@@ -88,28 +88,37 @@ export const getDefaultCapabilitiesForRole = (roleLabel: string): CapabilityName
   }
 };
 
+export const ALLOWED_CAPABILITIES_BY_ROLE: Record<string, CapabilityName[]> = {
+  'Super Admin': ALL_CAPABILITIES.map((c) => c.name),
+  'School Admin': ['CREATE_TEACHER', 'CREATE_STUDENT', 'VIEW_SCHOOL_WIDE_CONTROLS'],
+  'Teacher': ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST'],
+  'Student': ['ATTEMPT_TEST', 'VIEW_OWN_RESULT'],
+};
+
 /**
  * Returns capabilities that CANNOT be toggled for a given target role.
- * Enforces the role pyramid: Super Admin > School Admin > Teacher > Student.
- *
- * - Student  : all caps locked (only ATTEMPT_TEST + VIEW_OWN_RESULT by design)
- * - Teacher  : cannot receive school-level admin caps
- * - School Admin : cannot receive super-admin-only caps
+ * Enforces strict role scopes:
+ * - Super Admin: all 10 caps allowed (0 locked)
+ * - School Admin: 3 caps allowed (7 locked)
+ * - Teacher: 4 caps allowed (6 locked)
+ * - Student: 2 caps allowed (8 locked)
+ * Also ensures School Admins cannot modify Super Admins or other School Admins.
  */
-export const getLockedCapsForRole = (targetRole: string): CapabilityName[] => {
-  switch (targetRole) {
-    case 'Student':
-      // Students have exactly 2 fixed caps - nothing is changeable
-      return ALL_CAPABILITIES.map((c) => c.name);
-    case 'Teacher':
-      // Teachers must not receive school/admin-level capabilities
-      return ['CREATE_SCHOOL', 'CREATE_SCHOOL_ADMIN', 'VIEW_SCHOOL_WIDE_CONTROLS'];
-    case 'School Admin':
-      // School Admins must not receive super-admin-only capabilities
-      return ['CREATE_SCHOOL', 'CREATE_SCHOOL_ADMIN'];
-    default:
-      return [];
+export const getLockedCapsForRole = (targetRole: string, editorRole?: string): CapabilityName[] => {
+  // School Admins cannot modify Super Admin or School Admin capabilities
+  if (editorRole === 'School Admin' && (targetRole === 'Super Admin' || targetRole === 'School Admin')) {
+    return ALL_CAPABILITIES.map((c) => c.name);
   }
+  // Teachers and Students cannot modify anyone
+  if (editorRole === 'Teacher' || editorRole === 'Student') {
+    return ALL_CAPABILITIES.map((c) => c.name);
+  }
+
+  const allowed = ALLOWED_CAPABILITIES_BY_ROLE[targetRole];
+  if (!allowed) {
+    return ALL_CAPABILITIES.map((c) => c.name);
+  }
+  return ALL_CAPABILITIES.map((c) => c.name).filter((c) => !allowed.includes(c));
 };
 
 interface PermissionManagerProps {
@@ -130,9 +139,8 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   const defaultCaps = getDefaultCapabilitiesForRole(user.role_label);
-  // Caps that are off-limits based on the target user's role in the pyramid
-  const lockedCaps = getLockedCapsForRole(user.role_label);
-  const isStudentTarget = user.role_label === 'Student';
+  // Caps that are off-limits based on the target user's role and editor role
+  const lockedCaps = getLockedCapsForRole(user.role_label, editorRole);
 
   const handleToggle = async (capName: CapabilityName) => {
     const isCurrentlyGranted = grantedCaps.includes(capName);
@@ -188,25 +196,32 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
         </div>
       </div>
 
-      {/* Role pyramid boundary notice */}
-      {isStudentTarget && (
+      {/* Role scope boundary notice */}
+      {lockedCaps.length > 0 && (
         <div className="p-3 rounded-card bg-surface-muted border border-border/80 flex items-start gap-2">
           <Lock className="w-3.5 h-3.5 text-ink/50 shrink-0 mt-0.5" />
           <p className="text-[11px] text-ink/65 leading-snug">
-            <span className="font-semibold text-ink">Student permissions are fixed.</span>{' '}
-            Students are granted exactly 2 capabilities by design (<span className="font-mono">ATTEMPT_TEST</span>,{' '}
-            <span className="font-mono">VIEW_OWN_RESULT</span>) and cannot be modified.
-          </p>
-        </div>
-      )}
-
-      {!isStudentTarget && lockedCaps.length > 0 && (
-        <div className="p-3 rounded-card bg-surface-muted border border-border/80 flex items-start gap-2">
-          <Lock className="w-3.5 h-3.5 text-ink/50 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-ink/65 leading-snug">
-            <span className="font-semibold text-ink">Role boundary active.</span>{' '}
-            Some capabilities are locked because they exceed the{' '}
-            <span className="font-semibold">{user.role_label}</span> role level in the permission pyramid.
+            <span className="font-semibold text-ink">Role scope boundary enforced.</span>{' '}
+            {user.role_label === 'School Admin' && (
+              <>
+                School Admins can only hold 3 designated capabilities (<span className="font-mono">CREATE_TEACHER</span>, <span className="font-mono">CREATE_STUDENT</span>, <span className="font-mono">VIEW_SCHOOL_WIDE_CONTROLS</span>). The other 7 capabilities are locked and out of scope.
+              </>
+            )}
+            {user.role_label === 'Teacher' && (
+              <>
+                Teachers can only hold 4 designated capabilities (<span className="font-mono">CREATE_STUDENT</span>, <span className="font-mono">GENERATE_SELECT_QUESTIONS</span>, <span className="font-mono">CREATE_PAPER</span>, <span className="font-mono">ASSIGN_TEST</span>). The other 6 capabilities are locked and out of scope.
+              </>
+            )}
+            {user.role_label === 'Student' && (
+              <>
+                Students can only hold 2 designated capabilities (<span className="font-mono">ATTEMPT_TEST</span>, <span className="font-mono">VIEW_OWN_RESULT</span>). The other 8 capabilities are locked and out of scope.
+              </>
+            )}
+            {user.role_label !== 'School Admin' && user.role_label !== 'Teacher' && user.role_label !== 'Student' && (
+              <>
+                {lockedCaps.length} capabilities are locked because they exceed the <span className="font-semibold">{user.role_label}</span> role boundary.
+              </>
+            )}
           </p>
         </div>
       )}

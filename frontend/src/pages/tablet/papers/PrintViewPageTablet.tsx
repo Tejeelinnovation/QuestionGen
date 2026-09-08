@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import type { PaperPrintData } from '../../../types';
 
+import { PrintablePaperSheet } from '../../../components/papers/PrintablePaperSheet';
+
 export const PrintViewPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
@@ -74,6 +76,9 @@ export const PrintViewPageTablet: React.FC = () => {
           <p className="text-xs text-ink/60">
             Formal document styling for proctored examinations
           </p>
+          <p className="text-[11px] text-ink/50 font-mono mt-1">
+            Tip: In browser print dialog, uncheck &quot;Headers and footers&quot; to remove page URL and timestamp.
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -96,70 +101,7 @@ export const PrintViewPageTablet: React.FC = () => {
       </div>
 
       {/* ── Printable Formal Paper ── */}
-      <div className="bg-white text-black border border-border print:border-none p-6 sm:p-10 rounded-card print:rounded-none print:p-0 shadow-card print:shadow-none space-y-6">
-        <div className="border-b-2 border-black pb-4 text-center space-y-2">
-          <div className="text-[10px] font-mono tracking-widest uppercase text-gray-600">
-            Institutional Examination Paper
-          </div>
-          <h1 className="font-heading font-bold text-2xl text-black uppercase">
-            {printData.title}
-          </h1>
-          <div className="flex justify-between items-center text-xs font-mono pt-2 border-t border-gray-300 font-semibold text-black">
-            <span>VERSION: {printData.version_label}</span>
-            <span>QUESTIONS: {printData.question_count}</span>
-            <span>MAX MARKS: {printData.total_marks}</span>
-          </div>
-          {printData.instructions && (
-            <p className="text-left text-xs italic text-gray-800 border-t border-dashed border-gray-300 pt-2">
-              <strong className="font-mono uppercase text-[10px] not-italic text-black">Instructions:</strong> {printData.instructions}
-            </p>
-          )}
-        </div>
-
-        {/* Candidate table */}
-        <div className="grid grid-cols-2 gap-3 text-xs font-mono border border-black p-3">
-          <div>STUDENT NAME: _________________________________</div>
-          <div className="text-right">ROLL NO / DATE: __________________</div>
-        </div>
-
-        {/* Questions */}
-        <div className="space-y-6 pt-2">
-          {printData.questions?.map((q, idx) => (
-            <div key={q.question_id || idx} className="space-y-2 break-inside-avoid">
-              <div className="flex justify-between items-baseline gap-2">
-                <div className="text-sm font-medium">
-                  <span className="font-bold mr-1">{idx + 1}.</span> {q.question_text}
-                </div>
-                <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
-                  [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
-                </span>
-              </div>
-
-              {q.options && Object.keys(q.options).length > 0 && (
-                <div className="grid grid-cols-2 gap-2 text-xs pl-4 pt-1">
-                  {Object.entries(q.options).map(([key, val]) => (
-                    <div key={key} className="flex items-baseline gap-1.5">
-                      <span className="font-bold font-mono">({key})</span>
-                      <span>{val}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {q.question_type !== 'MCQ' && (
-                <div className="pt-2 space-y-2.5 pl-4">
-                  <div className="h-3 border-b border-dashed border-gray-300 w-full" />
-                  <div className="h-3 border-b border-dashed border-gray-300 w-full" />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="text-center font-mono text-[10px] text-gray-500 border-t border-black pt-4">
-          *** END OF QUESTION PAPER ***
-        </div>
-      </div>
+      <PrintablePaperSheet printData={printData} />
     </div>
   );
 };

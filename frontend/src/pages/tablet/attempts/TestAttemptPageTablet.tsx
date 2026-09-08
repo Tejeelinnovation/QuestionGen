@@ -33,8 +33,6 @@ export const TestAttemptPageTablet: React.FC = () => {
       try {
         const data = await attemptsApi.startOrResumeAttempt(deliveryId);
 
-        sessionStorage.setItem(`delivery_${deliveryId}_attempt`, String(data.attempt_id));
-
         if (data.status === 'SUBMITTED' || data.status === 'EVALUATED') {
           navigate(`/attempts/${data.attempt_id}/result`, { replace: true });
           return;
@@ -55,13 +53,11 @@ export const TestAttemptPageTablet: React.FC = () => {
           setIsExpired(true);
         }
       } catch (err: any) {
-        const detail = err.response?.data?.detail;
-        if (detail === 'You have already submitted this test.') {
-          const cachedAttemptId = sessionStorage.getItem(`delivery_${deliveryId}_attempt`);
-          if (cachedAttemptId) {
-            navigate(`/attempts/${cachedAttemptId}/result`, { replace: true });
-            return;
-          }
+        const resData = err.response?.data;
+        const detail = resData?.detail;
+        if (resData?.attempt_id) {
+          navigate(`/attempts/${resData.attempt_id}/result`, { replace: true });
+          return;
         }
         if (detail === 'This test has expired.') {
           setIsExpired(true);
@@ -132,7 +128,6 @@ export const TestAttemptPageTablet: React.FC = () => {
     setErrorMessage(null);
     try {
       const result = await attemptsApi.submitAttempt(attemptData.attempt_id);
-      sessionStorage.setItem(`delivery_${deliveryId}_attempt`, String(result.id));
       navigate(`/attempts/${result.id}/result`);
     } catch (err: any) {
       const detail = err.response?.data?.detail;

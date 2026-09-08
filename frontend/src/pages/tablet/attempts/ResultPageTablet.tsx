@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
 import type { StudentAttemptResult } from '../../../types';
@@ -60,8 +60,10 @@ export const ResultPageTablet: React.FC = () => {
 
   const isEvaluated = result.status === 'EVALUATED';
   const isSubmitted = result.status === 'SUBMITTED';
+  const scoreNum = Number(result.score) || 0;
+  const maxScoreNum = Number(result.max_score) || 0;
   const percentage =
-    result.max_score > 0 ? ((result.score / result.max_score) * 100).toFixed(1) : '0.0';
+    maxScoreNum > 0 ? ((scoreNum / maxScoreNum) * 100).toFixed(1) : '0.0';
 
   const pendingQuestionsCount = result.answers?.filter((a) => a.pending_manual_review).length || 0;
 
@@ -116,10 +118,10 @@ export const ResultPageTablet: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2.5" id="result-score-display">
             <span className="font-heading font-bold text-5xl sm:text-6xl text-forest tracking-tight">
-              {result.score % 1 === 0 ? result.score : result.score.toFixed(1)}
+              {scoreNum % 1 === 0 ? scoreNum : scoreNum.toFixed(1)}
             </span>
             <span className="font-heading font-normal text-2xl text-ink/40">
-              / {result.max_score}
+              / {maxScoreNum}
             </span>
             <span className="text-xs font-mono font-semibold text-ink/60 pl-1">Marks</span>
           </div>

@@ -9,7 +9,7 @@ import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 export const PaperDetailPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
-  const { hasCapability } = useAuth();
+  const { hasCapability, dashboardPath } = useAuth();
 
   const [paper, setPaper] = useState<Paper | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,10 +58,10 @@ export const PaperDetailPageTablet: React.FC = () => {
             </div>
           )}
           <Link
-            to="/dashboard/teacher"
+            to={dashboardPath}
             className="text-xs font-heading font-semibold text-forest hover:underline"
           >
-            ← Return to Teacher Studio
+            ← Return to Dashboard
           </Link>
         </div>
       </div>

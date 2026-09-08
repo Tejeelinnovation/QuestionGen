@@ -74,9 +74,25 @@ class SeededBankGenerationService(QuestionGenerationService):
         # Consistent ordering matching papers app
         qs = qs.order_by("topic_id", "difficulty", "id")
 
-        # Quantity constraint
+        # Quota or Quantity constraint
+        total_marks = constraints.get("total_marks")
         quantity = constraints.get("quantity")
-        if quantity:
+
+        if total_marks is not None:
+            from papers.selection import select_questions_for_quota
+            qty_int = None
+            if quantity:
+                try:
+                    qty_int = int(quantity)
+                except (ValueError, TypeError):
+                    qty_int = None
+            selected_questions, _ = select_questions_for_quota(
+                list(qs),
+                target_marks=float(total_marks),
+                max_quantity=qty_int,
+            )
+            qs = selected_questions
+        elif quantity:
             try:
                 qty_int = int(quantity)
                 if qty_int > 0:

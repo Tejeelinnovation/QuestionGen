@@ -1,12 +1,14 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
+import { useAuth } from '../../../auth/AuthContext';
 import type { DeliveryResultsRoster } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 
 export const ResultsRosterPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
+  const { dashboardPath } = useAuth();
 
   const [roster, setRoster] = useState<DeliveryResultsRoster | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,10 +52,10 @@ export const ResultsRosterPageTablet: React.FC = () => {
           </div>
         )}
         <Link
-          to="/dashboard/teacher"
+          to={dashboardPath}
           className="min-h-[48px] inline-flex items-center text-sm font-heading font-semibold text-forest hover:underline"
         >
-          ← Return to Teacher Dashboard
+          ← Return to Dashboard
         </Link>
       </div>
     );
@@ -102,10 +104,10 @@ export const ResultsRosterPageTablet: React.FC = () => {
             Refresh Roster ↻
           </button>
           <Link
-            to="/dashboard/teacher"
+            to={dashboardPath}
             className="min-h-[44px] px-5 py-2 inline-flex items-center text-xs font-heading font-semibold rounded-pill bg-surface-muted border border-border text-ink hover:bg-ink hover:text-white transition-colors active:scale-95"
           >
-            ← Teacher Studio
+            ← Dashboard
           </Link>
         </div>
       </div>

@@ -12,7 +12,7 @@ import { getStaggerDelay, MOTION } from '../../lib/motion';
 const PaperDetailPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
-  const { hasCapability } = useAuth();
+  const { hasCapability, dashboardPath } = useAuth();
 
   const [paper, setPaper] = useState<Paper | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,10 +61,10 @@ const PaperDetailPageDesktop: React.FC = () => {
             </div>
           )}
           <Link
-            to="/dashboard/teacher"
+            to={dashboardPath}
             className="text-xs font-heading font-semibold text-forest hover:underline"
           >
-            ← Return to Teacher Dashboard
+            ← Return to Dashboard
           </Link>
         </div>
       </div>

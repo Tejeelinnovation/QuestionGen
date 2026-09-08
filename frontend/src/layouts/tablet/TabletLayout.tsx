@@ -32,7 +32,7 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col font-body selection:bg-lime selection:text-ink">
       {/* ── Tablet Header Bar (Touch-Optimized, Sticky) ── */}
-      <header className="sticky top-0 z-40 w-full border-b border-border bg-surface/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-surface/95 backdrop-blur-sm print:hidden">
         <div className="px-6 h-16 flex items-center justify-between">
           {/* Hamburger Trigger & Brand */}
           <div className="flex items-center gap-4">
@@ -95,7 +95,7 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
       )}
 
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-50 w-72 bg-surface border-r border-border shadow-float transform transition-transform duration-300 ease-out flex flex-col justify-between ${
+        className={`fixed top-0 left-0 bottom-0 z-50 w-72 bg-surface border-r border-border shadow-float transform transition-transform duration-300 ease-out flex flex-col justify-between print:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

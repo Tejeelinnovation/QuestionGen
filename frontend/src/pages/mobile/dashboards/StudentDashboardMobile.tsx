@@ -29,8 +29,8 @@ export const StudentDashboardMobile: React.FC = () => {
     fetchDeliveries();
   }, []);
 
-  const completedCount = deliveries.filter((d) =>
-    sessionStorage.getItem(`delivery_${d.id}_attempt`)
+  const completedCount = deliveries.filter(
+    (d) => d.my_attempt && (d.my_attempt.status === 'SUBMITTED' || d.my_attempt.status === 'EVALUATED')
   ).length;
 
   const pendingCount = deliveries.length - completedCount;
@@ -78,15 +78,15 @@ export const StudentDashboardMobile: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Single-Column Feed of Assessments ── */}
+      {/* ── Main Delivery Cards List ── */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
-          <span>YOUR EXAMINATIONS ({deliveries.length})</span>
-        </div>
-
         {isLoading ? (
-          <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
+          <div className="p-8 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
             Loading assigned tests...
+          </div>
+        ) : errorMessage ? (
+          <div className="p-3 text-xs text-ember bg-ember/10 border border-ember/20 rounded-card font-medium">
+            {errorMessage}
           </div>
         ) : deliveries.length === 0 ? (
           <div className="p-6 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
@@ -94,8 +94,23 @@ export const StudentDashboardMobile: React.FC = () => {
           </div>
         ) : (
           deliveries.map((d, idx) => {
-            const cachedAttemptId = sessionStorage.getItem(`delivery_${d.id}_attempt`);
-            const isCompleted = !!cachedAttemptId;
+            const myAttempt = d.my_attempt;
+            const hasSubmitted = myAttempt && (myAttempt.status === 'SUBMITTED' || myAttempt.status === 'EVALUATED');
+            const isInProgress = myAttempt && myAttempt.status === 'IN_PROGRESS';
+
+            let statusPillText = 'Ready to Take';
+            let statusPillClass = 'pill-ember';
+
+            if (myAttempt?.status === 'EVALUATED') {
+              statusPillText = `Evaluated (${myAttempt.score}/${myAttempt.max_score})`;
+              statusPillClass = 'pill-forest';
+            } else if (myAttempt?.status === 'SUBMITTED') {
+              statusPillText = 'Submitted';
+              statusPillClass = 'pill-forest';
+            } else if (isInProgress) {
+              statusPillText = 'In Progress';
+              statusPillClass = 'pill-ember';
+            }
 
             return (
               <div
@@ -113,11 +128,9 @@ export const StudentDashboardMobile: React.FC = () => {
                     </div>
                   </div>
                   <span
-                    className={`pill text-[10px] py-0.5 px-2 shrink-0 ${
-                      isCompleted ? 'pill-forest' : 'pill-ember'
-                    }`}
+                    className={`pill text-[10px] py-0.5 px-2 shrink-0 ${statusPillClass}`}
                   >
-                    {isCompleted ? 'Completed' : 'Ready to Take'}
+                    {statusPillText}
                   </span>
                 </div>
 
@@ -129,13 +142,23 @@ export const StudentDashboardMobile: React.FC = () => {
                 )}
 
                 <div className="pt-2 border-t border-border/50">
-                  {isCompleted ? (
+                  {hasSubmitted ? (
                     <Link
-                      to={`/attempts/${cachedAttemptId}/result`}
+                      to={`/attempts/${myAttempt.id}/result`}
+                      id={`view-result-btn-${d.id}`}
                       className="w-full py-2.5 px-4 rounded-pill border border-border bg-surface-muted text-forest font-heading font-semibold text-xs hover:bg-forest hover:text-white active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[44px]"
                     >
                       <Award className="w-3.5 h-3.5" />
                       <span>Review Score & Feedback</span>
+                    </Link>
+                  ) : isInProgress ? (
+                    <Link
+                      to={`/deliveries/${d.id}/attempt`}
+                      id={`resume-test-btn-${d.id}`}
+                      className="w-full py-3 px-4 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[48px] shadow-xs"
+                    >
+                      <span>Resume Assessment</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   ) : (
                     <Link

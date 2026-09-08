@@ -348,6 +348,7 @@ class DeliverySerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source="created_by.username", read_only=True)
     assigned_students_count = serializers.SerializerMethodField()
     assigned_students_details = serializers.SerializerMethodField()
+    my_attempt = serializers.SerializerMethodField()
 
     class Meta:
         model = Delivery
@@ -363,6 +364,7 @@ class DeliverySerializer(serializers.ModelSerializer):
             "assigned_students",
             "assigned_students_count",
             "assigned_students_details",
+            "my_attempt",
             "available_from",
             "available_until",
             "created_by",
@@ -380,6 +382,20 @@ class DeliverySerializer(serializers.ModelSerializer):
             for s in obj.assigned_students.all()
         ]
 
+    def get_my_attempt(self, obj: Delivery) -> dict[str, Any] | None:
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return None
+        attempt = obj.attempts.filter(student=request.user).first()
+        if not attempt:
+            return None
+        return {
+            "id": attempt.id,
+            "status": attempt.status,
+            "score": float(attempt.score) if attempt.score is not None else 0.0,
+            "max_score": float(attempt.max_score) if attempt.max_score is not None else float(obj.paper_version.total_marks),
+        }
+
 
 # ---------------------------------------------------------------------------
 # Print Representation Serializer
@@ -393,7 +409,8 @@ class PaperPrintSerializer(serializers.Serializer):
 
     paper_id = serializers.IntegerField()
     title = serializers.CharField()
-    instructions = serializers.CharField()
+    school_name = serializers.CharField(required=False, allow_blank=True, default="")
+    instructions = serializers.CharField(required=False, allow_blank=True, default="")
     version_label = serializers.CharField()
     total_marks = serializers.IntegerField()
     question_count = serializers.IntegerField()

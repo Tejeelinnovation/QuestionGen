@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
+import { useAuth } from '../../../auth/AuthContext';
 import type { TeacherAttemptDetail, TeacherAttemptAnswerItem } from '../../../types';
 
 interface GradeFormState {
@@ -14,6 +15,7 @@ interface GradeFormState {
 export const GradeAttemptPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const attemptId = Number(id);
+  const { dashboardPath } = useAuth();
 
   const [attempt, setAttempt] = useState<TeacherAttemptDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -204,10 +206,10 @@ export const GradeAttemptPageTablet: React.FC = () => {
           {errorMessage || 'Attempt record not found.'}
         </div>
         <Link
-          to="/dashboard/teacher"
+          to={dashboardPath}
           className="min-h-[48px] inline-flex items-center text-sm font-heading font-semibold text-forest hover:underline"
         >
-          ← Return to Teacher Dashboard
+          ← Return to Dashboard
         </Link>
       </div>
     );
@@ -227,10 +229,10 @@ export const GradeAttemptPageTablet: React.FC = () => {
           ← Return to Results Roster
         </Link>
         <Link
-          to="/dashboard/teacher"
+          to={dashboardPath}
           className="font-heading font-medium text-ink/60 hover:text-ink transition-colors py-1"
         >
-          Teacher Studio
+          Dashboard
         </Link>
       </div>
 
@@ -549,10 +551,10 @@ export const GradeAttemptPageTablet: React.FC = () => {
         </Link>
 
         <Link
-          to="/dashboard/teacher"
+          to={dashboardPath}
           className="min-h-[44px] px-4 inline-flex items-center text-xs sm:text-sm font-heading font-medium text-ink/60 hover:text-ink transition-colors"
         >
-          Teacher Dashboard
+          Dashboard
         </Link>
       </div>
     </div>

@@ -609,3 +609,56 @@ class AttemptsWorkflowTests(APITestCase):
         audit_entry = AuditLog.objects.filter(action="answer.graded").first()
         self.assertIsNotNone(audit_entry)
         self.assertEqual(audit_entry.user, self.teacher_1)
+
+    # ------------------------------------------------------------------
+    # 17. Start Attempt on Already Submitted Test Returns attempt_id
+    # ------------------------------------------------------------------
+
+    def test_start_attempt_already_submitted_returns_attempt_id(self):
+        self.client.force_authenticate(user=self.student_1)
+        start_res = self.client.get(f"/api/deliveries/{self.online_delivery.id}/start/")
+        attempt_id = start_res.data["attempt_id"]
+        self.client.post(f"/api/attempts/{attempt_id}/submit/")
+
+        # Try to start/resume again
+        retry_res = self.client.get(f"/api/deliveries/{self.online_delivery.id}/start/")
+        self.assertEqual(retry_res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(retry_res.data["detail"], "You have already submitted this test.")
+        self.assertEqual(retry_res.data["attempt_id"], attempt_id)
+        self.assertEqual(retry_res.data["status"], AttemptStatus.SUBMITTED)
+
+    # ------------------------------------------------------------------
+    # 18. Delivery List and Detail Includes my_attempt as Single Source of Truth
+    # ------------------------------------------------------------------
+
+    def test_delivery_list_and_detail_includes_my_attempt_for_student(self):
+        self.client.force_authenticate(user=self.student_1)
+
+        # Before starting: my_attempt should be None
+        list_res = self.client.get("/api/deliveries/")
+        self.assertEqual(list_res.status_code, status.HTTP_200_OK)
+        delivery_data = next(d for d in list_res.data if d["id"] == self.online_delivery.id)
+        self.assertIsNone(delivery_data["my_attempt"])
+
+        # Start attempt and submit
+        start_res = self.client.get(f"/api/deliveries/{self.online_delivery.id}/start/")
+        attempt_id = start_res.data["attempt_id"]
+
+        # In-progress: my_attempt should have status IN_PROGRESS
+        list_res = self.client.get("/api/deliveries/")
+        delivery_data = next(d for d in list_res.data if d["id"] == self.online_delivery.id)
+        self.assertIsNotNone(delivery_data["my_attempt"])
+        self.assertEqual(delivery_data["my_attempt"]["id"], attempt_id)
+        self.assertEqual(delivery_data["my_attempt"]["status"], AttemptStatus.IN_PROGRESS)
+
+        # Submit
+        self.client.post(f"/api/attempts/{attempt_id}/submit/")
+
+        # After submission: my_attempt status should be SUBMITTED
+        detail_res = self.client.get(f"/api/deliveries/{self.online_delivery.id}/")
+        self.assertEqual(detail_res.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(detail_res.data["my_attempt"])
+        self.assertEqual(detail_res.data["my_attempt"]["id"], attempt_id)
+        self.assertEqual(detail_res.data["my_attempt"]["status"], AttemptStatus.SUBMITTED)
+        self.assertIn("score", detail_res.data["my_attempt"])
+        self.assertIn("max_score", detail_res.data["my_attempt"])
