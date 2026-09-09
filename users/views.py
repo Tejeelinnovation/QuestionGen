@@ -16,6 +16,7 @@ DELETE /api/users/{id}/permissions/{cap}/   → UserViewSet.revoke_permission
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -25,6 +26,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.audit import log_action
+from core.pagination import StandardPageNumberPagination
 from .models import Capability, CapabilityName, User, UserCapability
 from .permissions import (
     HasCapability,
@@ -127,6 +129,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
     """
 
     serializer_class = UserSerializer
+    pagination_class = StandardPageNumberPagination
 
     def get_queryset(self):
         return self.get_scoped_queryset()
@@ -135,7 +138,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         """
         Return appropriate permissions based on the current action.
         """
-        if self.action == "list":
+        if self.action in ("list", "stats"):
             return [IsAuthenticated()]
 
         if self.action == "create":
@@ -156,10 +159,78 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
     # ------------------------------------------------------------------
 
     def list(self, request):
-        """Return users within the caller's scope."""
+        """Return users within the caller's scope with filtering, search, and pagination."""
         queryset = self.get_queryset()
+
+        role = request.query_params.get("role")
+        if role and role.upper() != "ALL":
+            role_norm = role.strip().lower()
+            if role_norm in ("super admin", "super_admin"):
+                queryset = queryset.filter(
+                    Q(role__in=["Super Admin", "super_admin"])
+                    | Q(user_capabilities__capability__name=CapabilityName.CREATE_SCHOOL)
+                )
+            elif role_norm in ("school admin", "school_admin"):
+                queryset = queryset.filter(
+                    Q(role__in=["School Admin", "school_admin"])
+                    | (
+                        Q(user_capabilities__capability__name=CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS)
+                        & Q(school__isnull=False)
+                    )
+                )
+            elif role_norm in ("teacher",):
+                queryset = queryset.filter(
+                    Q(role__in=["Teacher", "teacher"])
+                    | (
+                        Q(user_capabilities__capability__name=CapabilityName.CREATE_STUDENT)
+                        & Q(school__isnull=False)
+                        & ~Q(user_capabilities__capability__name=CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS)
+                    )
+                )
+            elif role_norm in ("student",):
+                queryset = queryset.filter(
+                    Q(role__in=["Student", "student"])
+                    | Q(user_capabilities__capability__name=CapabilityName.ATTEMPT_TEST)
+                )
+
+        search = request.query_params.get("search")
+        if search and search.strip():
+            s = search.strip()
+            queryset = queryset.filter(
+                Q(username__icontains=s)
+                | Q(first_name__icontains=s)
+                | Q(last_name__icontains=s)
+                | Q(email__icontains=s)
+                | Q(school__name__icontains=s)
+            )
+
+        queryset = queryset.distinct().order_by("-date_joined", "id")
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = UserSerializer(page, many=True, context={"request": request})
+            return self.get_paginated_response(serializer.data)
+
         serializer = UserSerializer(queryset, many=True, context={"request": request})
         return Response(serializer.data)
+
+    # ------------------------------------------------------------------
+    # stats — GET /api/users/stats/
+    # ------------------------------------------------------------------
+
+    @action(detail=False, methods=["get"], url_path="stats")
+    def stats(self, request):
+        """Return user counts broken down by role within the caller's scope."""
+        queryset = self.get_scoped_queryset()
+        users = list(queryset)
+        counts = {
+            "total": len(users),
+            "super_admin": sum(1 for u in users if u.role_label == "Super Admin"),
+            "school_admin": sum(1 for u in users if u.role_label == "School Admin"),
+            "teacher": sum(1 for u in users if u.role_label == "Teacher"),
+            "student": sum(1 for u in users if u.role_label == "Student"),
+        }
+        return Response(counts)
 
     # ------------------------------------------------------------------
     # create — POST /api/users/

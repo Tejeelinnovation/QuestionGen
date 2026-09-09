@@ -32,8 +32,8 @@ const TeacherDashboardDesktop: React.FC = () => {
     setIsLoadingStudents(true);
     setStudentsError(null);
     try {
-      const data = await usersApi.getUsers();
-      setStudents(data.filter((u) => u.role_label === 'Student'));
+      const data = await usersApi.getAllUsers({ role: 'Student' });
+      setStudents(data);
     } catch (err: any) {
       setStudentsError(err.response?.data?.detail || 'Failed to load students.');
     } finally {

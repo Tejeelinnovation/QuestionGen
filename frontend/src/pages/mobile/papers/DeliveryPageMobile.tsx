@@ -32,8 +32,7 @@ export const DeliveryPageMobile: React.FC = () => {
         const vData = await papersApi.getPaperVersion(paperId, vId);
         setVersion(vData);
 
-        const usersData = await usersApi.getUsers();
-        const studentList = usersData.filter((u) => u.role_label === 'Student');
+        const studentList = await usersApi.getAllUsers({ role: 'Student' });
         setStudents(studentList);
       } catch (err: any) {
         setErrorMessage(

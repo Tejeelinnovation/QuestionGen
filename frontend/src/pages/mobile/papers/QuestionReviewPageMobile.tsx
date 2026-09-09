@@ -133,7 +133,6 @@ export const QuestionReviewPageMobile: React.FC = () => {
         currentStep="review"
         paperId={paperId}
         paperTitle={paper?.title}
-        chapterTitle={paper?.chapter_title}
         backTo={`/papers/${paperId}/configure`}
       />
 

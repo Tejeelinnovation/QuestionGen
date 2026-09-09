@@ -33,9 +33,11 @@ user_list_create = UserViewSet.as_view({"get": "list", "post": "create"})
 user_detail = UserViewSet.as_view({"get": "retrieve", "patch": "partial_update"})
 user_grant_permission = UserViewSet.as_view({"post": "grant_permission"})
 user_revoke_permission = UserViewSet.as_view({"delete": "revoke_permission"})
+user_stats = UserViewSet.as_view({"get": "stats"})
 
 users_urlpatterns = [
     path("", user_list_create, name="user-list-create"),
+    path("stats/", user_stats, name="user-stats"),
     path("<int:pk>/", user_detail, name="user-detail"),
     path("<int:pk>/permissions/", user_grant_permission, name="user-grant-permission"),
     path(

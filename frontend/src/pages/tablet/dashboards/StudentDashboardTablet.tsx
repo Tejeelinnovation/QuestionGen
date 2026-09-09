@@ -28,11 +28,7 @@ export const StudentDashboardTablet: React.FC = () => {
     fetchDeliveries();
   }, []);
 
-  const completedCount = deliveries.filter(
-    (d) => d.my_attempt && (d.my_attempt.status === 'SUBMITTED' || d.my_attempt.status === 'EVALUATED')
-  ).length;
 
-  const pendingCount = deliveries.length - completedCount;
 
   return (
     <div className="space-y-8 font-body">

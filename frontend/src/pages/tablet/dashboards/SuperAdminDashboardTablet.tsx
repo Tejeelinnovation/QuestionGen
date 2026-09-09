@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
-import type { User, School } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
-import { Plus, Edit2, Building2 } from 'lucide-react';
+import { Plus, Edit2, Building2, Search } from 'lucide-react';
+import type { User, School, UserStats } from '../../../types';
+import { Pagination } from '../../../components/ui/pagination';
 
 export const SuperAdminDashboardTablet: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize] = useState<number>(12);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -18,16 +26,35 @@ export const SuperAdminDashboardTablet: React.FC = () => {
   const [createUserProfile, setCreateUserProfile] = useState<'school_admin' | 'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const fetchData = async () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const [usersData, schoolsData] = await Promise.all([
-        usersApi.getUsers(),
+      const [usersData, schoolsData, statsData] = await Promise.all([
+        usersApi.getUsers({
+          page: currentPage,
+          page_size: pageSize,
+          search: searchQuery.trim() || undefined,
+          role: roleFilter !== 'ALL' ? roleFilter : undefined,
+        }),
         usersApi.getSchools().catch(() => [] as School[]),
+        usersApi.getUserStats().catch(() => null),
       ]);
-      setUsers(usersData);
+      setUsers(usersData.results);
+      setTotalUsersCount(usersData.count);
       setSchools(schoolsData);
+      if (statsData) {
+        setUserStats(statsData);
+      }
     } catch (err: any) {
       setErrorMessage(
         err.response?.data?.detail || 'Failed to load user accounts from server.'
@@ -39,18 +66,12 @@ export const SuperAdminDashboardTablet: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
-
-  const countsByRole = users.reduce<Record<string, number>>((acc, u) => {
-    const role = u.role_label || 'Unknown';
-    acc[role] = (acc[role] || 0) + 1;
-    return acc;
-  }, {});
+  }, [currentPage, pageSize, searchQuery, roleFilter]);
 
   const roleDeck = [
     {
       title: 'Super Admins',
-      count: countsByRole['Super Admin'] || 0,
+      count: userStats?.super_admin ?? users.filter((u) => u.role_label === 'Super Admin').length,
       scope: 'Global Scope',
       accent: 'forest',
       badgeClass: 'pill-lime',
@@ -59,7 +80,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
     },
     {
       title: 'School Admins',
-      count: countsByRole['School Admin'] || 0,
+      count: userStats?.school_admin ?? users.filter((u) => u.role_label === 'School Admin').length,
       scope: 'Institutional Scope',
       accent: 'ember',
       badgeClass: 'pill-ember',
@@ -68,21 +89,21 @@ export const SuperAdminDashboardTablet: React.FC = () => {
     },
     {
       title: 'Teachers',
-      count: countsByRole['Teacher'] || 0,
+      count: userStats?.teacher ?? users.filter((u) => u.role_label === 'Teacher').length,
       scope: 'Pedagogical Scope',
       accent: 'grape',
       badgeClass: 'pill-grape',
       cardClass: 'bg-surface text-ink border border-border',
-      subtext: 'Course authors drafting question papers, setting rubrics, and grading.',
+      subtext: 'Content authors drafting questions, assembling papers, and grading.',
     },
     {
       title: 'Students',
-      count: countsByRole['Student'] || 0,
+      count: userStats?.student ?? users.filter((u) => u.role_label === 'Student').length,
       scope: 'Candidate Scope',
       accent: 'lime',
       badgeClass: 'pill-lime',
       cardClass: 'bg-surface text-ink border border-border',
-      subtext: 'Assessment examinees taking adaptive tests and receiving grades.',
+      subtext: 'Enrolled students sitting for online test deliveries and assessments.',
     },
   ];
 
@@ -152,7 +173,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
               <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink/60">
                 // Role Directory Breakdown
               </span>
-              <span className="text-xs text-ink/50">{users.length} Total Users</span>
+              <span className="text-xs text-ink/50">{userStats?.total ?? totalUsersCount} Total Users</span>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -184,14 +205,47 @@ export const SuperAdminDashboardTablet: React.FC = () => {
           </section>
 
           {/* ── 2-Column Grid for User Directory ── */}
-          <section className="space-y-3 pt-2">
+          <section className="space-y-4 pt-2">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <h2 className="font-heading font-bold text-xl text-ink">
                 All Enrolled User Accounts
               </h2>
               <span className="pill pill-forest text-xs">
-                {users.length} Accounts
+                {totalUsersCount} Accounts
               </span>
+            </div>
+
+            {/* Search & Filter Bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search accounts..."
+                  className="w-full pl-9 pr-3 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest"
+                />
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
+                {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student'].map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => {
+                      setRoleFilter(role);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-1 rounded-pill text-[11px] font-heading font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      roleFilter === role
+                        ? 'bg-forest text-white shadow-xs'
+                        : 'bg-surface border border-border text-ink hover:border-forest/50'
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3.5">
@@ -251,6 +305,21 @@ export const SuperAdminDashboardTablet: React.FC = () => {
                 );
               })}
             </div>
+
+            {users.length === 0 && (
+              <div className="p-8 text-center bg-surface border border-border rounded-card text-ink/50 italic text-xs">
+                No users found matching "{searchTerm || roleFilter}".
+              </div>
+            )}
+
+            {/* Responsive Tablet Pagination */}
+            <Pagination
+              currentPage={currentPage}
+              totalCount={totalUsersCount}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              itemName="accounts"
+            />
           </section>
         </>
       )}

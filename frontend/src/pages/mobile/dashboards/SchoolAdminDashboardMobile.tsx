@@ -6,6 +6,7 @@ import type { User, Delivery } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
+import { Pagination } from '../../../components/ui/pagination';
 import {
   Building2,
   UserPlus,
@@ -15,6 +16,7 @@ import {
   GraduationCap,
   FileSpreadsheet,
   Plus,
+  Search,
   ExternalLink,
 } from 'lucide-react';
 
@@ -29,6 +31,15 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
+
+  // Pagination states
+  const [teacherPage, setTeacherPage] = useState(1);
+  const teacherPageSize = 6;
+  const [studentPage, setStudentPage] = useState(1);
+  const studentPageSize = 8;
+  const [deliveryPage, setDeliveryPage] = useState(1);
+  const deliveryPageSize = 5;
 
   // Create Teacher form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -45,7 +56,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const data = await usersApi.getUsers();
+      const data = await usersApi.getAllUsers();
       setUsers(data);
     } catch (err: any) {
       setErrorMessage(
@@ -116,6 +127,32 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
 
   const teachers = users.filter((u) => u.role_label === 'Teacher');
   const students = users.filter((u) => u.role_label === 'Student');
+
+  const filteredStudents = students.filter((s) => {
+    const term = studentSearch.toLowerCase().trim();
+    if (!term) return true;
+    const name = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+    return (
+      s.username.toLowerCase().includes(term) ||
+      name.includes(term) ||
+      (s.email && s.email.toLowerCase().includes(term))
+    );
+  });
+
+  const paginatedTeachers = teachers.slice(
+    (teacherPage - 1) * teacherPageSize,
+    teacherPage * teacherPageSize
+  );
+
+  const paginatedStudents = filteredStudents.slice(
+    (studentPage - 1) * studentPageSize,
+    studentPage * studentPageSize
+  );
+
+  const paginatedDeliveries = deliveries.slice(
+    (deliveryPage - 1) * deliveryPageSize,
+    deliveryPage * deliveryPageSize
+  );
 
   return (
     <div className="space-y-4 font-body pb-10">
@@ -302,35 +339,44 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
               No teachers registered yet.
             </div>
           ) : (
-            teachers.map((t, idx) => (
-              <div
-                key={t.id}
-                style={getStaggerDelay(idx, true)}
-                className={`p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2 ${MOTION.touch.card.className}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-heading font-bold text-sm text-ink">
-                    {t.first_name || t.last_name
-                      ? `${t.first_name || ''} ${t.last_name || ''}`.trim()
-                      : t.username}
-                  </span>
-                  <span className="pill pill-ember text-[10px] py-0.5">Faculty</span>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
-                  <div className="text-xs text-ink/60 font-mono truncate max-w-[170px]">
-                    @{t.username} {t.email && `• ${t.email}`}
+            <div className="space-y-3">
+              {paginatedTeachers.map((t, idx) => (
+                <div
+                  key={t.id}
+                  style={getStaggerDelay(idx, true)}
+                  className={`p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2 ${MOTION.touch.card.className}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading font-bold text-sm text-ink">
+                      {t.first_name || t.last_name
+                        ? `${t.first_name || ''} ${t.last_name || ''}`.trim()
+                        : t.username}
+                    </span>
+                    <span className="pill pill-ember text-[10px] py-0.5">Faculty</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditUserId(t.id)}
-                    className="px-2.5 py-1.5 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
-                  >
-                    <Edit2 className="w-3 h-3" />
-                    <span>Edit & Perms</span>
-                  </button>
+                  <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
+                    <div className="text-xs text-ink/60 font-mono truncate max-w-[170px]">
+                      @{t.username} {t.email && `• ${t.email}`}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditUserId(t.id)}
+                      className="px-2.5 py-1.5 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Edit & Perms</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+
+              <Pagination
+                currentPage={teacherPage}
+                totalCount={teachers.length}
+                pageSize={teacherPageSize}
+                onPageChange={setTeacherPage}
+              />
+            </div>
           )}
         </div>
       )}
@@ -338,26 +384,40 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
       {/* ── TAB 2: STUDENTS ── */}
       {activeTab === 'students' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono text-ink/60">
-              ENROLLED CANDIDATES ({students.length})
+              ENROLLED ({filteredStudents.length})
             </span>
             <button
               onClick={() => setIsCreateStudentOpen(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs active:scale-95 transition-transform cursor-pointer shadow-xs"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs active:scale-95 transition-transform cursor-pointer shadow-xs min-h-[36px]"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Enroll Student</span>
             </button>
           </div>
 
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-ink/40 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={studentSearch}
+              onChange={(e) => {
+                setStudentSearch(e.target.value);
+                setStudentPage(1);
+              }}
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-pill border border-border bg-surface text-ink focus:outline-none focus:border-forest"
+            />
+          </div>
+
           {isLoading ? (
             <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
               Loading student roster...
             </div>
-          ) : students.length === 0 ? (
+          ) : filteredStudents.length === 0 ? (
             <div className="p-8 text-center space-y-2 bg-surface border border-dashed border-border rounded-card text-xs text-ink/60">
-              <p>No student accounts created yet.</p>
+              <p>No student accounts found.</p>
               <button
                 type="button"
                 onClick={() => setIsCreateStudentOpen(true)}
@@ -367,36 +427,45 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
               </button>
             </div>
           ) : (
-            students.map((s, idx) => {
-              const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
-              return (
-                <div
-                  key={s.id}
-                  style={getStaggerDelay(idx, true)}
-                  className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-heading font-bold text-sm text-ink">
-                      {fullName || s.username}
-                    </span>
-                    <span className="pill pill-lime text-[10px] py-0.5">Student</span>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
-                    <div className="text-xs text-ink/60 font-mono truncate max-w-[170px]">
-                      @{s.username} {s.email && `• ${s.email}`}
+            <div className="space-y-3">
+              {paginatedStudents.map((s, idx) => {
+                const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
+                return (
+                  <div
+                    key={s.id}
+                    style={getStaggerDelay(idx, true)}
+                    className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-heading font-bold text-sm text-ink">
+                        {fullName || s.username}
+                      </span>
+                      <span className="pill pill-lime text-[10px] py-0.5">Student</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditUserId(s.id)}
-                      className="px-2.5 py-1.5 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                      <span>Edit & Perms</span>
-                    </button>
+                    <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
+                      <div className="text-xs text-ink/60 font-mono truncate max-w-[170px]">
+                        @{s.username} {s.email && `• ${s.email}`}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditUserId(s.id)}
+                        className="px-2.5 py-1.5 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>Edit & Perms</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+
+              <Pagination
+                currentPage={studentPage}
+                totalCount={filteredStudents.length}
+                pageSize={studentPageSize}
+                onPageChange={setStudentPage}
+              />
+            </div>
           )}
         </div>
       )}
@@ -419,49 +488,58 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
               No examination deliveries found for this school.
             </div>
           ) : (
-            deliveries.map((d, idx) => (
-              <div
-                key={d.id}
-                style={getStaggerDelay(idx, true)}
-                className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-heading font-bold text-sm text-ink truncate">
-                    {d.paper_title || 'Institutional Question Paper'}
-                  </span>
-                  <span
-                    className={`pill text-[10px] py-0.5 shrink-0 ${
-                      d.mode === 'ONLINE' ? 'pill-lime' : 'pill-muted'
-                    }`}
-                  >
-                    {d.mode}
-                  </span>
-                </div>
-
-                <div className="text-xs text-ink/60 font-mono">
-                  Ver. {d.version_label} • {d.total_marks} Marks • {d.assigned_students?.length || 0} candidates
-                </div>
-
-                <div className="pt-2 border-t border-border/50 flex justify-end">
-                  {d.mode === 'ONLINE' ? (
-                    <Link
-                      to={`/deliveries/${d.id}/results`}
-                      className="px-3.5 py-1.5 rounded-pill bg-ember text-white text-xs font-heading font-semibold flex items-center gap-1.5 shadow-xs"
+            <div className="space-y-3">
+              {paginatedDeliveries.map((d, idx) => (
+                <div
+                  key={d.id}
+                  style={getStaggerDelay(idx, true)}
+                  className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-heading font-bold text-sm text-ink truncate">
+                      {d.paper_title || 'Institutional Question Paper'}
+                    </span>
+                    <span
+                      className={`pill text-[10px] py-0.5 shrink-0 ${
+                        d.mode === 'ONLINE' ? 'pill-lime' : 'pill-muted'
+                      }`}
                     >
-                      <span>Results Roster</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
-                  ) : (
-                    <Link
-                      to={`/papers/${d.paper_id || 1}/versions/${d.paper_version}/print`}
-                      className="px-3.5 py-1.5 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold"
-                    >
-                      Print Layout →
-                    </Link>
-                  )}
+                      {d.mode}
+                    </span>
+                  </div>
+
+                  <div className="text-xs text-ink/60 font-mono">
+                    Ver. {d.version_label} • {d.total_marks} Marks • {d.assigned_students?.length || 0} candidates
+                  </div>
+
+                  <div className="pt-2 border-t border-border/50 flex justify-end">
+                    {d.mode === 'ONLINE' ? (
+                      <Link
+                        to={`/deliveries/${d.id}/results`}
+                        className="px-3.5 py-1.5 rounded-pill bg-ember text-white text-xs font-heading font-semibold flex items-center gap-1.5 shadow-xs"
+                      >
+                        <span>Results Roster</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/papers/${d.paper_id || 1}/versions/${d.paper_version}/print`}
+                        className="px-3.5 py-1.5 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold"
+                      >
+                        Print Layout →
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+
+              <Pagination
+                currentPage={deliveryPage}
+                totalCount={deliveries.length}
+                pageSize={deliveryPageSize}
+                onPageChange={setDeliveryPage}
+              />
+            </div>
           )}
         </div>
       )}

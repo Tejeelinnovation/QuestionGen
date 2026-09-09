@@ -18,6 +18,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { User, Delivery } from '../../types';
+import { Pagination } from '../../components/ui/pagination';
 
 type ActiveTab = 'teachers' | 'students' | 'deliveries';
 
@@ -31,6 +32,14 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
+
+  // Pagination states
+  const [studentPage, setStudentPage] = useState<number>(1);
+  const studentPageSize = 9;
+  const [teacherPage, setTeacherPage] = useState<number>(1);
+  const teacherPageSize = 6;
+  const [deliveryPage, setDeliveryPage] = useState<number>(1);
+  const deliveryPageSize = 6;
 
   // Create Teacher form state
   const [username, setUsername] = useState('');
@@ -46,7 +55,7 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const data = await usersApi.getUsers();
+      const data = await usersApi.getAllUsers();
       setUsers(data);
     } catch (err: any) {
       setErrorMessage(
@@ -126,6 +135,21 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
       (s.email && s.email.toLowerCase().includes(term))
     );
   });
+
+  const paginatedStudents = filteredStudents.slice(
+    (studentPage - 1) * studentPageSize,
+    studentPage * studentPageSize
+  );
+
+  const paginatedTeachers = teachers.slice(
+    (teacherPage - 1) * teacherPageSize,
+    teacherPage * teacherPageSize
+  );
+
+  const paginatedDeliveries = deliveries.slice(
+    (deliveryPage - 1) * deliveryPageSize,
+    deliveryPage * deliveryPageSize
+  );
 
   return (
     <div className="space-y-8 font-body">
@@ -250,7 +274,7 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
 
             {!isLoading && (
               <div className="space-y-3.5">
-                {teachers.map((t, idx) => {
+                {paginatedTeachers.map((t, idx) => {
                   const fullName = [t.first_name, t.last_name].filter(Boolean).join(' ');
 
                   return (
@@ -307,6 +331,14 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
                     </div>
                   );
                 })}
+
+                <Pagination
+                  currentPage={teacherPage}
+                  totalCount={teachers.length}
+                  pageSize={teacherPageSize}
+                  onPageChange={setTeacherPage}
+                  itemName="teachers"
+                />
               </div>
             )}
           </div>
@@ -454,7 +486,10 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
                   type="text"
                   placeholder="Search students..."
                   value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
+                  onChange={(e) => {
+                    setStudentSearch(e.target.value);
+                    setStudentPage(1);
+                  }}
                   className="pl-8 pr-3 py-1.5 text-xs rounded-pill border border-border bg-surface text-ink focus:outline-none focus:border-forest w-48 sm:w-60"
                 />
               </div>
@@ -501,53 +536,63 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
           )}
 
           {!isLoading && filteredStudents.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredStudents.map((s, idx) => {
-                const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paginatedStudents.map((s, idx) => {
+                  const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
 
-                return (
-                  <div
-                    key={s.id}
-                    style={getStaggerDelay(idx)}
-                    className="bg-surface border border-border rounded-card p-4 shadow-card hover:border-border-strong space-y-3 flex flex-col justify-between"
-                  >
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="pill pill-lime text-[10px]">
-                          Student #{s.id}
-                        </span>
+                  return (
+                    <div
+                      key={s.id}
+                      style={getStaggerDelay(idx)}
+                      className="bg-surface border border-border rounded-card p-4 shadow-card hover:border-border-strong space-y-3 flex flex-col justify-between"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="pill pill-lime text-[10px]">
+                            Student #{s.id}
+                          </span>
+                          <span className="font-mono text-[11px] text-ink/50">
+                            @{s.username}
+                          </span>
+                        </div>
+
+                        <h3 className="font-heading font-bold text-base text-ink">
+                          {fullName || s.username}
+                        </h3>
+
+                        <div className="text-xs text-ink/60 font-mono truncate">
+                          {s.email || 'No email recorded'}
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-border flex items-center justify-between">
                         <span className="font-mono text-[11px] text-ink/50">
-                          @{s.username}
+                          {s.is_active ? 'Active' : 'Disabled'}
                         </span>
-                      </div>
 
-                      <h3 className="font-heading font-bold text-base text-ink">
-                        {fullName || s.username}
-                      </h3>
-
-                      <div className="text-xs text-ink/60 font-mono truncate">
-                        {s.email || 'No email recorded'}
+                        <button
+                          type="button"
+                          id={`edit-student-${s.id}`}
+                          onClick={() => setEditUserId(s.id)}
+                          className="px-3 py-1 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink hover:bg-forest hover:text-white transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          <span>Edit & Permissions</span>
+                        </button>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="pt-2 border-t border-border flex items-center justify-between">
-                      <span className="font-mono text-[11px] text-ink/50">
-                        {s.is_active ? 'Active' : 'Disabled'}
-                      </span>
-
-                      <button
-                        type="button"
-                        id={`edit-student-${s.id}`}
-                        onClick={() => setEditUserId(s.id)}
-                        className="px-3 py-1 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink hover:bg-forest hover:text-white transition-all flex items-center gap-1 cursor-pointer"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        <span>Edit & Permissions</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              <Pagination
+                currentPage={studentPage}
+                totalCount={filteredStudents.length}
+                pageSize={studentPageSize}
+                onPageChange={setStudentPage}
+                itemName="students"
+              />
             </div>
           )}
         </div>
@@ -588,63 +633,73 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
           )}
 
           {!isLoadingDeliveries && deliveries.length > 0 && (
-            <div className="space-y-3">
-              {deliveries.map((d, idx) => (
-                <div
-                  key={d.id}
-                  style={getStaggerDelay(idx)}
-                  className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${MOTION.hoverLift.className}`}
-                >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-ink">
-                        Delivery #{d.id}
-                      </span>
-                      <span
-                        className={`pill text-[10px] ${
-                          d.mode === 'ONLINE' ? 'pill-lime' : 'pill-muted'
-                        }`}
-                      >
-                        {d.mode}
-                      </span>
-                      <span className="pill pill-muted text-[10px]">
-                        Ver. {d.version_label}
-                      </span>
-                      <span className="text-xs text-ink/50 font-mono">
-                        Max Marks: {d.total_marks}
-                      </span>
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {paginatedDeliveries.map((d, idx) => (
+                  <div
+                    key={d.id}
+                    style={getStaggerDelay(idx)}
+                    className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${MOTION.hoverLift.className}`}
+                  >
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-ink">
+                          Delivery #{d.id}
+                        </span>
+                        <span
+                          className={`pill text-[10px] ${
+                            d.mode === 'ONLINE' ? 'pill-lime' : 'pill-muted'
+                          }`}
+                        >
+                          {d.mode}
+                        </span>
+                        <span className="pill pill-muted text-[10px]">
+                          Ver. {d.version_label}
+                        </span>
+                        <span className="text-xs text-ink/50 font-mono">
+                          Max Marks: {d.total_marks}
+                        </span>
+                      </div>
+
+                      <h3 className="font-heading font-bold text-base text-ink">
+                        {d.paper_title || 'Institutional Question Paper'}
+                      </h3>
+
+                      <div className="text-xs text-ink/65 font-mono">
+                        {d.assigned_students?.length || 0} candidates assigned • Scheduled {new Date(d.created_at).toLocaleDateString()}
+                      </div>
                     </div>
 
-                    <h3 className="font-heading font-bold text-base text-ink">
-                      {d.paper_title || 'Institutional Question Paper'}
-                    </h3>
-
-                    <div className="text-xs text-ink/65 font-mono">
-                      {d.assigned_students?.length || 0} candidates assigned • Scheduled {new Date(d.created_at).toLocaleDateString()}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {d.mode === 'ONLINE' ? (
+                        <Link
+                          to={`/deliveries/${d.id}/results`}
+                          id={`delivery-results-btn-${d.id}`}
+                          className="px-4 py-2 rounded-pill bg-ember text-white font-heading font-semibold text-xs hover:bg-ember/90 transition-all flex items-center gap-1.5 shadow-sm"
+                        >
+                          <span>View Results Roster</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Link>
+                      ) : (
+                        <Link
+                          to={`/papers/${d.paper_id || 1}/versions/${d.paper_version}/print`}
+                          className="px-4 py-2 rounded-pill border border-border bg-bg text-ink font-heading font-semibold text-xs hover:bg-surface-muted transition-all"
+                        >
+                          View Print Layout →
+                        </Link>
+                      )}
                     </div>
                   </div>
+                ))}
+              </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    {d.mode === 'ONLINE' ? (
-                      <Link
-                        to={`/deliveries/${d.id}/results`}
-                        id={`delivery-results-btn-${d.id}`}
-                        className="px-4 py-2 rounded-pill bg-ember text-white font-heading font-semibold text-xs hover:bg-ember/90 transition-all flex items-center gap-1.5 shadow-sm"
-                      >
-                        <span>View Results Roster</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Link>
-                    ) : (
-                      <Link
-                        to={`/papers/${d.paper_id || 1}/versions/${d.paper_version}/print`}
-                        className="px-4 py-2 rounded-pill border border-border bg-bg text-ink font-heading font-semibold text-xs hover:bg-surface-muted transition-all"
-                      >
-                        View Print Layout →
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              ))}
+              <Pagination
+                currentPage={deliveryPage}
+                totalCount={deliveries.length}
+                pageSize={deliveryPageSize}
+                onPageChange={setDeliveryPage}
+                itemName="deliveries"
+              />
             </div>
           )}
         </div>

@@ -6,7 +6,17 @@ import type {
   School,
   SchoolCreateInput,
   SchoolUpdateInput,
+  PaginatedResponse,
+  UserStats,
 } from '../types';
+
+export interface UserQueryParams {
+  page?: number;
+  page_size?: number;
+  search?: string;
+  role?: string;
+  paginate?: boolean;
+}
 
 export interface CreateUserInput {
   username: string;
@@ -28,13 +38,54 @@ const normalizeUser = (u: any): User => {
 };
 
 export const usersApi = {
-  getUsers: async (): Promise<User[]> => {
-    const response = await apiClient.get<User[]>('/api/users/');
-    const list = response.data;
-    if (Array.isArray(list)) {
-      list.forEach((u) => normalizeUser(u));
+  getUsers: async (params?: UserQueryParams): Promise<PaginatedResponse<User>> => {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.page_size) query.set('page_size', String(params.page_size));
+    if (params?.search) query.set('search', params.search);
+    if (params?.role && params.role !== 'ALL') query.set('role', params.role);
+    if (params?.paginate !== undefined) query.set('paginate', String(params.paginate));
+
+    const qs = query.toString();
+    const url = qs ? `/api/users/?${qs}` : '/api/users/';
+    const response = await apiClient.get<any>(url);
+
+    if (Array.isArray(response.data)) {
+      const list = response.data.map(normalizeUser);
+      return {
+        count: list.length,
+        next: null,
+        previous: null,
+        results: list,
+      };
     }
-    return list;
+
+    if (response.data && Array.isArray(response.data.results)) {
+      response.data.results = response.data.results.map(normalizeUser);
+      return response.data as PaginatedResponse<User>;
+    }
+
+    return {
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    };
+  },
+
+  getAllUsers: async (params?: { role?: string; search?: string }): Promise<User[]> => {
+    const query = new URLSearchParams({ paginate: 'false' });
+    if (params?.role && params.role !== 'ALL') query.set('role', params.role);
+    if (params?.search) query.set('search', params.search);
+
+    const response = await apiClient.get<any>(`/api/users/?${query.toString()}`);
+    const list = Array.isArray(response.data) ? response.data : (response.data?.results || []);
+    return list.map(normalizeUser);
+  },
+
+  getUserStats: async (): Promise<UserStats> => {
+    const response = await apiClient.get<UserStats>('/api/users/stats/');
+    return response.data;
   },
 
   getUser: async (id: number): Promise<User> => {

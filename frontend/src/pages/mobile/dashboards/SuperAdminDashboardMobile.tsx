@@ -1,35 +1,60 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
-import type { User, School } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { ShieldCheck, Search, Plus, Edit2, Building2 } from 'lucide-react';
+import type { User, School, UserStats } from '../../../types';
+import { Pagination } from '../../../components/ui/pagination';
 
 export const SuperAdminDashboardMobile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize] = useState<number>(10);
   const [schools, setSchools] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
 
   // Modals state
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
   const [createUserProfile, setCreateUserProfile] = useState<'school_admin' | 'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
+  // Debounce search query to server
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const fetchData = async () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const [usersData, schoolsData] = await Promise.all([
-        usersApi.getUsers(),
+      const [usersData, schoolsData, statsData] = await Promise.all([
+        usersApi.getUsers({
+          page: currentPage,
+          page_size: pageSize,
+          search: searchQuery.trim() || undefined,
+          role: roleFilter !== 'ALL' ? roleFilter : undefined,
+        }),
         usersApi.getSchools().catch(() => [] as School[]),
+        usersApi.getUserStats().catch(() => null),
       ]);
-      setUsers(usersData);
+      setUsers(usersData.results);
+      setTotalUsersCount(usersData.count);
       setSchools(schoolsData);
+      if (statsData) {
+        setUserStats(statsData);
+      }
     } catch (err: any) {
       setErrorMessage(
         err.response?.data?.detail || 'Failed to load user accounts from server.'
@@ -41,25 +66,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
-
-  const countsByRole = users.reduce<Record<string, number>>((acc, u) => {
-    const role = u.role_label || 'Unknown';
-    acc[role] = (acc[role] || 0) + 1;
-    return acc;
-  }, {});
-
-  const filteredUsers = users.filter((u) => {
-    if (roleFilter !== 'ALL' && u.role_label !== roleFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchUsername = u.username.toLowerCase().includes(q);
-      const matchSchool = u.school_name?.toLowerCase().includes(q) || false;
-      const matchEmail = u.email?.toLowerCase().includes(q) || false;
-      return matchUsername || matchSchool || matchEmail;
-    }
-    return true;
-  });
+  }, [currentPage, pageSize, searchQuery, roleFilter]);
 
   const getRolePillClass = (role?: string) => {
     switch (role) {
@@ -88,7 +95,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
           Super Admin Roster
         </h1>
         <p className="text-xs text-ink/70">
-          {users.length} accounts across {schools.length} institutions
+          {userStats?.total ?? totalUsersCount} accounts across {schools.length} institutions
         </p>
       </div>
 
@@ -131,13 +138,14 @@ export const SuperAdminDashboardMobile: React.FC = () => {
         <div className="p-3 rounded-card bg-forest text-white shadow-xs flex justify-between items-center">
           <span className="text-xs font-heading font-medium">Admins</span>
           <span className="font-heading font-bold text-lg">
-            {(countsByRole['Super Admin'] || 0) + (countsByRole['School Admin'] || 0)}
+            {(userStats?.super_admin ?? users.filter((u) => u.role_label === 'Super Admin').length) +
+             (userStats?.school_admin ?? users.filter((u) => u.role_label === 'School Admin').length)}
           </span>
         </div>
         <div className="p-3 rounded-card bg-surface border border-border shadow-xs flex justify-between items-center">
           <span className="text-xs font-heading font-medium text-ink/80">Teachers</span>
           <span className="font-heading font-bold text-lg text-ink">
-            {countsByRole['Teacher'] || 0}
+            {userStats?.teacher ?? users.filter((u) => u.role_label === 'Teacher').length}
           </span>
         </div>
       </div>
@@ -149,8 +157,8 @@ export const SuperAdminDashboardMobile: React.FC = () => {
           <input
             type="text"
             placeholder="Search by username, email, school..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-2 rounded-card border border-border bg-surface text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:border-forest"
           />
         </div>
@@ -160,7 +168,10 @@ export const SuperAdminDashboardMobile: React.FC = () => {
           {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student'].map((role) => (
             <button
               key={role}
-              onClick={() => setRoleFilter(role)}
+              onClick={() => {
+                setRoleFilter(role);
+                setCurrentPage(1);
+              }}
               className={`px-3 py-1.5 rounded-pill font-heading text-xs whitespace-nowrap transition-all active:scale-95 ${
                 roleFilter === role
                   ? 'bg-ink text-white font-semibold'
@@ -176,19 +187,19 @@ export const SuperAdminDashboardMobile: React.FC = () => {
       {/* ── Single-Column Feed of Accounts ── */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
-          <span>ACCOUNTS ({filteredUsers.length})</span>
+          <span>ACCOUNTS ({totalUsersCount})</span>
         </div>
 
         {isLoading ? (
           <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
             Loading institutional roster...
           </div>
-        ) : filteredUsers.length === 0 ? (
+        ) : users.length === 0 ? (
           <div className="p-6 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
             No accounts match your criteria.
           </div>
         ) : (
-          filteredUsers.map((u, idx) => (
+          users.map((u, idx) => (
             <div
               key={u.id}
               style={getStaggerDelay(idx, true)}
@@ -225,6 +236,15 @@ export const SuperAdminDashboardMobile: React.FC = () => {
             </div>
           ))
         )}
+
+        {/* Mobile Pagination */}
+        <Pagination
+          currentPage={currentPage}
+          totalCount={totalUsersCount}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          itemName="accounts"
+        />
       </div>
 
       {/* Modals & Drawers */}

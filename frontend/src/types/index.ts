@@ -40,6 +40,21 @@ export interface User {
   date_joined?: string;
 }
 
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export interface UserStats {
+  total: number;
+  super_admin: number;
+  school_admin: number;
+  teacher: number;
+  student: number;
+}
+
 export interface UserUpdateInput {
   email?: string;
   first_name?: string;

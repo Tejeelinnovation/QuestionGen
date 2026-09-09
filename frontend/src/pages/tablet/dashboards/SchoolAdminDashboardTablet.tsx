@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import type { User, Delivery } from '../../../types';
+import { Pagination } from '../../../components/ui/pagination';
 
 type ActiveTab = 'teachers' | 'students' | 'deliveries';
 
@@ -28,6 +29,14 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
+
+  // Pagination states
+  const [teacherPage, setTeacherPage] = useState(1);
+  const teacherPageSize = 8;
+  const [studentPage, setStudentPage] = useState(1);
+  const [studentPageSize, setStudentPageSize] = useState(10);
+  const [deliveryPage, setDeliveryPage] = useState(1);
+  const deliveryPageSize = 6;
 
   // Create Teacher form state
   const [username, setUsername] = useState('');
@@ -43,7 +52,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const data = await usersApi.getUsers();
+      const data = await usersApi.getAllUsers();
       setUsers(data);
     } catch (err: any) {
       setErrorMessage(
@@ -123,6 +132,21 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
       (s.email && s.email.toLowerCase().includes(term))
     );
   });
+
+  const paginatedTeachers = teachers.slice(
+    (teacherPage - 1) * teacherPageSize,
+    teacherPage * teacherPageSize
+  );
+
+  const paginatedStudents = filteredStudents.slice(
+    (studentPage - 1) * studentPageSize,
+    studentPage * studentPageSize
+  );
+
+  const paginatedDeliveries = deliveries.slice(
+    (deliveryPage - 1) * deliveryPageSize,
+    deliveryPage * deliveryPageSize
+  );
 
   return (
     <div className="space-y-6 font-body pb-12">
@@ -333,7 +357,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
 
             {!isLoading && (
               <div className="space-y-3">
-                {teachers.map((t, idx) => {
+                {paginatedTeachers.map((t, idx) => {
                   const fullName = [t.first_name, t.last_name].filter(Boolean).join(' ');
 
                   return (
@@ -370,6 +394,13 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                     </div>
                   );
                 })}
+
+                <Pagination
+                  currentPage={teacherPage}
+                  totalCount={teachers.length}
+                  pageSize={teacherPageSize}
+                  onPageChange={setTeacherPage}
+                />
               </div>
             )}
           </div>
@@ -396,7 +427,10 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                   type="text"
                   placeholder="Search students..."
                   value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
+                  onChange={(e) => {
+                    setStudentSearch(e.target.value);
+                    setStudentPage(1);
+                  }}
                   className="pl-8 pr-3 py-1.5 text-xs rounded-pill border border-border bg-surface text-ink focus:outline-none focus:border-forest w-48"
                 />
               </div>
@@ -432,49 +466,62 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
           )}
 
           {!isLoading && filteredStudents.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {filteredStudents.map((s, idx) => {
-                const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {paginatedStudents.map((s, idx) => {
+                  const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
 
-                return (
-                  <div
-                    key={s.id}
-                    style={getStaggerDelay(idx)}
-                    className="p-4 rounded-card bg-surface border border-border shadow-xs flex flex-col justify-between space-y-3"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="pill pill-lime text-[10px]">
-                          Student #{s.id}
-                        </span>
-                        <span className="font-mono text-xs text-ink/50">
-                          @{s.username}
-                        </span>
+                  return (
+                    <div
+                      key={s.id}
+                      style={getStaggerDelay(idx)}
+                      className="p-4 rounded-card bg-surface border border-border shadow-xs flex flex-col justify-between space-y-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="pill pill-lime text-[10px]">
+                            Student #{s.id}
+                          </span>
+                          <span className="font-mono text-xs text-ink/50">
+                            @{s.username}
+                          </span>
+                        </div>
+                        <h4 className="font-heading font-bold text-base text-ink">
+                          {fullName || s.username}
+                        </h4>
+                        <div className="text-xs text-ink/60 font-mono truncate">
+                          {s.email || 'No email recorded'}
+                        </div>
                       </div>
-                      <h4 className="font-heading font-bold text-base text-ink">
-                        {fullName || s.username}
-                      </h4>
-                      <div className="text-xs text-ink/60 font-mono truncate">
-                        {s.email || 'No email recorded'}
+
+                      <div className="pt-2 border-t border-border flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-ink/60">
+                          {s.is_active ? 'Active' : 'Disabled'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditUserId(s.id)}
+                          className="px-3 py-1.5 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold hover:bg-forest hover:text-white transition-colors flex items-center gap-1 cursor-pointer min-h-[36px]"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          <span>Edit & Permissions</span>
+                        </button>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="pt-2 border-t border-border flex items-center justify-between">
-                      <span className="text-[11px] font-mono text-ink/60">
-                        {s.is_active ? 'Active' : 'Disabled'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setEditUserId(s.id)}
-                        className="px-3 py-1.5 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-semibold hover:bg-forest hover:text-white transition-colors flex items-center gap-1 cursor-pointer min-h-[36px]"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                        <span>Edit & Permissions</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              <Pagination
+                currentPage={studentPage}
+                totalCount={filteredStudents.length}
+                pageSize={studentPageSize}
+                onPageChange={setStudentPage}
+                onPageSizeChange={(newSize) => {
+                  setStudentPageSize(newSize);
+                  setStudentPage(1);
+                }}
+              />
             </div>
           )}
         </div>
@@ -511,7 +558,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
 
           {!isLoadingDeliveries && deliveries.length > 0 && (
             <div className="space-y-3">
-              {deliveries.map((d, idx) => (
+              {paginatedDeliveries.map((d, idx) => (
                 <div
                   key={d.id}
                   style={getStaggerDelay(idx)}
@@ -566,6 +613,13 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                   </div>
                 </div>
               ))}
+
+              <Pagination
+                currentPage={deliveryPage}
+                totalCount={deliveries.length}
+                pageSize={deliveryPageSize}
+                onPageChange={setDeliveryPage}
+              />
             </div>
           )}
         </div>
