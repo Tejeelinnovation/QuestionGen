@@ -4,7 +4,7 @@ import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
-import { ShieldCheck, Search, Plus, Edit2, Building2 } from 'lucide-react';
+import { ShieldCheck, Search, Plus, Edit2, Building2, Loader2 } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 
@@ -14,7 +14,8 @@ export const SuperAdminDashboardMobile: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize] = useState<number>(10);
   const [schools, setSchools] = useState<School[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [isUpdatingUsers, setIsUpdatingUsers] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -26,17 +27,17 @@ export const SuperAdminDashboardMobile: React.FC = () => {
   const [createUserProfile, setCreateUserProfile] = useState<'school_admin' | 'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
-  // Debounce search query to server
+  // Debounce search query to server (400ms pause)
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchTerm);
       setCurrentPage(1);
-    }, 300);
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
   const fetchData = async () => {
-    setIsLoading(true);
+    setIsUpdatingUsers(true);
     setErrorMessage(null);
     try {
       const [usersData, schoolsData, statsData] = await Promise.all([
@@ -60,7 +61,8 @@ export const SuperAdminDashboardMobile: React.FC = () => {
         err.response?.data?.detail || 'Failed to load user accounts from server.'
       );
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+      setIsUpdatingUsers(false);
     }
   };
 
@@ -153,13 +155,17 @@ export const SuperAdminDashboardMobile: React.FC = () => {
       {/* ── Search & Filter Controls ── */}
       <div className="space-y-2 pt-1">
         <div className="relative">
-          <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {isUpdatingUsers ? (
+            <Loader2 className="w-4 h-4 text-forest animate-spin absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          ) : (
+            <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          )}
           <input
             type="text"
             placeholder="Search by username, email, school..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-card border border-border bg-surface text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:border-forest"
+            className="w-full pl-9 pr-3 py-2 rounded-card border border-border bg-surface text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:border-forest transition-colors"
           />
         </div>
 
@@ -185,14 +191,15 @@ export const SuperAdminDashboardMobile: React.FC = () => {
       </div>
 
       {/* ── Single-Column Feed of Accounts ── */}
-      <div className="space-y-2.5">
+      <div className={`space-y-2.5 transition-opacity duration-150 ${isUpdatingUsers ? 'opacity-60' : 'opacity-100'}`}>
         <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
           <span>ACCOUNTS ({totalUsersCount})</span>
         </div>
 
-        {isLoading ? (
-          <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
-            Loading institutional roster...
+        {isInitialLoading ? (
+          <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-forest" />
+            <span>Loading institutional roster...</span>
           </div>
         ) : users.length === 0 ? (
           <div className="p-6 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">

@@ -7,7 +7,7 @@ import { getStaggerDelay } from '../../lib/motion';
 import { CreateSchoolDrawer } from '../../components/schools/CreateSchoolDrawer';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
-import { Plus, Edit2, Building2, Search } from 'lucide-react';
+import { Plus, Edit2, Building2, Search, Loader2 } from 'lucide-react';
 import type { User, School, UserStats } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
 
@@ -21,7 +21,8 @@ const SuperAdminDashboardDesktop: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [schools, setSchools] = useState<School[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [isUpdatingUsers, setIsUpdatingUsers] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Drawer / modal states
@@ -29,17 +30,17 @@ const SuperAdminDashboardDesktop: React.FC = () => {
   const [createUserProfile, setCreateUserProfile] = useState<'school_admin' | 'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
-  // Debounce search term to server query
+  // Debounce search term to server query (400ms pause)
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchTerm);
       setCurrentPage(1);
-    }, 300);
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
   const fetchData = async () => {
-    setIsLoading(true);
+    setIsUpdatingUsers(true);
     setErrorMessage(null);
     try {
       const [usersData, schoolsData, statsData] = await Promise.all([
@@ -63,7 +64,8 @@ const SuperAdminDashboardDesktop: React.FC = () => {
         err.response?.data?.detail || 'Failed to load accounts directory from the server.'
       );
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+      setIsUpdatingUsers(false);
     }
   };
 
@@ -136,9 +138,10 @@ const SuperAdminDashboardDesktop: React.FC = () => {
         </div>
       </div>
 
-      {isLoading && (
-        <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium">
-          Loading institutional directory...
+      {isInitialLoading && (
+        <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-forest" />
+          <span>Loading institutional directory...</span>
         </div>
       )}
 
@@ -148,7 +151,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
         </div>
       )}
 
-      {!isLoading && !errorMessage && (
+      {!isInitialLoading && !errorMessage && (
         <>
           {/* ── Reference 01 (Truus Category Cards): Fanned / Staggered Card Composition ── */}
           <section className="pt-4 pb-8">
@@ -324,13 +327,17 @@ const SuperAdminDashboardDesktop: React.FC = () => {
               {/* Search & Filter Bar */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
                 <div className="relative flex-1 max-w-sm">
-                  <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                  {isUpdatingUsers ? (
+                    <Loader2 className="w-4 h-4 text-forest animate-spin absolute left-3 top-1/2 -translate-y-1/2" />
+                  ) : (
+                    <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                  )}
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search username, name, email, school..."
-                    className="w-full pl-9 pr-3 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest"
+                    className="w-full pl-9 pr-3 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest transition-colors"
                   />
                 </div>
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
@@ -354,7 +361,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className={`overflow-x-auto transition-opacity duration-150 ${isUpdatingUsers ? 'opacity-60' : 'opacity-100'}`}>
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-border text-ink/60 font-mono uppercase tracking-wider">

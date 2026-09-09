@@ -4,7 +4,7 @@ import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
-import { Plus, Edit2, Building2, Search } from 'lucide-react';
+import { Plus, Edit2, Building2, Search, Loader2 } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 
@@ -18,7 +18,8 @@ export const SuperAdminDashboardTablet: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [schools, setSchools] = useState<School[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [isUpdatingUsers, setIsUpdatingUsers] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Modals state
@@ -26,17 +27,17 @@ export const SuperAdminDashboardTablet: React.FC = () => {
   const [createUserProfile, setCreateUserProfile] = useState<'school_admin' | 'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
-  // Debounce search query
+  // Debounce search query (400ms pause)
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchTerm);
       setCurrentPage(1);
-    }, 300);
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
   const fetchData = async () => {
-    setIsLoading(true);
+    setIsUpdatingUsers(true);
     setErrorMessage(null);
     try {
       const [usersData, schoolsData, statsData] = await Promise.all([
@@ -60,7 +61,8 @@ export const SuperAdminDashboardTablet: React.FC = () => {
         err.response?.data?.detail || 'Failed to load user accounts from server.'
       );
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+      setIsUpdatingUsers(false);
     }
   };
 
@@ -153,9 +155,10 @@ export const SuperAdminDashboardTablet: React.FC = () => {
         </div>
       </div>
 
-      {isLoading && (
-        <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium">
-          Loading institutional directory...
+      {isInitialLoading && (
+        <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-forest" />
+          <span>Loading institutional directory...</span>
         </div>
       )}
 
@@ -165,7 +168,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
         </div>
       )}
 
-      {!isLoading && !errorMessage && (
+      {!isInitialLoading && !errorMessage && (
         <>
           {/* ── 4-Card 2x2 Grid for Role Breakdown ── */}
           <section className="space-y-3">
@@ -218,13 +221,17 @@ export const SuperAdminDashboardTablet: React.FC = () => {
             {/* Search & Filter Bar */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-xs">
-                <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                {isUpdatingUsers ? (
+                  <Loader2 className="w-4 h-4 text-forest animate-spin absolute left-3 top-1/2 -translate-y-1/2" />
+                ) : (
+                  <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                )}
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search accounts..."
-                  className="w-full pl-9 pr-3 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest"
+                  className="w-full pl-9 pr-3 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest transition-colors"
                 />
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
@@ -248,7 +255,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3.5">
+            <div className={`grid grid-cols-2 gap-3.5 transition-opacity duration-150 ${isUpdatingUsers ? 'opacity-60' : 'opacity-100'}`}>
               {users.map((u) => {
                 let rolePill = 'pill-muted';
                 if (u.role_label === 'Super Admin') rolePill = 'pill-forest';
