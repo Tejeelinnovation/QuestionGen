@@ -18,7 +18,13 @@ import {
   Plus,
   Search,
   ExternalLink,
+  X,
 } from 'lucide-react';
+import {
+  SkeletonFacultyRoster,
+  SkeletonStudentGrid,
+  SkeletonDeliveriesList,
+} from '../../../components/ui/skeleton';
 
 type ActiveTab = 'teachers' | 'students' | 'deliveries';
 
@@ -331,9 +337,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
 
           {/* Teacher list */}
           {isLoading ? (
-            <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
-              Loading faculty records...
-            </div>
+            <SkeletonFacultyRoster count={4} />
           ) : teachers.length === 0 ? (
             <div className="p-6 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
               No teachers registered yet.
@@ -407,14 +411,25 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                 setStudentSearch(e.target.value);
                 setStudentPage(1);
               }}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-pill border border-border bg-surface text-ink focus:outline-none focus:border-forest"
+              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-pill border border-border bg-surface text-ink focus:outline-none focus:border-forest"
             />
+            {studentSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStudentSearch('');
+                  setStudentPage(1);
+                }}
+                className="absolute right-2.5 top-2 p-0.5 rounded-full hover:bg-surface-muted text-ink/40 hover:text-ink transition-colors cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {isLoading ? (
-            <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
-              Loading student roster...
-            </div>
+            <SkeletonStudentGrid count={4} />
           ) : filteredStudents.length === 0 ? (
             <div className="p-8 text-center space-y-2 bg-surface border border-dashed border-border rounded-card text-xs text-ink/60">
               <p>No student accounts found.</p>
@@ -480,9 +495,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
           </div>
 
           {isLoadingDeliveries ? (
-            <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
-              Loading test deliveries...
-            </div>
+            <SkeletonDeliveriesList count={3} />
           ) : deliveries.length === 0 ? (
             <div className="p-8 text-center bg-surface border border-dashed border-border rounded-card text-xs text-ink/60">
               No examination deliveries found for this school.

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../../api/deliveries';
 import type { Delivery } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
+import { SkeletonDeliveriesList } from '../../../components/ui/skeleton';
 
 export const StudentDashboardTablet: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -47,9 +48,7 @@ export const StudentDashboardTablet: React.FC = () => {
       </div>
 
       {isLoading && (
-        <div className="p-8 text-center bg-surface border border-border rounded-card text-ink/60 font-medium">
-          Loading assigned assessments...
-        </div>
+        <SkeletonDeliveriesList count={3} />
       )}
 
       {errorMessage && (

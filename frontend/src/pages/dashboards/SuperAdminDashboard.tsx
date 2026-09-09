@@ -7,9 +7,10 @@ import { getStaggerDelay } from '../../lib/motion';
 import { CreateSchoolDrawer } from '../../components/schools/CreateSchoolDrawer';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
-import { Plus, Edit2, Building2, Search, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Building2, Search, Loader2, X } from 'lucide-react';
 import type { User, School, UserStats } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
+import { SkeletonRoleDeck, SkeletonTable, Skeleton } from '../../components/ui/skeleton';
 
 const SuperAdminDashboardDesktop: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -139,9 +140,39 @@ const SuperAdminDashboardDesktop: React.FC = () => {
       </div>
 
       {isInitialLoading && (
-        <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium flex items-center justify-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-forest" />
-          <span>Loading institutional directory...</span>
+        <div className="space-y-10" aria-label="Loading dashboard skeleton">
+          <SkeletonRoleDeck />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-8 bg-surface border border-border rounded-lg p-6 shadow-card space-y-5">
+              <div className="flex items-center justify-between border-b border-border pb-4">
+                <div className="space-y-1">
+                  <Skeleton className="h-5 w-48" radius="sm" />
+                  <Skeleton className="h-3 w-64" radius="sm" />
+                </div>
+                <Skeleton className="h-6 w-24" radius="pill" />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <Skeleton className="h-8 w-64" radius="pill" />
+                <div className="flex gap-1.5">
+                  {[0, 1, 2, 3].map((k) => (
+                    <Skeleton key={k} className="h-7 w-16" radius="pill" />
+                  ))}
+                </div>
+              </div>
+              <SkeletonTable rows={6} />
+            </div>
+            <div className="lg:col-span-4 bg-surface border border-border rounded-lg p-6 shadow-card space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <Skeleton className="h-5 w-32" radius="sm" />
+                <Skeleton className="h-6 w-16" radius="pill" />
+              </div>
+              <div className="space-y-3">
+                {[0, 1, 2].map((k) => (
+                  <Skeleton key={k} className="h-16 w-full" radius="card" />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -337,8 +368,22 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search username, name, email, school..."
-                    className="w-full pl-9 pr-3 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest transition-colors"
+                    className="w-full pl-9 pr-8 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest transition-colors"
                   />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setSearchQuery('');
+                        setCurrentPage(1);
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-ink/40 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
                   {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student'].map((role) => (
@@ -418,8 +463,31 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                     ))}
                     {users.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-ink/50 italic">
-                          No users matching search or filter criteria.
+                        <td colSpan={6} className="py-12 text-center">
+                          <div className="flex flex-col items-center justify-center space-y-2 text-ink/60">
+                            <span className="font-heading font-semibold text-sm text-ink">
+                              No accounts found matching your query
+                            </span>
+                            <p className="text-xs text-ink/50 max-w-sm">
+                              {searchTerm || roleFilter !== 'ALL'
+                                ? 'Try clearing your search terms or selecting "All Roles".'
+                                : 'No user accounts are registered yet.'}
+                            </p>
+                            {(searchTerm || roleFilter !== 'ALL') && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSearchTerm('');
+                                  setSearchQuery('');
+                                  setRoleFilter('ALL');
+                                  setCurrentPage(1);
+                                }}
+                                className="mt-2 px-3 py-1 rounded-pill text-xs font-heading font-semibold bg-forest text-white hover:bg-forest/90 transition-colors cursor-pointer"
+                              >
+                                Reset Filters & Search
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )}

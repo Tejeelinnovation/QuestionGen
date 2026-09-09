@@ -4,9 +4,10 @@ import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
-import { ShieldCheck, Search, Plus, Edit2, Building2, Loader2 } from 'lucide-react';
+import { ShieldCheck, Search, Plus, Edit2, Building2, Loader2, X } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
+import { SkeletonRoleDeck, SkeletonRoster } from '../../../components/ui/skeleton';
 
 export const SuperAdminDashboardMobile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -165,8 +166,22 @@ export const SuperAdminDashboardMobile: React.FC = () => {
             placeholder="Search by username, email, school..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-card border border-border bg-surface text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:border-forest transition-colors"
+            className="w-full pl-9 pr-8 py-2 rounded-card border border-border bg-surface text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:border-forest transition-colors"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setSearchQuery('');
+                setCurrentPage(1);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-ink/40 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Horizontal scrollable role filter chips */}
@@ -190,22 +205,46 @@ export const SuperAdminDashboardMobile: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Single-Column Feed of Accounts ── */}
-      <div className={`space-y-2.5 transition-opacity duration-150 ${isUpdatingUsers ? 'opacity-60' : 'opacity-100'}`}>
-        <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
-          <span>ACCOUNTS ({totalUsersCount})</span>
+      {isInitialLoading && (
+        <div className="space-y-3" aria-label="Loading mobile dashboard skeleton">
+          <SkeletonRoleDeck />
+          <SkeletonRoster count={5} />
         </div>
+      )}
 
-        {isInitialLoading ? (
-          <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card flex items-center justify-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin text-forest" />
-            <span>Loading institutional roster...</span>
+      {/* ── Single-Column Feed of Accounts ── */}
+      {!isInitialLoading && (
+        <div className={`space-y-2.5 transition-opacity duration-150 ${isUpdatingUsers ? 'opacity-60' : 'opacity-100'}`}>
+          <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
+            <span>ACCOUNTS ({totalUsersCount})</span>
           </div>
-        ) : users.length === 0 ? (
-          <div className="p-6 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
-            No accounts match your criteria.
-          </div>
-        ) : (
+
+          {users.length === 0 ? (
+            <div className="p-8 text-center bg-surface border border-border rounded-card space-y-2">
+              <span className="font-heading font-semibold text-sm text-ink block">
+                No accounts match your criteria.
+              </span>
+              <p className="text-xs text-ink/50">
+                {searchTerm || roleFilter !== 'ALL'
+                  ? 'Try clearing your search or filter.'
+                  : 'No accounts recorded yet.'}
+              </p>
+              {(searchTerm || roleFilter !== 'ALL') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSearchQuery('');
+                    setRoleFilter('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className="mt-1 px-3 py-1 rounded-pill text-xs font-heading font-semibold bg-forest text-white"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          ) : (
           users.map((u, idx) => (
             <div
               key={u.id}
@@ -253,6 +292,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
           itemName="accounts"
         />
       </div>
+      )}
 
       {/* Modals & Drawers */}
       <CreateSchoolDrawer

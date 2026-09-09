@@ -11,6 +11,11 @@ import { UpdateUserModal, canEditUser } from '../../components/users/UpdateUserM
 import { getStaggerDelay, MOTION } from '../../lib/motion';
 import { Plus, Edit2 } from 'lucide-react';
 import type { Paper, User, Delivery } from '../../types';
+import {
+  SkeletonPaperGrid,
+  SkeletonDeliveriesList,
+  SkeletonCompactList,
+} from '../../components/ui/skeleton';
 
 const TeacherDashboardDesktop: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -129,9 +134,7 @@ const TeacherDashboardDesktop: React.FC = () => {
         </div>
 
         {isLoadingPapers && (
-          <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
-            Loading papers repository...
-          </div>
+          <SkeletonPaperGrid count={3} />
         )}
 
         {papersError && (
@@ -225,9 +228,7 @@ const TeacherDashboardDesktop: React.FC = () => {
           </div>
 
           {isLoadingDeliveries && (
-            <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
-              Loading test deliveries...
-            </div>
+            <SkeletonDeliveriesList count={2} />
           )}
 
           {deliveriesError && (
@@ -324,9 +325,7 @@ const TeacherDashboardDesktop: React.FC = () => {
           </div>
 
           {isLoadingStudents && (
-            <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
-              Loading student roster...
-            </div>
+            <SkeletonCompactList count={4} />
           )}
 
           {studentsError && (

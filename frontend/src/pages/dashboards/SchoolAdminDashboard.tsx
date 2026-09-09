@@ -16,9 +16,15 @@ import {
   Plus,
   Search,
   ExternalLink,
+  X,
 } from 'lucide-react';
 import type { User, Delivery } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
+import {
+  SkeletonFacultyRoster,
+  SkeletonStudentGrid,
+  SkeletonDeliveriesList,
+} from '../../components/ui/skeleton';
 
 type ActiveTab = 'teachers' | 'students' | 'deliveries';
 
@@ -257,9 +263,7 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
             </div>
 
             {isLoading && (
-              <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
-                Loading faculty records...
-              </div>
+              <SkeletonFacultyRoster count={4} />
             )}
 
             {!isLoading && teachers.length === 0 && (
@@ -490,8 +494,21 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
                     setStudentSearch(e.target.value);
                     setStudentPage(1);
                   }}
-                  className="pl-8 pr-3 py-1.5 text-xs rounded-pill border border-border bg-surface text-ink focus:outline-none focus:border-forest w-48 sm:w-60"
+                  className="pl-8 pr-7 py-1.5 text-xs rounded-pill border border-border bg-surface text-ink focus:outline-none focus:border-forest w-48 sm:w-60"
                 />
+                {studentSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentSearch('');
+                      setStudentPage(1);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-ink/40 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
               </div>
 
               <button
@@ -507,9 +524,7 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
           </div>
 
           {isLoading && (
-            <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
-              Loading student roster...
-            </div>
+            <SkeletonStudentGrid count={6} />
           )}
 
           {!isLoading && filteredStudents.length === 0 && (
@@ -617,9 +632,7 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
           </div>
 
           {isLoadingDeliveries && (
-            <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60">
-              Loading school examination deliveries...
-            </div>
+            <SkeletonDeliveriesList count={3} />
           )}
 
           {!isLoadingDeliveries && deliveries.length === 0 && (

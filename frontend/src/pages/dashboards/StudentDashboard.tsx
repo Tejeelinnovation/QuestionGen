@@ -5,6 +5,7 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { StudentDashboardTablet } from '../tablet/dashboards/StudentDashboardTablet';
 import { StudentDashboardMobile } from '../mobile/dashboards/StudentDashboardMobile';
 import { AnimatedCard } from '../../components/ui/animated-card';
+import { SkeletonDeliveriesList } from '../../components/ui/skeleton';
 import type { Delivery } from '../../types';
 
 const StudentDashboardDesktop: React.FC = () => {
@@ -61,9 +62,7 @@ const StudentDashboardDesktop: React.FC = () => {
       </div>
 
       {isLoading && (
-        <div className="p-10 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium">
-          Loading assigned assessments...
-        </div>
+        <SkeletonDeliveriesList count={3} />
       )}
 
       {errorMessage && (

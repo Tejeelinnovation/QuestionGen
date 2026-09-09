@@ -4,9 +4,10 @@ import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
-import { Plus, Edit2, Building2, Search, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Building2, Search, Loader2, X } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
+import { SkeletonRoleDeck, SkeletonRoster, Skeleton } from '../../../components/ui/skeleton';
 
 export const SuperAdminDashboardTablet: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -156,9 +157,23 @@ export const SuperAdminDashboardTablet: React.FC = () => {
       </div>
 
       {isInitialLoading && (
-        <div className="p-8 text-center bg-surface border border-border rounded-lg text-ink/60 font-medium flex items-center justify-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-forest" />
-          <span>Loading institutional directory...</span>
+        <div className="space-y-6" aria-label="Loading tablet dashboard skeleton">
+          <SkeletonRoleDeck />
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <Skeleton className="h-6 w-48" radius="sm" />
+              <Skeleton className="h-5 w-20" radius="pill" />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Skeleton className="h-8 w-60" radius="pill" />
+              <div className="flex gap-1.5">
+                {[0, 1, 2, 3].map((k) => (
+                  <Skeleton key={k} className="h-7 w-16" radius="pill" />
+                ))}
+              </div>
+            </div>
+            <SkeletonRoster count={6} />
+          </div>
         </div>
       )}
 
@@ -231,8 +246,22 @@ export const SuperAdminDashboardTablet: React.FC = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search accounts..."
-                  className="w-full pl-9 pr-3 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest transition-colors"
+                  className="w-full pl-9 pr-8 py-1.5 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest transition-colors"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSearchQuery('');
+                      setCurrentPage(1);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-ink/40 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
                 {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student'].map((role) => (

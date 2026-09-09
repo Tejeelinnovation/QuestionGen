@@ -74,6 +74,15 @@
   }
 }
 
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 /* Mobile motion is genuinely lighter/faster (200ms, 6px rise) */
 @media (max-width: 767px) {
   @keyframes card-enter {
@@ -90,6 +99,25 @@
   .animate-card-enter {
     animation-duration: 200ms !important;
     animation-timing-function: ease-out !important;
+  }
+}
+
+/* Skeleton Shimmer Utility with warm project palette */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-muted) 0%,
+    #E8E3DC 50%,
+    var(--color-surface-muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none !important;
+    background: var(--color-surface-muted) !important;
   }
 }
 

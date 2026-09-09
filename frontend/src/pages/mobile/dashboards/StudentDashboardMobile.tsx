@@ -4,6 +4,7 @@ import { deliveriesApi } from '../../../api/deliveries';
 import type { Delivery } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { BookOpen, Clock, ArrowRight, Award } from 'lucide-react';
+import { SkeletonDeliveriesList } from '../../../components/ui/skeleton';
 
 export const StudentDashboardMobile: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -81,9 +82,7 @@ export const StudentDashboardMobile: React.FC = () => {
       {/* ── Main Delivery Cards List ── */}
       <div className="space-y-3">
         {isLoading ? (
-          <div className="p-8 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
-            Loading assigned tests...
-          </div>
+          <SkeletonDeliveriesList count={2} />
         ) : errorMessage ? (
           <div className="p-3 text-xs text-ember bg-ember/10 border border-ember/20 rounded-card font-medium">
             {errorMessage}

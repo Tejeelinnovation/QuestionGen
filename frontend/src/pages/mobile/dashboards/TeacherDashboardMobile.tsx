@@ -16,6 +16,11 @@ import {
   Edit2,
   Users,
 } from 'lucide-react';
+import {
+  SkeletonPaperGrid,
+  SkeletonDeliveriesList,
+  SkeletonCompactList,
+} from '../../../components/ui/skeleton';
 
 export const TeacherDashboardMobile: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -143,9 +148,7 @@ export const TeacherDashboardMobile: React.FC = () => {
         </div>
 
         {isLoadingPapers ? (
-          <div className="p-8 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
-            Loading question papers...
-          </div>
+          <SkeletonPaperGrid count={2} />
         ) : papers.length === 0 ? (
           <div className="p-6 text-center text-xs text-ink/60 bg-surface border border-border rounded-card space-y-2">
             <p>No question papers created yet.</p>
@@ -206,9 +209,7 @@ export const TeacherDashboardMobile: React.FC = () => {
         </div>
 
         {isLoadingDeliveries ? (
-          <div className="p-6 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
-            Loading deliveries...
-          </div>
+          <SkeletonDeliveriesList count={2} />
         ) : deliveries.length === 0 ? (
           <div className="p-4 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
             No active test deliveries. Finalize a paper to schedule one.
@@ -261,9 +262,7 @@ export const TeacherDashboardMobile: React.FC = () => {
         </div>
 
         {isLoadingStudents ? (
-          <div className="p-6 text-center text-xs text-ink/50 bg-surface border border-border rounded-card">
-            Loading student roster...
-          </div>
+          <SkeletonCompactList count={3} />
         ) : studentsError ? (
           <div className="p-3 text-xs font-medium text-ember bg-ember/10 border border-ember/30 rounded-card">
             {studentsError}
