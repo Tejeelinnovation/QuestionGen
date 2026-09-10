@@ -196,3 +196,189 @@ class RolePermissionBoundaryTests(TestCase):
         # Attempt to modify Student 1
         res = self.client.delete(f"/api/users/{self.student1.id}/permissions/ATTEMPT_TEST/")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CompulsoryMobileAndEmailTests(TestCase):
+    """
+    Test suite verifying compulsory email and +91 10-digit mobile number rules.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.school = School.objects.create(name="Demo School")
+        self.superadmin = User.objects.create_user(
+            username="super_test",
+            email="sa@demo.com",
+            mobile_number="+919876543210",
+            role="Super Admin",
+        )
+        grant_super_admin_defaults(self.superadmin)
+        self.client.force_authenticate(user=self.superadmin)
+
+    def test_create_user_fails_without_email(self):
+        res = self.client.post(
+            "/api/users/",
+            {
+                "username": "no_email_user",
+                "password": "password123!",
+                "mobile_number": "+919876543210",
+                "profile": "teacher",
+                "school": self.school.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", res.data)
+
+    def test_create_user_fails_without_mobile_number(self):
+        res = self.client.post(
+            "/api/users/",
+            {
+                "username": "no_mob_user",
+                "password": "password123!",
+                "email": "valid@email.com",
+                "profile": "teacher",
+                "school": self.school.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("mobile_number", res.data)
+
+    def test_create_user_fails_with_invalid_mobile(self):
+        # 1. Missing +91
+        res1 = self.client.post(
+            "/api/users/",
+            {
+                "username": "bad_mob1",
+                "password": "password123!",
+                "email": "test@domain.com",
+                "mobile_number": "9876543210",
+                "profile": "teacher",
+                "school": self.school.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res1.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("mobile_number", res1.data)
+
+        # 2. 9 digits
+        res2 = self.client.post(
+            "/api/users/",
+            {
+                "username": "bad_mob2",
+                "password": "password123!",
+                "email": "test@domain.com",
+                "mobile_number": "+91987654321",
+                "profile": "teacher",
+                "school": self.school.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_user_succeeds_with_valid_mobile_and_email(self):
+        res = self.client.post(
+            "/api/users/",
+            {
+                "username": "valid_teacher",
+                "password": "password123!",
+                "email": "valid_teacher@domain.com",
+                "mobile_number": "+919876543219",
+                "profile": "teacher",
+                "school": self.school.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["mobile_number"], "+919876543219")
+        self.assertEqual(res.data["email"], "valid_teacher@domain.com")
+
+
+class UnifiedSchoolAndAdminCreationTests(TestCase):
+    """
+    Test suite verifying atomic creation of School and School Admin in a single flow.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.superadmin = User.objects.create_user(
+            username="super_admin_creator",
+            email="creator@system.local",
+            mobile_number="+919876543210",
+            role="Super Admin",
+        )
+        grant_super_admin_defaults(self.superadmin)
+        self.client.force_authenticate(user=self.superadmin)
+
+    def test_create_school_with_admin_at_once(self):
+        payload = {
+            "name": "Delhi Public Academy",
+            "config": {"board": "CBSE", "curriculum": "NCERT", "timezone": "Asia/Kolkata"},
+            "admin": {
+                "username": "dpa_admin",
+                "password": "password123!",
+                "email": "admin@dpa.edu",
+                "mobile_number": "+919811223344",
+                "first_name": "Rajesh",
+                "last_name": "Kumar",
+            },
+        }
+        res = self.client.post("/api/schools/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["name"], "Delhi Public Academy")
+        self.assertIn("admin", res.data)
+        self.assertEqual(res.data["admin"]["username"], "dpa_admin")
+        self.assertEqual(res.data["admin"]["mobile_number"], "+919811223344")
+
+        # Verify DB records
+        created_school = School.objects.get(name="Delhi Public Academy")
+        admin_user = User.objects.get(username="dpa_admin")
+        self.assertEqual(admin_user.school_id, created_school.id)
+        self.assertEqual(admin_user.role_label, "School Admin")
+        self.assertEqual(admin_user.created_by, self.superadmin)
+
+    def test_create_school_without_admin_fails_because_both_required(self):
+        payload = {
+            "name": "Solo School Without Admin",
+            "config": {"board": "ICSE", "curriculum": "ICSE Syllabus"},
+        }
+        res = self.client.post("/api/schools/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("admin", res.data)
+        self.assertFalse(School.objects.filter(name="Solo School Without Admin").exists())
+
+    def test_create_school_admin_standalone_is_forbidden(self):
+        demo_school = School.objects.create(name="Existing School")
+        res = self.client.post(
+            "/api/users/",
+            {
+                "username": "standalone_admin",
+                "password": "password123!",
+                "email": "sa@existing.edu",
+                "mobile_number": "+919876543210",
+                "profile": "school_admin",
+                "school": demo_school.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", res.data)
+        self.assertIn("School Admins cannot be created separately", res.data["detail"])
+
+    def test_create_school_with_invalid_admin_rolls_back_school(self):
+        payload = {
+            "name": "Should Rollback School",
+            "config": {"board": "CBSE"},
+            "admin": {
+                "username": "bad_admin",
+                "password": "password123!",
+                "email": "not-valid-email",
+                "mobile_number": "12345",  # Invalid mobile number
+            },
+        }
+        res = self.client.post("/api/schools/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        # Verify rollback: school was NOT created in DB
+        self.assertFalse(School.objects.filter(name="Should Rollback School").exists())
+

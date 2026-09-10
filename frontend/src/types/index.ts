@@ -28,6 +28,7 @@ export interface User {
   id: number;
   username: string;
   email?: string;
+  mobile_number?: string;
   first_name?: string;
   last_name?: string;
   role_label: RoleLabel;
@@ -57,6 +58,7 @@ export interface UserStats {
 
 export interface UserUpdateInput {
   email?: string;
+  mobile_number?: string;
   first_name?: string;
   last_name?: string;
   is_active?: boolean;
@@ -365,9 +367,19 @@ export interface School {
   updated_at?: string;
 }
 
+export interface SchoolAdminCreateInput {
+  username: string;
+  password: string;
+  email: string;
+  mobile_number: string;
+  first_name?: string;
+  last_name?: string;
+}
+
 export interface SchoolCreateInput {
   name: string;
   config?: Record<string, any>;
+  admin?: SchoolAdminCreateInput;
 }
 
 export interface SchoolUpdateInput {

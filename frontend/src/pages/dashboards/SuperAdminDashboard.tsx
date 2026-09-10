@@ -28,7 +28,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
 
   // Drawer / modal states
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
-  const [createUserProfile, setCreateUserProfile] = useState<'school_admin' | 'teacher' | null>(null);
+  const [createUserProfile, setCreateUserProfile] = useState<'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
   // Debounce search term to server query (400ms pause)
@@ -111,20 +111,10 @@ const SuperAdminDashboardDesktop: React.FC = () => {
             type="button"
             id="superadmin-create-school-btn"
             onClick={() => setIsCreateSchoolOpen(true)}
-            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-ink hover:text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-forest hover:text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>New School</span>
-          </button>
-
-          <button
-            type="button"
-            id="superadmin-create-schooladmin-btn"
-            onClick={() => setCreateUserProfile('school_admin')}
-            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-ember text-white hover:bg-ember/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>School Admin</span>
+            <span>Add School & Admin</span>
           </button>
 
           <button
@@ -422,8 +412,17 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                     {users.map((u) => (
                       <tr key={u.id} className="hover:bg-bg/60 transition-colors">
                         <td className="py-3 px-3 font-mono text-ink/70">#{u.id}</td>
-                        <td className="py-3 px-3 font-heading font-semibold text-ink text-sm">
-                          {u.username}
+                        <td className="py-3 px-3">
+                          <div className="font-heading font-semibold text-ink text-sm">
+                            {u.first_name || u.last_name
+                              ? `${u.first_name || ''} ${u.last_name || ''}`.trim()
+                              : u.username}
+                          </div>
+                          <div className="text-[11px] text-ink/60 font-mono flex items-center gap-1.5 flex-wrap">
+                            <span>@{u.username}</span>
+                            {u.email && <span>• {u.email}</span>}
+                            {u.mobile_number && <span className="text-forest font-medium">• {u.mobile_number}</span>}
+                          </div>
                         </td>
                         <td className="py-3 px-3">
                           <span

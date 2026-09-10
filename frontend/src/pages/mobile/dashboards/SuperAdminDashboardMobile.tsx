@@ -25,7 +25,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
 
   // Modals state
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
-  const [createUserProfile, setCreateUserProfile] = useState<'school_admin' | 'teacher' | null>(null);
+  const [createUserProfile, setCreateUserProfile] = useState<'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
   // Debounce search query to server (400ms pause)
@@ -113,18 +113,10 @@ export const SuperAdminDashboardMobile: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsCreateSchoolOpen(true)}
-          className="px-3 py-2 rounded-pill border border-border bg-surface text-ink text-xs font-heading font-semibold hover:bg-ink hover:text-white transition-all flex items-center gap-1 shrink-0 active:scale-95"
+          className="px-3 py-2 rounded-pill border border-border bg-surface text-ink text-xs font-heading font-semibold hover:bg-forest hover:text-white transition-all flex items-center gap-1 shrink-0 active:scale-95"
         >
           <Building2 className="w-3.5 h-3.5" />
-          <span>School</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setCreateUserProfile('school_admin')}
-          className="px-3 py-2 rounded-pill bg-ember text-white text-xs font-heading font-semibold hover:bg-ember/90 transition-all flex items-center gap-1 shrink-0 active:scale-95"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Admin</span>
+          <span>School & Admin</span>
         </button>
         <button
           type="button"
@@ -258,6 +250,9 @@ export const SuperAdminDashboardMobile: React.FC = () => {
                   </div>
                   {u.email && (
                     <div className="text-[11px] text-ink/60 font-mono">{u.email}</div>
+                  )}
+                  {u.mobile_number && (
+                    <div className="text-[11px] text-forest font-mono font-medium">{u.mobile_number}</div>
                   )}
                 </div>
                 <span className={`pill text-[10px] py-0.5 px-2 ${getRolePillClass(u.role_label)}`}>

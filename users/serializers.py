@@ -40,6 +40,17 @@ class LoginSerializer(serializers.Serializer):
 # User serializers
 # ---------------------------------------------------------------------------
 
+import re
+
+def validate_indian_mobile(value: str) -> str:
+    cleaned = value.strip().replace(" ", "").replace("-", "")
+    if not re.match(r"^\+91[0-9]{10}$", cleaned):
+        raise serializers.ValidationError(
+            "Mobile number must start with +91 followed by a valid 10-digit number (e.g. +919876543210)."
+        )
+    return cleaned
+
+
 class CapabilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Capability
@@ -64,6 +75,7 @@ class UserSerializer(serializers.ModelSerializer):
             "id",
             "username",
             "email",
+            "mobile_number",
             "first_name",
             "last_name",
             "school",
@@ -89,9 +101,26 @@ class UserSerializer(serializers.ModelSerializer):
 class CreateUserSerializer(serializers.ModelSerializer):
     """
     Input serializer for user creation with mandatory capability gating.
-    Requires password, username, and a target capability profile.
+    Requires password, username, email, mobile_number, and a target capability profile.
     """
 
+    email = serializers.EmailField(
+        required=True,
+        allow_blank=False,
+        error_messages={
+            "required": "Email address is compulsory.",
+            "blank": "Email address cannot be empty.",
+        },
+    )
+    mobile_number = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        validators=[validate_indian_mobile],
+        error_messages={
+            "required": "Mobile number is compulsory.",
+            "blank": "Mobile number cannot be empty.",
+        },
+    )
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
     profile = serializers.ChoiceField(
         choices=["school_admin", "teacher", "student"],
@@ -112,6 +141,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
         fields = [
             "username",
             "email",
+            "mobile_number",
             "first_name",
             "last_name",
             "password",
@@ -172,9 +202,16 @@ class UpdateUserSerializer(serializers.ModelSerializer):
     Capability changes go through the dedicated grant/revoke endpoints.
     """
 
+    email = serializers.EmailField(required=False, allow_blank=False)
+    mobile_number = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        validators=[validate_indian_mobile],
+    )
+
     class Meta:
         model = User
-        fields = ["email", "first_name", "last_name", "is_active"]
+        fields = ["email", "mobile_number", "first_name", "last_name", "is_active"]
 
 
 class CapabilityGrantSerializer(serializers.Serializer):

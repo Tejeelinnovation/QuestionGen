@@ -5,6 +5,7 @@ import { papersApi } from '../../../api/papers';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
+import { PhoneInput } from '../../../components/ui/phone-input';
 import {
   Edit2,
   Users,
@@ -50,6 +51,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -96,6 +98,18 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
       return;
     }
 
+    if (!email.trim()) {
+      setFormError('Email address is compulsory.');
+      return;
+    }
+
+    const mobDigits = mobileNumber.replace(/\D/g, '');
+    const isTenDigits = mobDigits.length === 10 || (mobDigits.length === 12 && mobDigits.startsWith('91'));
+    if (!mobileNumber.trim() || !isTenDigits) {
+      setFormError('A valid 10-digit Indian mobile number (+91) is compulsory.');
+      return;
+    }
+
     setIsCreating(true);
     try {
       const newUser = await usersApi.createUser({
@@ -104,7 +118,8 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
         profile: 'teacher',
         first_name: firstName.trim() || undefined,
         last_name: lastName.trim() || undefined,
-        email: email.trim() || undefined,
+        email: email.trim(),
+        mobile_number: mobileNumber.startsWith('+91') ? mobileNumber : `+91${mobDigits.slice(-10)}`,
       });
 
       setFormSuccess(`Teacher "${newUser.username}" created successfully.`);
@@ -113,6 +128,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
       setFirstName('');
       setLastName('');
       setEmail('');
+      setMobileNumber('');
       fetchUsers();
     } catch (err: any) {
       const detail =
@@ -316,18 +332,31 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <label className="block text-[11px] font-heading font-semibold uppercase text-ink mb-1" htmlFor="tab-t-email">
-                  Email Address
+                  Email Address *
                 </label>
                 <input
                   id="tab-t-email"
                   type="email"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isCreating}
                   placeholder="teacher@school.edu"
                   className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:outline-none focus:border-forest"
+                />
+              </div>
+
+              <div>
+                <PhoneInput
+                  id="tab-t-mobile"
+                  label="Mobile Number"
+                  required={true}
+                  value={mobileNumber}
+                  onChange={setMobileNumber}
+                  disabled={isCreating}
+                  placeholder="98765 43210"
                 />
               </div>
 
@@ -382,9 +411,16 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                         <h4 className="font-heading font-bold text-base text-ink">
                           {fullName || t.username}
                         </h4>
-                        <div className="text-xs text-ink/60 font-mono">
-                          {t.email || 'No email recorded'}
-                        </div>
+                        {t.email && (
+                          <div className="text-xs text-ink/60 font-mono">
+                            ✉ {t.email}
+                          </div>
+                        )}
+                        {t.mobile_number && (
+                          <div className="text-xs text-ink/60 font-mono">
+                            📞 {t.mobile_number}
+                          </div>
+                        )}
                       </div>
 
                       <button
@@ -507,6 +543,11 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                         <div className="text-xs text-ink/60 font-mono truncate">
                           {s.email || 'No email recorded'}
                         </div>
+                        {s.mobile_number && (
+                          <div className="text-xs text-ink/60 font-mono truncate">
+                            📞 {s.mobile_number}
+                          </div>
+                        )}
                       </div>
 
                       <div className="pt-2 border-t border-border flex items-center justify-between">

@@ -22,7 +22,8 @@ export interface CreateUserInput {
   username: string;
   password: string;
   profile: 'school_admin' | 'teacher' | 'student';
-  email?: string;
+  email: string;
+  mobile_number: string;
   first_name?: string;
   last_name?: string;
   school?: number;

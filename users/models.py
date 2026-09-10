@@ -108,6 +108,12 @@ class User(AbstractUser):
         help_text="Explicit hierarchical role: Super Admin, School Admin, Teacher, Student.",
     )
 
+    mobile_number = models.CharField(
+        max_length=15,
+        default="+919876543210",
+        help_text="Indian mobile number with +91 country code and 10 digits.",
+    )
+
     objects = UserManager()
 
     class Meta(AbstractUser.Meta):

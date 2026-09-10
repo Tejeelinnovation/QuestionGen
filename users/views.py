@@ -252,6 +252,17 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         constrained to create within their own school.
         """
         profile = request.data.get("profile")
+        if profile == "school_admin":
+            return Response(
+                {
+                    "detail": (
+                        "School Admins cannot be created separately. "
+                        "They must be created together when registering a School."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         required_cap = self._PROFILE_TO_REQUIRED_CAP.get(profile)
 
         if not required_cap:

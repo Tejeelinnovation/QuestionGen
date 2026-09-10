@@ -7,6 +7,7 @@ import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { Pagination } from '../../../components/ui/pagination';
+import { PhoneInput } from '../../../components/ui/phone-input';
 import {
   Building2,
   UserPlus,
@@ -54,6 +55,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -95,8 +97,15 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
     setFormError(null);
     setFormSuccess(null);
 
-    if (!username.trim() || !password.trim()) {
-      setFormError('Username and password are required.');
+    if (!username.trim() || !password.trim() || !email.trim() || !mobileNumber.trim()) {
+      setFormError('Username, password, email, and mobile number are required.');
+      return;
+    }
+
+    const digitsOnly = mobileNumber.replace(/\D/g, '');
+    const cleanDigits = digitsOnly.startsWith('91') && digitsOnly.length === 12 ? digitsOnly.slice(2) : digitsOnly;
+    if (cleanDigits.length !== 10) {
+      setFormError('Please enter a valid 10-digit mobile number (+91).');
       return;
     }
 
@@ -108,7 +117,8 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
         profile: 'teacher',
         first_name: firstName.trim() || undefined,
         last_name: lastName.trim() || undefined,
-        email: email.trim() || undefined,
+        email: email.trim(),
+        mobile_number: `+91${cleanDigits}`,
       });
 
       setFormSuccess(`Teacher "${newUser.username}" added successfully.`);
@@ -117,6 +127,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
       setFirstName('');
       setLastName('');
       setEmail('');
+      setMobileNumber('');
       setShowAddForm(false);
       fetchUsers();
     } catch (err: any) {
@@ -307,13 +318,24 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-heading font-semibold text-ink">Email</label>
+                  <label className="font-heading font-semibold text-ink">Email *</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="faculty@school.edu"
+                    required
                     className="w-full px-3 py-2 rounded-card bg-surface border border-border text-xs focus:outline-none focus:border-forest"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <PhoneInput
+                    value={mobileNumber}
+                    onChange={setMobileNumber}
+                    label="Mobile Number *"
+                    placeholder="98765 43210"
+                    required
                   />
                 </div>
 
@@ -360,7 +382,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
                     <div className="text-xs text-ink/60 font-mono truncate max-w-[170px]">
-                      @{t.username} {t.email && `• ${t.email}`}
+                      @{t.username} {t.email && `• ${t.email}`} {t.mobile_number && `• ${t.mobile_number}`}
                     </div>
                     <button
                       type="button"
@@ -459,7 +481,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
                       <div className="text-xs text-ink/60 font-mono truncate max-w-[170px]">
-                        @{s.username} {s.email && `• ${s.email}`}
+                        @{s.username} {s.email && `• ${s.email}`} {s.mobile_number && `• ${s.mobile_number}`}
                       </div>
                       <button
                         type="button"

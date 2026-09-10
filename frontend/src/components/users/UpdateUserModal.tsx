@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { PermissionManager } from './PermissionManager';
 import type { User, CapabilityName } from '../../types';
 import { X, UserCheck, Shield, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { PhoneInput } from '../ui/phone-input';
 
 export const canEditUser = (currentUser: User | null, targetUser: User): boolean => {
   if (!currentUser) return false;
@@ -48,6 +49,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [isActive, setIsActive] = useState(true);
 
   const isSuperAdmin = hasCapability('CREATE_SCHOOL_ADMIN') || hasCapability('CREATE_SCHOOL');
@@ -72,6 +74,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
           setFirstName(user.first_name || '');
           setLastName(user.last_name || '');
           setEmail(user.email || '');
+          setMobileNumber(user.mobile_number || '');
           setIsActive(user.is_active ?? true);
         })
         .catch((err) => {
@@ -91,13 +94,27 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
     e.preventDefault();
     setSaveError(null);
     setSaveSuccess(null);
+
+    if (!email.trim()) {
+      setSaveError('Email address is compulsory.');
+      return;
+    }
+
+    const mobDigits = mobileNumber.replace(/\D/g, '');
+    const isTenDigits = mobDigits.length === 10 || (mobDigits.length === 12 && mobDigits.startsWith('91'));
+    if (!mobileNumber.trim() || !isTenDigits) {
+      setSaveError('A valid 10-digit Indian mobile number (+91) is compulsory.');
+      return;
+    }
+
     setIsSaving(true);
 
     try {
       const updated = await usersApi.updateUser(userId, {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        email: email.trim() || undefined,
+        email: email.trim(),
+        mobile_number: mobileNumber.startsWith('+91') ? mobileNumber : `+91${mobDigits.slice(-10)}`,
         is_active: isActive,
       });
 
@@ -108,6 +125,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
       const msg =
         err.response?.data?.detail ||
         err.response?.data?.email?.[0] ||
+        err.response?.data?.mobile_number?.[0] ||
         err.message ||
         'Failed to update user.';
       setSaveError(msg);
@@ -287,18 +305,31 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label htmlFor="edit-email" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
-                      Email Address
-                    </label>
-                    <input
-                      id="edit-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                    <div className="space-y-1">
+                      <label htmlFor="edit-email" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1">
+                        Email Address *
+                      </label>
+                      <input
+                        id="edit-email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isSaving}
+                        placeholder="user@school.edu"
+                        className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <PhoneInput
+                      id="edit-mobile"
+                      label="Mobile Number"
+                      required={true}
+                      value={mobileNumber}
+                      onChange={setMobileNumber}
                       disabled={isSaving}
-                      placeholder="user@school.edu"
-                      className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none font-mono"
+                      placeholder="98765 43210"
                     />
                   </div>
 

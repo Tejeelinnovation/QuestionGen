@@ -60,6 +60,7 @@ class Command(BaseCommand):
                 username="superadmin",
                 defaults={
                     "email": "superadmin@system.local",
+                    "mobile_number": "+919876543210",
                     "first_name": "Super",
                     "last_name": "Admin",
                     "role": "Super Admin",
@@ -69,6 +70,7 @@ class Command(BaseCommand):
                 },
             )
             superadmin.role = "Super Admin"
+            superadmin.mobile_number = "+919876543210"
             superadmin.set_password("password123")
             superadmin.save()
             grant_super_admin_defaults(superadmin)
@@ -79,6 +81,7 @@ class Command(BaseCommand):
                 username="schooladmin1",
                 defaults={
                     "email": "admin@greenwood.edu",
+                    "mobile_number": "+919876543211",
                     "first_name": "Sarah",
                     "last_name": "Admin",
                     "role": "School Admin",
@@ -87,6 +90,7 @@ class Command(BaseCommand):
                 },
             )
             sa.role = "School Admin"
+            sa.mobile_number = "+919876543211"
             sa.set_password("password123")
             sa.save()
             grant_school_admin_defaults(sa, granted_by=superadmin)
@@ -97,6 +101,7 @@ class Command(BaseCommand):
                 username="teacher1",
                 defaults={
                     "email": "teacher1@greenwood.edu",
+                    "mobile_number": "+919876543212",
                     "first_name": "Thomas",
                     "last_name": "Teacher",
                     "role": "Teacher",
@@ -105,20 +110,22 @@ class Command(BaseCommand):
                 },
             )
             teacher.role = "Teacher"
+            teacher.mobile_number = "+919876543212"
             teacher.set_password("password123")
             teacher.save()
             grant_teacher_defaults(teacher, granted_by=sa)
             self.stdout.write(f"  {'Created' if created else 'Updated'} teacher1 (Teacher)")
 
             # 5. Students
-            for uname, fname, lname in [
-                ("student1", "Sam", "Student"),
-                ("student2", "Sophie", "Learner"),
+            for uname, fname, lname, mob in [
+                ("student1", "Sam", "Student", "+919876543213"),
+                ("student2", "Sophie", "Learner", "+919876543214"),
             ]:
                 stu, created = User.objects.get_or_create(
                     username=uname,
                     defaults={
                         "email": f"{uname}@greenwood.edu",
+                        "mobile_number": mob,
                         "first_name": fname,
                         "last_name": lname,
                         "role": "Student",
@@ -127,6 +134,7 @@ class Command(BaseCommand):
                     },
                 )
                 stu.role = "Student"
+                stu.mobile_number = mob
                 stu.set_password("password123")
                 stu.save()
                 grant_student_defaults(stu, granted_by=teacher)

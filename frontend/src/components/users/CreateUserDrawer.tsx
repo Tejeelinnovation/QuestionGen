@@ -3,11 +3,12 @@ import { usersApi } from '../../api/users';
 import { useAuth } from '../../auth/AuthContext';
 import type { User, School } from '../../types';
 import { X, UserPlus, Check, AlertCircle } from 'lucide-react';
+import { PhoneInput } from '../ui/phone-input';
 
 interface CreateUserDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  targetProfile: 'school_admin' | 'teacher' | 'student';
+  targetProfile: 'teacher' | 'student';
   onUserCreated: (newUser: User) => void;
 }
 
@@ -25,6 +26,7 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -54,8 +56,6 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
 
   const getProfileTitle = () => {
     switch (targetProfile) {
-      case 'school_admin':
-        return 'Create School Admin';
       case 'teacher':
         return 'Create Teacher';
       case 'student':
@@ -67,8 +67,6 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
 
   const getProfileDescription = () => {
     switch (targetProfile) {
-      case 'school_admin':
-        return 'Provision administrator credentials with school-wide controls.';
       case 'teacher':
         return 'Provision authoring faculty with test assembly and evaluation rights.';
       case 'student':
@@ -87,8 +85,20 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
       return;
     }
 
+    if (!email.trim()) {
+      setErrorMsg('Email address is compulsory.');
+      return;
+    }
+
+    const mobDigits = mobileNumber.replace(/\D/g, '');
+    const isTenDigits = mobDigits.length === 10 || (mobDigits.length === 12 && mobDigits.startsWith('91'));
+    if (!mobileNumber.trim() || !isTenDigits) {
+      setErrorMsg('A valid 10-digit Indian mobile number (+91) is compulsory.');
+      return;
+    }
+
     const schoolIdToUse = currentUser?.school || (selectedSchoolId ? Number(selectedSchoolId) : undefined);
-    if (!schoolIdToUse && targetProfile !== 'school_admin' && !currentUser?.school) {
+    if (!schoolIdToUse && !currentUser?.school) {
       setErrorMsg('Please select a school for this account.');
       return;
     }
@@ -99,9 +109,10 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
         username: username.trim(),
         password: password.trim(),
         profile: targetProfile,
+        email: email.trim(),
+        mobile_number: mobileNumber.startsWith('+91') ? mobileNumber : `+91${mobDigits.slice(-10)}`,
         first_name: firstName.trim() || undefined,
         last_name: lastName.trim() || undefined,
-        email: email.trim() || undefined,
         school: schoolIdToUse,
       });
 
@@ -113,6 +124,7 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
       setFirstName('');
       setLastName('');
       setEmail('');
+      setMobileNumber('');
     } catch (err: any) {
       const data = err.response?.data;
       let detail = err.message || 'Failed to create account.';
@@ -121,6 +133,8 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
       } else if (data && typeof data === 'object') {
         if (data.detail) detail = data.detail;
         else if (data.username) detail = Array.isArray(data.username) ? data.username[0] : String(data.username);
+        else if (data.email) detail = Array.isArray(data.email) ? data.email[0] : String(data.email);
+        else if (data.mobile_number) detail = Array.isArray(data.mobile_number) ? data.mobile_number[0] : String(data.mobile_number);
         else if (data.password) detail = Array.isArray(data.password) ? data.password[0] : String(data.password);
         else if (data.non_field_errors) detail = Array.isArray(data.non_field_errors) ? data.non_field_errors[0] : String(data.non_field_errors);
         else detail = Object.values(data).flat().join(' ');
@@ -273,18 +287,32 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="u-email" className="block font-heading text-xs font-medium text-ink">
-              Email Address (Optional)
-            </label>
-            <input
-              id="u-email"
-              type="email"
-              placeholder="john.doe@school.edu"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+          {/* Contact Information (Compulsory Email & Mobile) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+            <div className="space-y-1">
+              <label htmlFor="u-email" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1">
+                Email Address *
+              </label>
+              <input
+                id="u-email"
+                type="email"
+                required
+                placeholder="e.g. user@school.edu"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isSubmitting}
+                className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none font-mono"
+              />
+            </div>
+
+            <PhoneInput
+              id="u-mobile"
+              label="Mobile Number"
+              required={true}
+              value={mobileNumber}
+              onChange={setMobileNumber}
               disabled={isSubmitting}
-              className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none font-mono"
+              placeholder="98765 43210"
             />
           </div>
 
