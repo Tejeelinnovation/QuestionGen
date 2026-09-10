@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { usersApi } from '../../api/users';
 import type { School } from '../../types';
 import { X, Building2, Check, AlertCircle } from 'lucide-react';
+import { SearchableSelect } from '../ui/searchable-select';
+import { INDIAN_BOARDS, INDIAN_CURRICULA } from '../../constants/educationData';
 
 interface CreateSchoolDrawerProps {
   isOpen: boolean;
@@ -17,9 +19,11 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
   const [name, setName] = useState('');
   const [board, setBoard] = useState('CBSE');
   const [curriculum, setCurriculum] = useState('NCERT');
-  const [timezone, setTimezone] = useState('Asia/Kolkata');
-  const [isCustomJson, setIsCustomJson] = useState(false);
-  const [customJson, setCustomJson] = useState('{}');
+  // System timezone is fixed to 'Asia/Kolkata' for Indian institutions (hidden from UI)
+  const [timezone] = useState('Asia/Kolkata');
+  // Tenant custom JSON configuration preserved for future expansion (hidden from UI)
+  const [isCustomJson] = useState(false);
+  const [customJson] = useState('{}');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -47,7 +51,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
       configPayload = {
         board: board.trim(),
         curriculum: curriculum.trim(),
-        timezone: timezone.trim(),
+        timezone: timezone.trim() || 'Asia/Kolkata',
       };
     }
 
@@ -142,83 +146,31 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
             />
           </div>
 
-          {/* Config Fields */}
+          {/* Academic & Curriculum Configuration */}
           <div className="space-y-4 pt-2 border-t border-border">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-ink/60">
-                // Tenant Configuration
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsCustomJson(!isCustomJson)}
-                className="text-xs text-forest hover:underline cursor-pointer font-medium"
-              >
-                {isCustomJson ? 'Use standard fields' : 'Custom JSON config'}
-              </button>
-            </div>
+            {/* Education Board Searchable Dropdown */}
+            <SearchableSelect
+              id="school-board"
+              label="Education Board"
+              value={board}
+              onChange={setBoard}
+              options={INDIAN_BOARDS}
+              placeholder="Search Indian education board..."
+              disabled={isSubmitting}
+              required
+            />
 
-            {!isCustomJson ? (
-              <div className="space-y-3.5">
-                <div>
-                  <label htmlFor="school-board" className="block font-heading text-xs font-medium text-ink mb-1">
-                    Education Board
-                  </label>
-                  <input
-                    id="school-board"
-                    type="text"
-                    value={board}
-                    onChange={(e) => setBoard(e.target.value)}
-                    disabled={isSubmitting}
-                    placeholder="e.g. CBSE / ICSE / Cambridge"
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="school-curriculum" className="block font-heading text-xs font-medium text-ink mb-1">
-                    Default Curriculum
-                  </label>
-                  <input
-                    id="school-curriculum"
-                    type="text"
-                    value={curriculum}
-                    onChange={(e) => setCurriculum(e.target.value)}
-                    disabled={isSubmitting}
-                    placeholder="e.g. NCERT / State Syllabus"
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="school-timezone" className="block font-heading text-xs font-medium text-ink mb-1">
-                    System Timezone
-                  </label>
-                  <input
-                    id="school-timezone"
-                    type="text"
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    disabled={isSubmitting}
-                    placeholder="e.g. Asia/Kolkata"
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none font-mono"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div>
-                <label htmlFor="school-custom-json" className="block font-heading text-xs font-medium text-ink mb-1">
-                  Raw JSON Configuration
-                </label>
-                <textarea
-                  id="school-custom-json"
-                  rows={5}
-                  value={customJson}
-                  onChange={(e) => setCustomJson(e.target.value)}
-                  disabled={isSubmitting}
-                  className="w-full rounded-card border border-border bg-bg p-3 text-xs font-mono text-ink focus:bg-surface focus:border-forest focus:outline-none"
-                />
-              </div>
-            )}
+            {/* Default Curriculum Searchable Dropdown */}
+            <SearchableSelect
+              id="school-curriculum"
+              label="Default Curriculum"
+              value={curriculum}
+              onChange={setCurriculum}
+              options={INDIAN_CURRICULA}
+              placeholder="Search default curriculum..."
+              disabled={isSubmitting}
+              required
+            />
           </div>
         </form>
 
