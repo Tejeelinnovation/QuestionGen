@@ -421,8 +421,10 @@ export interface ClassSection {
   section: string;
   name: string;
   max_students: number;
-  student_count: number;
+  student_count?: number;
+  enrolled_students_count?: number;
   class_teacher: number | null;
+  class_teacher_username?: string | null;
   class_teacher_name?: string | null;
   class_teacher_subject?: string;
   subject_teachers?: ClassSubjectTeacher[];

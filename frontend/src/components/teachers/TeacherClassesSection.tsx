@@ -179,9 +179,10 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
         <div className="space-y-6">
           {/* ── 1. Main Class Teacher Division (Featured Banner) ── */}
           {classTeacherSections.map((sec) => {
+            const studentCount = sec.student_count ?? sec.enrolled_students_count ?? 0;
             const capacityPct =
               sec.max_students > 0
-                ? Math.min(100, Math.round((sec.student_count / sec.max_students) * 100))
+                ? Math.min(100, Math.round((studentCount / sec.max_students) * 100))
                 : 0;
 
             return (
@@ -218,7 +219,7 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
                       <div className="flex items-center justify-between text-[11px] font-mono text-ink/75">
                         <span className="flex items-center gap-1 font-heading font-semibold text-ink">
                           <Users className="w-3.5 h-3.5 text-forest" />
-                          Enrolled Roster: {sec.student_count} / {sec.max_students} students
+                          Enrolled Roster: {studentCount} / {sec.max_students} students
                         </span>
                         <span className="font-bold">{capacityPct}% capacity</span>
                       </div>

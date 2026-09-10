@@ -106,6 +106,7 @@ class ClassSectionSerializer(serializers.ModelSerializer):
     """Read serializer for ClassSection with embedded teacher details and capacity metrics."""
 
     name = serializers.CharField(read_only=True)
+    student_count = serializers.SerializerMethodField()
     enrolled_students_count = serializers.SerializerMethodField()
     class_teacher_username = serializers.CharField(
         source="class_teacher.username", read_only=True, default=None
@@ -122,6 +123,7 @@ class ClassSectionSerializer(serializers.ModelSerializer):
             "section",
             "name",
             "max_students",
+            "student_count",
             "enrolled_students_count",
             "class_teacher",
             "class_teacher_username",
@@ -134,6 +136,7 @@ class ClassSectionSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "name",
+            "student_count",
             "enrolled_students_count",
             "class_teacher_username",
             "class_teacher_name",
@@ -141,6 +144,9 @@ class ClassSectionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_student_count(self, obj: ClassSection) -> int:
+        return obj.students.count()
 
     def get_enrolled_students_count(self, obj: ClassSection) -> int:
         return obj.students.count()

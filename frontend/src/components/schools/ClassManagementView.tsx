@@ -13,10 +13,12 @@ import {
   X,
   Trash2,
   Edit2,
-  ChevronDown,
-  ChevronUp,
   Mail,
   Phone,
+  ArrowLeft,
+  ArrowRight,
+  Search,
+  Loader2,
 } from 'lucide-react';
 
 interface ClassManagementViewProps {
@@ -55,10 +57,29 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
   const [subjectSubmitting, setSubjectSubmitting] = useState(false);
   const [subjectError, setSubjectError] = useState<string | null>(null);
 
-  // Expanded student roster for a class
-  const [expandedClassId, setExpandedClassId] = useState<number | null>(null);
-  const [classStudents, setClassStudents] = useState<User[]>([]);
-  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  // Selected class for dedicated full details view
+  const [selectedClassDetail, setSelectedClassDetail] = useState<ClassSection | null>(null);
+  const [detailStudents, setDetailStudents] = useState<User[]>([]);
+  const [isLoadingDetailStudents, setIsLoadingDetailStudents] = useState(false);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+
+  const getStudentCount = (cls: ClassSection): number =>
+    cls.student_count ?? cls.enrolled_students_count ?? 0;
+
+  const openClassDetail = async (cls: ClassSection) => {
+    setSelectedClassDetail(cls);
+    setStudentSearchTerm('');
+    setIsLoadingDetailStudents(true);
+    try {
+      const students = await classesApi.getClassStudents(cls.id);
+      setDetailStudents(students);
+    } catch (err) {
+      console.error('Failed to load class students', err);
+      setDetailStudents([]);
+    } finally {
+      setIsLoadingDetailStudents(false);
+    }
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -71,6 +92,12 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
       setClasses(classesData);
       if (faculty.length === 0) {
         setFaculty(teachersData);
+      }
+      if (selectedClassDetail) {
+        const refreshed = classesData.find((c) => c.id === selectedClassDetail.id);
+        if (refreshed) {
+          setSelectedClassDetail(refreshed);
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || 'Failed to load classes.');
@@ -147,7 +174,9 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
     try {
       await classesApi.deleteClass(cls.id);
       setClasses((prev) => prev.filter((c) => c.id !== cls.id));
-      if (expandedClassId === cls.id) setExpandedClassId(null);
+      if (selectedClassDetail?.id === cls.id) {
+        setSelectedClassDetail(null);
+      }
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to delete class.');
     }
@@ -180,6 +209,10 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
       const data = await classesApi.getClassSubjectTeachers(activeSubjectModalClass.id);
       setSubjectTeachers(data);
       await loadData();
+      if (selectedClassDetail?.id === activeSubjectModalClass.id) {
+        const updated = await classesApi.getClass(selectedClassDetail.id);
+        setSelectedClassDetail(updated);
+      }
     } catch (err: any) {
       setSubjectError(err.response?.data?.detail || 'Failed to assign subject teacher.');
     } finally {
@@ -193,299 +226,590 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
       await classesApi.removeSubjectTeacher(activeSubjectModalClass.id, subject);
       setSubjectTeachers((prev) => prev.filter((st) => st.subject !== subject));
       await loadData();
+      if (selectedClassDetail?.id === activeSubjectModalClass.id) {
+        const updated = await classesApi.getClass(selectedClassDetail.id);
+        setSelectedClassDetail(updated);
+      }
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to remove subject teacher.');
     }
   };
 
-  // Toggle Student Roster for a Class
-  const toggleClassStudents = async (cls: ClassSection) => {
-    if (expandedClassId === cls.id) {
-      setExpandedClassId(null);
-      return;
-    }
-    setExpandedClassId(cls.id);
-    setIsLoadingStudents(true);
-    try {
-      const students = await classesApi.getClassStudents(cls.id);
-      setClassStudents(students);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoadingStudents(false);
-    }
-  };
-
   const totalCapacity = classes.reduce((sum, c) => sum + (c.max_students || 0), 0);
-  const totalEnrolled = classes.reduce((sum, c) => sum + (c.student_count || 0), 0);
+  const totalEnrolled = classes.reduce((sum, c) => sum + getStudentCount(c), 0);
+
+  const renderClassDetailView = (cls: ClassSection) => {
+    const enrolledCount = detailStudents.length;
+    const maxCapacity = cls.max_students || 40;
+    const fillPercent = Math.min(100, Math.round((enrolledCount / maxCapacity) * 100));
+    const seatsAvailable = Math.max(0, maxCapacity - enrolledCount);
+
+    const filteredStudents = detailStudents.filter((s) => {
+      const q = studentSearchTerm.toLowerCase().trim();
+      if (!q) return true;
+      const name = `${s.first_name || ''} ${s.last_name || ''} ${s.username}`.toLowerCase();
+      const email = (s.email || '').toLowerCase();
+      const phone = (s.mobile_number || '').toLowerCase();
+      const gr = (s.gr_number || '').toLowerCase();
+      const roll = (s.roll_number || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || phone.includes(q) || gr.includes(q) || roll.includes(q);
+    });
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        {/* Navigation & Action Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface border border-border rounded-card p-4 shadow-card">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSelectedClassDetail(null)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted text-xs font-heading font-semibold transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 text-forest" />
+              <span>Back to All Classes</span>
+            </button>
+            <div className="h-5 w-px bg-border hidden sm:block" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-heading font-bold text-lg text-ink">
+                  Class {cls.standard}-{cls.section}
+                </h2>
+                <span className="pill pill-forest text-[10px] font-mono">
+                  Standard {cls.standard}
+                </span>
+                <span className="pill text-[10px] font-mono bg-surface-muted text-ink/70 border border-border">
+                  Division {cls.section}
+                </span>
+              </div>
+              <p className="text-[11px] text-ink/60 font-mono">
+                Classroom Architecture, Faculty Assignments & Enrolled Student Roster
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => openEditClassModal(cls)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+            >
+              <Edit2 className="w-3.5 h-3.5 text-forest" />
+              <span>Edit Class</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openSubjectTeachersModal(cls)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-grape" />
+              <span>Manage Subjects</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeleteClass(cls)}
+              className="p-2 rounded-pill text-ink/50 hover:text-ember hover:bg-ember/10 transition-colors cursor-pointer"
+              title="Delete Class"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Overview Metrics Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+            <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Enrolled Students</span>
+            <div className="font-heading font-bold text-2xl text-ink mt-1">
+              {enrolledCount} <span className="text-sm font-normal text-ink/50">/ {maxCapacity}</span>
+            </div>
+            <span className="text-[11px] text-forest font-semibold font-mono">
+              {fillPercent}% capacity utilized
+            </span>
+          </div>
+
+          <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+            <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Available Seats</span>
+            <div className={`font-heading font-bold text-2xl mt-1 ${seatsAvailable > 0 ? 'text-forest' : 'text-ember'}`}>
+              {seatsAvailable}
+            </div>
+            <span className="text-[11px] text-ink/50 font-mono">Remaining student intake</span>
+          </div>
+
+          <div className="bg-surface border border-border rounded-card p-4 shadow-card col-span-2">
+            <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Main Class Teacher</span>
+            <div className="font-heading font-bold text-base text-ink mt-1 truncate">
+              {cls.class_teacher_name || 'No Class Teacher Assigned'}
+            </div>
+            <div className="text-[11px] text-ink/60 font-mono mt-0.5 flex items-center gap-2">
+              <span>Subject: <strong className="text-forest">{cls.class_teacher_subject || 'General'}</strong></span>
+              {cls.class_teacher_username && <span>• @{cls.class_teacher_username}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Capacity Progress Bar Gauge */}
+        <div className="p-4 bg-surface border border-border rounded-card shadow-card space-y-2">
+          <div className="flex justify-between items-center text-xs">
+            <span className="font-heading font-semibold text-ink">Classroom Capacity Gauge</span>
+            <span className="font-mono text-ink/70">
+              {enrolledCount} of {maxCapacity} students ({fillPercent}%)
+            </span>
+          </div>
+          <div className="w-full h-2.5 rounded-full bg-border overflow-hidden">
+            <div
+              className={`h-full transition-all duration-300 rounded-full ${
+                fillPercent >= 100 ? 'bg-ember' : fillPercent >= 75 ? 'bg-amber-500' : 'bg-forest'
+              }`}
+              style={{ width: `${fillPercent}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-[10px] text-ink/50 font-mono">
+            <span>0 students</span>
+            <span>{seatsAvailable} seats remaining</span>
+            <span>{maxCapacity} max capacity</span>
+          </div>
+        </div>
+
+        {/* Faculty & Subject Mapping Section */}
+        <div className="bg-surface border border-border rounded-card p-5 shadow-card space-y-3">
+          <div className="flex items-center justify-between border-b border-border pb-2.5">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-forest" />
+              <h3 className="font-heading font-bold text-sm text-ink">
+                Subject Instructors & Faculty
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => openSubjectTeachersModal(cls)}
+              className="text-xs text-forest font-semibold hover:underline cursor-pointer"
+            >
+              + Manage Subjects
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {/* Main Class Teacher Card */}
+            <div className="p-3 rounded-card bg-surface-muted/60 border border-forest/20 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-forest/10 text-forest flex items-center justify-center font-bold text-xs shrink-0">
+                <UserCheck className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="pill text-[9px] bg-forest/15 text-forest border border-forest/25 mb-1">
+                  Class Teacher ({cls.class_teacher_subject || 'General'})
+                </span>
+                <div className="font-heading font-semibold text-xs text-ink truncate">
+                  {cls.class_teacher_name || 'Unassigned'}
+                </div>
+              </div>
+            </div>
+
+            {/* Other Subject Teachers */}
+            {cls.subject_teachers?.map((st) => (
+              <div
+                key={st.id}
+                className="p-3 rounded-card bg-bg border border-border flex items-center gap-2.5"
+              >
+                <div className="w-8 h-8 rounded-full bg-grape/10 text-grape flex items-center justify-center font-bold text-xs shrink-0">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="pill text-[9px] bg-grape/10 text-grape border border-grape/25 mb-1">
+                    {st.subject}
+                  </span>
+                  <div className="font-heading font-semibold text-xs text-ink truncate">
+                    {st.teacher_name}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {(!cls.subject_teachers || cls.subject_teachers.length === 0) && (
+              <div className="p-3 rounded-card bg-bg border border-dashed border-border text-xs text-ink/50 italic flex items-center justify-between sm:col-span-2">
+                <span>No additional subject teachers mapped to this class.</span>
+                <button
+                  type="button"
+                  onClick={() => openSubjectTeachersModal(cls)}
+                  className="text-[11px] text-forest font-semibold hover:underline cursor-pointer"
+                >
+                  + Add Instructor
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Enrolled Students Roster Directory */}
+        <div className="bg-surface border border-border rounded-card p-5 shadow-card space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+            <div>
+              <h3 className="font-heading font-bold text-base text-ink flex items-center gap-2">
+                <Users className="w-4 h-4 text-forest" />
+                <span>Enrolled Students</span>
+                <span className="pill pill-forest text-[11px] font-mono font-bold">
+                  {detailStudents.length} Students
+                </span>
+              </h3>
+              <p className="text-xs text-ink/60 mt-0.5">
+                Full roster of students assigned to Standard {cls.standard}, Division {cls.section}.
+              </p>
+            </div>
+
+            {/* Search filter input */}
+            <div className="relative max-w-xs w-full">
+              <Search className="w-3.5 h-3.5 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={studentSearchTerm}
+                onChange={(e) => setStudentSearchTerm(e.target.value)}
+                placeholder="Search name, roll, GR, mobile..."
+                className="w-full pl-8 pr-7 py-1.5 rounded-pill border border-border bg-bg text-xs text-ink focus:outline-none focus:border-forest"
+              />
+              {studentSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setStudentSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink text-xs cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {isLoadingDetailStudents ? (
+            <div className="py-12 text-center text-xs text-ink/50 italic flex flex-col items-center gap-2">
+              <Loader2 className="w-5 h-5 text-forest animate-spin" />
+              <span>Loading enrolled students roster...</span>
+            </div>
+          ) : detailStudents.length === 0 ? (
+            <div className="py-12 text-center bg-bg border border-dashed border-border rounded-card space-y-2">
+              <Users className="w-8 h-8 mx-auto text-ink/30" />
+              <div className="font-heading font-semibold text-sm text-ink">No Students Enrolled Yet</div>
+              <p className="text-xs text-ink/50 max-w-md mx-auto">
+                No students are currently mapped to Standard {cls.standard}, Division {cls.section}.
+                You can enroll students via Excel Bulk Import or the Add Student drawer.
+              </p>
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="py-8 text-center bg-bg border border-border rounded-card text-xs text-ink/50">
+              No students found matching "{studentSearchTerm}".
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-border text-ink/60 font-mono uppercase tracking-wider text-[11px]">
+                    <th className="py-2.5 px-3">Roll #</th>
+                    <th className="py-2.5 px-3">GR Number</th>
+                    <th className="py-2.5 px-3">Student Name</th>
+                    <th className="py-2.5 px-3">Username & Email</th>
+                    <th className="py-2.5 px-3">Mobile Number</th>
+                    <th className="py-2.5 px-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {filteredStudents.map((s, idx) => (
+                    <tr key={s.id} className="hover:bg-bg/60 transition-colors">
+                      <td className="py-2.5 px-3 font-mono font-bold text-ink">
+                        {s.roll_number || idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-ink/80">
+                        {s.gr_number ? (
+                          <span className="px-2 py-0.5 rounded-sm bg-surface-muted border border-border text-[11px]">
+                            {s.gr_number}
+                          </span>
+                        ) : (
+                          <span className="text-ink/40 italic">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-heading font-semibold text-ink text-sm">
+                          {s.first_name || s.last_name
+                            ? `${s.first_name || ''} ${s.last_name || ''}`.trim()
+                            : s.username}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="font-mono text-xs text-ink/75">@{s.username}</div>
+                        {s.email && <div className="text-[11px] text-ink/50 font-mono">{s.email}</div>}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-ink/80">
+                        {s.mobile_number ? (
+                          <span className="text-forest font-medium">{s.mobile_number}</span>
+                        ) : (
+                          <span className="text-ink/40 italic">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="pill pill-forest text-[10px]">
+                          Enrolled
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Overview Metric Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="bg-surface border border-border rounded-card p-4 shadow-card">
-          <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Total Sections</span>
-          <div className="font-heading font-bold text-2xl text-ink mt-1">{classes.length}</div>
-          <span className="text-[11px] text-ink/50 font-mono">Standards 8, 9, 10</span>
-        </div>
-
-        <div className="bg-surface border border-border rounded-card p-4 shadow-card">
-          <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Total Enrolled</span>
-          <div className="font-heading font-bold text-2xl text-forest mt-1">{totalEnrolled}</div>
-          <span className="text-[11px] text-ink/50 font-mono">Across all classes</span>
-        </div>
-
-        <div className="bg-surface border border-border rounded-card p-4 shadow-card">
-          <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Total Capacity</span>
-          <div className="font-heading font-bold text-2xl text-ink mt-1">{totalCapacity}</div>
-          <span className="text-[11px] text-ink/50 font-mono">Max allowable seats</span>
-        </div>
-
-        <div className="bg-surface border border-border rounded-card p-4 shadow-card">
-          <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Available Seats</span>
-          <div className="font-heading font-bold text-2xl text-ember mt-1">
-            {Math.max(0, totalCapacity - totalEnrolled)}
-          </div>
-          <span className="text-[11px] text-ink/50 font-mono">Remaining intake</span>
-        </div>
-      </div>
-
-      {/* Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface border border-border rounded-card p-4 shadow-card">
-        <div>
-          <h2 className="font-heading font-bold text-base text-ink flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-forest" />
-            Classroom & Division Architecture
-          </h2>
-          <p className="text-xs text-ink/65 mt-0.5">
-            Manage standards (8-10), sections (A-J), class teachers with designated subjects, and subject faculty.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={openCreateClassModal}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 active:scale-95 transition-all shadow-xs cursor-pointer self-start sm:self-auto"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Class / Division
-        </button>
-      </div>
-
-      {errorMsg && (
-        <div className="p-3.5 rounded-card bg-ember/10 border border-ember/30 text-ember text-xs font-medium flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {/* Classes Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="bg-surface border border-border rounded-card p-5 h-56 animate-pulse" />
-          ))}
-        </div>
-      ) : classes.length === 0 ? (
-        <div className="p-12 text-center bg-surface border border-border rounded-card text-ink/60 space-y-3">
-          <GraduationCap className="w-10 h-10 mx-auto text-ink/30" />
-          <h3 className="font-heading font-bold text-base text-ink">No Classes Configured Yet</h3>
-          <p className="text-xs max-w-md mx-auto">
-            Get started by adding your first classroom division (e.g. Standard 10, Section A) to map class teachers and subject instructors.
-          </p>
-          <button
-            type="button"
-            onClick={openCreateClassModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add First Class
-          </button>
-        </div>
+      {selectedClassDetail ? (
+        renderClassDetailView(selectedClassDetail)
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classes.map((cls) => {
-            const fillPercentage = Math.min(100, Math.round((cls.student_count / (cls.max_students || 1)) * 100));
-            const isExpanded = expandedClassId === cls.id;
+        <>
+          {/* Overview Metric Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+              <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Total Sections</span>
+              <div className="font-heading font-bold text-2xl text-ink mt-1">{classes.length}</div>
+              <span className="text-[11px] text-ink/50 font-mono">Standards 8, 9, 10</span>
+            </div>
 
-            return (
-              <div
-                key={cls.id}
-                className="bg-surface border border-border hover:border-border-strong rounded-card shadow-card flex flex-col justify-between transition-all duration-200"
+            <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+              <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Total Enrolled</span>
+              <div className="font-heading font-bold text-2xl text-forest mt-1">{totalEnrolled}</div>
+              <span className="text-[11px] text-ink/50 font-mono">Across all classes</span>
+            </div>
+
+            <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+              <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Total Capacity</span>
+              <div className="font-heading font-bold text-2xl text-ink mt-1">{totalCapacity}</div>
+              <span className="text-[11px] text-ink/50 font-mono">Max allowable seats</span>
+            </div>
+
+            <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+              <span className="font-mono text-[10px] text-ink/60 uppercase tracking-wider">Available Seats</span>
+              <div className="font-heading font-bold text-2xl text-ember mt-1">
+                {Math.max(0, totalCapacity - totalEnrolled)}
+              </div>
+              <span className="text-[11px] text-ink/50 font-mono">Remaining intake</span>
+            </div>
+          </div>
+
+          {/* Action Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface border border-border rounded-card p-4 shadow-card">
+            <div>
+              <h2 className="font-heading font-bold text-base text-ink flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-forest" />
+                Classroom & Division Architecture
+              </h2>
+              <p className="text-xs text-ink/65 mt-0.5">
+                Manage standards (8-10), sections (A-J), class teachers with designated subjects, and subject faculty.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={openCreateClassModal}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 active:scale-95 transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Class / Division
+            </button>
+          </div>
+
+          {errorMsg && (
+            <div className="p-3.5 rounded-card bg-ember/10 border border-ember/30 text-ember text-xs font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Classes Grid */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-surface border border-border rounded-card p-5 h-56 animate-pulse" />
+              ))}
+            </div>
+          ) : classes.length === 0 ? (
+            <div className="p-12 text-center bg-surface border border-border rounded-card text-ink/60 space-y-3">
+              <GraduationCap className="w-10 h-10 mx-auto text-ink/30" />
+              <h3 className="font-heading font-bold text-base text-ink">No Classes Configured Yet</h3>
+              <p className="text-xs max-w-md mx-auto">
+                Get started by adding your first classroom division (e.g. Standard 10, Section A) to map class teachers and subject instructors.
+              </p>
+              <button
+                type="button"
+                onClick={openCreateClassModal}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all cursor-pointer"
               >
-                {/* Class Card Top */}
-                <div className="p-5 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-heading font-black text-2xl text-ink">
-                          {cls.standard}-{cls.section}
-                        </span>
-                        <span className="pill pill-forest text-[10px] font-mono">
-                          Standard {cls.standard}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-ink/50 font-mono">Division {cls.section}</span>
-                    </div>
+                <Plus className="w-3.5 h-3.5" />
+                Add First Class
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {classes.map((cls) => {
+                const count = getStudentCount(cls);
+                const max = cls.max_students || 40;
+                const fillPercentage = Math.min(100, Math.round((count / max) * 100));
+                const seatsLeft = Math.max(0, max - count);
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openEditClassModal(cls)}
-                        className="p-1.5 rounded-sm text-ink/60 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
-                        title="Edit Class Capacity or Teacher"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteClass(cls)}
-                        className="p-1.5 rounded-sm text-ink/60 hover:text-ember hover:bg-ember/10 transition-colors cursor-pointer"
-                        title="Delete Class"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Enrollment Progress */}
-                  <div className="space-y-1.5 bg-bg border border-border/80 rounded-card p-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-ink/65 font-medium">Student Enrollment</span>
-                      <span className="font-mono font-bold text-ink">
-                        {cls.student_count} / {cls.max_students}
-                      </span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-border overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-300 ${
-                          fillPercentage >= 100
-                            ? 'bg-ember'
-                            : fillPercentage >= 75
-                            ? 'bg-amber-500'
-                            : 'bg-forest'
-                        }`}
-                        style={{ width: `${fillPercentage}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-ink/50 font-mono">
-                      <span>{fillPercentage}% full</span>
-                      <span>{Math.max(0, cls.max_students - cls.student_count)} seats left</span>
-                    </div>
-                  </div>
-
-                  {/* Designated Class Teacher */}
-                  <div className="space-y-1.5 pt-1">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-ink/50 font-semibold block">
-                      Main Class Teacher
-                    </span>
-                    {cls.class_teacher_name ? (
-                      <div className="flex items-center justify-between p-2.5 rounded-card bg-surface-muted border border-border text-xs">
-                        <div className="flex items-center gap-2">
-                          <UserCheck className="w-4 h-4 text-forest shrink-0" />
-                          <div>
-                            <div className="font-semibold text-ink">{cls.class_teacher_name}</div>
-                            <span className="text-[10px] text-ink/60 font-mono">
-                              Subject: {cls.class_teacher_subject || 'General'}
+                return (
+                  <div
+                    key={cls.id}
+                    onClick={() => openClassDetail(cls)}
+                    className="bg-surface border border-border hover:border-forest/50 hover:shadow-card-hover rounded-card shadow-card flex flex-col justify-between transition-all duration-200 cursor-pointer group"
+                  >
+                    {/* Class Card Top */}
+                    <div className="p-5 space-y-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-heading font-black text-2xl text-ink group-hover:text-forest transition-colors">
+                              {cls.standard}-{cls.section}
+                            </span>
+                            <span className="pill pill-forest text-[10px] font-mono">
+                              Standard {cls.standard}
                             </span>
                           </div>
+                          <span className="text-[11px] text-ink/50 font-mono">Division {cls.section}</span>
                         </div>
-                        <span className="pill text-[9px] bg-forest/15 text-forest border border-forest/20">
-                          Class Teacher
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="p-2.5 rounded-card bg-bg border border-dashed border-border text-xs text-ink/50 italic flex items-center justify-between">
-                        <span>No class teacher assigned</span>
-                        <button
-                          type="button"
-                          onClick={() => openEditClassModal(cls)}
-                          className="text-[11px] text-forest font-semibold hover:underline cursor-pointer"
-                        >
-                          + Assign
-                        </button>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Subject Faculty Indicator */}
-                  <div className="space-y-1.5 pt-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-ink/50 font-semibold">
-                        Subject Instructors ({cls.subject_teachers?.length || 0})
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => openSubjectTeachersModal(cls)}
-                        className="text-[11px] text-forest font-semibold hover:underline cursor-pointer"
-                      >
-                        Manage Subjects
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {cls.subject_teachers && cls.subject_teachers.length > 0 ? (
-                        cls.subject_teachers.map((st) => (
-                          <span
-                            key={st.id}
-                            className="pill text-[10px] bg-surface-muted text-ink/80 border border-border flex items-center gap-1"
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => openEditClassModal(cls)}
+                            className="p-1.5 rounded-sm text-ink/60 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+                            title="Edit Class Capacity or Teacher"
                           >
-                            <span className="font-bold">{st.subject}:</span> {st.teacher_name}
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClass(cls)}
+                            className="p-1.5 rounded-sm text-ink/60 hover:text-ember hover:bg-ember/10 transition-colors cursor-pointer"
+                            title="Delete Class"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Enrollment Progress */}
+                      <div className="space-y-1.5 bg-bg border border-border/80 rounded-card p-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-ink/65 font-medium">Student Enrollment</span>
+                          <span className="font-mono font-bold text-ink">
+                            {count} / {max}
                           </span>
-                        ))
-                      ) : (
-                        <span className="text-[11px] text-ink/40 italic">
-                          No additional subject instructors mapped yet.
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-border overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              fillPercentage >= 100
+                                ? 'bg-ember'
+                                : fillPercentage >= 75
+                                ? 'bg-amber-500'
+                                : 'bg-forest'
+                            }`}
+                            style={{ width: `${fillPercentage}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-ink/50 font-mono">
+                          <span>{fillPercentage}% full</span>
+                          <span>{seatsLeft} seats left</span>
+                        </div>
+                      </div>
+
+                      {/* Designated Class Teacher */}
+                      <div className="space-y-1.5 pt-1">
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-ink/50 font-semibold block">
+                          Main Class Teacher
                         </span>
-                      )}
+                        {cls.class_teacher_name ? (
+                          <div className="flex items-center justify-between p-2.5 rounded-card bg-surface-muted border border-border text-xs">
+                            <div className="flex items-center gap-2">
+                              <UserCheck className="w-4 h-4 text-forest shrink-0" />
+                              <div>
+                                <div className="font-semibold text-ink">{cls.class_teacher_name}</div>
+                                <span className="text-[10px] text-ink/60 font-mono">
+                                  Subject: {cls.class_teacher_subject || 'General'}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="pill text-[9px] bg-forest/15 text-forest border border-forest/20">
+                              Class Teacher
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="p-2.5 rounded-card bg-bg border border-dashed border-border text-xs text-ink/50 italic flex items-center justify-between">
+                            <span>No class teacher assigned</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditClassModal(cls);
+                              }}
+                              className="text-[11px] text-forest font-semibold hover:underline cursor-pointer"
+                            >
+                              + Assign
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Subject Faculty Indicator */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-ink/50 font-semibold">
+                            Subject Instructors ({cls.subject_teachers?.length || 0})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openSubjectTeachersModal(cls);
+                            }}
+                            className="text-[11px] text-forest font-semibold hover:underline cursor-pointer"
+                          >
+                            Manage Subjects
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {cls.subject_teachers && cls.subject_teachers.length > 0 ? (
+                            cls.subject_teachers.map((st) => (
+                              <span
+                                key={st.id}
+                                className="pill text-[10px] bg-surface-muted text-ink/80 border border-border flex items-center gap-1"
+                              >
+                                <span className="font-bold">{st.subject}:</span> {st.teacher_name}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[11px] text-ink/40 italic">
+                              No additional subject instructors mapped yet.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Footer: Replaces the accordion button with a clean clickable detail action */}
+                    <div className="border-t border-border bg-surface-muted/30 px-4 py-3 flex items-center justify-between text-xs font-heading font-semibold text-forest group-hover:text-forest-dark transition-colors">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>{count} Enrolled Students</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px]">
+                        <span>View Details & Roster</span>
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Card Footer: View Students Roster */}
-                <div className="border-t border-border bg-surface-muted/30 p-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleClassStudents(cls)}
-                    className="w-full py-1.5 px-3 rounded-card text-xs font-semibold text-ink/75 hover:text-ink hover:bg-surface border border-transparent hover:border-border transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    <span>{isExpanded ? 'Hide Enrolled Students' : `View Enrolled Students (${cls.student_count})`}</span>
-                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </button>
-
-                  {/* Inline Student Roster Dropdown */}
-                  {isExpanded && (
-                    <div className="mt-3 pt-3 border-t border-border/80 space-y-2 max-h-48 overflow-y-auto">
-                      {isLoadingStudents ? (
-                        <div className="text-center py-3 text-xs text-ink/50 italic">Loading student roster...</div>
-                      ) : classStudents.length === 0 ? (
-                        <div className="text-center py-3 text-xs text-ink/50 italic">
-                          No students currently enrolled in this class.
-                        </div>
-                      ) : (
-                        classStudents.map((s) => (
-                          <div
-                            key={s.id}
-                            className="p-2 rounded-card bg-bg border border-border/60 text-xs flex items-center justify-between"
-                          >
-                            <div>
-                              <div className="font-semibold text-ink">
-                                {s.first_name || s.last_name ? `${s.first_name || ''} ${s.last_name || ''}`.trim() : s.username}
-                              </div>
-                              <div className="text-[10px] text-ink/60 font-mono">{s.email}</div>
-                            </div>
-                            <span className="font-mono text-[10px] text-ink/50">{s.mobile_number}</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {/* Add / Edit Class Modal Drawer */}
