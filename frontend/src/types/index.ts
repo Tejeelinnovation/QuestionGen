@@ -428,6 +428,25 @@ export interface ClassSection {
   updated_at?: string;
 }
 
+export interface SubjectAssignment {
+  id: number;
+  class_section_id: number;
+  class_name: string;
+  standard: number;
+  section: string;
+  subject: string;
+  student_count: number;
+  max_students: number;
+  class_teacher_id?: number | null;
+  class_teacher_name?: string | null;
+  is_class_teacher?: boolean;
+}
+
+export interface TeacherAssignmentsResponse {
+  class_teacher_sections: ClassSection[];
+  subject_assignments: SubjectAssignment[];
+}
+
 export interface ClassSectionCreateInput {
   standard: number;
   section: string;

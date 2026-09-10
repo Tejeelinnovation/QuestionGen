@@ -134,19 +134,21 @@ class Command(BaseCommand):
             class_10a.class_teacher_subject = "Mathematics"
             class_10a.save()
 
-            ClassSection.objects.get_or_create(
+            sec_9a, _ = ClassSection.objects.get_or_create(
                 school=school,
                 standard=9,
                 section="A",
                 defaults={"max_students": 40},
             )
-            ClassSection.objects.get_or_create(
+            sec_8a, _ = ClassSection.objects.get_or_create(
                 school=school,
                 standard=8,
                 section="A",
                 defaults={"max_students": 40},
             )
 
+            # Teacher teaches Mathematics in 10-A (also Class Teacher), Science in 10-A,
+            # Mathematics in 9-A, and Science in 8-A (multiple subjects across classes!)
             ClassSubjectTeacher.objects.get_or_create(
                 class_section=class_10a,
                 subject="Mathematics",
@@ -154,6 +156,16 @@ class Command(BaseCommand):
             )
             ClassSubjectTeacher.objects.get_or_create(
                 class_section=class_10a,
+                subject="Science",
+                defaults={"teacher": teacher},
+            )
+            ClassSubjectTeacher.objects.get_or_create(
+                class_section=sec_9a,
+                subject="Mathematics",
+                defaults={"teacher": teacher},
+            )
+            ClassSubjectTeacher.objects.get_or_create(
+                class_section=sec_8a,
                 subject="Science",
                 defaults={"teacher": teacher},
             )

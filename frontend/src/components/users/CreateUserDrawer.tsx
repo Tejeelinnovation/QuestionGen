@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import type { User, School, ClassSection } from '../../types';
 import { X, UserPlus, Check, AlertCircle } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
+import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
 
 interface CreateUserDrawerProps {
   isOpen: boolean;
@@ -372,14 +373,12 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
               <label htmlFor="u-primary-subject" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                 Primary Teaching Subject
               </label>
-              <input
+              <SearchableSubjectSelect
                 id="u-primary-subject"
-                type="text"
-                placeholder="e.g. Mathematics, Science, Social Science, English"
                 value={primarySubject}
-                onChange={(e) => setPrimarySubject(e.target.value)}
+                onChange={setPrimarySubject}
                 disabled={isSubmitting}
-                className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                placeholder="Search or enter subject..."
               />
               <p className="text-[10px] text-ink/50">
                 Designate teacher's subject specialization for class teacher or subject teacher mappings.

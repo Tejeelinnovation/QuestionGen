@@ -6,6 +6,7 @@ import { PermissionManager } from './PermissionManager';
 import type { User, CapabilityName, ClassSection } from '../../types';
 import { X, UserCheck, Shield, Check, AlertCircle, RefreshCw, BookOpen, GraduationCap } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
+import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
 
 export const canEditUser = (currentUser: User | null, targetUser: User): boolean => {
   if (!currentUser) return false;
@@ -358,14 +359,12 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
                         <BookOpen className="w-3.5 h-3.5 text-forest" />
                         <span>Primary Teaching Subject</span>
                       </label>
-                      <input
+                      <SearchableSubjectSelect
                         id="edit-subject"
-                        type="text"
                         value={primarySubject}
-                        onChange={(e) => setPrimarySubject(e.target.value)}
+                        onChange={setPrimarySubject}
                         disabled={isSaving}
-                        placeholder="e.g. Mathematics, Science, English"
-                        className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                        placeholder="Search or enter subject..."
                       />
                     </div>
                   )}

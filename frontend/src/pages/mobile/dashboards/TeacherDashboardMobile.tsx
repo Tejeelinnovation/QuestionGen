@@ -21,6 +21,7 @@ import {
   SkeletonDeliveriesList,
   SkeletonCompactList,
 } from '../../../components/ui/skeleton';
+import { TeacherClassesSection } from '../../../components/teachers/TeacherClassesSection';
 
 export const TeacherDashboardMobile: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -139,6 +140,9 @@ export const TeacherDashboardMobile: React.FC = () => {
         <FilePlus className="w-4 h-4" />
         <span>Create New Paper</span>
       </Link>
+
+      {/* ── Academic Classes & Teaching Scope (Grape Block) ── */}
+      <TeacherClassesSection compact={true} />
 
       {/* ── Question Papers Feed (Most Important Content First) ── */}
       <div className="space-y-3">

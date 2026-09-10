@@ -3,6 +3,7 @@ import type {
   ClassSection,
   ClassSectionCreateInput,
   ClassSubjectTeacher,
+  TeacherAssignmentsResponse,
   User,
 } from '../types';
 
@@ -72,4 +73,12 @@ export const classesApi = {
     );
     return response.data;
   },
+
+  getMyAssignments: async (): Promise<TeacherAssignmentsResponse> => {
+    const response = await apiClient.get<TeacherAssignmentsResponse>(
+      '/api/schools/classes/my-assignments/'
+    );
+    return response.data;
+  },
 };
+

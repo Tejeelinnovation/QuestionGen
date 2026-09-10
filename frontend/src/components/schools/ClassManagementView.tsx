@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { classesApi } from '../../api/classes';
 import { usersApi } from '../../api/users';
 import type { ClassSection, ClassSubjectTeacher, User } from '../../types';
+import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
 import {
   GraduationCap,
   Plus,
@@ -25,19 +26,6 @@ interface ClassManagementViewProps {
 
 const STANDARDS = [8, 9, 10];
 const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
-const COMMON_SUBJECTS = [
-  'Mathematics',
-  'Science',
-  'Social Science',
-  'English',
-  'Hindi',
-  'Physics',
-  'Chemistry',
-  'Biology',
-  'History',
-  'Geography',
-  'Computer Science',
-];
 
 export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
   schoolId,
@@ -548,7 +536,7 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
                   <select
                     value={standard}
                     onChange={(e) => setStandard(Number(e.target.value))}
-                    disabled={Boolean(editingClass) || modalSubmitting}
+                    disabled={modalSubmitting}
                     className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
                   >
                     {STANDARDS.map((std) => (
@@ -566,7 +554,7 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
                   <select
                     value={section}
                     onChange={(e) => setSection(e.target.value)}
-                    disabled={Boolean(editingClass) || modalSubmitting}
+                    disabled={modalSubmitting}
                     className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
                   >
                     {SECTIONS.map((sec) => (
@@ -636,13 +624,11 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
                   <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                     Class Teacher's Subject
                   </label>
-                  <input
-                    type="text"
+                  <SearchableSubjectSelect
                     value={classTeacherSubject}
-                    onChange={(e) => setClassTeacherSubject(e.target.value)}
+                    onChange={setClassTeacherSubject}
                     disabled={modalSubmitting}
-                    placeholder="e.g. Mathematics, Science"
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                    placeholder="Search or enter subject..."
                   />
                   <p className="text-[10px] text-ink/50">
                     Subject taught by the class teacher for this class division.
@@ -726,21 +712,14 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="block text-[11px] text-ink/70 font-medium mb-1">Subject</label>
-                    <input
-                      type="text"
-                      list="common-subjects-list"
-                      required
+                    <label className="block text-[11px] text-ink/70 font-medium mb-1">Subject *</label>
+                    <SearchableSubjectSelect
                       value={newSubject}
-                      onChange={(e) => setNewSubject(e.target.value)}
-                      placeholder="e.g. Science"
-                      className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                      onChange={setNewSubject}
+                      disabled={subjectSubmitting}
+                      placeholder="Search or enter subject..."
+                      required
                     />
-                    <datalist id="common-subjects-list">
-                      {COMMON_SUBJECTS.map((s) => (
-                        <option key={s} value={s} />
-                      ))}
-                    </datalist>
                   </div>
 
                   <div>

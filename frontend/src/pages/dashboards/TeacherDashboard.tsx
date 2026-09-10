@@ -16,6 +16,7 @@ import {
   SkeletonDeliveriesList,
   SkeletonCompactList,
 } from '../../components/ui/skeleton';
+import { TeacherClassesSection } from '../../components/teachers/TeacherClassesSection';
 
 const TeacherDashboardDesktop: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -116,6 +117,9 @@ const TeacherDashboardDesktop: React.FC = () => {
       </div>
 
       {/* ── Category Separation Architecture (Ref: 01 Color Blocked Functional Sections) ── */}
+
+      {/* Category 0: Assigned Academic Classes & Divisions (Grape Block) */}
+      <TeacherClassesSection />
 
       {/* Category 1: Question Papers (Forest Color Block) */}
       <section className="space-y-4">

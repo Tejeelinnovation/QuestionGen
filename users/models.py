@@ -124,10 +124,10 @@ class User(AbstractUser):
     )
 
     primary_subject = models.CharField(
-        max_length=100,
+        max_length=255,
         blank=True,
         default="",
-        help_text="Primary subject taught by this faculty member (e.g. Mathematics).",
+        help_text="Subject specialization or subjects taught by this faculty member (e.g. Mathematics, Science).",
     )
 
     objects = UserManager()

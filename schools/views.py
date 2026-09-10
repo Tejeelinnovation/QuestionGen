@@ -204,3 +204,57 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
         serializer = UserSerializer(students, many=True, context={"request": request})
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"], url_path="my-assignments")
+    def my_assignments(self, request):
+        """
+        Returns class sections and subject assignments specifically for the authenticated teacher.
+        Includes:
+        1. Class sections where the teacher is designated as the Main Class Teacher.
+        2. All subject teaching mappings where the teacher is assigned to teach in a division.
+        """
+        user = request.user
+        if not user.is_authenticated:
+            return Response({"class_teacher_sections": [], "subject_assignments": []})
+
+        ct_sections = (
+            ClassSection.objects.filter(class_teacher=user)
+            .select_related("school", "class_teacher")
+            .prefetch_related("subject_teachers", "students")
+        )
+        ct_serializer = ClassSectionSerializer(ct_sections, many=True, context={"request": request})
+
+        st_records = (
+            ClassSubjectTeacher.objects.filter(teacher=user)
+            .select_related("class_section", "class_section__class_teacher", "class_section__school")
+            .prefetch_related("class_section__students")
+        )
+
+        subject_assignments = []
+        for st in st_records:
+            sec = st.class_section
+            ct_name = None
+            if sec.class_teacher:
+                ct_name = (
+                    f"{sec.class_teacher.first_name} {sec.class_teacher.last_name}".strip()
+                    or sec.class_teacher.username
+                )
+            subject_assignments.append({
+                "id": st.id,
+                "class_section_id": sec.id,
+                "class_name": sec.name,
+                "standard": sec.standard,
+                "section": sec.section,
+                "subject": st.subject,
+                "student_count": sec.students.filter(role="Student").count(),
+                "max_students": sec.max_students,
+                "class_teacher_id": sec.class_teacher_id,
+                "class_teacher_name": ct_name,
+                "is_class_teacher": (sec.class_teacher_id == user.id),
+            })
+
+        return Response({
+            "class_teacher_sections": ct_serializer.data,
+            "subject_assignments": subject_assignments,
+        })
+
+

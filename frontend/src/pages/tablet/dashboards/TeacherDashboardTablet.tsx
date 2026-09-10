@@ -13,6 +13,7 @@ import {
   SkeletonDeliveriesList,
   SkeletonCompactList,
 } from '../../../components/ui/skeleton';
+import { TeacherClassesSection } from '../../../components/teachers/TeacherClassesSection';
 
 export const TeacherDashboardTablet: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -108,6 +109,9 @@ export const TeacherDashboardTablet: React.FC = () => {
           <span>+ Create New Paper</span>
         </Link>
       </div>
+
+      {/* ── Section 0: Academic Classes & Teaching Scope (Grape Block) ── */}
+      <TeacherClassesSection compact={true} />
 
       {/* ── Section 1: Authored Question Papers (2-Column Bento Grid) ── */}
       <section className="space-y-4">
