@@ -88,7 +88,7 @@ export const getDefaultCapabilitiesForRole = (roleLabel: string): CapabilityName
   }
 };
 
-export const ALLOWED_CAPABILITIES_BY_ROLE: Record<string, CapabilityName[]> = {
+const ALLOWED_CAPABILITIES_BY_ROLE: Record<string, CapabilityName[]> = {
   'Super Admin': ALL_CAPABILITIES.map((c) => c.name),
   'School Admin': ['CREATE_TEACHER', 'CREATE_STUDENT', 'VIEW_SCHOOL_WIDE_CONTROLS'],
   'Teacher': ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST'],
@@ -104,7 +104,7 @@ export const ALLOWED_CAPABILITIES_BY_ROLE: Record<string, CapabilityName[]> = {
  * - Student: 2 caps allowed (8 locked)
  * Also ensures School Admins cannot modify Super Admins or other School Admins.
  */
-export const getLockedCapsForRole = (targetRole: string, editorRole?: string): CapabilityName[] => {
+const getLockedCapsForRole = (targetRole: string, editorRole?: string): CapabilityName[] => {
   // School Admins cannot modify Super Admin or School Admin capabilities
   if (editorRole === 'School Admin' && (targetRole === 'Super Admin' || targetRole === 'School Admin')) {
     return ALL_CAPABILITIES.map((c) => c.name);

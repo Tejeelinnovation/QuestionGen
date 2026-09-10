@@ -5,7 +5,8 @@ import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDraw
 import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
-import { Plus, Edit2, Building2, Search, Loader2, X } from 'lucide-react';
+import { BulkImportModal } from '../../../components/schools/BulkImportModal';
+import { Plus, Edit2, Building2, Search, Loader2, X, FileSpreadsheet } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster, Skeleton } from '../../../components/ui/skeleton';
@@ -29,6 +30,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
   const [createUserProfile, setCreateUserProfile] = useState<'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
+  const [bulkImportSchool, setBulkImportSchool] = useState<School | null>(null);
 
   // Debounce search query (400ms pause)
   useEffect(() => {
@@ -247,6 +249,15 @@ export const SuperAdminDashboardTablet: React.FC = () => {
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
+                        id={`tablet-import-school-${s.id}`}
+                        onClick={() => setBulkImportSchool(s)}
+                        className="p-1 rounded-sm text-ink/60 hover:text-forest hover:bg-forest/10 transition-colors cursor-pointer"
+                        title="Excel Bulk Import (Students / Teachers)"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-forest" />
+                      </button>
+                      <button
+                        type="button"
                         id={`tablet-edit-school-${s.id}`}
                         onClick={() => setEditingSchool(s)}
                         className="p-1 rounded-sm text-ink/60 hover:text-forest hover:bg-forest/10 transition-colors cursor-pointer"
@@ -453,6 +464,15 @@ export const SuperAdminDashboardTablet: React.FC = () => {
         isOpen={editUserId !== null}
         onClose={() => setEditUserId(null)}
         onUserUpdated={() => fetchData()}
+      />
+
+      <BulkImportModal
+        isOpen={bulkImportSchool !== null}
+        onClose={() => setBulkImportSchool(null)}
+        schoolId={bulkImportSchool?.id}
+        schoolName={bulkImportSchool?.name}
+        initialRole="student"
+        onSuccess={() => fetchData()}
       />
     </div>
   );

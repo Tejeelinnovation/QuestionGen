@@ -22,20 +22,38 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   error,
 }) => {
   // Extract only the 10 digits part for display/editing
-  const extractDigits = (val: string) => {
-    const cleaned = val.replace(/\D/g, '');
-    // If it starts with 91 and has 12 digits, strip leading 91
+  const extractDigits = (val: string | undefined | null): string => {
+    if (!val) return '';
+    const trimmed = val.trim();
+    // If it starts with +91, strip the country code prefix
+    if (trimmed.startsWith('+91')) {
+      return trimmed.slice(3).replace(/\D/g, '').slice(0, 10);
+    }
+    // If it starts with +, strip + and non-digits
+    if (trimmed.startsWith('+')) {
+      return trimmed.replace(/\D/g, '').slice(0, 10);
+    }
+    const cleaned = trimmed.replace(/\D/g, '');
+    // If it's a 12-digit number starting with 91, strip 91
     if (cleaned.length === 12 && cleaned.startsWith('91')) {
       return cleaned.slice(2);
     }
-    // If user typed up to 10 digits
+    // If it starts with 91 and has more than 10 digits
+    if (cleaned.length > 10 && cleaned.startsWith('91')) {
+      return cleaned.slice(2, 12);
+    }
     return cleaned.slice(0, 10);
   };
 
   const digits = extractDigits(value);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDigits = e.target.value.replace(/\D/g, '').slice(0, 10);
+    let inputVal = e.target.value;
+    // Strip leading +91 if pasted
+    if (inputVal.startsWith('+91')) {
+      inputVal = inputVal.slice(3);
+    }
+    const newDigits = inputVal.replace(/\D/g, '').slice(0, 10);
     // Send full +91XXXXXXXXXX when digits exist, or empty string if empty
     if (newDigits.length > 0) {
       onChange(`+91${newDigits}`);

@@ -5,14 +5,18 @@ Views for the schools app.
 from __future__ import annotations
 
 from django.db import transaction
+from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.audit import log_action
 from users.permissions import HasCapability
 from .models import ClassSection, ClassSubjectTeacher, School
+from .services.bulk_importer import BulkImporter
+from .services.excel_templates import generate_student_template, generate_teacher_template
 from .serializers import (
     ClassSectionCreateUpdateSerializer,
     ClassSectionSerializer,
@@ -256,5 +260,158 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
             "class_teacher_sections": ct_serializer.data,
             "subject_assignments": subject_assignments,
         })
+
+
+class BulkImportViewSet(viewsets.ViewSet):
+    """
+    ViewSet for downloading bulk import Excel templates, checking capacity,
+    and processing Excel-based student and teacher cohorts.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def _resolve_school(self, request, requested_school_id=None):
+        user = request.user
+        can_import = user.has_capability("VIEW_SCHOOL_WIDE_CONTROLS") or user.has_capability("CREATE_SCHOOL")
+        if not can_import:
+            return None, Response(
+                {"detail": "You do not have permission to access bulk import features."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        target_school_id = requested_school_id or user.school_id
+        if user.school_id is not None:
+            # School Admin can only access their own school
+            if requested_school_id and int(requested_school_id) != user.school_id:
+                return None, Response(
+                    {"detail": "You cannot perform imports for another school."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            target_school_id = user.school_id
+
+        if not target_school_id:
+            return None, Response(
+                {"detail": "'school_id' parameter is required for Super Admin."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            school = School.objects.get(id=target_school_id)
+            return school, None
+        except School.DoesNotExist:
+            return None, Response(
+                {"detail": "Target school not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    @action(detail=False, methods=["get"], url_path="template")
+    def template(self, request):
+        """
+        Download sample Excel template for Student or Teacher import.
+        Query param: ?type=student | teacher
+        """
+        template_type = request.query_params.get("type", "student").strip().lower()
+        if template_type == "teacher":
+            content = generate_teacher_template()
+            filename = "teacher_import_sample.xlsx"
+        else:
+            content = generate_student_template()
+            filename = "student_import_sample.xlsx"
+
+        response = HttpResponse(
+            content,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    @action(detail=False, methods=["get"], url_path="capacity")
+    def capacity(self, request):
+        """
+        Returns configured limit, current usage, and remaining capacity for students and teachers.
+        """
+        school_id = request.query_params.get("school_id")
+        school, err_response = self._resolve_school(request, school_id)
+        if err_response:
+            return err_response
+
+        current_students = school.users.filter(role="Student").count()
+        current_teachers = school.users.filter(role="Teacher").count()
+
+        return Response({
+            "school_id": school.id,
+            "school_name": school.name,
+            "students": {
+                "limit": school.max_students,
+                "current": current_students,
+                "remaining": max(0, school.max_students - current_students),
+            },
+            "teachers": {
+                "limit": school.max_teachers,
+                "current": current_teachers,
+                "remaining": max(0, school.max_teachers - current_teachers),
+            },
+        })
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="students",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def students(self, request):
+        """
+        Upload and process completed Student workbook.
+        Enforces atomic capacity checks and prevents duplicate account creation.
+        """
+        school_id = request.data.get("school_id") or request.query_params.get("school_id")
+        school, err_response = self._resolve_school(request, school_id)
+        if err_response:
+            return err_response
+
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response(
+                {"detail": "Please attach an Excel file (.xlsx) with form key 'file'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        file_bytes = uploaded_file.read()
+        report = BulkImporter.import_students_from_excel(file_bytes, school.id, request.user)
+        return Response(
+            report,
+            status=status.HTTP_200_OK if "error" not in report else status.HTTP_400_BAD_REQUEST,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="teachers",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def teachers(self, request):
+        """
+        Upload and process completed Teacher workbook.
+        Enforces atomic capacity checks and prevents duplicate account creation.
+        """
+        school_id = request.data.get("school_id") or request.query_params.get("school_id")
+        school, err_response = self._resolve_school(request, school_id)
+        if err_response:
+            return err_response
+
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response(
+                {"detail": "Please attach an Excel file (.xlsx) with form key 'file'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        file_bytes = uploaded_file.read()
+        report = BulkImporter.import_teachers_from_excel(file_bytes, school.id, request.user)
+        return Response(
+            report,
+            status=status.HTTP_200_OK if "error" not in report else status.HTTP_400_BAD_REQUEST,
+        )
+
 
 

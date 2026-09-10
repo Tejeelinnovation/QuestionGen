@@ -6,7 +6,8 @@ import { usersApi } from '../../../api/users';
 import type { Paper, User, Delivery } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
-import { UpdateUserModal, canEditUser } from '../../../components/users/UpdateUserModal';
+import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
+import { canEditUser } from '../../../utils/userPermissions';
 import {
   FilePlus,
   Sparkles,

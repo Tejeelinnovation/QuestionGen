@@ -6,6 +6,7 @@ import type { User, Delivery } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
+import { BulkImportModal } from '../../../components/schools/BulkImportModal';
 import { Pagination } from '../../../components/ui/pagination';
 import { PhoneInput } from '../../../components/ui/phone-input';
 import { ClassManagementView } from '../../../components/schools/ClassManagementView';
@@ -40,6 +41,8 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkImportRole, setBulkImportRole] = useState<'student' | 'teacher'>('student');
   const [studentSearch, setStudentSearch] = useState('');
 
   // Pagination states
@@ -191,6 +194,19 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
           Faculty management, student admissions, and examination results.
         </p>
       </div>
+
+      {/* ── Action: Excel Bulk Import ── */}
+      <button
+        type="button"
+        onClick={() => {
+          setBulkImportRole(activeTab === 'students' ? 'student' : 'teacher');
+          setIsBulkImportOpen(true);
+        }}
+        className="w-full py-2 px-3 rounded-pill bg-forest text-white font-heading font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-transform cursor-pointer min-h-[40px]"
+      >
+        <FileSpreadsheet className="w-4 h-4" />
+        <span>Excel Bulk Import ({activeTab === 'students' ? 'Students' : 'Teachers'})</span>
+      </button>
 
       {/* ── Segmented Tab Selector ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-surface-muted rounded-card border border-border">
@@ -450,13 +466,27 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
             <span className="text-xs font-mono text-ink/60">
               ENROLLED ({filteredStudents.length})
             </span>
-            <button
-              onClick={() => setIsCreateStudentOpen(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs active:scale-95 transition-transform cursor-pointer shadow-xs min-h-[36px]"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Enroll Student</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkImportRole('student');
+                  setIsBulkImportOpen(true);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-pill bg-forest/10 border border-forest/30 text-forest font-heading font-semibold text-xs active:scale-95 transition-transform cursor-pointer min-h-[36px]"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Excel</span>
+              </button>
+
+              <button
+                onClick={() => setIsCreateStudentOpen(true)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs active:scale-95 transition-transform cursor-pointer shadow-xs min-h-[36px]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Enroll</span>
+              </button>
+            </div>
           </div>
 
           <div className="relative">
@@ -644,6 +674,14 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
         isOpen={editUserId !== null}
         onClose={() => setEditUserId(null)}
         onUserUpdated={() => fetchUsers()}
+      />
+
+      {/* Excel Bulk Provisioning Modal */}
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        onImportSuccess={() => fetchUsers()}
+        defaultRole={bulkImportRole}
       />
     </div>
   );

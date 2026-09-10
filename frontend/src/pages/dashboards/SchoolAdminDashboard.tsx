@@ -8,6 +8,7 @@ import { SchoolAdminDashboardMobile } from '../mobile/dashboards/SchoolAdminDash
 import { getStaggerDelay, MOTION } from '../../lib/motion';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
+import { BulkImportModal } from '../../components/schools/BulkImportModal';
 import { PhoneInput } from '../../components/ui/phone-input';
 import { ClassManagementView } from '../../components/schools/ClassManagementView';
 import {
@@ -40,6 +41,8 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkImportRole, setBulkImportRole] = useState<'student' | 'teacher'>('student');
   const [studentSearch, setStudentSearch] = useState('');
 
   // Pagination states
@@ -209,6 +212,19 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
+            type="button"
+            id="schooladmin-bulk-import-btn"
+            onClick={() => {
+              setBulkImportRole(activeTab === 'students' ? 'student' : 'teacher');
+              setIsBulkImportOpen(true);
+            }}
+            className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Excel Bulk Import</span>
+          </button>
+
+          <button
             onClick={() => {
               fetchUsers();
               fetchDeliveries();
@@ -291,9 +307,22 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
               <h2 className="font-heading font-bold text-xl text-ink">
                 Faculty Roster
               </h2>
-              <span className="font-mono text-xs text-ink/60 bg-surface px-2.5 py-1 rounded-pill border border-border">
-                {teachers.length} Active Faculty
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkImportRole('teacher');
+                    setIsBulkImportOpen(true);
+                  }}
+                  className="px-3 py-1 text-xs font-heading font-semibold rounded-pill bg-ember/10 border border-ember/30 text-ember hover:bg-ember hover:text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Import Teachers (Excel)</span>
+                </button>
+                <span className="font-mono text-xs text-ink/60 bg-surface px-2.5 py-1 rounded-pill border border-border">
+                  {teachers.length} Active Faculty
+                </span>
+              </div>
             </div>
 
             {isLoading && (
@@ -582,6 +611,18 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
 
               <button
                 type="button"
+                onClick={() => {
+                  setBulkImportRole('student');
+                  setIsBulkImportOpen(true);
+                }}
+                className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest/10 border border-forest/30 text-forest hover:bg-forest hover:text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Import Students (Excel)</span>
+              </button>
+
+              <button
+                type="button"
                 id="schooladmin-create-student-btn"
                 onClick={() => setIsCreateStudentOpen(true)}
                 className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
@@ -821,6 +862,14 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
         isOpen={editUserId !== null}
         onClose={() => setEditUserId(null)}
         onUserUpdated={() => fetchUsers()}
+      />
+
+      {/* Excel Bulk Provisioning Modal */}
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        onImportSuccess={() => fetchUsers()}
+        defaultRole={bulkImportRole}
       />
     </div>
   );

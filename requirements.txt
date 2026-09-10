@@ -20,3 +20,7 @@ django-environ==0.13.0
 
 # CORS headers for frontend integration
 django-cors-headers==4.7.0
+
+# Excel file generation and processing
+openpyxl==3.1.5
+

@@ -36,6 +36,8 @@ export interface User {
   school_name?: string;
   class_section?: number | null;
   class_section_name?: string | null;
+  gr_number?: string;
+  roll_number?: string;
   primary_subject?: string;
   created_by?: number | null;
   created_by_username?: string | null;
@@ -455,4 +457,82 @@ export interface ClassSectionCreateInput {
   class_teacher_subject?: string;
   school?: number;
 }
+
+export interface SchoolCapacityInfo {
+  school_id: number;
+  school_name: string;
+  students: {
+    limit: number;
+    current: number;
+    remaining: number;
+  };
+  teachers: {
+    limit: number;
+    current: number;
+    remaining: number;
+  };
+}
+
+export interface ImportSummary {
+  total_rows: number;
+  created_count: number;
+  over_limit_count: number;
+  duplicate_count: number;
+  invalid_count: number;
+  configured_limit: number;
+  current_usage_before: number;
+  current_usage_after: number;
+  remaining_capacity_before: number;
+  remaining_capacity_after: number;
+}
+
+export interface ImportCreatedRow {
+  row_number: number;
+  id: number;
+  name: string;
+  username: string;
+  mobile_number: string;
+  gr_number?: string;
+  roll_number?: string;
+  standard?: number;
+  division?: string;
+  class_name?: string;
+  subject?: string;
+  class_teacher?: string;
+}
+
+export interface ImportOverLimitRow {
+  row_number: number;
+  name: string;
+  gr_number?: string;
+  standard?: number;
+  division?: string;
+  subject?: string;
+  error: string;
+}
+
+export interface ImportDuplicateRow {
+  row_number: number;
+  name: string;
+  gr_number?: string;
+  duplicate_field: string;
+  error: string;
+}
+
+export interface ImportInvalidRow {
+  row_number: number;
+  name?: string;
+  gr_number?: string;
+  error: string;
+}
+
+export interface ImportReport {
+  error?: string;
+  summary: ImportSummary;
+  created: ImportCreatedRow[];
+  over_limit: ImportOverLimitRow[];
+  duplicates: ImportDuplicateRow[];
+  invalid: ImportInvalidRow[];
+}
+
 

@@ -85,6 +85,8 @@ class UserSerializer(serializers.ModelSerializer):
             "school_name",
             "class_section",
             "class_section_name",
+            "gr_number",
+            "roll_number",
             "primary_subject",
             "created_by",
             "created_by_username",

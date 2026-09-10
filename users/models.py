@@ -123,6 +123,20 @@ class User(AbstractUser):
         help_text="Class division this student is enrolled in.",
     )
 
+    gr_number = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="General Register (GR) Number / Student Registration ID.",
+    )
+
+    roll_number = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text="Class Roll Number where applicable.",
+    )
+
     primary_subject = models.CharField(
         max_length=255,
         blank=True,

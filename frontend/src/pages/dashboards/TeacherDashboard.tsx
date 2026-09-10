@@ -7,7 +7,8 @@ import { TeacherDashboardTablet } from '../tablet/dashboards/TeacherDashboardTab
 import { TeacherDashboardMobile } from '../mobile/dashboards/TeacherDashboardMobile';
 import { useAuth } from '../../auth/AuthContext';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
-import { UpdateUserModal, canEditUser } from '../../components/users/UpdateUserModal';
+import { UpdateUserModal } from '../../components/users/UpdateUserModal';
+import { canEditUser } from '../../utils/userPermissions';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
 import { Plus, Edit2 } from 'lucide-react';
 import type { Paper, User, Delivery } from '../../types';

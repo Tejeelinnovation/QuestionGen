@@ -5,6 +5,7 @@ import { papersApi } from '../../../api/papers';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
+import { BulkImportModal } from '../../../components/schools/BulkImportModal';
 import { PhoneInput } from '../../../components/ui/phone-input';
 import { ClassManagementView } from '../../../components/schools/ClassManagementView';
 import {
@@ -37,6 +38,8 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkImportRole, setBulkImportRole] = useState<'student' | 'teacher'>('student');
   const [studentSearch, setStudentSearch] = useState('');
 
   // Pagination states
@@ -192,16 +195,30 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            fetchUsers();
-            fetchDeliveries();
-          }}
-          disabled={isLoading || isLoadingDeliveries}
-          className="self-start sm:self-auto px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer"
-        >
-          {isLoading || isLoadingDeliveries ? 'Refreshing...' : '↻ Refresh Data'}
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setBulkImportRole(activeTab === 'students' ? 'student' : 'teacher');
+              setIsBulkImportOpen(true);
+            }}
+            className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm min-h-[40px]"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Excel Bulk Import</span>
+          </button>
+
+          <button
+            onClick={() => {
+              fetchUsers();
+              fetchDeliveries();
+            }}
+            disabled={isLoading || isLoadingDeliveries}
+            className="px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer min-h-[40px]"
+          >
+            {isLoading || isLoadingDeliveries ? 'Refreshing...' : '↻ Refresh Data'}
+          </button>
+        </div>
       </div>
 
       {/* ── Segmented Navigation Tabs ── */}
@@ -407,9 +424,22 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
 
           {/* Teacher Roster */}
           <div className="space-y-3">
-            <h3 className="font-heading font-bold text-base text-ink">
-              Faculty Members ({teachers.length})
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading font-bold text-base text-ink">
+                Faculty Members ({teachers.length})
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkImportRole('teacher');
+                  setIsBulkImportOpen(true);
+                }}
+                className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill bg-ember/10 border border-ember/30 text-ember hover:bg-ember hover:text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Import Teachers (Excel)</span>
+              </button>
+            </div>
 
             {isLoading && (
               <SkeletonFacultyRoster count={4} />
@@ -527,6 +557,18 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                   </button>
                 )}
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkImportRole('student');
+                  setIsBulkImportOpen(true);
+                }}
+                className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest/10 border border-forest/30 text-forest hover:bg-forest hover:text-white transition-all flex items-center gap-1.5 shadow-xs min-h-[40px] cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Import Students (Excel)</span>
+              </button>
 
               <button
                 type="button"
@@ -748,6 +790,14 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
         isOpen={editUserId !== null}
         onClose={() => setEditUserId(null)}
         onUserUpdated={() => fetchUsers()}
+      />
+
+      {/* Excel Bulk Provisioning Modal */}
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        onImportSuccess={() => fetchUsers()}
+        defaultRole={bulkImportRole}
       />
     </div>
   );
