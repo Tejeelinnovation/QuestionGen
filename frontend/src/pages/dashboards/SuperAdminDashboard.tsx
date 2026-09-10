@@ -5,6 +5,7 @@ import { SuperAdminDashboardTablet } from '../tablet/dashboards/SuperAdminDashbo
 import { SuperAdminDashboardMobile } from '../mobile/dashboards/SuperAdminDashboardMobile';
 import { getStaggerDelay } from '../../lib/motion';
 import { CreateSchoolDrawer } from '../../components/schools/CreateSchoolDrawer';
+import { EditSchoolModal } from '../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
 import { Plus, Edit2, Building2, Search, Loader2, X } from 'lucide-react';
@@ -28,6 +29,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
 
   // Drawer / modal states
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<School | null>(null);
   const [createUserProfile, setCreateUserProfile] = useState<'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
@@ -535,14 +537,33 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                         <span className="font-heading font-semibold text-xs text-ink truncate">
                           {s.name}
                         </span>
-                        <span className="font-mono text-[10px] text-ink/50 bg-surface px-1.5 py-0.5 rounded-sm">
-                          #{s.id}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            id={`edit-school-${s.id}`}
+                            onClick={() => setEditingSchool(s)}
+                            className="p-1 rounded-sm text-ink/50 hover:text-forest hover:bg-forest/10 transition-colors cursor-pointer"
+                            title="Edit Student & Teacher Quota"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <span className="font-mono text-[10px] text-ink/50 bg-surface px-1.5 py-0.5 rounded-sm">
+                            #{s.id}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-ink/65 font-mono">
                         <span>Board: {s.config?.board || 'Standard'}</span>
                         <span>•</span>
                         <span>{s.config?.curriculum || 'NCERT'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="pill text-[10px] bg-forest/10 text-forest border border-forest/20">
+                          Students: {s.student_count ?? 0} / {s.max_students ?? 500}
+                        </span>
+                        <span className="pill text-[10px] bg-grape/10 text-grape border border-grape/20">
+                          Teachers: {s.teacher_count ?? 0} / {s.max_teachers ?? 50}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -580,6 +601,15 @@ const SuperAdminDashboardDesktop: React.FC = () => {
         isOpen={isCreateSchoolOpen}
         onClose={() => setIsCreateSchoolOpen(false)}
         onSchoolCreated={() => {
+          fetchData();
+        }}
+      />
+
+      <EditSchoolModal
+        school={editingSchool}
+        isOpen={editingSchool !== null}
+        onClose={() => setEditingSchool(null)}
+        onSchoolUpdated={() => {
           fetchData();
         }}
       />

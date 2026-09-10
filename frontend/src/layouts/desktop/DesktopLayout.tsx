@@ -6,10 +6,13 @@ export const DesktopLayout: React.FC<{ children?: React.ReactNode }> = ({ childr
   const { user, hasCapability } = useAuth();
   const location = useLocation();
 
-  // Determine active navigation links based on user capabilities
+  // Determine active navigation links based on user capabilities (Teachers only for Create Paper)
+  const canCreatePaper =
+    user?.role_label === 'Teacher' && hasCapability('CREATE_PAPER');
+
   const navItems = [
     { label: 'Dashboard', path: '/' },
-    ...(hasCapability('CREATE_PAPER')
+    ...(canCreatePaper
       ? [{ label: '+ Create Paper', path: '/papers/new' }]
       : []),
   ];

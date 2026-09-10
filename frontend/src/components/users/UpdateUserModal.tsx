@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
+import { classesApi } from '../../api/classes';
 import { useAuth } from '../../auth/AuthContext';
 import { PermissionManager } from './PermissionManager';
-import type { User, CapabilityName } from '../../types';
-import { X, UserCheck, Shield, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import type { User, CapabilityName, ClassSection } from '../../types';
+import { X, UserCheck, Shield, Check, AlertCircle, RefreshCw, BookOpen, GraduationCap } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
 
 export const canEditUser = (currentUser: User | null, targetUser: User): boolean => {
@@ -50,6 +51,9 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const [primarySubject, setPrimarySubject] = useState('');
+  const [classSectionId, setClassSectionId] = useState<number | ''>('');
+  const [availableClasses, setAvailableClasses] = useState<ClassSection[]>([]);
   const [isActive, setIsActive] = useState(true);
 
   const isSuperAdmin = hasCapability('CREATE_SCHOOL_ADMIN') || hasCapability('CREATE_SCHOOL');
@@ -75,7 +79,18 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
           setLastName(user.last_name || '');
           setEmail(user.email || '');
           setMobileNumber(user.mobile_number || '');
+          setPrimarySubject(user.primary_subject || '');
+          setClassSectionId(user.class_section || '');
           setIsActive(user.is_active ?? true);
+
+          if (user.school) {
+            classesApi
+              .getClasses(user.school)
+              .then(setAvailableClasses)
+              .catch(() => setAvailableClasses([]));
+          } else {
+            setAvailableClasses([]);
+          }
         })
         .catch((err) => {
           setFetchError(err.response?.data?.detail || 'Failed to fetch user details.');
@@ -85,6 +100,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
         });
     } else {
       setUserData(null);
+      setAvailableClasses([]);
     }
   }, [isOpen, userId]);
 
@@ -116,6 +132,8 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
         email: email.trim(),
         mobile_number: mobileNumber.startsWith('+91') ? mobileNumber : `+91${mobDigits.slice(-10)}`,
         is_active: isActive,
+        primary_subject: userData?.role_label === 'Teacher' ? primarySubject.trim() : undefined,
+        class_section: userData?.role_label === 'Student' ? (classSectionId ? Number(classSectionId) : null) : undefined,
       });
 
       setUserData(updated);
@@ -332,6 +350,49 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
                       placeholder="98765 43210"
                     />
                   </div>
+
+                  {/* Teacher Primary Subject */}
+                  {userData.role_label === 'Teacher' && (
+                    <div className="space-y-1">
+                      <label htmlFor="edit-subject" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-forest" />
+                        <span>Primary Teaching Subject</span>
+                      </label>
+                      <input
+                        id="edit-subject"
+                        type="text"
+                        value={primarySubject}
+                        onChange={(e) => setPrimarySubject(e.target.value)}
+                        disabled={isSaving}
+                        placeholder="e.g. Mathematics, Science, English"
+                        className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  {/* Student Class Section */}
+                  {userData.role_label === 'Student' && (
+                    <div className="space-y-1">
+                      <label htmlFor="edit-class-section" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-forest" />
+                        <span>Assigned Class & Division</span>
+                      </label>
+                      <select
+                        id="edit-class-section"
+                        value={classSectionId}
+                        onChange={(e) => setClassSectionId(e.target.value ? Number(e.target.value) : '')}
+                        disabled={isSaving}
+                        className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
+                      >
+                        <option value="">Unassigned</option>
+                        {availableClasses.map((cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            Class {cls.name} ({cls.student_count ?? 0}/{cls.max_students} students)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Account Status Toggle */}
                   <div className="pt-2 border-t border-border">

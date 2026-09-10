@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
+import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
-import { ShieldCheck, Search, Plus, Edit2, Building2, Loader2, X } from 'lucide-react';
+import { ShieldCheck, Search, Plus, Edit2, Building2, Loader2, X, Users as UsersIcon } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster } from '../../../components/ui/skeleton';
@@ -13,8 +14,9 @@ export const SuperAdminDashboardMobile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize] = useState<number>(10);
+  const pageSize = 10;
   const [schools, setSchools] = useState<School[]>([]);
+  const [activeTab, setActiveTab] = useState<'accounts' | 'schools'>('accounts');
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isUpdatingUsers, setIsUpdatingUsers] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -25,6 +27,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
 
   // Modals state
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<School | null>(null);
   const [createUserProfile, setCreateUserProfile] = useState<'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
@@ -145,148 +148,242 @@ export const SuperAdminDashboardMobile: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Search & Filter Controls ── */}
-      <div className="space-y-2 pt-1">
-        <div className="relative">
-          {isUpdatingUsers ? (
-            <Loader2 className="w-4 h-4 text-forest animate-spin absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          ) : (
-            <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          )}
-          <input
-            type="text"
-            placeholder="Search by username, email, school..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 rounded-card border border-border bg-surface text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:border-forest transition-colors"
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm('');
-                setSearchQuery('');
-                setCurrentPage(1);
-              }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-ink/40 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
-              title="Clear search"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+      {/* ── View Mode Switcher (Accounts vs Schools) ── */}
+      <div className="grid grid-cols-2 gap-1 p-1 bg-surface-muted rounded-pill border border-border">
+        <button
+          type="button"
+          onClick={() => setActiveTab('accounts')}
+          className={`py-1.5 px-3 rounded-pill text-xs font-heading font-semibold transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'accounts'
+              ? 'bg-forest text-white shadow-xs'
+              : 'text-ink/60 hover:text-ink'
+          }`}
+        >
+          <UsersIcon className="w-3.5 h-3.5" />
+          <span>Accounts ({totalUsersCount})</span>
+        </button>
 
-        {/* Horizontal scrollable role filter chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-          {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student'].map((role) => (
-            <button
-              key={role}
-              onClick={() => {
-                setRoleFilter(role);
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-pill font-heading text-xs whitespace-nowrap transition-all active:scale-95 ${
-                roleFilter === role
-                  ? 'bg-ink text-white font-semibold'
-                  : 'bg-surface border border-border text-ink/70 hover:text-ink'
-              }`}
-            >
-              {role === 'ALL' ? 'All Roles' : role}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveTab('schools')}
+          className={`py-1.5 px-3 rounded-pill text-xs font-heading font-semibold transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'schools'
+              ? 'bg-forest text-white shadow-xs'
+              : 'text-ink/60 hover:text-ink'
+          }`}
+        >
+          <Building2 className="w-3.5 h-3.5" />
+          <span>Schools ({schools.length})</span>
+        </button>
       </div>
 
-      {isInitialLoading && (
-        <div className="space-y-3" aria-label="Loading mobile dashboard skeleton">
-          <SkeletonRoleDeck />
-          <SkeletonRoster count={5} />
+      {activeTab === 'schools' && (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
+            <span>REGISTERED INSTITUTIONS ({schools.length})</span>
+            <button
+              type="button"
+              onClick={() => setIsCreateSchoolOpen(true)}
+              className="text-forest font-semibold text-[11px] hover:underline cursor-pointer"
+            >
+              + Add School
+            </button>
+          </div>
+
+          {schools.map((s) => (
+            <div
+              key={s.id}
+              className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-heading font-semibold text-xs text-ink truncate">
+                  {s.name}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    id={`mobile-edit-school-${s.id}`}
+                    onClick={() => setEditingSchool(s)}
+                    className="p-1 rounded-sm text-ink/60 hover:text-forest hover:bg-forest/10 transition-colors cursor-pointer"
+                    title="Edit Quotas"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="font-mono text-[10px] text-ink/50 bg-bg px-1.5 py-0.5 rounded-sm">
+                    #{s.id}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-ink/65 font-mono">
+                <span>Board: {s.config?.board || 'Standard'}</span>
+                <span>•</span>
+                <span>{s.config?.curriculum || 'NCERT'}</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="pill text-[10px] bg-forest/10 text-forest border border-forest/20">
+                  Students: {s.student_count ?? 0} / {s.max_students ?? 500}
+                </span>
+                <span className="pill text-[10px] bg-grape/10 text-grape border border-grape/20">
+                  Teachers: {s.teacher_count ?? 0} / {s.max_teachers ?? 50}
+                </span>
+              </div>
+            </div>
+          ))}
+
+          {schools.length === 0 && (
+            <div className="p-6 text-center text-xs text-ink/50 italic bg-surface rounded-card border border-border">
+              No registered schools found.
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Single-Column Feed of Accounts ── */}
-      {!isInitialLoading && (
-        <div className={`space-y-2.5 transition-opacity duration-150 ${isUpdatingUsers ? 'opacity-60' : 'opacity-100'}`}>
-          <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
-            <span>ACCOUNTS ({totalUsersCount})</span>
-          </div>
-
-          {users.length === 0 ? (
-            <div className="p-8 text-center bg-surface border border-border rounded-card space-y-2">
-              <span className="font-heading font-semibold text-sm text-ink block">
-                No accounts match your criteria.
-              </span>
-              <p className="text-xs text-ink/50">
-                {searchTerm || roleFilter !== 'ALL'
-                  ? 'Try clearing your search or filter.'
-                  : 'No accounts recorded yet.'}
-              </p>
-              {(searchTerm || roleFilter !== 'ALL') && (
+      {activeTab === 'accounts' && (
+        <>
+          {/* ── Search & Filter Controls ── */}
+          <div className="space-y-2 pt-1">
+            <div className="relative">
+              {isUpdatingUsers ? (
+                <Loader2 className="w-4 h-4 text-forest animate-spin absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              ) : (
+                <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              )}
+              <input
+                type="text"
+                placeholder="Search by username, email, school..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 rounded-card border border-border bg-surface text-xs text-ink placeholder:text-ink/40 focus:outline-none focus:border-forest transition-colors"
+              />
+              {searchTerm && (
                 <button
                   type="button"
                   onClick={() => {
                     setSearchTerm('');
                     setSearchQuery('');
-                    setRoleFilter('ALL');
                     setCurrentPage(1);
                   }}
-                  className="mt-1 px-3 py-1 rounded-pill text-xs font-heading font-semibold bg-forest text-white"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-ink/40 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+                  title="Clear search"
                 >
-                  Clear Filters
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
-          ) : (
-          users.map((u, idx) => (
-            <div
-              key={u.id}
-              style={getStaggerDelay(idx, true)}
-              className={`animate-card-enter p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5 ${MOTION.touch.card.className}`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-0.5">
-                  <div className="font-heading font-bold text-sm text-ink flex items-center gap-1.5">
-                    {u.username}
-                  </div>
-                  {u.email && (
-                    <div className="text-[11px] text-ink/60 font-mono">{u.email}</div>
-                  )}
-                  {u.mobile_number && (
-                    <div className="text-[11px] text-forest font-mono font-medium">{u.mobile_number}</div>
+
+            {/* Horizontal scrollable role filter chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student'].map((role) => (
+                <button
+                  key={role}
+                  onClick={() => {
+                    setRoleFilter(role);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-pill font-heading text-xs whitespace-nowrap transition-all active:scale-95 ${
+                    roleFilter === role
+                      ? 'bg-ink text-white font-semibold'
+                      : 'bg-surface border border-border text-ink/70 hover:text-ink'
+                  }`}
+                >
+                  {role === 'ALL' ? 'All Roles' : role}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {isInitialLoading && (
+            <div className="space-y-3" aria-label="Loading mobile dashboard skeleton">
+              <SkeletonRoleDeck />
+              <SkeletonRoster count={5} />
+            </div>
+          )}
+
+          {/* ── Single-Column Feed of Accounts ── */}
+          {!isInitialLoading && (
+            <div className={`space-y-2.5 transition-opacity duration-150 ${isUpdatingUsers ? 'opacity-60' : 'opacity-100'}`}>
+              <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
+                <span>ACCOUNTS ({totalUsersCount})</span>
+              </div>
+
+              {users.length === 0 ? (
+                <div className="p-8 text-center bg-surface border border-border rounded-card space-y-2">
+                  <span className="font-heading font-semibold text-sm text-ink block">
+                    No accounts match your criteria.
+                  </span>
+                  <p className="text-xs text-ink/50">
+                    {searchTerm || roleFilter !== 'ALL'
+                      ? 'Try clearing your search or filter.'
+                      : 'No accounts recorded yet.'}
+                  </p>
+                  {(searchTerm || roleFilter !== 'ALL') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setSearchQuery('');
+                        setRoleFilter('ALL');
+                        setCurrentPage(1);
+                      }}
+                      className="mt-1 px-3 py-1 rounded-pill text-xs font-heading font-semibold bg-forest text-white"
+                    >
+                      Clear Filters
+                    </button>
                   )}
                 </div>
-                <span className={`pill text-[10px] py-0.5 px-2 ${getRolePillClass(u.role_label)}`}>
-                  {u.role_label || 'User'}
-                </span>
-              </div>
+              ) : (
+                users.map((u, idx) => (
+                  <div
+                    key={u.id}
+                    style={getStaggerDelay(idx, true)}
+                    className={`animate-card-enter p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5 ${MOTION.touch.card.className}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <div className="font-heading font-bold text-sm text-ink flex items-center gap-1.5">
+                          {u.username}
+                        </div>
+                        {u.email && (
+                          <div className="text-[11px] text-ink/60 font-mono">{u.email}</div>
+                        )}
+                        {u.mobile_number && (
+                          <div className="text-[11px] text-forest font-mono font-medium">{u.mobile_number}</div>
+                        )}
+                      </div>
+                      <span className={`pill text-[10px] py-0.5 px-2 ${getRolePillClass(u.role_label)}`}>
+                        {u.role_label || 'User'}
+                      </span>
+                    </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[11px]">
-                <span className="truncate max-w-[170px] text-ink/60">
-                  {u.school_name ? `🏫 ${u.school_name}` : 'Global Tenant'}
-                </span>
-                <button
-                  type="button"
-                  id={`mobile-edit-user-${u.id}`}
-                  onClick={() => setEditUserId(u.id)}
-                  className="px-3 py-1 rounded-pill border border-border bg-bg text-ink font-heading font-semibold text-xs flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
-                >
-                  <Edit2 className="w-3 h-3" />
-                  <span>Edit</span>
-                </button>
-              </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[11px]">
+                      <span className="truncate max-w-[170px] text-ink/60">
+                        {u.school_name ? `🏫 ${u.school_name}` : 'Global Tenant'}
+                      </span>
+                      <button
+                        type="button"
+                        id={`mobile-edit-user-${u.id}`}
+                        onClick={() => setEditUserId(u.id)}
+                        className="px-3 py-1 rounded-pill border border-border bg-bg text-ink font-heading font-semibold text-xs flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {/* Mobile Pagination */}
+              <Pagination
+                currentPage={currentPage}
+                totalCount={totalUsersCount}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                itemName="accounts"
+              />
             </div>
-          ))
-        )}
-
-        {/* Mobile Pagination */}
-        <Pagination
-          currentPage={currentPage}
-          totalCount={totalUsersCount}
-          pageSize={pageSize}
-          onPageChange={setCurrentPage}
-          itemName="accounts"
-        />
-      </div>
+          )}
+        </>
       )}
 
       {/* Modals & Drawers */}
@@ -294,6 +391,13 @@ export const SuperAdminDashboardMobile: React.FC = () => {
         isOpen={isCreateSchoolOpen}
         onClose={() => setIsCreateSchoolOpen(false)}
         onSchoolCreated={() => fetchData()}
+      />
+
+      <EditSchoolModal
+        school={editingSchool}
+        isOpen={editingSchool !== null}
+        onClose={() => setEditingSchool(null)}
+        onSchoolUpdated={() => fetchData()}
       />
 
       {createUserProfile && (

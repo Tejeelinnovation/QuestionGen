@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
+import { classesApi } from '../../api/classes';
 import { useAuth } from '../../auth/AuthContext';
-import type { User, School } from '../../types';
+import type { User, School, ClassSection } from '../../types';
 import { X, UserPlus, Check, AlertCircle } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
 
@@ -21,6 +22,9 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
   const { user: currentUser } = useAuth();
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | ''>('');
+  const [classes, setClasses] = useState<ClassSection[]>([]);
+  const [selectedClassSection, setSelectedClassSection] = useState<number | ''>('');
+  const [primarySubject, setPrimarySubject] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -51,6 +55,23 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
       }
     }
   }, [isOpen, currentUser]);
+
+  // Load classes for the active school
+  useEffect(() => {
+    const sId = currentUser?.school || (selectedSchoolId ? Number(selectedSchoolId) : undefined);
+    if (isOpen && sId) {
+      classesApi
+        .getClasses(sId)
+        .then((data) => {
+          setClasses(data);
+        })
+        .catch(() => {
+          setClasses([]);
+        });
+    } else {
+      setClasses([]);
+    }
+  }, [isOpen, currentUser, selectedSchoolId]);
 
   if (!isOpen) return null;
 
@@ -114,6 +135,8 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
         first_name: firstName.trim() || undefined,
         last_name: lastName.trim() || undefined,
         school: schoolIdToUse,
+        class_section: selectedClassSection ? Number(selectedClassSection) : undefined,
+        primary_subject: primarySubject.trim() || undefined,
       });
 
       onUserCreated(createdUser);
@@ -125,6 +148,8 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
       setLastName('');
       setEmail('');
       setMobileNumber('');
+      setSelectedClassSection('');
+      setPrimarySubject('');
     } catch (err: any) {
       const data = err.response?.data;
       let detail = err.message || 'Failed to create account.';
@@ -315,6 +340,52 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
               placeholder="98765 43210"
             />
           </div>
+
+          {/* Role-Specific Academic Assignment */}
+          {targetProfile === 'student' && (
+            <div className="space-y-1.5 pt-1">
+              <label htmlFor="u-class-section" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
+                Class & Division Assignment
+              </label>
+              <select
+                id="u-class-section"
+                value={selectedClassSection}
+                onChange={(e) => setSelectedClassSection(e.target.value ? Number(e.target.value) : '')}
+                disabled={isSubmitting}
+                className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
+              >
+                <option value="">No class assigned (Unassigned)</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    Class {c.name} ({c.student_count} / {c.max_students} students enrolled)
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-ink/50">
+                Enroll student directly into a division (Standards 8, 9, 10 up to Section J).
+              </p>
+            </div>
+          )}
+
+          {targetProfile === 'teacher' && (
+            <div className="space-y-1.5 pt-1">
+              <label htmlFor="u-primary-subject" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
+                Primary Teaching Subject
+              </label>
+              <input
+                id="u-primary-subject"
+                type="text"
+                placeholder="e.g. Mathematics, Science, Social Science, English"
+                value={primarySubject}
+                onChange={(e) => setPrimarySubject(e.target.value)}
+                disabled={isSubmitting}
+                className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+              />
+              <p className="text-[10px] text-ink/50">
+                Designate teacher's subject specialization for class teacher or subject teacher mappings.
+              </p>
+            </div>
+          )}
 
           {/* Automatic defaults notification */}
           <div className="p-3 rounded-card bg-surface-muted border border-border text-[11px] text-ink/70 space-y-1">

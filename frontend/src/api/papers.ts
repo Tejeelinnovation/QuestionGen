@@ -38,6 +38,7 @@ export interface CloneVersionInput {
 export interface DeliverVersionInput {
   mode: 'PRINT' | 'ONLINE';
   student_ids?: number[];
+  class_section_id?: number;
   available_from?: string | null;
   available_until?: string | null;
 }

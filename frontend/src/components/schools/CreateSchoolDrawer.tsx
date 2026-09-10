@@ -21,6 +21,8 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
   const [name, setName] = useState('');
   const [board, setBoard] = useState('CBSE');
   const [curriculum, setCurriculum] = useState('NCERT');
+  const [maxStudents, setMaxStudents] = useState<number>(500);
+  const [maxTeachers, setMaxTeachers] = useState<number>(50);
   // System timezone is fixed to 'Asia/Kolkata' for Indian institutions (hidden from UI)
   const [timezone] = useState('Asia/Kolkata');
   const [isCustomJson] = useState(false);
@@ -89,6 +91,8 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
     // Build unified payload
     const payload: SchoolCreateInput = {
       name: trimmedName,
+      max_students: Number(maxStudents) > 0 ? Number(maxStudents) : 500,
+      max_teachers: Number(maxTeachers) > 0 ? Number(maxTeachers) : 50,
       config: configPayload,
       admin: {
         username: uName,
@@ -109,6 +113,8 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
       setName('');
       setBoard('CBSE');
       setCurriculum('NCERT');
+      setMaxStudents(500);
+      setMaxTeachers(50);
       setAdminUsername('');
       setAdminPassword('');
       setAdminEmail('');
@@ -238,6 +244,52 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
                 disabled={isSubmitting}
                 required
               />
+            </div>
+
+            {/* Quota & Capacity Controls (Super Admin Exclusive) */}
+            <div className="pt-2">
+              <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                Institutional Capacity Quotas (Super Admin Governed)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-surface-muted/40 border border-border rounded-card p-3">
+                <div className="space-y-1">
+                  <label htmlFor="school-max-students" className="block text-[11px] font-medium text-ink/80">
+                    Max Allowed Students *
+                  </label>
+                  <input
+                    id="school-max-students"
+                    type="number"
+                    min="1"
+                    max="50000"
+                    required
+                    value={maxStudents}
+                    onChange={(e) => setMaxStudents(parseInt(e.target.value) || 0)}
+                    disabled={isSubmitting}
+                    className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                    placeholder="e.g. 500"
+                  />
+                  <p className="text-[10px] text-ink/50">Total student limit for entire school</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="school-max-teachers" className="block text-[11px] font-medium text-ink/80">
+                    Max Allowed Teachers *
+                  </label>
+                  <input
+                    id="school-max-teachers"
+                    type="number"
+                    min="1"
+                    max="5000"
+                    required
+                    value={maxTeachers}
+                    onChange={(e) => setMaxTeachers(parseInt(e.target.value) || 0)}
+                    disabled={isSubmitting}
+                    className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                    placeholder="e.g. 50"
+                  />
+                  <p className="text-[10px] text-ink/50">Total faculty limit for entire school</p>
+                </div>
+              </div>
             </div>
           </div>
 

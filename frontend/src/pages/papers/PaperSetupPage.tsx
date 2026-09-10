@@ -18,7 +18,13 @@ import {
 
 const PaperSetupPageDesktop: React.FC = () => {
   const navigate = useNavigate();
-  const { dashboardPath } = useAuth();
+  const { user, dashboardPath } = useAuth();
+
+  useEffect(() => {
+    if (user && user.role_label !== 'Teacher') {
+      navigate(dashboardPath, { replace: true });
+    }
+  }, [user, dashboardPath, navigate]);
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [title, setTitle] = useState('');

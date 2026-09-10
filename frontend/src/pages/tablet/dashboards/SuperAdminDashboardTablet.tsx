@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
+import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { Plus, Edit2, Building2, Search, Loader2, X } from 'lucide-react';
@@ -25,6 +26,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
 
   // Modals state
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<School | null>(null);
   const [createUserProfile, setCreateUserProfile] = useState<'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
 
@@ -214,6 +216,67 @@ export const SuperAdminDashboardTablet: React.FC = () => {
             </div>
           </section>
 
+          {/* ── Registered Institutions Grid (Tablet) ── */}
+          <section className="space-y-3 pt-2">
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-forest" />
+                <h2 className="font-heading font-bold text-lg text-ink">
+                  Registered Institutions ({schools.length})
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateSchoolOpen(true)}
+                className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-colors cursor-pointer"
+              >
+                + New School
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {schools.map((s) => (
+                <div
+                  key={s.id}
+                  className="p-3.5 rounded-card bg-surface border border-border hover:border-forest/40 transition-all space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading font-semibold text-xs text-ink truncate">
+                      {s.name}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        id={`tablet-edit-school-${s.id}`}
+                        onClick={() => setEditingSchool(s)}
+                        className="p-1 rounded-sm text-ink/60 hover:text-forest hover:bg-forest/10 transition-colors cursor-pointer"
+                        title="Edit Quotas"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="font-mono text-[10px] text-ink/50 bg-bg px-1.5 py-0.5 rounded-sm">
+                        #{s.id}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-ink/65 font-mono">
+                    <span>Board: {s.config?.board || 'Standard'}</span>
+                    <span>•</span>
+                    <span>{s.config?.curriculum || 'NCERT'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <span className="pill text-[10px] bg-forest/10 text-forest border border-forest/20">
+                      Students: {s.student_count ?? 0} / {s.max_students ?? 500}
+                    </span>
+                    <span className="pill text-[10px] bg-grape/10 text-grape border border-grape/20">
+                      Teachers: {s.teacher_count ?? 0} / {s.max_teachers ?? 50}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
           {/* ── 2-Column Grid for User Directory ── */}
           <section className="space-y-4 pt-2">
             <div className="flex items-center justify-between border-b border-border pb-2">
@@ -367,6 +430,13 @@ export const SuperAdminDashboardTablet: React.FC = () => {
         isOpen={isCreateSchoolOpen}
         onClose={() => setIsCreateSchoolOpen(false)}
         onSchoolCreated={() => fetchData()}
+      />
+
+      <EditSchoolModal
+        school={editingSchool}
+        isOpen={editingSchool !== null}
+        onClose={() => setEditingSchool(null)}
+        onSchoolUpdated={() => fetchData()}
       />
 
       {createUserProfile && (

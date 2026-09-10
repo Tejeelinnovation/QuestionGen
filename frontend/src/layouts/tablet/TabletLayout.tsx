@@ -22,9 +22,12 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
     }
   };
 
+  const canCreatePaper =
+    user?.role_label === 'Teacher' && hasCapability('CREATE_PAPER');
+
   const navItems = [
     { label: 'Dashboard', path: '/' },
-    ...(hasCapability('CREATE_PAPER')
+    ...(canCreatePaper
       ? [{ label: '+ Create Paper', path: '/papers/new' }]
       : []),
   ];

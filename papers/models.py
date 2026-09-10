@@ -204,6 +204,14 @@ class Delivery(TimestampedModel):
         db_index=True,
         help_text="PRINT | ONLINE",
     )
+    target_class = models.ForeignKey(
+        "schools.ClassSection",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deliveries",
+        help_text="Class section division targeted for this delivery.",
+    )
     assigned_students = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,

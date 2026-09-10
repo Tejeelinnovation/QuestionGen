@@ -597,6 +597,7 @@ class PaperVersionDeliverView(APIView):
                 paper_version=version,
                 mode=mode,
                 status=data.get("status", DeliveryStatus.ACTIVE),
+                target_class=data.get("target_class"),
                 available_from=data.get("available_from"),
                 available_until=data.get("available_until"),
                 created_by=request.user,
@@ -612,6 +613,7 @@ class PaperVersionDeliverView(APIView):
                     "delivery_id": delivery.id,
                     "paper_version_id": version.id,
                     "mode": delivery.mode,
+                    "target_class_id": delivery.target_class_id,
                     "assigned_students_count": len(assigned_students),
                 },
             )

@@ -6,11 +6,13 @@ import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { PhoneInput } from '../../../components/ui/phone-input';
+import { ClassManagementView } from '../../../components/schools/ClassManagementView';
 import {
   Edit2,
   Users,
   GraduationCap,
   FileSpreadsheet,
+  BookOpen,
   Plus,
   Search,
   ExternalLink,
@@ -24,7 +26,7 @@ import {
   SkeletonDeliveriesList,
 } from '../../../components/ui/skeleton';
 
-type ActiveTab = 'teachers' | 'students' | 'deliveries';
+type ActiveTab = 'teachers' | 'students' | 'classes' | 'deliveries';
 
 export const SchoolAdminDashboardTablet: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -52,6 +54,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const [primarySubject, setPrimarySubject] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -120,6 +123,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
         last_name: lastName.trim() || undefined,
         email: email.trim(),
         mobile_number: mobileNumber.startsWith('+91') ? mobileNumber : `+91${mobDigits.slice(-10)}`,
+        primary_subject: primarySubject.trim() || undefined,
       });
 
       setFormSuccess(`Teacher "${newUser.username}" created successfully.`);
@@ -129,6 +133,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
       setLastName('');
       setEmail('');
       setMobileNumber('');
+      setPrimarySubject('');
       fetchUsers();
     } catch (err: any) {
       const detail =
@@ -225,6 +230,19 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
         >
           <GraduationCap className="w-4 h-4" />
           <span>Students ({students.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('classes')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-heading font-semibold rounded-pill transition-all whitespace-nowrap cursor-pointer min-h-[44px] ${
+            activeTab === 'classes'
+              ? 'bg-lime text-ink shadow-sm font-bold'
+              : 'text-ink/70 hover:text-ink hover:bg-surface-muted'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Classes & Divisions</span>
         </button>
 
         <button
@@ -360,6 +378,21 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                 />
               </div>
 
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-heading font-semibold uppercase text-ink mb-1" htmlFor="tab-t-subject">
+                  Primary Teaching Subject
+                </label>
+                <input
+                  id="tab-t-subject"
+                  type="text"
+                  value={primarySubject}
+                  onChange={(e) => setPrimarySubject(e.target.value)}
+                  disabled={isCreating}
+                  placeholder="e.g. Mathematics, Science, English"
+                  className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:outline-none focus:border-forest"
+                />
+              </div>
+
               <div className="sm:col-span-2 pt-1">
                 <button
                   type="submit"
@@ -419,6 +452,13 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                         {t.mobile_number && (
                           <div className="text-xs text-ink/60 font-mono">
                             📞 {t.mobile_number}
+                          </div>
+                        )}
+                        {t.primary_subject && (
+                          <div className="pt-1">
+                            <span className="pill text-[10px] bg-grape/10 text-grape border border-grape/20 font-medium">
+                              📖 {t.primary_subject}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -548,6 +588,13 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                             📞 {s.mobile_number}
                           </div>
                         )}
+                        {s.class_section_name && (
+                          <div className="pt-1">
+                            <span className="pill text-[10px] bg-forest/15 text-forest border border-forest/25 font-semibold">
+                              Class {s.class_section_name}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="pt-2 border-t border-border flex items-center justify-between">
@@ -583,7 +630,12 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
         </div>
       )}
 
-      {/* ── TAB 3: DELIVERIES & RESULTS ── */}
+      {/* ── TAB 3: CLASSES & DIVISIONS ── */}
+      {activeTab === 'classes' && (
+        <ClassManagementView faculty={teachers} />
+      )}
+
+      {/* ── TAB 4: DELIVERIES & RESULTS ── */}
       {activeTab === 'deliveries' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-border">

@@ -13,8 +13,9 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
   const { user, hasCapability } = useAuth();
   const location = useLocation();
 
-  // Mobile Bottom Tab Items tailored by capability
-  const isTeacher = hasCapability('CREATE_PAPER');
+  // Mobile Bottom Tab Items tailored by capability (Teachers only for Create Paper)
+  const isTeacher =
+    user?.role_label === 'Teacher' && hasCapability('CREATE_PAPER');
   const isStudent = hasCapability('ATTEMPT_TEST');
 
   const tabs = [

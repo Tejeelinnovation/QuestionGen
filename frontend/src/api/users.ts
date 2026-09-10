@@ -27,6 +27,8 @@ export interface CreateUserInput {
   first_name?: string;
   last_name?: string;
   school?: number;
+  class_section?: number | null;
+  primary_subject?: string;
 }
 
 const normalizeUser = (u: any): User => {

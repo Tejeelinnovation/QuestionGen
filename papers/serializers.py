@@ -307,11 +307,16 @@ class PaperVersionDetailSerializer(serializers.ModelSerializer):
 
 class DeliveryCreateSerializer(serializers.Serializer):
     mode = serializers.ChoiceField(choices=DeliveryMode.choices)
+    class_section_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Optional ClassSection ID to assign all enrolled students at once.",
+    )
     student_ids = serializers.ListField(
         child=serializers.IntegerField(),
         required=False,
         default=list,
-        help_text="List of User IDs for students (required for ONLINE mode).",
+        help_text="List of User IDs for students (required for ONLINE mode unless class_section_id is given).",
     )
     status = serializers.ChoiceField(
         choices=DeliveryStatus.choices,
@@ -324,10 +329,21 @@ class DeliveryCreateSerializer(serializers.Serializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         mode = attrs.get("mode")
         student_ids = attrs.get("student_ids", [])
+        class_section_id = attrs.get("class_section_id")
+
+        if class_section_id:
+            from schools.models import ClassSection  # noqa: PLC0415
+            cs = ClassSection.objects.filter(id=class_section_id).first()
+            if not cs:
+                raise serializers.ValidationError({"class_section_id": "Specified class section division does not exist."})
+            class_student_ids = list(cs.students.filter(role="Student").values_list("id", flat=True))
+            student_ids = list(set(student_ids + class_student_ids))
+            attrs["student_ids"] = student_ids
+            attrs["target_class"] = cs
 
         if mode == DeliveryMode.ONLINE and not student_ids:
             raise serializers.ValidationError(
-                {"student_ids": "At least one student must be assigned for ONLINE delivery."}
+                {"student_ids": "At least one student or an enrolled class division must be assigned for ONLINE delivery."}
             )
 
         avail_from = attrs.get("available_from")
@@ -346,6 +362,7 @@ class DeliverySerializer(serializers.ModelSerializer):
     version_label = serializers.CharField(source="paper_version.version_label", read_only=True)
     total_marks = serializers.IntegerField(source="paper_version.total_marks", read_only=True)
     created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+    target_class_name = serializers.CharField(source="target_class.name", read_only=True, default=None)
     assigned_students_count = serializers.SerializerMethodField()
     assigned_students_details = serializers.SerializerMethodField()
     my_attempt = serializers.SerializerMethodField()
@@ -361,6 +378,8 @@ class DeliverySerializer(serializers.ModelSerializer):
             "total_marks",
             "mode",
             "status",
+            "target_class",
+            "target_class_name",
             "assigned_students",
             "assigned_students_count",
             "assigned_students_details",

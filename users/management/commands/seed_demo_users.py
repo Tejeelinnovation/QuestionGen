@@ -107,14 +107,56 @@ class Command(BaseCommand):
                     "role": "Teacher",
                     "school": school,
                     "created_by": sa,
+                    "primary_subject": "Mathematics",
                 },
             )
             teacher.role = "Teacher"
             teacher.mobile_number = "+919876543212"
+            teacher.primary_subject = "Mathematics"
             teacher.set_password("password123")
             teacher.save()
             grant_teacher_defaults(teacher, granted_by=sa)
             self.stdout.write(f"  {'Created' if created else 'Updated'} teacher1 (Teacher)")
+
+            # 4b. Seed Academic Classes & Subject Mapping
+            from schools.models import ClassSection, ClassSubjectTeacher  # noqa: PLC0415
+            class_10a, _ = ClassSection.objects.get_or_create(
+                school=school,
+                standard=10,
+                section="A",
+                defaults={
+                    "max_students": 40,
+                    "class_teacher": teacher,
+                    "class_teacher_subject": "Mathematics",
+                },
+            )
+            class_10a.class_teacher = teacher
+            class_10a.class_teacher_subject = "Mathematics"
+            class_10a.save()
+
+            ClassSection.objects.get_or_create(
+                school=school,
+                standard=9,
+                section="A",
+                defaults={"max_students": 40},
+            )
+            ClassSection.objects.get_or_create(
+                school=school,
+                standard=8,
+                section="A",
+                defaults={"max_students": 40},
+            )
+
+            ClassSubjectTeacher.objects.get_or_create(
+                class_section=class_10a,
+                subject="Mathematics",
+                defaults={"teacher": teacher},
+            )
+            ClassSubjectTeacher.objects.get_or_create(
+                class_section=class_10a,
+                subject="Science",
+                defaults={"teacher": teacher},
+            )
 
             # 5. Students
             for uname, fname, lname, mob in [
@@ -131,14 +173,16 @@ class Command(BaseCommand):
                         "role": "Student",
                         "school": school,
                         "created_by": teacher,
+                        "class_section": class_10a,
                     },
                 )
                 stu.role = "Student"
                 stu.mobile_number = mob
+                stu.class_section = class_10a
                 stu.set_password("password123")
                 stu.save()
                 grant_student_defaults(stu, granted_by=teacher)
-                self.stdout.write(f"  {'Created' if created else 'Updated'} {uname} (Student)")
+                self.stdout.write(f"  {'Created' if created else 'Updated'} {uname} (Student - Class 10-A)")
 
         self.stdout.write(
             self.style.SUCCESS(

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import { usersApi } from '../../../api/users';
+import { classesApi } from '../../../api/classes';
 import { useAuth } from '../../../auth/AuthContext';
-import type { Delivery, PaperVersion, User } from '../../../types';
+import type { Delivery, PaperVersion, User, ClassSection } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
+import { GraduationCap, Users } from 'lucide-react';
 
 export const DeliveryPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -14,7 +16,11 @@ export const DeliveryPageTablet: React.FC = () => {
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [students, setStudents] = useState<User[]>([]);
+  const [classes, setClasses] = useState<ClassSection[]>([]);
   const [mode, setMode] = useState<'ONLINE' | 'PRINT'>('ONLINE');
+  const [assignmentType, setAssignmentType] = useState<'class' | 'individual'>('class');
+  const [selectedClassId, setSelectedClassId] = useState<number | ''>('');
+  const [classFilter, setClassFilter] = useState<string>('ALL');
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [availableFrom, setAvailableFrom] = useState('');
   const [availableUntil, setAvailableUntil] = useState('');
@@ -30,14 +36,26 @@ export const DeliveryPageTablet: React.FC = () => {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        const vData = await papersApi.getPaperVersion(paperId, vId);
+        const [vData, studentList, classList] = await Promise.all([
+          papersApi.getPaperVersion(paperId, vId),
+          usersApi.getAllUsers({ role: 'Student' }),
+          classesApi.getClasses(),
+        ]);
         setVersion(vData);
-
-        const studentList = await usersApi.getAllUsers({ role: 'Student' });
         setStudents(studentList);
+        setClasses(classList);
+
+        if (classList.length > 0) {
+          const firstClassId = classList[0].id;
+          setSelectedClassId(firstClassId);
+          const enrolled = studentList.filter((s) => s.class_section === firstClassId).map((s) => s.id);
+          setSelectedStudentIds(enrolled);
+        } else {
+          setAssignmentType('individual');
+        }
       } catch (err: any) {
         setErrorMessage(
-          err.response?.data?.detail || 'Failed to load paper version or students list.'
+          err.response?.data?.detail || 'Failed to load paper version, students or classes list.'
         );
       } finally {
         setIsLoading(false);
@@ -48,6 +66,16 @@ export const DeliveryPageTablet: React.FC = () => {
       loadVersionAndStudents();
     }
   }, [paperId, vId]);
+
+  const handleClassSelect = (classId: number | '') => {
+    setSelectedClassId(classId);
+    if (classId) {
+      const classStudents = students.filter((s) => s.class_section === Number(classId));
+      setSelectedStudentIds(classStudents.map((s) => s.id));
+    } else {
+      setSelectedStudentIds([]);
+    }
+  };
 
   const handleStudentToggle = (studentId: number) => {
     setSelectedStudentIds((prev) =>
@@ -67,8 +95,8 @@ export const DeliveryPageTablet: React.FC = () => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (mode === 'ONLINE' && selectedStudentIds.length === 0) {
-      setErrorMessage('Please assign at least one student for online test delivery.');
+    if (mode === 'ONLINE' && selectedStudentIds.length === 0 && (!selectedClassId || assignmentType !== 'class')) {
+      setErrorMessage('Please assign at least one student or a valid class division for online test delivery.');
       return;
     }
 
@@ -79,7 +107,11 @@ export const DeliveryPageTablet: React.FC = () => {
       };
 
       if (mode === 'ONLINE') {
+        if (assignmentType === 'class' && selectedClassId) {
+          deliveryPayload.class_section_id = Number(selectedClassId);
+        }
         deliveryPayload.student_ids = selectedStudentIds;
+
         if (availableFrom) {
           deliveryPayload.available_from = new Date(availableFrom).toISOString();
         }
@@ -105,6 +137,13 @@ export const DeliveryPageTablet: React.FC = () => {
   };
 
   const filteredStudents = students.filter((s) => {
+    if (classFilter !== 'ALL') {
+      if (classFilter === 'UNASSIGNED') {
+        if (s.class_section) return false;
+      } else if (s.class_section !== Number(classFilter)) {
+        return false;
+      }
+    }
     if (!studentSearch.trim()) return true;
     const query = studentSearch.toLowerCase();
     const fullName = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
@@ -172,6 +211,12 @@ export const DeliveryPageTablet: React.FC = () => {
           <h2 className="font-heading font-bold text-2xl text-white">
             {createdDelivery.mode === 'ONLINE' ? 'Online Test Deployed' : 'Print Package Generated'}
           </h2>
+
+          {createdDelivery.target_class_name && (
+            <div className="text-xs font-semibold text-lime">
+              🎯 Targeted Division: Class {createdDelivery.target_class_name}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-white/20">
             <Link
@@ -315,10 +360,10 @@ export const DeliveryPageTablet: React.FC = () => {
                 <div className="flex items-center justify-between border-b border-border pb-3">
                   <div>
                     <h3 className="font-heading font-bold text-base text-ink">
-                      Assign Students *
+                      Assign Examination Audience *
                     </h3>
                     <p className="text-xs text-ink/60">
-                      Tap student cardlets to select
+                      Target by classroom division or custom students
                     </p>
                   </div>
 
@@ -326,69 +371,169 @@ export const DeliveryPageTablet: React.FC = () => {
                     <span className="pill pill-grape text-[10px]">
                       {selectedStudentIds.length} Selected
                     </span>
-                    {filteredStudents.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleSelectAllStudents}
-                        className="text-xs font-heading font-semibold text-forest hover:underline"
-                      >
-                        {selectedStudentIds.length === filteredStudents.length ? 'Deselect' : 'All'}
-                      </button>
-                    )}
                   </div>
                 </div>
 
-                <input
-                  type="text"
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                  placeholder="Search students..."
-                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-grape focus:outline-none min-h-[40px]"
-                />
+                {/* Assignment Strategy Segmented Control */}
+                <div className="flex items-center gap-2 p-1 bg-surface-muted rounded-pill border border-border w-fit">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignmentType('class');
+                      if (classes.length > 0 && selectedClassId) {
+                        handleClassSelect(selectedClassId);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-pill text-xs font-heading font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      assignmentType === 'class'
+                        ? 'bg-forest text-white shadow-xs'
+                        : 'text-ink/60 hover:text-ink'
+                    }`}
+                  >
+                    <GraduationCap className="w-3.5 h-3.5" />
+                    <span>By Class Section</span>
+                  </button>
 
-                <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                  {filteredStudents.map((s) => {
-                    const isSelected = selectedStudentIds.includes(s.id);
-                    const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
-                    const initials = (s.username[0] || '?').toUpperCase();
+                  <button
+                    type="button"
+                    onClick={() => setAssignmentType('individual')}
+                    className={`px-3 py-1.5 rounded-pill text-xs font-heading font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      assignmentType === 'individual'
+                        ? 'bg-grape text-white shadow-xs'
+                        : 'text-ink/60 hover:text-ink'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Custom Selection</span>
+                  </button>
+                </div>
 
-                    return (
-                      <div
-                        key={s.id}
-                        onClick={() => handleStudentToggle(s.id)}
-                        className={`p-3 rounded-card border flex items-center justify-between gap-3 cursor-pointer min-h-[48px] active:scale-[0.99] transition-all ${
-                          isSelected
-                            ? 'border-grape bg-grape/10'
-                            : 'border-border bg-bg hover:bg-surface-muted'
-                        }`}
+                {/* Mode 1: Class Divisions */}
+                {assignmentType === 'class' && (
+                  <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                    {classes.map((cls) => {
+                      const isSelected = selectedClassId === cls.id;
+                      return (
+                        <div
+                          key={cls.id}
+                          onClick={() => handleClassSelect(cls.id)}
+                          className={`p-3 rounded-card border-2 transition-all cursor-pointer space-y-1 ${
+                            isSelected
+                              ? 'border-forest bg-forest/10 shadow-sm'
+                              : 'border-border bg-bg hover:bg-surface-muted'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-heading font-bold text-base text-ink">
+                              Class {cls.name}
+                            </span>
+                            <span className="pill pill-forest text-[10px]">
+                              {cls.student_count} / {cls.max_students} students
+                            </span>
+                          </div>
+                          {cls.class_teacher_name && (
+                            <div className="text-[11px] text-ink/60">
+                              👨‍🏫 Class Teacher: {cls.class_teacher_name} ({cls.class_teacher_subject || 'General'})
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Mode 2: Individual Candidates */}
+                {assignmentType === 'individual' && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={studentSearch}
+                        onChange={(e) => setStudentSearch(e.target.value)}
+                        placeholder="Search students..."
+                        className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-grape focus:outline-none min-h-[40px]"
+                      />
+                      <select
+                        value={classFilter}
+                        onChange={(e) => setClassFilter(e.target.value)}
+                        className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-grape focus:outline-none min-h-[40px] cursor-pointer"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <option value="ALL">All Divisions</option>
+                        {classes.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            Class {c.name}
+                          </option>
+                        ))}
+                        <option value="UNASSIGNED">Unassigned</option>
+                      </select>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs text-ink/60">
+                      <span>{filteredStudents.length} candidates</span>
+                      {filteredStudents.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleSelectAllStudents}
+                          className="text-xs font-heading font-semibold text-forest hover:underline"
+                        >
+                          {selectedStudentIds.length === filteredStudents.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                      {filteredStudents.map((s) => {
+                        const isSelected = selectedStudentIds.includes(s.id);
+                        const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
+                        const initials = (s.username[0] || '?').toUpperCase();
+
+                        return (
                           <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                              isSelected ? 'bg-grape text-white' : 'bg-surface border border-border text-ink'
+                            key={s.id}
+                            onClick={() => handleStudentToggle(s.id)}
+                            className={`p-3 rounded-card border flex items-center justify-between gap-3 cursor-pointer min-h-[48px] active:scale-[0.99] transition-all ${
+                              isSelected
+                                ? 'border-grape bg-grape/10'
+                                : 'border-border bg-bg hover:bg-surface-muted'
                             }`}
                           >
-                            {initials}
-                          </div>
-                          <div className="truncate text-xs">
-                            <div className="font-heading font-semibold text-ink truncate">
-                              {fullName || s.username}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  isSelected ? 'bg-grape text-white' : 'bg-surface border border-border text-ink'
+                                }`}
+                              >
+                                {initials}
+                              </div>
+                              <div className="truncate text-xs">
+                                <div className="font-heading font-semibold text-ink truncate">
+                                  {fullName || s.username}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-[10px] text-ink/50 truncate">
+                                    @{s.username}
+                                  </span>
+                                  {s.class_section_name && (
+                                    <span className="pill text-[9px] bg-forest/15 text-forest border border-forest/20">
+                                      Class {s.class_section_name}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="font-mono text-[10px] text-ink/50 truncate">
-                              @{s.username}
-                            </div>
-                          </div>
-                        </div>
 
-                        {isSelected && (
-                          <span className="pill pill-grape text-[10px] py-0.5 px-1.5 shrink-0">
-                            ✓
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleStudentToggle(s.id)}
+                              className="accent-grape w-4 h-4 shrink-0 pointer-events-none"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

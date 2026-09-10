@@ -8,7 +8,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from schools.models import School
+from schools.models import ClassSection, School
 from .models import Capability, CapabilityName, User, UserCapability
 
 
@@ -43,7 +43,7 @@ class LoginSerializer(serializers.Serializer):
 import re
 
 def validate_indian_mobile(value: str) -> str:
-    cleaned = value.strip().replace(" ", "").replace("-", "")
+    cleaned = str(value).strip().replace(" ", "").replace("-", "")
     if not re.match(r"^\+91[0-9]{10}$", cleaned):
         raise serializers.ValidationError(
             "Mobile number must start with +91 followed by a valid 10-digit number (e.g. +919876543210)."
@@ -60,13 +60,16 @@ class CapabilitySerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Read-only representation of a User — used for list/detail endpoints."""
+    """Full user representation including capabilities list and role label."""
 
-    role_label = serializers.CharField(read_only=True)
     capabilities = serializers.SerializerMethodField()
+    role_label = serializers.CharField(read_only=True)
     school_name = serializers.CharField(source="school.name", read_only=True, default=None)
     created_by_username = serializers.CharField(
         source="created_by.username", read_only=True, default=None
+    )
+    class_section_name = serializers.CharField(
+        source="class_section.name", read_only=True, default=None
     )
 
     class Meta:
@@ -80,6 +83,9 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "school",
             "school_name",
+            "class_section",
+            "class_section_name",
+            "primary_subject",
             "created_by",
             "created_by_username",
             "role",
@@ -135,6 +141,16 @@ class CreateUserSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    class_section = serializers.PrimaryKeyRelatedField(
+        queryset=ClassSection.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    primary_subject = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
+    )
 
     class Meta:
         model = User
@@ -146,6 +162,8 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "last_name",
             "password",
             "school",
+            "class_section",
+            "primary_subject",
             "profile",
         ]
 
@@ -162,6 +180,51 @@ class CreateUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"school": "A school must be specified for this user type."}
             )
+
+        # Capacity Quota Enforcement
+        if school and profile == "teacher":
+            current_teachers = school.users.filter(role="Teacher").count()
+            if current_teachers >= school.max_teachers:
+                raise serializers.ValidationError(
+                    {
+                        "school": (
+                            f"Teacher capacity limit ({school.max_teachers}) reached for {school.name}. "
+                            f"Currently {current_teachers} teachers are registered. "
+                            "Contact Super Admin to increase institution quota."
+                        )
+                    }
+                )
+
+        if school and profile == "student":
+            current_students = school.users.filter(role="Student").count()
+            if current_students >= school.max_students:
+                raise serializers.ValidationError(
+                    {
+                        "school": (
+                            f"Student enrollment limit ({school.max_students}) reached for {school.name}. "
+                            f"Currently {current_students} students are enrolled. "
+                            "Contact Super Admin to increase institution quota."
+                        )
+                    }
+                )
+
+            class_section = attrs.get("class_section")
+            if class_section:
+                if class_section.school_id != school.id:
+                    raise serializers.ValidationError(
+                        {"class_section": "The selected class section does not belong to this school."}
+                    )
+                enrolled = class_section.students.filter(role="Student").count()
+                if enrolled >= class_section.max_students:
+                    raise serializers.ValidationError(
+                        {
+                            "class_section": (
+                                f"Class division '{class_section.name}' has reached its maximum capacity "
+                                f"of {class_section.max_students} students (currently {enrolled} enrolled)."
+                            )
+                        }
+                    )
+
         return attrs
 
     def create(self, validated_data):
@@ -208,10 +271,47 @@ class UpdateUserSerializer(serializers.ModelSerializer):
         allow_blank=False,
         validators=[validate_indian_mobile],
     )
+    class_section = serializers.PrimaryKeyRelatedField(
+        queryset=ClassSection.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    primary_subject = serializers.CharField(
+        required=False,
+        allow_blank=True,
+    )
 
     class Meta:
         model = User
-        fields = ["email", "mobile_number", "first_name", "last_name", "is_active"]
+        fields = [
+            "email",
+            "mobile_number",
+            "first_name",
+            "last_name",
+            "class_section",
+            "primary_subject",
+            "is_active",
+        ]
+
+    def validate(self, attrs):
+        class_section = attrs.get("class_section")
+        if class_section and self.instance:
+            if self.instance.school_id and class_section.school_id != self.instance.school_id:
+                raise serializers.ValidationError(
+                    {"class_section": "Class division must belong to the student's school."}
+                )
+            if self.instance.class_section_id != class_section.id:
+                enrolled = class_section.students.filter(role="Student").count()
+                if enrolled >= class_section.max_students:
+                    raise serializers.ValidationError(
+                        {
+                            "class_section": (
+                                f"Class division '{class_section.name}' has reached its maximum capacity "
+                                f"of {class_section.max_students} students."
+                            )
+                        }
+                    )
+        return attrs
 
 
 class CapabilityGrantSerializer(serializers.Serializer):

@@ -6,13 +6,19 @@ from __future__ import annotations
 
 from django.db import transaction
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.audit import log_action
 from users.permissions import HasCapability
-from .models import School
-from .serializers import SchoolSerializer
+from .models import ClassSection, ClassSubjectTeacher, School
+from .serializers import (
+    ClassSectionCreateUpdateSerializer,
+    ClassSectionSerializer,
+    ClassSubjectTeacherSerializer,
+    SchoolSerializer,
+)
 
 
 class SchoolViewSet(viewsets.ModelViewSet):
@@ -90,3 +96,111 @@ class SchoolViewSet(viewsets.ModelViewSet):
             school,
             metadata={"name": school.name, "school_id": school.id},
         )
+
+
+class ClassSectionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing ClassSection divisions and their subject teachers.
+    Scoped by the authenticated user's school.
+    """
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return ClassSection.objects.none()
+        if user.school_id is None:
+            # Super Admin
+            school_id = self.request.query_params.get("school_id")
+            if school_id:
+                return ClassSection.objects.filter(school_id=school_id)
+            return ClassSection.objects.all()
+        return ClassSection.objects.filter(school_id=user.school_id)
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return ClassSectionCreateUpdateSerializer
+        return ClassSectionSerializer
+
+    def get_permissions(self):
+        if self.action in ("create", "update", "partial_update", "destroy", "subject_teachers"):
+            # Allow users with school-wide controls (School Admin) or Super Admin
+            return [IsAuthenticated(), HasCapability("VIEW_SCHOOL_WIDE_CONTROLS")()]
+        return [IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        school = serializer.validated_data.get("school")
+        if user.school_id is not None:
+            school = user.school
+        instance = serializer.save(school=school)
+        log_action(
+            user,
+            "class_section.created",
+            instance,
+            metadata={"name": instance.name, "school_id": instance.school_id},
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        log_action(
+            self.request.user,
+            "class_section.updated",
+            instance,
+            metadata={"name": instance.name, "school_id": instance.school_id},
+        )
+
+    def perform_destroy(self, instance):
+        log_action(
+            self.request.user,
+            "class_section.deleted",
+            instance,
+            metadata={"name": instance.name, "school_id": instance.school_id},
+        )
+        instance.delete()
+
+    @action(detail=True, methods=["get", "post", "delete"], url_path="subject-teachers")
+    def subject_teachers(self, request, pk=None):
+        class_section = self.get_object()
+        if request.method == "GET":
+            mappings = class_section.subject_teachers.all()
+            serializer = ClassSubjectTeacherSerializer(mappings, many=True)
+            return Response(serializer.data)
+
+        if request.method == "POST":
+            data = request.data.copy()
+            data["class_section"] = class_section.id
+            serializer = ClassSubjectTeacherSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            mapping = serializer.save()
+            log_action(
+                request.user,
+                "class_section.subject_teacher_assigned",
+                mapping,
+                metadata={
+                    "class": class_section.name,
+                    "subject": mapping.subject,
+                    "teacher_id": mapping.teacher_id,
+                },
+            )
+            return Response(ClassSubjectTeacherSerializer(mapping).data, status=status.HTTP_201_CREATED)
+
+        if request.method == "DELETE":
+            subject = request.data.get("subject") or request.query_params.get("subject")
+            if not subject:
+                return Response(
+                    {"detail": "'subject' is required to delete mapping."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            deleted, _ = class_section.subject_teachers.filter(subject__iexact=subject.strip()).delete()
+            if deleted:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response({"detail": "Subject mapping not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=["get"], url_path="students")
+    def students(self, request, pk=None):
+        class_section = self.get_object()
+        students = class_section.students.filter(role="Student")
+        from users.serializers import UserSerializer  # noqa: PLC0415
+        serializer = UserSerializer(students, many=True, context={"request": request})
+        return Response(serializer.data)
+

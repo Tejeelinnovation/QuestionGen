@@ -114,6 +114,22 @@ class User(AbstractUser):
         help_text="Indian mobile number with +91 country code and 10 digits.",
     )
 
+    class_section = models.ForeignKey(
+        "schools.ClassSection",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="students",
+        help_text="Class division this student is enrolled in.",
+    )
+
+    primary_subject = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Primary subject taught by this faculty member (e.g. Mathematics).",
+    )
+
     objects = UserManager()
 
     class Meta(AbstractUser.Meta):

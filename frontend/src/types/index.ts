@@ -34,6 +34,9 @@ export interface User {
   role_label: RoleLabel;
   school: number | null;
   school_name?: string;
+  class_section?: number | null;
+  class_section_name?: string | null;
+  primary_subject?: string;
   created_by?: number | null;
   created_by_username?: string | null;
   capabilities: CapabilityName[];
@@ -61,6 +64,8 @@ export interface UserUpdateInput {
   mobile_number?: string;
   first_name?: string;
   last_name?: string;
+  class_section?: number | null;
+  primary_subject?: string;
   is_active?: boolean;
 }
 
@@ -200,6 +205,8 @@ export interface Delivery {
   assigned_students: number[];
   assigned_students_count?: number;
   assigned_students_details?: Array<{ id: number; username: string; email: string }>;
+  target_class?: number | null;
+  target_class_name?: string | null;
   my_attempt?: StudentAttemptSummary | null;
   available_from: string | null;
   available_until: string | null;
@@ -363,6 +370,10 @@ export interface School {
   id: number;
   name: string;
   config?: Record<string, any>;
+  max_students?: number;
+  max_teachers?: number;
+  student_count?: number;
+  teacher_count?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -378,12 +389,51 @@ export interface SchoolAdminCreateInput {
 
 export interface SchoolCreateInput {
   name: string;
+  max_students?: number;
+  max_teachers?: number;
   config?: Record<string, any>;
   admin?: SchoolAdminCreateInput;
 }
 
 export interface SchoolUpdateInput {
   name?: string;
+  max_students?: number;
+  max_teachers?: number;
   config?: Record<string, any>;
+}
+
+export interface ClassSubjectTeacher {
+  id: number;
+  class_section: number;
+  subject: string;
+  teacher: number;
+  teacher_name?: string;
+  teacher_email?: string;
+  teacher_mobile?: string;
+}
+
+export interface ClassSection {
+  id: number;
+  school: number;
+  standard: number;
+  section: string;
+  name: string;
+  max_students: number;
+  student_count: number;
+  class_teacher: number | null;
+  class_teacher_name?: string | null;
+  class_teacher_subject?: string;
+  subject_teachers?: ClassSubjectTeacher[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ClassSectionCreateInput {
+  standard: number;
+  section: string;
+  max_students?: number;
+  class_teacher?: number | null;
+  class_teacher_subject?: string;
+  school?: number;
 }
 
