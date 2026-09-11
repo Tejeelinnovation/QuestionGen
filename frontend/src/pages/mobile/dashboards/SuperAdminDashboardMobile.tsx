@@ -6,10 +6,11 @@ import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../../components/schools/BulkImportModal';
-import { ShieldCheck, Search, Edit2, Building2, Loader2, X, Users as UsersIcon, FileSpreadsheet } from 'lucide-react';
+import { ShieldCheck, Search, Edit2, Building2, Loader2, X, Users as UsersIcon, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster } from '../../../components/ui/skeleton';
+import { SuperAdminAuditLogViewer } from '../../../components/audit/SuperAdminAuditLogViewer';
 
 export const SuperAdminDashboardMobile: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -17,7 +18,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
   const [schools, setSchools] = useState<School[]>([]);
-  const [activeTab, setActiveTab] = useState<'accounts' | 'schools'>('accounts');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'schools' | 'logs'>('accounts');
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isUpdatingUsers, setIsUpdatingUsers] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -126,50 +127,67 @@ export const SuperAdminDashboardMobile: React.FC = () => {
       </div>
 
       {/* ── Role Count Summary Chips ── */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="p-3 rounded-card bg-forest text-white shadow-xs flex justify-between items-center">
-          <span className="text-xs font-heading font-medium">Admins</span>
-          <span className="font-heading font-bold text-lg">
-            {(userStats?.super_admin ?? users.filter((u) => u.role_label === 'Super Admin').length) +
-             (userStats?.school_admin ?? users.filter((u) => u.role_label === 'School Admin').length)}
-          </span>
+      {activeTab !== 'logs' && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="p-3 rounded-card bg-forest text-white shadow-xs flex justify-between items-center">
+            <span className="text-xs font-heading font-medium">Admins</span>
+            <span className="font-heading font-bold text-lg">
+              {(userStats?.super_admin ?? users.filter((u) => u.role_label === 'Super Admin').length) +
+               (userStats?.school_admin ?? users.filter((u) => u.role_label === 'School Admin').length)}
+            </span>
+          </div>
+          <div className="p-3 rounded-card bg-surface border border-border shadow-xs flex justify-between items-center">
+            <span className="text-xs font-heading font-medium text-ink/80">Teachers</span>
+            <span className="font-heading font-bold text-lg text-ink">
+              {userStats?.teacher ?? users.filter((u) => u.role_label === 'Teacher').length}
+            </span>
+          </div>
         </div>
-        <div className="p-3 rounded-card bg-surface border border-border shadow-xs flex justify-between items-center">
-          <span className="text-xs font-heading font-medium text-ink/80">Teachers</span>
-          <span className="font-heading font-bold text-lg text-ink">
-            {userStats?.teacher ?? users.filter((u) => u.role_label === 'Teacher').length}
-          </span>
-        </div>
-      </div>
+      )}
 
-      {/* ── View Mode Switcher (Accounts vs Schools) ── */}
-      <div className="grid grid-cols-2 gap-1 p-1 bg-surface-muted rounded-pill border border-border">
+      {/* ── View Mode Switcher (Accounts vs Schools vs Logs) ── */}
+      <div className="grid grid-cols-3 gap-1 p-1 bg-surface-muted rounded-pill border border-border">
         <button
           type="button"
           onClick={() => setActiveTab('accounts')}
-          className={`py-1.5 px-3 rounded-pill text-xs font-heading font-semibold transition-all flex items-center justify-center gap-1.5 ${
+          className={`py-1.5 px-2 rounded-pill text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
             activeTab === 'accounts'
               ? 'bg-forest text-white shadow-xs'
               : 'text-ink/60 hover:text-ink'
           }`}
         >
-          <UsersIcon className="w-3.5 h-3.5" />
-          <span>Accounts ({totalUsersCount})</span>
+          <UsersIcon className="w-3 h-3" />
+          <span>Accounts</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('schools')}
-          className={`py-1.5 px-3 rounded-pill text-xs font-heading font-semibold transition-all flex items-center justify-center gap-1.5 ${
+          className={`py-1.5 px-2 rounded-pill text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
             activeTab === 'schools'
               ? 'bg-forest text-white shadow-xs'
               : 'text-ink/60 hover:text-ink'
           }`}
         >
-          <Building2 className="w-3.5 h-3.5" />
-          <span>Schools & Classes ({schools.length})</span>
+          <Building2 className="w-3 h-3" />
+          <span>Schools</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('logs')}
+          className={`py-1.5 px-2 rounded-pill text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
+            activeTab === 'logs'
+              ? 'bg-forest text-white shadow-xs'
+              : 'text-ink/60 hover:text-ink'
+          }`}
+        >
+          <ShieldAlert className="w-3 h-3 text-ember" />
+          <span>Audit Logs</span>
         </button>
       </div>
+
+      {activeTab === 'logs' && <SuperAdminAuditLogViewer />}
 
       {activeTab === 'schools' && (
         <div className="space-y-2.5">

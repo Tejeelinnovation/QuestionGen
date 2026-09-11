@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { attemptsApi } from '../../api/attempts';
 import type { AttemptQuestionItem, AttemptStartResponse } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useExamProctoring } from '../../hooks/useExamProctoring';
+import { ProctoringWarningModal } from '../../components/attempts/ProctoringWarningModal';
 import { TestAttemptPageTablet } from '../tablet/attempts/TestAttemptPageTablet';
 import { TestAttemptPageMobile } from '../mobile/attempts/TestAttemptPageMobile';
 
@@ -20,6 +22,18 @@ const TestAttemptPageDesktop: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+
+  // Anti-cheating exam proctoring hook
+  const {
+    warningCount,
+    activeWarning,
+    dismissWarning,
+    isFullscreen,
+    requestFullscreen,
+  } = useExamProctoring({
+    attemptId: attemptData?.attempt_id,
+    isActive: Boolean(attemptData && !isSubmitting && !isExpired),
+  });
 
   // Debounce timers map
   const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
@@ -199,7 +213,30 @@ const TestAttemptPageDesktop: React.FC = () => {
             </h1>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {!isFullscreen && (
+              <button
+                type="button"
+                onClick={requestFullscreen}
+                className="px-3 py-1.5 rounded-pill bg-forest/10 border border-forest/20 text-forest text-xs font-semibold hover:bg-forest/20 transition-all cursor-pointer flex items-center gap-1.5"
+                title="Enter full-screen mode for exam sitting"
+              >
+                <span>⛶</span>
+                <span>Enter Fullscreen</span>
+              </button>
+            )}
+
+            <span
+              className={`pill text-[11px] font-mono font-semibold flex items-center gap-1 ${
+                warningCount > 0
+                  ? 'bg-ember/15 text-ember border border-ember/30'
+                  : 'bg-forest/10 text-forest border border-forest/20'
+              }`}
+            >
+              <span>🛡️ Proctoring Active</span>
+              {warningCount > 0 && <span>({warningCount} Warnings)</span>}
+            </span>
+
             <span className="pill pill-forest text-[11px] font-semibold">
               Version {attemptData.version_label}
             </span>
@@ -417,6 +454,13 @@ const TestAttemptPageDesktop: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Proctoring Warning Modal */}
+      <ProctoringWarningModal
+        warning={activeWarning}
+        totalWarnings={warningCount}
+        onDismiss={dismissWarning}
+      />
     </div>
   );
 };

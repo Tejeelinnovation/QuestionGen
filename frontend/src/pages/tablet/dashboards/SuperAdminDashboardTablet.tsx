@@ -6,12 +6,14 @@ import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../../components/schools/BulkImportModal';
-import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet } from 'lucide-react';
+import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, ShieldAlert, Users as UsersIcon } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster, Skeleton } from '../../../components/ui/skeleton';
+import { SuperAdminAuditLogViewer } from '../../../components/audit/SuperAdminAuditLogViewer';
 
 export const SuperAdminDashboardTablet: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'directory' | 'logs'>('directory');
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -139,37 +141,74 @@ export const SuperAdminDashboardTablet: React.FC = () => {
             className="px-3 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>School / Coaching Class & Admin</span>
+            <span>Add School & Admin</span>
           </button>
         </div>
       </div>
 
-      {isInitialLoading && (
-        <div className="space-y-6" aria-label="Loading tablet dashboard skeleton">
-          <SkeletonRoleDeck />
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <Skeleton className="h-6 w-48" radius="sm" />
-              <Skeleton className="h-5 w-20" radius="pill" />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <Skeleton className="h-8 w-60" radius="pill" />
-              <div className="flex gap-1.5">
-                {[0, 1, 2, 3].map((k) => (
-                  <Skeleton key={k} className="h-7 w-16" radius="pill" />
-                ))}
+      {/* ── Mode Switcher Tab Navigation ── */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('directory')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            activeTab === 'directory'
+              ? 'bg-forest text-white shadow-2xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink hover:bg-surface-muted'
+          }`}
+        >
+          <UsersIcon className="w-3.5 h-3.5" />
+          <span>Accounts & Institutions</span>
+          <span className="pill pill-muted text-[10px] py-0 px-1.5 ml-1">
+            {totalUsersCount}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('logs')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            activeTab === 'logs'
+              ? 'bg-forest text-white shadow-2xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink hover:bg-surface-muted'
+          }`}
+        >
+          <ShieldAlert className="w-3.5 h-3.5 text-ember" />
+          <span>System & Proctoring Audit Logs</span>
+          <span className="w-2 h-2 rounded-full bg-ember animate-pulse" />
+        </button>
+      </div>
+
+      {activeTab === 'logs' && <SuperAdminAuditLogViewer />}
+
+      {activeTab === 'directory' && (
+        <>
+          {isInitialLoading && (
+            <div className="space-y-6" aria-label="Loading tablet dashboard skeleton">
+              <SkeletonRoleDeck />
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between border-b border-border pb-2">
+                  <Skeleton className="h-6 w-48" radius="sm" />
+                  <Skeleton className="h-5 w-20" radius="pill" />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-8 w-60" radius="pill" />
+                  <div className="flex gap-1.5">
+                    {[0, 1, 2, 3].map((k) => (
+                      <Skeleton key={k} className="h-7 w-16" radius="pill" />
+                    ))}
+                  </div>
+                </div>
+                <SkeletonRoster count={6} />
               </div>
             </div>
-            <SkeletonRoster count={6} />
-          </div>
-        </div>
-      )}
+          )}
 
-      {errorMessage && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
-          {errorMessage}
-        </div>
-      )}
+          {errorMessage && (
+            <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
+              {errorMessage}
+            </div>
+          )}
 
       {!isInitialLoading && !errorMessage && (
         <>
@@ -434,6 +473,8 @@ export const SuperAdminDashboardTablet: React.FC = () => {
               itemName="accounts"
             />
           </section>
+        </>
+      )}
         </>
       )}
 

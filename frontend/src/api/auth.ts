@@ -27,4 +27,35 @@ export const authApi = {
     const response = await apiClient.post<{ detail: string }>('/api/auth/logout/', { refresh });
     return response.data;
   },
+
+  updateProfile: async (data: { first_name?: string; last_name?: string; primary_subject?: string }): Promise<User> => {
+    const response = await apiClient.patch<User>('/api/auth/me/', data);
+    return response.data;
+  },
+
+  changePassword: async (data: {
+    old_password: string;
+    new_password: string;
+    new_password_confirm: string;
+  }): Promise<{ detail: string }> => {
+    const response = await apiClient.post<{ detail: string }>('/api/auth/change-password/', data);
+    return response.data;
+  },
+
+  requestPasswordReset: async (email: string): Promise<{ detail: string; reset_url?: string }> => {
+    const response = await apiClient.post<{ detail: string; reset_url?: string }>('/api/auth/password-reset/request/', {
+      email,
+    });
+    return response.data;
+  },
+
+  confirmPasswordReset: async (payload: {
+    uid: string;
+    token: string;
+    new_password: string;
+    new_password_confirm: string;
+  }): Promise<{ detail: string }> => {
+    const response = await apiClient.post<{ detail: string }>('/api/auth/password-reset/confirm/', payload);
+    return response.data;
+  },
 };

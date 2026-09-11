@@ -19,6 +19,7 @@ import { DeliveryPage } from './pages/papers/DeliveryPage';
 import { PrintViewPage } from './pages/papers/PrintViewPage';
 import { PaperDetailPage } from './pages/papers/PaperDetailPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { RequireCapability } from './auth/RequireCapability';
 import { useAuth } from './auth/AuthContext';
 
@@ -44,6 +45,10 @@ export const routes: RouteObject[] = [
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
   },
   {
     path: '/',

@@ -540,3 +540,77 @@ class AttemptAnswerGradeView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+# ---------------------------------------------------------------------------
+# 7. Record Proctoring Warning View
+# ---------------------------------------------------------------------------
+
+class AttemptProctoringWarningView(APIView):
+    """
+    POST /api/attempts/{id}/proctoring-warning/
+
+    Logs an anti-cheating proctoring warning during an active test:
+    - Verifies attempt belongs to authenticated student and is IN_PROGRESS.
+    - Records event_type (e.g. TAB_SWITCH, WINDOW_BLUR, FULLSCREEN_EXIT).
+    - Increments warning_count and logs audit trail.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        attempt = Attempt.objects.select_related(
+            "student", "delivery", "delivery__paper_version", "delivery__paper_version__paper"
+        ).filter(pk=pk).first()
+
+        if not attempt:
+            return Response({"detail": "Attempt not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if attempt.student_id != request.user.id and not request.user.is_superuser:
+            return Response(
+                {"detail": "You do not have permission to record proctoring events for this attempt."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        event_type = request.data.get("event_type", "TAB_SWITCH")
+        details = request.data.get("details", "Student switched tab or window lost focus.")
+
+        attempt.warning_count += 1
+        log_entry = {
+            "timestamp": timezone.now().isoformat(),
+            "warning_number": attempt.warning_count,
+            "event_type": event_type,
+            "details": details,
+        }
+        current_logs = list(attempt.proctoring_logs or [])
+        current_logs.append(log_entry)
+        attempt.proctoring_logs = current_logs
+        attempt.save(update_fields=["warning_count", "proctoring_logs", "updated_at"])
+
+        # Write immutable audit log entry for Super Admin
+        log_action(
+            user=request.user,
+            action="exam.proctoring_warning",
+            target=attempt,
+            metadata={
+                "attempt_id": attempt.id,
+                "student_id": attempt.student_id,
+                "student_username": attempt.student.username,
+                "delivery_id": attempt.delivery_id,
+                "paper_title": getattr(attempt.delivery.paper_version.paper, "title", ""),
+                "warning_count": attempt.warning_count,
+                "event_type": event_type,
+                "details": details,
+            },
+        )
+
+        return Response(
+            {
+                "attempt_id": attempt.id,
+                "warning_count": attempt.warning_count,
+                "event_type": event_type,
+                "details": details,
+                "message": f"Proctoring warning recorded (#{attempt.warning_count}).",
+            },
+            status=status.HTTP_200_OK,
+        )

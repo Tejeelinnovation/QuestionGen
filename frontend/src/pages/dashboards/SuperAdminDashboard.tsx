@@ -9,12 +9,14 @@ import { EditSchoolModal } from '../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../components/schools/BulkImportModal';
-import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, UserPlus } from 'lucide-react';
+import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, UserPlus, Users, ShieldAlert } from 'lucide-react';
 import type { User, School, UserStats } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonTable, Skeleton } from '../../components/ui/skeleton';
+import { SuperAdminAuditLogViewer } from '../../components/audit/SuperAdminAuditLogViewer';
 
 const SuperAdminDashboardDesktop: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'directory' | 'logs'>('directory');
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -132,8 +134,45 @@ const SuperAdminDashboardDesktop: React.FC = () => {
         </div>
       </div>
 
-      {isInitialLoading && (
-        <div className="space-y-10" aria-label="Loading dashboard skeleton">
+      {/* ── Mode Switcher Tab Navigation ── */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('directory')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            activeTab === 'directory'
+              ? 'bg-forest text-white shadow-2xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink hover:bg-surface-muted'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>Accounts & Institutions</span>
+          <span className="pill pill-muted text-[10px] py-0 px-1.5 ml-1">
+            {totalSystemAccounts}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('logs')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            activeTab === 'logs'
+              ? 'bg-forest text-white shadow-2xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink hover:bg-surface-muted'
+          }`}
+        >
+          <ShieldAlert className="w-3.5 h-3.5 text-ember" />
+          <span>System & Proctoring Audit Logs</span>
+          <span className="w-2 h-2 rounded-full bg-ember animate-pulse" />
+        </button>
+      </div>
+
+      {activeTab === 'logs' && <SuperAdminAuditLogViewer />}
+
+      {activeTab === 'directory' && (
+        <>
+          {isInitialLoading && (
+            <div className="space-y-10" aria-label="Loading dashboard skeleton">
           <SkeletonRoleDeck />
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-8 bg-surface border border-border rounded-lg p-6 shadow-card space-y-5">
@@ -612,6 +651,8 @@ const SuperAdminDashboardDesktop: React.FC = () => {
             </div>
 
           </div>
+        </>
+      )}
         </>
       )}
 

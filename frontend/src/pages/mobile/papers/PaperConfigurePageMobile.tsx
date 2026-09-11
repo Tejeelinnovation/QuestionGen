@@ -4,7 +4,47 @@ import { contentApi } from '../../../api/content';
 import { papersApi, type SelectQuestionsConstraints } from '../../../api/papers';
 import type { Paper, Topic } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
-import { Check, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
+import {
+  Check,
+  ArrowRight,
+  Sparkles,
+  Clock,
+  Layers,
+  Plus,
+  Trash2,
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
+import { MOTION } from '../../../lib/motion';
+
+export interface MarkTierConfig {
+  id: string;
+  marks: number;
+  count: number;
+  question_types: string[];
+}
+
+const DEFAULT_TIERS: MarkTierConfig[] = [
+  { id: 'tier-1', marks: 1, count: 5, question_types: ['MCQ', 'FILL_IN_THE_BLANKS'] },
+  { id: 'tier-2', marks: 2, count: 5, question_types: ['SHORT_ANSWER'] },
+  { id: 'tier-3', marks: 3, count: 3, question_types: ['SHORT_ANSWER'] },
+  { id: 'tier-4', marks: 4, count: 2, question_types: ['LONG_ANSWER'] },
+  { id: 'tier-5', marks: 5, count: 1, question_types: ['LONG_ANSWER'] },
+];
+
+const AVAILABLE_QUESTION_FORMATS = [
+  { value: 'MCQ', label: 'MCQ' },
+  { value: 'MSQ', label: 'MSQ' },
+  { value: 'SHORT_ANSWER', label: 'Short Answer' },
+  { value: 'LONG_ANSWER', label: 'Long Answer' },
+  { value: 'FILL_IN_THE_BLANKS', label: 'Fill Blanks' },
+  { value: 'ONE_WORD', label: 'One Word' },
+  { value: 'MATCH_THE_FOLLOWING', label: 'Match' },
+  { value: 'DIAGRAM_BASED', label: 'Diagram' },
+  { value: 'COMPREHENSION_BASED', label: 'Comprehension' },
+];
 
 export const PaperConfigurePageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -16,13 +56,14 @@ export const PaperConfigurePageMobile: React.FC = () => {
   const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([]);
   const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | ''>('');
   const [learnerLevel, setLearnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | ''>('');
-  const [questionType, setQuestionType] = useState<'MCQ' | 'SHORT_ANSWER' | 'LONG_ANSWER' | ''>('');
-  const [marksPerQuestion, setMarksPerQuestion] = useState<string>('');
-  const [totalMarks, setTotalMarks] = useState<string>('');
-  const [quantity, setQuantity] = useState<string>('');
 
-  // Lightweight 3-step mobile sub-flow: 1 = Topics, 2 = Pedagogy & Types, 3 = Marks & Quantities
-  const [subStep, setSubStep] = useState<1 | 2 | 3>(1);
+  // Rubric & parameters
+  const [useDistributionRubric, setUseDistributionRubric] = useState<boolean>(true);
+  const [markTiers, setMarkTiers] = useState<MarkTierConfig[]>(DEFAULT_TIERS);
+  const [totalMarks, setTotalMarks] = useState<string>('37');
+  const [durationMinutes, setDurationMinutes] = useState<number>(60);
+  const [quantity, setQuantity] = useState<string>('');
+  const [showTopicsAccordion, setShowTopicsAccordion] = useState<boolean>(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,11 +77,19 @@ export const PaperConfigurePageMobile: React.FC = () => {
         const paperData = await papersApi.getPaper(paperId);
         setPaper(paperData);
 
+        if (paperData.duration_minutes) {
+          setDurationMinutes(paperData.duration_minutes);
+        }
+
         if (paperData.chapter) {
           const topicsData = await contentApi.getTopics(paperData.chapter);
           setTopics(topicsData);
         } else {
           setTopics([]);
+        }
+
+        if (paperData.total_question_count && !quantity) {
+          setQuantity(String(paperData.total_question_count));
         }
       } catch (err: any) {
         setErrorMessage(
@@ -70,30 +119,96 @@ export const PaperConfigurePageMobile: React.FC = () => {
     }
   };
 
+  const rubricTotalMarks = markTiers.reduce(
+    (acc, t) => acc + Number(t.count) * Number(t.marks),
+    0
+  );
+  const rubricTotalQuestions = markTiers.reduce((acc, t) => acc + Number(t.count), 0);
+
+  const handleUpdateTierCount = (tierId: string, count: number) => {
+    setMarkTiers((prev) =>
+      prev.map((t) => (t.id === tierId ? { ...t, count: Math.max(0, count) } : t))
+    );
+  };
+
+  const handleToggleTierFormat = (tierId: string, formatValue: string) => {
+    setMarkTiers((prev) =>
+      prev.map((t) => {
+        if (t.id !== tierId) return t;
+        const exists = t.question_types.includes(formatValue);
+        const updated = exists
+          ? t.question_types.filter((f) => f !== formatValue)
+          : [...t.question_types, formatValue];
+        return { ...t, question_types: updated };
+      })
+    );
+  };
+
+  const handleAddTier = () => {
+    const existingMarks = markTiers.map((t) => t.marks);
+    const nextMark = Math.max(...existingMarks, 0) + 1;
+    const newTier: MarkTierConfig = {
+      id: `tier-${Date.now()}`,
+      marks: nextMark,
+      count: 1,
+      question_types: ['LONG_ANSWER'],
+    };
+    setMarkTiers((prev) => [...prev, newTier]);
+  };
+
+  const handleRemoveTier = (tierId: string) => {
+    setMarkTiers((prev) => prev.filter((t) => t.id !== tierId));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const constraints: SelectQuestionsConstraints = {
-      topic_ids: selectedTopicIds.length > 0 ? selectedTopicIds : undefined,
-      difficulty: difficulty || undefined,
-      learner_level: learnerLevel || undefined,
-      question_type: questionType || undefined,
-      marks_per_question: marksPerQuestion ? Number(marksPerQuestion) : undefined,
-      total_marks: totalMarks ? Number(totalMarks) : undefined,
-      quantity: quantity ? Number(quantity) : undefined,
-      subjects: paper?.subjects?.length ? paper.subjects : undefined,
-      duration_minutes: paper?.duration_minutes,
-      total_question_count: paper?.total_question_count,
-    };
+    const parsedTotalMarks = Number(totalMarks);
+    if (!totalMarks || isNaN(parsedTotalMarks) || parsedTotalMarks <= 0) {
+      setErrorMessage('Total marks is compulsory. Please specify the grand total marks for this examination.');
+      return;
+    }
+
+    if (useDistributionRubric) {
+      const activeTiers = markTiers.filter((t) => t.count > 0);
+      if (activeTiers.length > 0 && rubricTotalMarks !== parsedTotalMarks) {
+        setErrorMessage(
+          `Rubric question distribution totals ${rubricTotalMarks} marks, which does not match compulsory Total Marks (${parsedTotalMarks}). Please adjust your question counts or sync Total Marks.`
+        );
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
+      if (durationMinutes && durationMinutes !== paper?.duration_minutes) {
+        await papersApi.updatePaper(paperId, { duration_minutes: Number(durationMinutes) });
+      }
+
+      const activeTiers = useDistributionRubric ? markTiers.filter((t) => t.count > 0) : [];
+      const constraints: SelectQuestionsConstraints = {
+        topic_ids: selectedTopicIds.length > 0 ? selectedTopicIds : undefined,
+        difficulty: difficulty || undefined,
+        learner_level: learnerLevel || undefined,
+        total_marks: parsedTotalMarks,
+        quantity: quantity ? Number(quantity) : (activeTiers.length > 0 ? rubricTotalQuestions : undefined),
+        subjects: paper?.subjects?.length ? paper.subjects : undefined,
+        duration_minutes: Number(durationMinutes) || 60,
+        mark_distribution: activeTiers.length > 0
+          ? activeTiers.map((t) => ({
+              marks: t.marks,
+              count: t.count,
+              question_types: t.question_types.length > 0 ? t.question_types : undefined,
+            }))
+          : undefined,
+      };
+
       const candidateQuestions = await papersApi.selectQuestions(paperId, constraints);
 
       if (candidateQuestions.length === 0) {
         setErrorMessage(
-          'No questions found matching your constraints. Try broadening difficulty or topics.'
+          'No questions found matching your constraints. Try broadening your criteria or question counts.'
         );
         setIsSubmitting(false);
         return;
@@ -110,7 +225,7 @@ export const PaperConfigurePageMobile: React.FC = () => {
       const detail =
         err.response?.data?.detail ||
         err.response?.data?.non_field_errors?.[0] ||
-        'Failed to select questions with specified constraints.';
+        'Failed to select candidate questions. Check criteria and try again.';
       setErrorMessage(detail);
     } finally {
       setIsSubmitting(false);
@@ -119,326 +234,371 @@ export const PaperConfigurePageMobile: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="py-12 text-center text-xs text-ink/60 font-body">
-        Loading curriculum topics for paper #{paperId}...
+      <div className="space-y-4 font-body">
+        <PaperWorkflowNavMobile currentStep="configure" backTo="/papers/create" />
+        <div className="p-8 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
+          Loading paper parameters and question bank...
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-4 font-body">
-      <PaperWorkflowNavMobile
-        currentStep="configure"
-        paperId={paperId}
-        paperTitle={paper?.title}
-        backTo={`/papers/${paperId}`}
-      />
+  const isMarksMatching = Number(totalMarks) === rubricTotalMarks;
 
-      {/* Sub-step indicator headline (Simple text, NO numbered circle steppers) */}
-      <div className="flex items-center justify-between pb-1">
-        <div className="space-y-0.5">
-          <span className="text-[11px] font-mono text-forest font-semibold uppercase tracking-wider">
-            Configuration Flow • Part {subStep} of 3
-          </span>
-          <h1 className="font-heading font-bold text-lg text-ink">
-            {subStep === 1 && 'Select Syllabus Topics'}
-            {subStep === 2 && 'Pedagogy & Question Types'}
-            {subStep === 3 && 'Marks & Distribution'}
-          </h1>
-        </div>
+  return (
+    <div className="space-y-4 font-body pb-24">
+      <PaperWorkflowNavMobile currentStep="configure" backTo="/papers/create" />
+
+      {/* Header */}
+      <div className="space-y-1">
+        <h1 className="font-heading font-bold text-xl text-ink tracking-tight">
+          Question Format & Rubric
+        </h1>
+        <p className="text-xs text-ink/70">
+          Configure question counts per marks tier (1, 2, 3, 4, 5-marker) and allowed formats.
+        </p>
       </div>
 
       {errorMessage && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-3 text-xs font-medium">
-          {errorMessage}
+        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-3 text-xs font-medium flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{errorMessage}</span>
         </div>
       )}
 
-      {/* ── Sub-step 1: Syllabus Topics Selection ── */}
-      {subStep === 1 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-ink/60">
-              {selectedTopicIds.length} of {topics.length} topics chosen
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Mode Switcher */}
+        <div className="flex items-center justify-between p-3 rounded-card bg-surface border border-border">
+          <div className="space-y-0.5">
+            <span className="text-xs font-heading font-semibold text-ink block">
+              Question Generation Mode
             </span>
-            <button
-              type="button"
-              onClick={handleSelectAllTopics}
-              className="text-xs font-heading font-semibold text-forest hover:underline cursor-pointer"
-            >
-              {selectedTopicIds.length === topics.length ? 'Deselect All' : 'Select All Topics'}
-            </button>
+            <span className="text-[11px] text-ink/60 block">
+              {useDistributionRubric ? 'Strict Marks Rubric Allocation' : 'Flexible Solver'}
+            </span>
           </div>
-
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-            {topics.length === 0 ? (
-              <div className="p-4 rounded-card bg-surface border border-border text-center text-xs text-ink/60">
-                No topics configured in this chapter.
-              </div>
-            ) : (
-              topics.map((t) => {
-                const isSelected = selectedTopicIds.includes(t.id);
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => handleTopicToggle(t.id)}
-                    className={`w-full p-3 rounded-card text-left flex items-start justify-between gap-2 border transition-all active:scale-[0.99] cursor-pointer min-h-[48px] ${
-                      isSelected
-                        ? 'bg-forest/5 border-forest text-ink'
-                        : 'bg-surface border-border text-ink hover:border-forest/40'
-                    }`}
-                  >
-                    <div className="space-y-0.5 pr-2">
-                      <span className="font-heading font-semibold text-xs text-ink block">
-                        {t.name}
-                      </span>
-                      <span className="text-[11px] text-ink/60 font-mono">
-                        {t.question_count} questions in bank
-                      </span>
-                    </div>
-                    <div
-                      className={`w-5 h-5 rounded-sm border shrink-0 flex items-center justify-center mt-0.5 ${
-                        isSelected
-                          ? 'bg-forest border-forest text-white'
-                          : 'border-border bg-surface'
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-
           <button
             type="button"
-            id="configure-step-1-next"
-            onClick={() => setSubStep(2)}
-            className="w-full mt-3 py-3 px-4 rounded-pill bg-forest text-white font-heading font-semibold text-xs active:scale-95 transition-all shadow-xs flex items-center justify-center gap-2 min-h-[48px] cursor-pointer"
+            onClick={() => setUseDistributionRubric(!useDistributionRubric)}
+            className={`px-3 py-1.5 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+              useDistributionRubric
+                ? 'bg-forest text-white shadow-2xs'
+                : 'bg-surface-muted text-ink/70'
+            }`}
           >
-            <span>Next: Pedagogy & Types</span>
-            <ArrowRight className="w-4 h-4" />
+            {useDistributionRubric ? 'Structured Rubric' : 'Flexible'}
           </button>
         </div>
-      )}
 
-      {/* ── Sub-step 2: Pedagogy, Bloom Level & Question Types ── */}
-      {subStep === 2 && (
-        <div className="space-y-4">
-          {/* Difficulty Selection */}
-          <div className="p-4 rounded-card bg-surface border border-border shadow-xs space-y-2.5">
-            <label className="block text-xs font-heading font-semibold text-ink">
-              Target Difficulty Level
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: 'Any Difficulty', val: '' },
-                { label: 'Easy', val: 'EASY' },
-                { label: 'Medium', val: 'MEDIUM' },
-                { label: 'Hard', val: 'HARD' },
-              ].map((item) => (
-                <button
-                  key={item.val}
-                  type="button"
-                  onClick={() => setDifficulty(item.val as any)}
-                  className={`py-2.5 px-3 rounded-pill text-xs font-heading font-semibold transition-all min-h-[44px] cursor-pointer ${
-                    difficulty === item.val
-                      ? 'bg-forest text-white shadow-xs'
-                      : 'bg-surface-muted text-ink/70 border border-border hover:text-ink'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+        {/* ── QUESTION FORMAT & MARKS RUBRIC DISTRIBUTION ── */}
+        {useDistributionRubric && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-heading font-bold text-ink uppercase tracking-wider">
+                Mark Tiers & Allowed Formats
+              </span>
+              <span className="text-[11px] font-mono text-ink/60">
+                {rubricTotalQuestions} Questions • {rubricTotalMarks} Marks
+              </span>
             </div>
-          </div>
 
-          {/* Learner Level (Bloom's Taxonomy) */}
-          <div className="p-4 rounded-card bg-surface border border-border shadow-xs space-y-2.5">
-            <label className="block text-xs font-heading font-semibold text-ink">
-              Learner Bloom Taxonomy
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: 'Any Level', val: '' },
-                { label: 'Beginner (Remember)', val: 'BEGINNER' },
-                { label: 'Intermediate (Apply)', val: 'INTERMEDIATE' },
-                { label: 'Advanced (Analyze)', val: 'ADVANCED' },
-              ].map((item) => (
-                <button
-                  key={item.val}
-                  type="button"
-                  onClick={() => setLearnerLevel(item.val as any)}
-                  className={`py-2 px-2.5 rounded-pill text-[11px] font-heading font-semibold transition-all min-h-[44px] cursor-pointer ${
-                    learnerLevel === item.val
-                      ? 'bg-grape text-white shadow-xs'
-                      : 'bg-surface-muted text-ink/70 border border-border hover:text-ink'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Question Type */}
-          <div className="p-4 rounded-card bg-surface border border-border shadow-xs space-y-2.5">
-            <label className="block text-xs font-heading font-semibold text-ink">
-              Question Format
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: 'All Formats', val: '' },
-                { label: 'MCQ Only', val: 'MCQ' },
-                { label: 'Short Answer', val: 'SHORT_ANSWER' },
-                { label: 'Long Answer', val: 'LONG_ANSWER' },
-              ].map((item) => (
-                <button
-                  key={item.val}
-                  type="button"
-                  onClick={() => setQuestionType(item.val as any)}
-                  className={`py-2.5 px-3 rounded-pill text-xs font-heading font-semibold transition-all min-h-[44px] cursor-pointer ${
-                    questionType === item.val
-                      ? 'bg-ember text-white shadow-xs'
-                      : 'bg-surface-muted text-ink/70 border border-border hover:text-ink'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Nav Controls */}
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setSubStep(1)}
-              className="flex-1 py-3 px-4 rounded-pill border border-border bg-surface text-ink font-heading font-semibold text-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[48px]"
+            {/* Rubric Match Pill */}
+            <div
+              className={`p-2.5 rounded-card border flex items-center justify-between text-xs ${
+                isMarksMatching
+                  ? 'bg-forest/10 border-forest/30 text-forest'
+                  : 'bg-ember/10 border-ember/30 text-ember'
+              }`}
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
-            </button>
-            <button
-              type="button"
-              id="configure-step-2-next"
-              onClick={() => setSubStep(3)}
-              className="flex-[2] py-3 px-4 rounded-pill bg-forest text-white font-heading font-semibold text-xs active:scale-95 transition-all shadow-xs flex items-center justify-center gap-1.5 min-h-[48px]"
-            >
-              <span>Next: Marks & Quantity</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+              <div className="flex items-center gap-1.5 font-medium">
+                {isMarksMatching ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Rubric matches Total Marks ({totalMarks})</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-4 h-4" />
+                    <span>
+                      Rubric: {rubricTotalMarks}M vs Total: {totalMarks || 0}M
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {!isMarksMatching && (
+                <button
+                  type="button"
+                  onClick={() => setTotalMarks(String(rubricTotalMarks))}
+                  className="text-[11px] font-bold underline cursor-pointer"
+                >
+                  Sync to {rubricTotalMarks}M
+                </button>
+              )}
+            </div>
+
+            {/* Tier Cards */}
+            <div className="space-y-3">
+              {markTiers.map((tier) => {
+                const subtotal = Number(tier.count) * Number(tier.marks);
+                return (
+                  <div
+                    key={tier.id}
+                    className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-3"
+                  >
+                    {/* Top Row: Mark Badge, Question Counter Stepper, Subtotal */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-card bg-surface-muted border border-border font-heading font-bold text-xs text-ink">
+                        <span>{tier.marks}</span>
+                        <span className="text-[10px] font-normal text-ink/60">
+                          {tier.marks === 1 ? 'Mark' : 'Marks'}
+                        </span>
+                      </div>
+
+                      {/* Stepper */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateTierCount(tier.id, tier.count - 1)}
+                          className="w-7 h-7 rounded-card bg-surface-muted border border-border text-ink font-bold text-xs flex items-center justify-center hover:bg-surface-muted/80 active:scale-95 cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="0"
+                          value={tier.count}
+                          onChange={(e) =>
+                            handleUpdateTierCount(tier.id, parseInt(e.target.value) || 0)
+                          }
+                          className="w-12 h-7 text-center rounded-card border border-border bg-surface text-xs font-mono font-bold text-ink"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateTierCount(tier.id, tier.count + 1)}
+                          className="w-7 h-7 rounded-card bg-surface-muted border border-border text-ink font-bold text-xs flex items-center justify-center hover:bg-surface-muted/80 active:scale-95 cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Subtotal & Delete */}
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-semibold text-forest">
+                          {subtotal} M
+                        </span>
+                        {markTiers.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTier(tier.id)}
+                            className="p-1 text-ink/40 hover:text-ember transition-colors cursor-pointer"
+                            title="Remove tier"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Allowed Formats Pills */}
+                    <div className="space-y-1 pt-1 border-t border-border/50">
+                      <span className="text-[10px] uppercase font-mono text-ink/50 block">
+                        Allowed Formats for {tier.marks}-Marker:
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {AVAILABLE_QUESTION_FORMATS.map((fmt) => {
+                          const isSelected = tier.question_types.includes(fmt.value);
+                          return (
+                            <button
+                              key={fmt.value}
+                              type="button"
+                              onClick={() => handleToggleTierFormat(tier.id, fmt.value)}
+                              className={`px-2 py-1 rounded text-[10px] font-heading transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-forest text-white font-bold'
+                                  : 'bg-surface-muted border border-border text-ink/70'
+                              }`}
+                            >
+                              {isSelected ? `✓ ${fmt.label}` : `+ ${fmt.label}`}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={handleAddTier}
+                className="w-full py-2.5 px-3 rounded-card border border-dashed border-border hover:border-forest text-xs font-heading font-semibold text-ink/70 hover:text-forest transition-colors flex items-center justify-center gap-1.5 cursor-pointer bg-surface"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Custom Mark Tier</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── EXAMINATION PARAMETERS: DURATION & COMPULSORY TOTAL MARKS ── */}
+        <div className="p-4 rounded-card bg-surface border border-border shadow-xs space-y-3">
+          <span className="text-xs font-heading font-bold text-ink uppercase tracking-wider block">
+            Examination Parameters
+          </span>
+
+          {/* Duration */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-ink flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-forest" />
+                <span>Exam Duration (Minutes) *</span>
+              </label>
+              <span className="pill pill-forest text-[10px] font-mono">{durationMinutes} min</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[30, 45, 60, 90, 120, 180].map((mins) => (
+                <button
+                  key={mins}
+                  type="button"
+                  onClick={() => setDurationMinutes(mins)}
+                  className={`px-2.5 py-1 rounded-pill text-[11px] font-mono transition-all cursor-pointer ${
+                    durationMinutes === mins
+                      ? 'bg-forest text-white font-bold'
+                      : 'bg-surface-muted border border-border text-ink/70'
+                  }`}
+                >
+                  {mins}m
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Grand Total Marks (Compulsory) */}
+          <div className="space-y-1 pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-ink flex items-center gap-1">
+                <span>Grand Total Marks *</span>
+                <span className="text-[10px] font-bold text-ember uppercase">(Compulsory)</span>
+              </label>
+              <span className="pill pill-ember text-[10px] uppercase font-mono">Required</span>
+            </div>
+            <input
+              type="number"
+              required
+              min="1"
+              value={totalMarks}
+              onChange={(e) => setTotalMarks(e.target.value)}
+              placeholder="e.g. 37, 50, 80, 100"
+              className="w-full px-3 py-2 text-xs font-mono font-bold rounded-card border border-border bg-bg text-ink focus:border-forest focus:outline-hidden"
+            />
+            <p className="text-[10px] text-ink/60">
+              Total score for this test. All selected questions will sum to this exact mark.
+            </p>
+          </div>
+
+          {/* Question volume cap */}
+          <div className="space-y-1 pt-2 border-t border-border">
+            <label className="text-xs font-semibold text-ink flex items-center justify-between">
+              <span>Question Volume Cap</span>
+              <span className="text-[10px] text-ink/50 font-normal">Optional</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder={useDistributionRubric ? `${rubricTotalQuestions} (from rubric)` : 'e.g. 20'}
+              className="w-full px-3 py-2 text-xs font-mono rounded-card border border-border bg-bg text-ink focus:border-forest focus:outline-hidden"
+            />
           </div>
         </div>
-      )}
 
-      {/* ── Sub-step 3: Marks & Quantities ── */}
-      {subStep === 3 && (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="p-4 rounded-card bg-surface border border-border shadow-xs space-y-3.5">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="mobile-quantity"
-                className="block text-xs font-heading font-semibold text-ink"
-              >
-                Number of Questions (Optional)
-              </label>
-              <input
-                id="mobile-quantity"
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="Leave blank for automatic selection"
-                className="w-full px-3.5 py-3 rounded-card bg-surface border border-border text-xs sm:text-sm font-body text-ink focus:border-forest focus:outline-none min-h-[48px]"
-              />
+        {/* ── SYLLABUS TOPIC COVERAGE ── */}
+        <div className="rounded-card bg-surface border border-border shadow-xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowTopicsAccordion(!showTopicsAccordion)}
+            className="w-full p-4 flex items-center justify-between text-left cursor-pointer hover:bg-surface-muted/40 transition-colors"
+          >
+            <div>
+              <span className="text-xs font-heading font-bold text-ink block">
+                Syllabus Topic Coverage
+              </span>
+              <span className="text-[11px] text-ink/60 block">
+                {selectedTopicIds.length === 0
+                  ? 'All topics included (full chapter)'
+                  : `${selectedTopicIds.length} of ${topics.length} topics selected`}
+              </span>
             </div>
+            {showTopicsAccordion ? (
+              <ChevronUp className="w-4 h-4 text-ink/50" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-ink/50" />
+            )}
+          </button>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="mobile-marks-per-q"
-                  className="block text-xs font-heading font-semibold text-ink"
+          {showTopicsAccordion && (
+            <div className="p-4 pt-0 space-y-3 border-t border-border/60">
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={handleSelectAllTopics}
+                  className="text-[11px] font-semibold text-forest hover:underline"
                 >
-                  Marks per Question
-                </label>
-                <input
-                  id="mobile-marks-per-q"
-                  type="number"
-                  min={1}
-                  value={marksPerQuestion}
-                  onChange={(e) => setMarksPerQuestion(e.target.value)}
-                  placeholder="e.g. 5"
-                  className="w-full px-3.5 py-3 rounded-card bg-surface border border-border text-xs sm:text-sm font-body text-ink focus:border-forest focus:outline-none min-h-[48px]"
-                />
+                  {selectedTopicIds.length === topics.length ? 'Deselect All' : 'Select All Topics'}
+                </button>
               </div>
 
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="mobile-total-marks"
-                  className="block text-xs font-heading font-semibold text-ink"
-                >
-                  Target Total Marks
-                </label>
-                <input
-                  id="mobile-total-marks"
-                  type="number"
-                  min={1}
-                  value={totalMarks}
-                  onChange={(e) => setTotalMarks(e.target.value)}
-                  placeholder="e.g. 50"
-                  className="w-full px-3.5 py-3 rounded-card bg-surface border border-border text-xs sm:text-sm font-body text-ink focus:border-forest focus:outline-none min-h-[48px]"
-                />
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {topics.map((t) => {
+                  const isChecked = selectedTopicIds.includes(t.id);
+                  return (
+                    <label
+                      key={t.id}
+                      onClick={() => handleTopicToggle(t.id)}
+                      className={`p-2 rounded-card border flex items-center gap-2 text-xs transition-colors cursor-pointer ${
+                        isChecked
+                          ? 'bg-forest/5 border-forest/40 text-forest font-semibold'
+                          : 'bg-surface border-border text-ink'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {}}
+                        className="rounded accent-forest"
+                      />
+                      <span className="truncate">{t.name}</span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Quick Summary Pill Banner */}
-          <div className="p-3 rounded-card bg-surface-muted border border-border text-xs space-y-1">
-            <span className="font-heading font-semibold text-ink block">Configuration Summary:</span>
-            <div className="flex flex-wrap gap-1 text-[11px] text-ink/70">
-              <span className="pill pill-forest py-0.5">
-                {selectedTopicIds.length > 0 ? `${selectedTopicIds.length} Topics` : 'All Topics'}
-              </span>
-              <span className="pill pill-ember py-0.5">
-                {difficulty || 'Any Difficulty'}
-              </span>
-              <span className="pill pill-grape py-0.5">
-                {questionType || 'Any Format'}
-              </span>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => setSubStep(2)}
-              className="flex-1 py-3 px-4 rounded-pill border border-border bg-surface text-ink font-heading font-semibold text-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[48px]"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
-            </button>
-            <button
-              type="submit"
-              id="mobile-generate-questions-btn"
-              disabled={isSubmitting}
-              className="flex-[2] py-3.5 px-4 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 min-h-[48px] cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                'Selecting Questions...'
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-lime" />
-                  <span>Generate Questions</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      )}
+        {/* Floating / Sticky Mobile Bottom Action Bar */}
+        <div className="fixed bottom-0 left-0 right-0 p-3 bg-surface/95 backdrop-blur-md border-t border-border shadow-lg z-30">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={`w-full py-3 px-4 rounded-pill bg-forest text-white font-heading font-bold text-xs hover:bg-forest/90 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50 ${MOTION.touch.button.className}`}
+          >
+            {isSubmitting ? (
+              <span>Generating Candidate Questions...</span>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>
+                  Generate Questions ({useDistributionRubric ? rubricTotalQuestions : totalMarks} Qs) &rarr;
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

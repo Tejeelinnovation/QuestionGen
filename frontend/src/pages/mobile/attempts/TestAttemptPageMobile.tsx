@@ -7,7 +7,10 @@ import {
   ChevronRight,
   Send,
   AlertCircle,
+  Shield,
 } from 'lucide-react';
+import { useExamProctoring } from '../../../hooks/useExamProctoring';
+import { ProctoringWarningModal } from '../../../components/attempts/ProctoringWarningModal';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -25,6 +28,16 @@ export const TestAttemptPageMobile: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+
+  // Anti-cheating exam proctoring hook
+  const {
+    warningCount,
+    activeWarning,
+    dismissWarning,
+  } = useExamProctoring({
+    attemptId: attemptData?.attempt_id,
+    isActive: Boolean(attemptData && !isSubmitting && !isExpired),
+  });
 
   // Swipe detection refs
   const touchStartX = useRef<number | null>(null);
@@ -223,8 +236,19 @@ export const TestAttemptPageMobile: React.FC = () => {
           </div>
         </div>
 
-        {/* Auto-Save & Marks Pills */}
+        {/* Auto-Save, Proctoring & Marks Pills */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <span
+            className={`pill text-[10px] py-0.5 px-2 flex items-center gap-1 ${
+              warningCount > 0
+                ? 'bg-ember/15 text-ember border border-ember/30'
+                : 'bg-forest/10 text-forest border border-forest/20'
+            }`}
+          >
+            <Shield className="w-3 h-3" />
+            <span>{warningCount > 0 ? `${warningCount}W` : 'Prot'}</span>
+          </span>
+
           <span
             className={`pill text-[10px] py-0.5 px-2 ${
               currentStatus === 'saving'
@@ -426,6 +450,13 @@ export const TestAttemptPageMobile: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Proctoring Warning Modal */}
+      <ProctoringWarningModal
+        warning={activeWarning}
+        totalWarnings={warningCount}
+        onDismiss={dismissWarning}
+      />
     </div>
   );
 };

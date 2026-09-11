@@ -662,3 +662,45 @@ class AttemptsWorkflowTests(APITestCase):
         self.assertEqual(detail_res.data["my_attempt"]["status"], AttemptStatus.SUBMITTED)
         self.assertIn("score", detail_res.data["my_attempt"])
         self.assertIn("max_score", detail_res.data["my_attempt"])
+
+    # ------------------------------------------------------------------
+    # 19. Proctoring Warning Recording & Result Evaluation Gating
+    # ------------------------------------------------------------------
+
+    def test_proctoring_warning_and_result_gating(self):
+        self.client.force_authenticate(user=self.student_1)
+        start_res = self.client.get(f"/api/deliveries/{self.online_delivery.id}/start/")
+        attempt_id = start_res.data["attempt_id"]
+
+        # 1. Post proctoring warning
+        warn_res = self.client.post(
+            f"/api/attempts/{attempt_id}/proctoring-warning/",
+            {"event_type": "TAB_SWITCH", "details": "Switched tabs during active exam."},
+            format="json",
+        )
+        self.assertEqual(warn_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(warn_res.data["warning_count"], 1)
+
+        # Post second warning
+        warn_res2 = self.client.post(
+            f"/api/attempts/{attempt_id}/proctoring-warning/",
+            {"event_type": "WINDOW_BLUR", "details": "Window lost focus."},
+            format="json",
+        )
+        self.assertEqual(warn_res2.status_code, status.HTTP_200_OK)
+        self.assertEqual(warn_res2.data["warning_count"], 2)
+
+        # Verify audit log
+        audit_warn = AuditLog.objects.filter(action="exam.proctoring_warning", target_id=str(attempt_id)).count()
+        self.assertEqual(audit_warn, 2)
+
+        # 2. Submit attempt (has subjective questions, status SUBMITTED)
+        self.client.post(f"/api/attempts/{attempt_id}/submit/")
+
+        # 3. Student views result -> is_evaluation_pending should be True
+        res = self.client.get(f"/api/attempts/{attempt_id}/result/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data["is_evaluation_pending"])
+        self.assertIsNotNone(res.data["evaluation_message"])
+        self.assertEqual(res.data["warning_count"], 2)
+

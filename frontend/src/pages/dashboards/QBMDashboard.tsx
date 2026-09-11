@@ -14,6 +14,7 @@ import {
   X,
   FileQuestion,
 } from 'lucide-react';
+import { SearchableSubjectSelect } from '../../components/ui/searchable-subject-select';
 
 export const QBMDashboard: React.FC = () => {
 
@@ -820,12 +821,10 @@ export const QBMDashboard: React.FC = () => {
                   <label className="block font-heading text-xs font-semibold text-ink">
                     Subject *
                   </label>
-                  <input
-                    type="text"
+                  <SearchableSubjectSelect
                     value={customSubject}
-                    onChange={(e) => setCustomSubject(e.target.value)}
-                    placeholder="e.g. Mathematics"
-                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                    onChange={setCustomSubject}
+                    placeholder="Search or enter subject..."
                     required={isCustomHierarchy}
                   />
                 </div>

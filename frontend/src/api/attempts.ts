@@ -74,4 +74,22 @@ export const attemptsApi = {
     );
     return response.data;
   },
+
+  logProctoringWarning: async (
+    attemptId: number,
+    eventType: string,
+    details?: string
+  ): Promise<{
+    attempt_id: number;
+    warning_count: number;
+    event_type: string;
+    details: string;
+    message: string;
+  }> => {
+    const response = await apiClient.post(
+      `/api/attempts/${attemptId}/proctoring-warning/`,
+      { event_type: eventType, details }
+    );
+    return response.data;
+  },
 };

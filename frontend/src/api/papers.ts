@@ -31,6 +31,11 @@ export interface SelectQuestionsConstraints {
   quantity?: number | null;
   total_question_count?: number | null;
   duration_minutes?: number | null;
+  mark_distribution?: Array<{
+    marks: number;
+    count: number;
+    question_types?: string[];
+  }>;
 }
 
 export interface CreateVersionInput {
@@ -69,6 +74,11 @@ export const papersApi = {
     return response.data;
   },
 
+  updatePaper: async (id: number, data: Partial<CreatePaperInput>): Promise<Paper> => {
+    const response = await apiClient.patch<Paper>(`/api/papers/${id}/`, data);
+    return response.data;
+  },
+
   selectQuestions: async (
     paperId: number,
     constraints: SelectQuestionsConstraints
@@ -95,6 +105,12 @@ export const papersApi = {
     }
     if (constraints.quantity !== undefined && constraints.quantity !== null && constraints.quantity > 0) {
       payload.quantity = Number(constraints.quantity);
+    }
+    if (constraints.duration_minutes !== undefined && constraints.duration_minutes !== null) {
+      payload.duration_minutes = Number(constraints.duration_minutes);
+    }
+    if (constraints.mark_distribution && constraints.mark_distribution.length > 0) {
+      payload.mark_distribution = constraints.mark_distribution;
     }
 
     const response = await apiClient.post<{ questions: QuestionPreview[] } | QuestionPreview[]>(

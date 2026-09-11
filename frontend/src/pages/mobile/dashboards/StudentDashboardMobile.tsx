@@ -94,18 +94,19 @@ export const StudentDashboardMobile: React.FC = () => {
         ) : (
           deliveries.map((d, idx) => {
             const myAttempt = d.my_attempt;
-            const hasSubmitted = myAttempt && (myAttempt.status === 'SUBMITTED' || myAttempt.status === 'EVALUATED');
+            const isEvaluated = myAttempt && myAttempt.status === 'EVALUATED';
+            const isSubmitted = myAttempt && myAttempt.status === 'SUBMITTED';
             const isInProgress = myAttempt && myAttempt.status === 'IN_PROGRESS';
 
             let statusPillText = 'Ready to Take';
             let statusPillClass = 'pill-ember';
 
-            if (myAttempt?.status === 'EVALUATED') {
+            if (isEvaluated) {
               statusPillText = `Evaluated (${myAttempt.score}/${myAttempt.max_score})`;
               statusPillClass = 'pill-forest';
-            } else if (myAttempt?.status === 'SUBMITTED') {
-              statusPillText = 'Submitted';
-              statusPillClass = 'pill-forest';
+            } else if (isSubmitted) {
+              statusPillText = 'Under Evaluation';
+              statusPillClass = 'pill-ember';
             } else if (isInProgress) {
               statusPillText = 'In Progress';
               statusPillClass = 'pill-ember';
@@ -141,7 +142,7 @@ export const StudentDashboardMobile: React.FC = () => {
                 )}
 
                 <div className="pt-2 border-t border-border/50">
-                  {hasSubmitted ? (
+                  {isEvaluated ? (
                     <Link
                       to={`/attempts/${myAttempt.id}/result`}
                       id={`view-result-btn-${d.id}`}
@@ -150,6 +151,11 @@ export const StudentDashboardMobile: React.FC = () => {
                       <Award className="w-3.5 h-3.5" />
                       <span>Review Score & Feedback</span>
                     </Link>
+                  ) : isSubmitted ? (
+                    <div className="w-full py-2.5 px-4 rounded-pill bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-heading font-semibold text-xs flex items-center justify-center gap-1.5 min-h-[44px]">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Evaluation In Progress</span>
+                    </div>
                   ) : isInProgress ? (
                     <Link
                       to={`/deliveries/${d.id}/attempt`}

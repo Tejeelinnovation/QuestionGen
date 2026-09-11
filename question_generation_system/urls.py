@@ -28,4 +28,7 @@ urlpatterns = [
 
     # Schools tenant management
     path("api/schools/", include(("schools.urls", "schools"), namespace="schools")),
+
+    # System audit logs & proctoring metrics
+    path("api/", include(("core.urls", "core"), namespace="core")),
 ]

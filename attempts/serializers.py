@@ -106,8 +106,10 @@ class AttemptSubmitResponseSerializer(serializers.ModelSerializer):
 
 class StudentAttemptResultSerializer(serializers.ModelSerializer):
     paper_title = serializers.CharField(source="delivery.paper_version.paper.title", read_only=True)
-    score = serializers.FloatField(read_only=True, allow_null=True)
+    score = serializers.SerializerMethodField()
     max_score = serializers.FloatField(read_only=True)
+    is_evaluation_pending = serializers.SerializerMethodField()
+    evaluation_message = serializers.SerializerMethodField()
     answers = serializers.SerializerMethodField()
 
     class Meta:
@@ -119,17 +121,35 @@ class StudentAttemptResultSerializer(serializers.ModelSerializer):
             "status",
             "score",
             "max_score",
+            "warning_count",
+            "is_evaluation_pending",
+            "evaluation_message",
             "started_at",
             "submitted_at",
             "answers",
         ]
 
+    def get_is_evaluation_pending(self, obj: Attempt) -> bool:
+        return obj.status != AttemptStatus.EVALUATED
+
+    def get_evaluation_message(self, obj: Attempt) -> str | None:
+        if obj.status != AttemptStatus.EVALUATED:
+            return (
+                "Your test has been submitted. Evaluation is currently in progress by your teacher. "
+                "Detailed marks and solutions will be made visible once all questions are graded."
+            )
+        return None
+
+    def get_score(self, obj: Attempt) -> float | None:
+        return float(obj.score) if obj.score is not None else 0.0
+
     def get_answers(self, obj: Attempt) -> list[dict[str, Any]]:
+        is_pending = obj.status != AttemptStatus.EVALUATED
         results = []
         for ans in obj.answers.all().order_by("id"):
             snap = ans.question_snapshot
             q_type = snap.get("question_type")
-            is_pending = q_type in ["SHORT_ANSWER", "LONG_ANSWER"] and ans.marks_awarded is None
+            ans_pending = (q_type in ["SHORT_ANSWER", "LONG_ANSWER"] and ans.marks_awarded is None) or is_pending
 
             item: dict[str, Any] = {
                 "question_id": ans.question_id,
@@ -137,11 +157,10 @@ class StudentAttemptResultSerializer(serializers.ModelSerializer):
                 "question_type": q_type,
                 "max_marks": float(snap.get("marks", 0)),
                 "student_response": ans.student_response,
-                "is_correct": ans.is_correct,
-                "marks_awarded": float(ans.marks_awarded) if ans.marks_awarded is not None else None,
-                "pending_manual_review": is_pending,
+                "is_correct": None if is_pending else ans.is_correct,
+                "marks_awarded": None if is_pending else (float(ans.marks_awarded) if ans.marks_awarded is not None else None),
+                "pending_manual_review": ans_pending,
             }
-            # Include correct answer if evaluated or auto-graded
             if not is_pending:
                 item["correct_answer"] = snap.get("correct_answer")
             results.append(item)
@@ -156,7 +175,11 @@ class TeacherAttemptResultSerializer(StudentAttemptResultSerializer):
         fields = StudentAttemptResultSerializer.Meta.fields + [
             "student_id",
             "student_username",
+            "proctoring_logs",
         ]
+
+    def get_score(self, obj: Attempt) -> float | None:
+        return float(obj.score) if obj.score is not None else 0.0
 
     def get_answers(self, obj: Attempt) -> list[dict[str, Any]]:
         results = []

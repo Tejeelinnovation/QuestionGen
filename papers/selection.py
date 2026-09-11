@@ -209,7 +209,52 @@ def select_questions_for_specification(
             all_selected.sort(key=lambda x: (x.topic_id, x.difficulty, x.id))
             return all_selected, None
 
-    # 3. Standard Marks / Quantity Quota (AC-18)
+    # 3. Custom Mark Distribution Rubric (e.g., 1-mark x 5, 2-mark x 3, with format constraints)
+    mark_dist = spec.get("mark_distribution")
+    if mark_dist and isinstance(mark_dist, list):
+        selected_distribution: list[Question] = []
+        already_chosen_ids: set[int] = set()
+
+        for tier in mark_dist:
+            tier_marks_raw = tier.get("marks")
+            if tier_marks_raw is None:
+                continue
+            tier_marks = float(tier_marks_raw)
+            tier_count = int(tier.get("count") or 0)
+            if tier_count <= 0:
+                continue
+
+            tier_formats = tier.get("question_types") or tier.get("formats") or []
+            if isinstance(tier_formats, str):
+                tier_formats = [tier_formats]
+
+            tier_pool = [
+                q for q in pool
+                if q.id not in already_chosen_ids and float(q.marks) == tier_marks
+            ]
+            if tier_formats:
+                tier_pool = [q for q in tier_pool if q.question_type in tier_formats]
+
+            if len(tier_pool) < tier_count:
+                marks_disp = int(tier_marks) if tier_marks.is_integer() else tier_marks
+                fmt_disp = f" ({', '.join(tier_formats)})" if tier_formats else ""
+                return [], (
+                    f"Requested {tier_count} questions worth {marks_disp} mark(s){fmt_disp}, "
+                    f"but only {len(tier_pool)} matching question(s) were found in the available question pool."
+                )
+
+            # Sort by topic and difficulty, then pick tier_count
+            tier_pool.sort(key=lambda x: (x.topic_id, x.difficulty, x.id))
+            chosen = tier_pool[:tier_count]
+            for c in chosen:
+                already_chosen_ids.add(c.id)
+                selected_distribution.append(c)
+
+        if selected_distribution:
+            selected_distribution.sort(key=lambda x: (float(x.marks), x.topic_id, x.id))
+            return selected_distribution, None
+
+    # 4. Standard Marks / Quantity Quota (AC-18)
     target_marks = spec.get("total_marks")
     max_quantity = spec.get("total_question_count") or spec.get("quantity")
     if target_marks is not None or max_quantity is not None:

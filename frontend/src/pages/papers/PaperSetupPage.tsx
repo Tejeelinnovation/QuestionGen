@@ -32,8 +32,6 @@ const PaperSetupPageDesktop: React.FC = () => {
   const [chapterId, setChapterId] = useState<number | ''>('');
   const [examMode, setExamMode] = useState<'single' | 'multi'>('single');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['Mathematics']);
-  const [durationMinutes, setDurationMinutes] = useState<number>(60);
-  const [totalQuestionCount, setTotalQuestionCount] = useState<number>(20);
 
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,8 +99,8 @@ const PaperSetupPageDesktop: React.FC = () => {
         instructions: instructions.trim(),
         chapter: examMode === 'single' ? Number(chapterId) : null,
         subjects: examMode === 'multi' ? selectedSubjects : [],
-        duration_minutes: Number(durationMinutes) || 60,
-        total_question_count: Number(totalQuestionCount) || 0,
+        duration_minutes: 60,
+        total_question_count: 0,
       });
 
       navigate(`/papers/${paper.id}/configure`);
@@ -328,76 +326,6 @@ const PaperSetupPageDesktop: React.FC = () => {
                   </div>
                 )}
 
-                {/* Duration & Target Question Count (AC-18) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border/70">
-                  {/* Duration in Minutes */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label
-                        htmlFor="paper-duration"
-                        className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider"
-                      >
-                        Exam Duration (Minutes) *
-                      </label>
-                      <span className="text-[11px] font-mono text-forest font-semibold">
-                        {durationMinutes} min
-                      </span>
-                    </div>
-                    <input
-                      id="paper-duration"
-                      type="number"
-                      min={1}
-                      max={600}
-                      value={durationMinutes}
-                      onChange={(e) => setDurationMinutes(Math.max(1, Number(e.target.value)))}
-                      className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-sm font-mono text-ink focus:border-forest focus:outline-none"
-                    />
-                    {/* Quick Presets */}
-                    <div className="flex items-center gap-1.5 mt-2">
-                      {[45, 60, 90, 120, 180].map((mins) => (
-                        <button
-                          key={mins}
-                          type="button"
-                          onClick={() => setDurationMinutes(mins)}
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded-pill border transition-colors cursor-pointer ${
-                            durationMinutes === mins
-                              ? 'bg-forest text-white border-forest'
-                              : 'bg-surface text-ink/60 border-border hover:text-ink'
-                          }`}
-                        >
-                          {mins}m
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Target Question Count */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label
-                        htmlFor="paper-target-count"
-                        className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider"
-                      >
-                        Target Total Questions
-                      </label>
-                      <span className="text-[11px] font-mono text-ink/40">Optional</span>
-                    </div>
-                    <input
-                      id="paper-target-count"
-                      type="number"
-                      min={0}
-                      max={200}
-                      value={totalQuestionCount}
-                      onChange={(e) => setTotalQuestionCount(Math.max(0, Number(e.target.value)))}
-                      placeholder="e.g. 25"
-                      className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-sm font-mono text-ink focus:border-forest focus:outline-none"
-                    />
-                    <p className="text-[11px] text-ink/50 mt-2">
-                      Target total question volume displayed on exam blueprint.
-                    </p>
-                  </div>
-                </div>
-
                 {/* Instructions / Notes */}
                 <div className="pt-2 border-t border-border/70">
                   <div className="flex items-center justify-between mb-1.5">
@@ -494,15 +422,8 @@ const PaperSetupPageDesktop: React.FC = () => {
                     </span>
                   ))}
                 </div>
-                <div className="p-3 bg-bg rounded-lg border border-border/70 space-y-1.5 text-xs font-mono">
-                  <div className="flex justify-between">
-                    <span className="text-ink/60">Duration:</span>
-                    <span className="font-bold text-forest">{durationMinutes} Minutes</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ink/60">Target Volume:</span>
-                    <span className="font-bold text-forest">{totalQuestionCount || 'Flexible'} Questions</span>
-                  </div>
+                <div className="p-3 bg-bg rounded-lg border border-border/70 text-xs text-ink/70">
+                  <span className="font-medium text-forest">Next Stage:</span> Exam duration, compulsory total marks, and per-mark question format distributions are configured in Stage 02.
                 </div>
               </div>
             )}

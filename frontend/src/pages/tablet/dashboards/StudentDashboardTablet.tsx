@@ -82,20 +82,22 @@ export const StudentDashboardTablet: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             {deliveries.map((d, index) => {
               const myAttempt = d.my_attempt;
-              const hasSubmitted = myAttempt && (myAttempt.status === 'SUBMITTED' || myAttempt.status === 'EVALUATED');
+              const isEvaluated = myAttempt && myAttempt.status === 'EVALUATED';
+              const isSubmitted = myAttempt && myAttempt.status === 'SUBMITTED';
               const isInProgress = myAttempt && myAttempt.status === 'IN_PROGRESS';
 
+              // Status badges: Forest for evaluated, Amber for submitted (under evaluation), Ember for in progress
               let statusPill: React.ReactNode;
-              if (myAttempt?.status === 'EVALUATED') {
+              if (isEvaluated) {
                 statusPill = (
                   <span className="pill pill-forest text-[10px]">
                     ✓ Evaluated ({myAttempt.score}/{myAttempt.max_score})
                   </span>
                 );
-              } else if (myAttempt?.status === 'SUBMITTED') {
+              } else if (isSubmitted) {
                 statusPill = (
-                  <span className="pill pill-forest text-[10px]">
-                    ✓ Submitted
+                  <span className="pill pill-ember text-[10px]">
+                    ⏳ Submitted (Under Review)
                   </span>
                 );
               } else if (isInProgress) {
@@ -149,7 +151,7 @@ export const StudentDashboardTablet: React.FC = () => {
                   </div>
 
                   <div className="pt-3 border-t border-border flex flex-wrap items-center gap-2">
-                    {hasSubmitted ? (
+                    {isEvaluated ? (
                       <Link
                         to={`/attempts/${myAttempt.id}/result`}
                         id={`view-result-btn-${d.id}`}
@@ -157,6 +159,12 @@ export const StudentDashboardTablet: React.FC = () => {
                       >
                         View Result →
                       </Link>
+                    ) : isSubmitted ? (
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-2 rounded-pill bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-heading font-semibold text-xs flex items-center gap-1 min-h-[40px]">
+                          <span>⏳ Evaluation in Progress</span>
+                        </span>
+                      </div>
                     ) : isInProgress ? (
                       <Link
                         to={`/deliveries/${d.id}/attempt`}

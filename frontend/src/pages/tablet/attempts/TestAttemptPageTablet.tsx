@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
 import type { AttemptQuestionItem, AttemptStartResponse } from '../../../types';
+import { useExamProctoring } from '../../../hooks/useExamProctoring';
+import { ProctoringWarningModal } from '../../../components/attempts/ProctoringWarningModal';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -17,6 +19,18 @@ export const TestAttemptPageTablet: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+
+  // Anti-cheating exam proctoring hook
+  const {
+    warningCount,
+    activeWarning,
+    dismissWarning,
+    isFullscreen,
+    requestFullscreen,
+  } = useExamProctoring({
+    attemptId: attemptData?.attempt_id,
+    isActive: Boolean(attemptData && !isSubmitting && !isExpired),
+  });
 
   const debounceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
@@ -180,12 +194,22 @@ export const TestAttemptPageTablet: React.FC = () => {
       <div className="bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
           <div className="md:col-span-8 space-y-2">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <span className="font-mono text-[11px] uppercase tracking-widest text-ink/50 block">
                 Active Assessment Session
               </span>
               <span className="pill pill-forest text-xs font-semibold">
                 Version {attemptData.version_label}
+              </span>
+              <span
+                className={`pill text-[11px] font-mono font-semibold flex items-center gap-1 ${
+                  warningCount > 0
+                    ? 'bg-ember/15 text-ember border border-ember/30'
+                    : 'bg-forest/10 text-forest border border-forest/20'
+                }`}
+              >
+                <span>🛡️ Proctoring Active</span>
+                {warningCount > 0 && <span>({warningCount} Warnings)</span>}
               </span>
             </div>
             <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight">
@@ -410,6 +434,13 @@ export const TestAttemptPageTablet: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Proctoring Warning Modal */}
+      <ProctoringWarningModal
+        warning={activeWarning}
+        totalWarnings={warningCount}
+        onDismiss={dismissWarning}
+      />
     </div>
   );
 };

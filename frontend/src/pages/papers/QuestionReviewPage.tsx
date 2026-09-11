@@ -8,6 +8,8 @@ import { QuestionReviewPageTablet } from '../tablet/papers/QuestionReviewPageTab
 import { QuestionReviewPageMobile } from '../mobile/papers/QuestionReviewPageMobile';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
 
+import { QuestionReplaceModal } from '../../components/papers/QuestionReplaceModal';
+
 const QuestionReviewPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
@@ -19,6 +21,7 @@ const QuestionReviewPageDesktop: React.FC = () => {
   const [constraints, setConstraints] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [replacingQuestion, setReplacingQuestion] = useState<{ question: QuestionPreview; index: number } | null>(null);
 
   useEffect(() => {
     // Load paper details for header context
@@ -72,7 +75,37 @@ const QuestionReviewPageDesktop: React.FC = () => {
   }, [paperId, location.state]);
 
   const handleRemoveQuestion = (questionId: number) => {
-    setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+    setQuestions((prev) => {
+      const next = prev.filter((q) => q.id !== questionId);
+      sessionStorage.setItem(
+        `paper_${paperId}_review`,
+        JSON.stringify({ questions: next, constraints })
+      );
+      return next;
+    });
+  };
+
+  const handleReplaceQuestion = (replacement: QuestionPreview, targetIndex?: number) => {
+    setQuestions((prev) => {
+      let next: QuestionPreview[];
+      if (targetIndex !== undefined && targetIndex >= 0 && targetIndex < prev.length) {
+        next = [...prev];
+        next[targetIndex] = replacement;
+      } else {
+        const idx = prev.findIndex((item) => item.id === replacingQuestion?.question.id);
+        if (idx !== -1) {
+          next = [...prev];
+          next[idx] = replacement;
+        } else {
+          next = [...prev, replacement];
+        }
+      }
+      sessionStorage.setItem(
+        `paper_${paperId}_review`,
+        JSON.stringify({ questions: next, constraints })
+      );
+      return next;
+    });
   };
 
   const handleMoveUp = (index: number) => {
@@ -82,6 +115,10 @@ const QuestionReviewPageDesktop: React.FC = () => {
       const temp = copy[index - 1];
       copy[index - 1] = copy[index];
       copy[index] = temp;
+      sessionStorage.setItem(
+        `paper_${paperId}_review`,
+        JSON.stringify({ questions: copy, constraints })
+      );
       return copy;
     });
   };
@@ -93,6 +130,10 @@ const QuestionReviewPageDesktop: React.FC = () => {
       const temp = copy[index + 1];
       copy[index + 1] = copy[index];
       copy[index] = temp;
+      sessionStorage.setItem(
+        `paper_${paperId}_review`,
+        JSON.stringify({ questions: copy, constraints })
+      );
       return copy;
     });
   };
@@ -337,6 +378,19 @@ const QuestionReviewPageDesktop: React.FC = () => {
 
                   <span className="text-border-strong">|</span>
 
+                  {/* Replace Question */}
+                  <button
+                    type="button"
+                    onClick={() => setReplacingQuestion({ question: q, index: idx })}
+                    disabled={isSaving}
+                    title="Replace question with matching alternative from question bank"
+                    className="p-1 px-2.5 text-xs font-heading font-semibold rounded-pill text-forest hover:bg-forest/10 cursor-pointer transition-colors flex items-center gap-1"
+                  >
+                    <span>🔄 Replace</span>
+                  </button>
+
+                  <span className="text-border-strong">|</span>
+
                   {/* Remove Question */}
                   <button
                     type="button"
@@ -411,6 +465,16 @@ const QuestionReviewPageDesktop: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Question Replace Modal */}
+      <QuestionReplaceModal
+        isOpen={Boolean(replacingQuestion)}
+        onClose={() => setReplacingQuestion(null)}
+        targetQuestion={replacingQuestion?.question || null}
+        targetIndex={replacingQuestion?.index}
+        existingQuestionIds={questions.map((q) => q.id)}
+        onSelectReplacement={handleReplaceQuestion}
+      />
     </div>
   );
 };

@@ -202,6 +202,12 @@ const LoginPageDesktop: React.FC = () => {
                     >
                       Password
                     </label>
+                    <a
+                      href="/reset-password"
+                      className="text-[11px] font-heading font-medium text-forest hover:underline"
+                    >
+                      Forgot password?
+                    </a>
                   </div>
                   <input
                     id="password"

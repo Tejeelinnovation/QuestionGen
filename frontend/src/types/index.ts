@@ -363,8 +363,11 @@ export interface StudentAttemptResult {
   delivery: number;
   paper_title: string;
   status: 'SUBMITTED' | 'EVALUATED' | string;
-  score: number;
+  score: number | null;
   max_score: number;
+  warning_count?: number;
+  is_evaluation_pending?: boolean;
+  evaluation_message?: string;
   started_at: string;
   submitted_at: string;
   answers: StudentResultAnswerItem[];

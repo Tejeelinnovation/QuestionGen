@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { usersApi } from '../../api/users';
 import type { CapabilityName, User } from '../../types';
-import { Shield, ShieldAlert, Check, RefreshCw, Lock } from 'lucide-react';
+import { Shield, ShieldAlert, Check, RefreshCw } from 'lucide-react';
 
 interface CapabilityMeta {
   name: CapabilityName;
@@ -191,40 +191,10 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
 
         <div className="flex items-center gap-2">
           <span className="pill pill-forest text-[11px] font-mono">
-            {grantedCaps.length} / {ALL_CAPABILITIES.length} active
+            {grantedCaps.filter((c) => !lockedCaps.includes(c)).length} / {ALL_CAPABILITIES.filter((c) => !lockedCaps.includes(c.name)).length} active
           </span>
         </div>
       </div>
-
-      {/* Role scope boundary notice */}
-      {lockedCaps.length > 0 && (
-        <div className="p-3 rounded-card bg-surface-muted border border-border/80 flex items-start gap-2">
-          <Lock className="w-3.5 h-3.5 text-ink/50 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-ink/65 leading-snug">
-            <span className="font-semibold text-ink">Role scope boundary enforced.</span>{' '}
-            {user.role_label === 'School Admin' && (
-              <>
-                School Admins can only hold 3 designated capabilities (<span className="font-mono">CREATE_TEACHER</span>, <span className="font-mono">CREATE_STUDENT</span>, <span className="font-mono">VIEW_SCHOOL_WIDE_CONTROLS</span>). The other 7 capabilities are locked and out of scope.
-              </>
-            )}
-            {user.role_label === 'Teacher' && (
-              <>
-                Teachers can only hold 4 designated capabilities (<span className="font-mono">CREATE_STUDENT</span>, <span className="font-mono">GENERATE_SELECT_QUESTIONS</span>, <span className="font-mono">CREATE_PAPER</span>, <span className="font-mono">ASSIGN_TEST</span>). The other 6 capabilities are locked and out of scope.
-              </>
-            )}
-            {user.role_label === 'Student' && (
-              <>
-                Students can only hold 2 designated capabilities (<span className="font-mono">ATTEMPT_TEST</span>, <span className="font-mono">VIEW_OWN_RESULT</span>). The other 8 capabilities are locked and out of scope.
-              </>
-            )}
-            {user.role_label !== 'School Admin' && user.role_label !== 'Teacher' && user.role_label !== 'Student' && (
-              <>
-                {lockedCaps.length} capabilities are locked because they exceed the <span className="font-semibold">{user.role_label}</span> role boundary.
-              </>
-            )}
-          </p>
-        </div>
-      )}
 
       {errorMsg && (
         <div className="p-3 rounded-card bg-ember/10 border border-ember/30 text-ember text-xs font-medium flex items-center gap-2">
@@ -240,23 +210,20 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
         </div>
       )}
 
-      {/* Capabilities List / Grid */}
+      {/* Capabilities List / Grid - Only display editable capabilities for target role */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {ALL_CAPABILITIES.map((cap) => {
+        {ALL_CAPABILITIES.filter((cap) => !lockedCaps.includes(cap.name)).map((cap) => {
           const isGranted = grantedCaps.includes(cap.name);
           const isDefault = defaultCaps.includes(cap.name);
           const isCustomGranted = isGranted && !isDefault;
           const isRevokedDefault = !isGranted && isDefault;
           const isBusy = pendingCap === cap.name;
-          const isLocked = lockedCaps.includes(cap.name);
 
           return (
             <div
               key={cap.name}
               className={`p-3.5 rounded-card border transition-all flex flex-col justify-between min-h-[96px] ${
-                isLocked
-                  ? 'bg-surface-muted/30 border-border/40 opacity-60'
-                  : isGranted
+                isGranted
                   ? 'bg-surface border-border hover:border-forest/40 shadow-xs'
                   : 'bg-surface-muted/50 border-border/70 opacity-80'
               }`}
@@ -269,25 +236,18 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
                     </span>
 
                     {/* Role pyramid boundary lock badge */}
-                    {isLocked && (
-                      <span className="inline-flex items-center gap-1 pill pill-muted text-[9px] py-0 px-1.5 font-mono text-ink/60">
-                        <Lock className="w-2 h-2" />
-                        Role Boundary
-                      </span>
-                    )}
-
                     {/* Tag indicating default profile vs custom */}
-                    {!isLocked && isCustomGranted && (
+                    {isCustomGranted && (
                       <span className="pill pill-ember text-[9px] py-0 px-1.5 font-mono">
                         Custom Grant
                       </span>
                     )}
-                    {!isLocked && isRevokedDefault && (
+                    {isRevokedDefault && (
                       <span className="pill pill-muted text-[9px] py-0 px-1.5 font-mono text-ember">
                         Default Revoked
                       </span>
                     )}
-                    {!isLocked && isGranted && isDefault && (
+                    {isGranted && isDefault && (
                       <span className="pill pill-lime text-[9px] py-0 px-1.5 font-mono">
                         Role Default
                       </span>
@@ -299,19 +259,8 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
                   </p>
                 </div>
 
-                {/* Instant Action Toggle Switch - disabled for locked caps */}
-                {isLocked ? (
-                  <div
-                    className="relative inline-flex h-6 w-11 shrink-0 rounded-pill border-2 border-transparent bg-ink/10 min-h-[24px] cursor-not-allowed"
-                    title={`Locked by role pyramid - cannot modify for ${user.role_label}`}
-                    aria-disabled="true"
-                  >
-                    <span className="pointer-events-none inline-flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
-                      <Lock className="w-2.5 h-2.5 text-ink/40" />
-                    </span>
-                  </div>
-                ) : (
-                  <button
+                {/* Instant Action Toggle Switch */}
+                <button
                     type="button"
                     id={`toggle-cap-${cap.name}`}
                     role="switch"
@@ -335,7 +284,6 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
                       ) : null}
                     </span>
                   </button>
-                )}
               </div>
 
               <div className="pt-2 mt-1 border-t border-border/40 flex items-center justify-between text-[10px] font-mono text-ink/50">

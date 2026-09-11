@@ -2,14 +2,18 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ALL_CAPABILITIES } from '../../components/users/PermissionManager';
-import { LogOut, User, Building, ShieldCheck, Mail, AlertTriangle } from 'lucide-react';
+import { LogOut, User, Building, ShieldCheck, Mail, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound } from 'lucide-react';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
+import { EditProfileModal } from '../../components/profile/EditProfileModal';
+import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
 
 export const ProfilePageTablet: React.FC = () => {
   const { user, role_label, logout } = useAuth();
   const navigate = useNavigate();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -58,28 +62,87 @@ export const ProfilePageTablet: React.FC = () => {
         style={getStaggerDelay(0)}
         className="animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card space-y-4"
       >
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-card bg-forest text-white font-heading font-bold text-lg flex items-center justify-center shrink-0">
-            {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
-          </div>
-          <div className="space-y-0.5 min-w-0 flex-1">
-            <h2 className="font-heading font-bold text-lg text-ink truncate">
-              {fullName || user?.username}
-            </h2>
-            <div className="flex items-center gap-2 text-xs text-ink/60">
-              <span className="font-mono">@{user?.username}</span>
-              <span>•</span>
-              <span className="font-mono">ID #{user?.id}</span>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-12 h-12 rounded-card bg-forest text-white font-heading font-bold text-lg flex items-center justify-center shrink-0">
+              {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
             </div>
+            <div className="space-y-0.5 min-w-0 flex-1">
+              <h2 className="font-heading font-bold text-lg text-ink truncate">
+                {fullName || user?.username}
+              </h2>
+              <div className="flex items-center gap-2 text-xs text-ink/60">
+                <span className="font-mono">@{user?.username}</span>
+                <span>•</span>
+                <span className="font-mono">ID #{user?.id}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-pill border border-border bg-surface text-ink text-xs font-semibold hover:border-forest hover:text-forest transition-colors cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPasswordModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-pill border border-border bg-surface text-ink text-xs font-semibold hover:border-forest hover:text-forest transition-colors cursor-pointer"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-forest" />
+              <span>Security</span>
+            </button>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border text-xs">
           <div className="flex items-center gap-2">
-            <Mail className="w-3.5 h-3.5 text-ink/40" />
+            <Mail className="w-3.5 h-3.5 text-ink/40 shrink-0" />
             <span className="truncate">{user?.email || 'No email recorded'}</span>
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded shrink-0">
+              <Lock className="w-2 h-2" />
+            </span>
           </div>
           <div className="flex items-center gap-2">
+            <Phone className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+            <span className="truncate">{user?.mobile_number || 'No mobile recorded'}</span>
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded shrink-0">
+              <Lock className="w-2 h-2" />
+            </span>
+          </div>
+          {user?.primary_subject && (
+            <div className="col-span-2 flex items-center gap-2 text-ink/80">
+              <BookOpen className="w-3.5 h-3.5 text-forest" />
+              <span>Subject: <strong className="font-mono text-forest">{user.primary_subject}</strong></span>
+            </div>
+          )}
+          {user?.class_section_name && (
+            <div className="flex items-center gap-2 text-ink/80">
+              <GraduationCap className="w-3.5 h-3.5 text-ink/40" />
+              <span>Class: <strong className="font-heading font-semibold text-ink">{user.class_section_name}</strong></span>
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded shrink-0">
+                <Lock className="w-2 h-2" />
+              </span>
+            </div>
+          )}
+          {(user?.gr_number || user?.roll_number) && (
+            <div className="flex items-center gap-2 text-ink/80">
+              <Hash className="w-3.5 h-3.5 text-ink/40" />
+              <span className="font-mono text-xs">
+                {user?.gr_number ? `GR: ${user.gr_number}` : ''}
+                {user?.gr_number && user?.roll_number ? ' • ' : ''}
+                {user?.roll_number ? `Roll: ${user.roll_number}` : ''}
+              </span>
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded shrink-0">
+                <Lock className="w-2 h-2" />
+              </span>
+            </div>
+          )}
+          <div className="col-span-2 flex items-center gap-2">
             <Building className="w-3.5 h-3.5 text-ink/40" />
             <span className="truncate">{user?.school_name || 'Global Scope'}</span>
           </div>
@@ -170,6 +233,16 @@ export const ProfilePageTablet: React.FC = () => {
           </div>
         )}
       </div>
+
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+      />
+
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+      />
     </div>
   );
 };

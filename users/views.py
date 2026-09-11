@@ -25,6 +25,10 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+
 from core.audit import log_action
 from core.pagination import StandardPageNumberPagination
 from .models import Capability, CapabilityName, User, UserCapability
@@ -36,8 +40,11 @@ from .permissions import (
 )
 from .serializers import (
     CapabilityGrantSerializer,
+    ChangePasswordSerializer,
     CreateUserSerializer,
     LoginSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     UpdateUserSerializer,
     UserSerializer,
 )
@@ -104,9 +111,8 @@ class LogoutView(APIView):
 
 class MeView(APIView):
     """
-    GET /api/auth/me/
-
-    Returns the authenticated user's profile, capabilities, and role label.
+    GET   /api/auth/me/  → Returns user profile and capabilities.
+    PATCH /api/auth/me/  → Self-update user profile (restricts sensitive fields).
     """
 
     permission_classes = [IsAuthenticated]
@@ -114,6 +120,159 @@ class MeView(APIView):
     def get(self, request):
         serializer = UserSerializer(request.user, context={"request": request})
         return Response(serializer.data)
+
+    def patch(self, request):
+        user = request.user
+        restricted_fields = {
+            "gr_number",
+            "class_section",
+            "roll_number",
+            "email",
+            "mobile_number",
+            "role",
+            "school",
+            "capabilities",
+            "is_superuser",
+            "is_staff",
+            "is_active",
+        }
+
+        # Check if user tried to alter locked administrative fields
+        attempted_restricted = [f for f in restricted_fields if f in request.data]
+        if not user.is_superuser and attempted_restricted:
+            return Response(
+                {
+                    "detail": f"Editing locked administrative fields ({', '.join(attempted_restricted)}) is not permitted. Please contact your school administrator.",
+                    "restricted_fields": attempted_restricted,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        allowed_fields = {"first_name", "last_name"}
+        if user.role in ["TEACHER", "HOD"]:
+            allowed_fields.add("primary_subject")
+
+        updated_keys = []
+        for key, value in request.data.items():
+            if key in allowed_fields:
+                setattr(user, key, value)
+                updated_keys.append(key)
+
+        user.save()
+        log_action(user, "user.profile_updated", user, metadata={"updated_fields": updated_keys})
+        serializer = UserSerializer(user, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    """
+    POST /api/auth/change-password/
+
+    Allows authenticated user to change their account password.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        if not user.check_password(serializer.validated_data["current_password"]):
+            return Response(
+                {"current_password": "The current password entered is incorrect."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(serializer.validated_data["new_password"])
+        user.save()
+        log_action(user, "user.password_changed", user)
+
+        return Response(
+            {"detail": "Your password has been changed successfully."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetRequestView(APIView):
+    """
+    POST /api/auth/password-reset/request/
+
+    Generates signed, secure password reset token for account recovery.
+    """
+
+    permission_classes = []
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].strip().lower()
+
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user:
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            reset_url = f"/reset-password?uid={uid}&token={token}"
+            log_action(user, "user.password_reset_requested", user)
+
+            return Response(
+                {
+                    "detail": "If an active account exists with this email address, password reset instructions have been dispatched.",
+                    "uid": uid,
+                    "token": token,
+                    "reset_url": reset_url,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {
+                "detail": "If an active account exists with this email address, password reset instructions have been dispatched.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    """
+    POST /api/auth/password-reset/confirm/
+
+    Confirms password reset using cryptographic token.
+    """
+
+    permission_classes = []
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        uid_str = serializer.validated_data["uid"]
+        token = serializer.validated_data["token"]
+        new_password = serializer.validated_data["new_password"]
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid_str))
+            user = User.objects.get(pk=user_id, is_active=True)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response(
+                {"detail": "Invalid or expired password reset link."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not default_token_generator.check_token(user, token):
+            return Response(
+                {"detail": "Invalid or expired password reset token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.set_password(new_password)
+        user.save()
+        log_action(user, "user.password_reset_confirmed", user)
+
+        return Response(
+            {"detail": "Your password has been reset successfully. You may now log in."},
+            status=status.HTTP_200_OK,
+        )
 
 
 # ---------------------------------------------------------------------------

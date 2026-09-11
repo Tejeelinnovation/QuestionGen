@@ -13,6 +13,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   hasCapability: (name: CapabilityName) => boolean;
 }
 
@@ -85,6 +86,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    try {
+      const userData = await authApi.getMe();
+      setUser(userData);
+    } catch (err) {
+      console.error('Failed to refresh user profile:', err);
+    }
+  };
+
   const hasCapability = useCallback(
     (name: CapabilityName): boolean => {
       if (!user || !user.capabilities) {
@@ -126,6 +136,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         login,
         logout,
+        refreshUser,
         hasCapability,
       }}
     >

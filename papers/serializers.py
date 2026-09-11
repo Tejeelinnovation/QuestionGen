@@ -212,6 +212,13 @@ class SelectQuestionsRequestSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Exam duration in minutes (AC-18).",
     )
+    mark_distribution = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        allow_null=True,
+        help_text="Custom rubric tiers: [{'marks': 1, 'count': 5, 'question_types': ['MCQ']}, ...]",
+    )
+
 
 
 class QuestionPreviewSerializer(serializers.ModelSerializer):

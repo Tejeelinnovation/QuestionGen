@@ -75,6 +75,15 @@ class Attempt(TimestampedModel):
         default=0.0,
         help_text="Maximum possible marks copied from PaperVersion total_marks.",
     )
+    warning_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of proctoring warnings (e.g. tab switches, blur) recorded during exam.",
+    )
+    proctoring_logs = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Detailed audit log of proctoring events during this attempt.",
+    )
 
     class Meta:
         ordering = ["-created_at"]

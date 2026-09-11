@@ -1,15 +1,19 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ALL_CAPABILITIES } from '../../components/users/PermissionManager';
-import { LogOut, User, Building, Calendar, ShieldCheck, Mail, AlertTriangle } from 'lucide-react';
+import { LogOut, User, Building, Calendar, ShieldCheck, Mail, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound } from 'lucide-react';
 import { getStaggerDelay, MOTION, CARD_MOTION } from '../../lib/motion';
+import { EditProfileModal } from '../../components/profile/EditProfileModal';
+import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
 
 export const ProfilePageDesktop: React.FC = () => {
   const { user, role_label, logout } = useAuth();
   const navigate = useNavigate();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -70,22 +74,35 @@ export const ProfilePageDesktop: React.FC = () => {
             style={getStaggerDelay(0)}
             className={`animate-card-enter bg-surface border border-border rounded-lg p-6 shadow-card space-y-6 ${CARD_MOTION.interactive}`}
           >
-            <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-card bg-forest text-white font-heading font-bold text-xl flex items-center justify-center shadow-sm shrink-0">
-                {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
-              </div>
-              <div className="space-y-1 min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className={`pill ${getRolePillClass()} text-[10px]`}>
-                    {role_label}
-                  </span>
-                  <span className="font-mono text-xs text-ink/50">#{user?.id}</span>
+            {/* Profile Header and Edit Action */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4 min-w-0">
+                <div className="w-14 h-14 rounded-card bg-forest text-white font-heading font-bold text-xl flex items-center justify-center shadow-sm shrink-0">
+                  {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
                 </div>
-                <h2 className="font-heading font-bold text-xl text-ink truncate">
-                  {fullName || user?.username}
-                </h2>
-                <p className="font-mono text-xs text-ink/60">@{user?.username}</p>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`pill ${getRolePillClass()} text-[10px]`}>
+                      {role_label}
+                    </span>
+                    <span className="font-mono text-xs text-ink/50">#{user?.id}</span>
+                  </div>
+                  <h2 className="font-heading font-bold text-xl text-ink truncate">
+                    {fullName || user?.username}
+                  </h2>
+                  <p className="font-mono text-xs text-ink/60">@{user?.username}</p>
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill border border-border bg-surface text-ink hover:border-forest hover:text-forest text-xs font-semibold transition-all shadow-2xs shrink-0 cursor-pointer"
+                title="Edit personal name and teaching subject"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Edit</span>
+              </button>
             </div>
 
             {/* Profile Attributes List */}
@@ -93,17 +110,94 @@ export const ProfilePageDesktop: React.FC = () => {
               <div className="flex items-center gap-3 py-1">
                 <Mail className="w-4 h-4 text-ink/40 shrink-0" />
                 <div className="flex-1 truncate">
-                  <span className="text-ink/60 block text-[10px] uppercase font-mono">Email Address</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-ink/60 block text-[10px] uppercase font-mono">Email Address</span>
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded" title="Governed by School Administration">
+                      <Lock className="w-2.5 h-2.5" /> Locked
+                    </span>
+                  </div>
                   <span className="font-mono text-ink font-medium">
                     {user?.email || <span className="italic text-ink/40">Not specified</span>}
                   </span>
                 </div>
               </div>
 
+              {/* Mobile Number */}
+              <div className="flex items-center gap-3 py-1">
+                <Phone className="w-4 h-4 text-ink/40 shrink-0" />
+                <div className="flex-1 truncate">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-ink/60 block text-[10px] uppercase font-mono">Mobile Number</span>
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded" title="Governed by School Administration">
+                      <Lock className="w-2.5 h-2.5" /> Locked
+                    </span>
+                  </div>
+                  <span className="font-mono text-ink font-medium">
+                    {user?.mobile_number || <span className="italic text-ink/40">Not registered</span>}
+                  </span>
+                </div>
+              </div>
+
+              {/* Teacher Primary Subject */}
+              {user?.primary_subject && (
+                <div className="flex items-center gap-3 py-1">
+                  <BookOpen className="w-4 h-4 text-forest shrink-0" />
+                  <div className="flex-1 truncate">
+                    <span className="text-ink/60 block text-[10px] uppercase font-mono">Teaching Subject Specialization</span>
+                    <span className="font-mono text-forest font-semibold">
+                      {user.primary_subject}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Student Class / Division */}
+              {user?.class_section_name && (
+                <div className="flex items-center gap-3 py-1">
+                  <GraduationCap className="w-4 h-4 text-ink/40 shrink-0" />
+                  <div className="flex-1 truncate">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-ink/60 block text-[10px] uppercase font-mono">Enrolled Class & Division</span>
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded" title="Governed by School Administration">
+                        <Lock className="w-2.5 h-2.5" /> Locked
+                      </span>
+                    </div>
+                    <span className="font-heading text-ink font-semibold">
+                      Class {user.class_section_name}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Student GR Number & Roll Number */}
+              {(user?.gr_number || user?.roll_number) && (
+                <div className="flex items-center gap-3 py-1">
+                  <Hash className="w-4 h-4 text-ink/40 shrink-0" />
+                  <div className="flex-1 truncate">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-ink/60 block text-[10px] uppercase font-mono">Student Identification</span>
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded" title="Governed by School Administration">
+                        <Lock className="w-2.5 h-2.5" /> Locked
+                      </span>
+                    </div>
+                    <span className="font-mono text-ink font-medium">
+                      {user?.gr_number ? `GR: ${user.gr_number}` : ''}
+                      {user?.gr_number && user?.roll_number ? ' • ' : ''}
+                      {user?.roll_number ? `Roll: ${user.roll_number}` : ''}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-3 py-1">
                 <Building className="w-4 h-4 text-ink/40 shrink-0" />
                 <div className="flex-1 truncate">
-                  <span className="text-ink/60 block text-[10px] uppercase font-mono">School Institution</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-ink/60 block text-[10px] uppercase font-mono">School Institution</span>
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded" title="Governed by School Administration">
+                      <Lock className="w-2.5 h-2.5" /> Locked
+                    </span>
+                  </div>
                   <span className="text-ink font-medium">
                     {user?.school_name || <span className="italic text-ink/40">Global (No Institution)</span>}
                   </span>
@@ -140,9 +234,38 @@ export const ProfilePageDesktop: React.FC = () => {
             </div>
           </div>
 
-          {/* Session Termination / Sign Out Section */}
+          {/* Account Security & Password */}
           <div
             style={getStaggerDelay(1)}
+            className="animate-card-enter bg-surface border border-border rounded-lg p-6 shadow-card space-y-4"
+          >
+            <div className="border-b border-border pb-3 flex items-start justify-between">
+              <div>
+                <span className="pill pill-forest text-[10px] uppercase mb-1">Security & Access</span>
+                <h3 className="font-heading font-bold text-base text-ink">
+                  Account Credentials
+                </h3>
+                <p className="text-xs text-ink/65 mt-0.5">
+                  Update password or request a secure recovery email link.
+                </p>
+              </div>
+              <KeyRound className="w-5 h-5 text-forest/80 shrink-0" />
+            </div>
+
+            <button
+              type="button"
+              id="profile-password-btn"
+              onClick={() => setIsPasswordModalOpen(true)}
+              className={`w-full py-2.5 px-4 rounded-pill border border-border bg-surface text-ink font-heading font-semibold text-xs hover:border-forest hover:text-forest transition-all flex items-center justify-center gap-2 cursor-pointer ${MOTION.touch.button.className}`}
+            >
+              <KeyRound className="w-3.5 h-3.5 text-forest" />
+              <span>Change Password / Security</span>
+            </button>
+          </div>
+
+          {/* Session Termination / Sign Out Section */}
+          <div
+            style={getStaggerDelay(2)}
             className="animate-card-enter bg-surface border border-border rounded-lg p-6 shadow-card space-y-4"
           >
             <div className="border-b border-border pb-3">
@@ -252,6 +375,17 @@ export const ProfilePageDesktop: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Edit Profile & Password Modals */}
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+      />
+
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+      />
     </div>
   );
 };

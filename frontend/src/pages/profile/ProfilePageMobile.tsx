@@ -2,14 +2,18 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ALL_CAPABILITIES } from '../../components/users/PermissionManager';
-import { LogOut, User, Building, Mail, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { LogOut, User, Building, Mail, ShieldCheck, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound } from 'lucide-react';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
+import { EditProfileModal } from '../../components/profile/EditProfileModal';
+import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
 
 export const ProfilePageMobile: React.FC = () => {
   const { user, role_label, logout } = useAuth();
   const navigate = useNavigate();
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -42,29 +46,98 @@ export const ProfilePageMobile: React.FC = () => {
         style={getStaggerDelay(0)}
         className="animate-card-enter bg-surface border border-border rounded-card p-4 shadow-card space-y-3"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-card bg-forest text-white font-heading font-bold text-base flex items-center justify-center shrink-0">
-            {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
-          </div>
-          <div className="space-y-0.5 min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className={`pill ${getRolePillClass()} text-[9px] py-0 px-2`}>
-                {role_label}
-              </span>
-              <span className="font-mono text-[10px] text-ink/40">#{user?.id}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-card bg-forest text-white font-heading font-bold text-base flex items-center justify-center shrink-0">
+              {user?.username ? user.username.charAt(0).toUpperCase() : 'U'}
             </div>
-            <h1 className="font-heading font-bold text-base text-ink truncate">
-              {fullName || user?.username}
-            </h1>
-            <p className="font-mono text-[11px] text-ink/60">@{user?.username}</p>
+            <div className="space-y-0.5 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className={`pill ${getRolePillClass()} text-[9px] py-0 px-2`}>
+                  {role_label}
+                </span>
+                <span className="font-mono text-[10px] text-ink/40">#{user?.id}</span>
+              </div>
+              <h1 className="font-heading font-bold text-base text-ink truncate">
+                {fullName || user?.username}
+              </h1>
+              <p className="font-mono text-[11px] text-ink/60">@{user?.username}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              className="p-2 rounded-card border border-border bg-surface text-ink text-xs hover:border-forest hover:text-forest transition-colors cursor-pointer"
+              title="Edit Profile"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPasswordModalOpen(true)}
+              className="p-2 rounded-card border border-border bg-surface text-forest text-xs hover:border-forest hover:bg-forest/5 transition-colors cursor-pointer"
+              title="Security & Password"
+            >
+              <KeyRound className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
         <div className="space-y-2 pt-2 border-t border-border text-xs text-ink/75">
           {user?.email && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 truncate">
+                <Mail className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                <span className="font-mono text-[11px] truncate">{user.email}</span>
+              </div>
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-mono text-ink/40 bg-surface-muted px-1 rounded shrink-0">
+                <Lock className="w-2 h-2" /> Locked
+              </span>
+            </div>
+          )}
+          {user?.mobile_number && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 truncate">
+                <Phone className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                <span className="font-mono text-[11px] truncate">{user.mobile_number}</span>
+              </div>
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-mono text-ink/40 bg-surface-muted px-1 rounded shrink-0">
+                <Lock className="w-2 h-2" /> Locked
+              </span>
+            </div>
+          )}
+          {user?.primary_subject && (
             <div className="flex items-center gap-2">
-              <Mail className="w-3.5 h-3.5 text-ink/40 shrink-0" />
-              <span className="font-mono text-[11px] truncate">{user.email}</span>
+              <BookOpen className="w-3.5 h-3.5 text-forest shrink-0" />
+              <span className="text-[11px]">Subject: <strong className="font-mono text-forest">{user.primary_subject}</strong></span>
+            </div>
+          )}
+          {user?.class_section_name && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                <span className="text-[11px]">Class: <strong className="font-heading font-semibold text-ink">{user.class_section_name}</strong></span>
+              </div>
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-mono text-ink/40 bg-surface-muted px-1 rounded shrink-0">
+                <Lock className="w-2 h-2" />
+              </span>
+            </div>
+          )}
+          {(user?.gr_number || user?.roll_number) && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Hash className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                <span className="font-mono text-[11px]">
+                  {user?.gr_number ? `GR: ${user.gr_number}` : ''}
+                  {user?.gr_number && user?.roll_number ? ' • ' : ''}
+                  {user?.roll_number ? `Roll: ${user.roll_number}` : ''}
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-mono text-ink/40 bg-surface-muted px-1 rounded shrink-0">
+                <Lock className="w-2 h-2" />
+              </span>
             </div>
           )}
           {user?.school_name && (
@@ -159,6 +232,16 @@ export const ProfilePageMobile: React.FC = () => {
           </div>
         )}
       </div>
+
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+      />
+
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+      />
     </div>
   );
 };

@@ -169,6 +169,22 @@ class PaperDetailView(APIView):
         serializer = PaperDetailSerializer(paper)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def patch(self, request, pk):
+        paper = get_scoped_papers(request.user).filter(pk=pk).first()
+        if not paper:
+            return Response({"detail": "Paper not found."}, status=status.HTTP_404_NOT_FOUND)
+        if not request.user.has_capability("CREATE_PAPER"):
+            return Response(
+                {"detail": "You do not have permission to modify papers."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        for field in ["title", "instructions", "duration_minutes", "total_question_count", "specifications"]:
+            if field in request.data:
+                setattr(paper, field, request.data[field])
+        paper.save()
+        return Response(PaperDetailSerializer(paper).data, status=status.HTTP_200_OK)
+
+
 
 # ---------------------------------------------------------------------------
 # 2. Select Questions (Review Candidate Questions)
