@@ -164,9 +164,16 @@ export const TeacherDashboardTablet: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-xs text-ink/50">Paper #{p.id}</span>
-                    <span className="pill pill-muted text-[10px]">
-                      {p.version_count ?? 0} {p.version_count === 1 ? 'Version' : 'Versions'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {p.duration_minutes ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-50 text-amber-700 border border-amber-200">
+                          ⏱ {p.duration_minutes}m
+                        </span>
+                      ) : null}
+                      <span className="pill pill-muted text-[10px]">
+                        {p.version_count ?? 0} {p.version_count === 1 ? 'Version' : 'Versions'}
+                      </span>
+                    </div>
                   </div>
 
                   <h3 className="font-heading font-bold text-lg text-ink line-clamp-2">
@@ -175,9 +182,19 @@ export const TeacherDashboardTablet: React.FC = () => {
                     </Link>
                   </h3>
 
-                  <div className="text-xs text-ink/70 flex items-center gap-1.5 font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-forest" />
-                    <span>{p.chapter_title || `Chapter #${p.chapter}`}</span>
+                  <div className="text-xs text-ink/70 flex items-center gap-1.5 font-medium flex-wrap">
+                    <span className="w-1.5 h-1.5 rounded-full bg-forest shrink-0" />
+                    {p.subjects && p.subjects.length > 0 ? (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {p.subjects.map((sub, sidx) => (
+                          <span key={sidx} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            {sub}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span>{p.chapter_title || (p.chapter ? `Chapter #${p.chapter}` : 'General Curriculum')}</span>
+                    )}
                   </div>
                 </div>
 

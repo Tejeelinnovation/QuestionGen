@@ -253,7 +253,18 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
     """
     Serializer for structured Question Ingestion workflow (AC-10, AC-13, AC-14, AC-15, AC-16).
     Supports single question creation with optional nested variants.
+    Accepts an existing `topic` ID or creates curriculum hierarchy (board, book, chapter, topic) dynamically.
     """
+
+    topic = serializers.PrimaryKeyRelatedField(
+        queryset=Topic.objects.all(), required=False, allow_null=True
+    )
+    board = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    book_title = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    subject = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    grade = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    chapter_title = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    topic_name = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     learner_level = serializers.ChoiceField(
         choices=LearnerLevel.choices,
@@ -267,6 +278,12 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "topic",
+            "board",
+            "book_title",
+            "subject",
+            "grade",
+            "chapter_title",
+            "topic_name",
             "question_text",
             "question_type",
             "marks",
@@ -282,8 +299,46 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_by"]
 
+    def validate(self, attrs):
+        if not attrs.get("topic") and not attrs.get("topic_name"):
+            raise serializers.ValidationError(
+                {"topic": "Either a valid topic ID or a custom topic_name must be provided."}
+            )
+        return attrs
+
     def create(self, validated_data):
         variants_data = validated_data.pop("variants", [])
+        board = validated_data.pop("board", None) or "CBSE"
+        book_title = validated_data.pop("book_title", None)
+        subject = validated_data.pop("subject", None)
+        grade = validated_data.pop("grade", None)
+        chapter_title = validated_data.pop("chapter_title", None)
+        topic_name = validated_data.pop("topic_name", None)
+
+        if not validated_data.get("topic"):
+            clean_subject = (subject or "General").strip()
+            clean_grade = (grade or "Standard").strip()
+            clean_book = (book_title or f"{clean_subject} ({clean_grade})").strip()
+            clean_chapter = (chapter_title or "Chapter 1").strip()
+            clean_topic = (topic_name or "General Topic").strip()
+
+            book, _ = Book.objects.get_or_create(
+                board=board.strip(),
+                title=clean_book,
+                subject=clean_subject,
+                grade=clean_grade,
+            )
+            chapter, _ = Chapter.objects.get_or_create(
+                book=book,
+                title=clean_chapter,
+                defaults={"chapter_order": book.chapters.count() + 1},
+            )
+            topic, _ = Topic.objects.get_or_create(
+                chapter=chapter,
+                name=clean_topic,
+            )
+            validated_data["topic"] = topic
+
         request = self.context.get("request")
         user = request.user if request else None
 

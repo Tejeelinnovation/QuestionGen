@@ -37,6 +37,15 @@ export const QBMDashboard: React.FC = () => {
 
   // Selected Ingestion hierarchy
   const [selectedBoard, setSelectedBoard] = useState('CBSE');
+  const [isCustomBoard, setIsCustomBoard] = useState(false);
+  const [customBoardName, setCustomBoardName] = useState('');
+  const [isCustomHierarchy, setIsCustomHierarchy] = useState(false);
+  const [customSubject, setCustomSubject] = useState('');
+  const [customGrade, setCustomGrade] = useState('Class 10');
+  const [customBookTitle, setCustomBookTitle] = useState('');
+  const [customChapterTitle, setCustomChapterTitle] = useState('');
+  const [customTopicName, setCustomTopicName] = useState('');
+
   const [selectedBookId, setSelectedBookId] = useState<number | ''>('');
   const [selectedChapterId, setSelectedChapterId] = useState<number | ''>('');
   const [selectedTopicId, setSelectedTopicId] = useState<number | ''>('');
@@ -100,17 +109,30 @@ export const QBMDashboard: React.FC = () => {
   // Load Books when selectedBoard changes
   useEffect(() => {
     if (selectedBoard) {
+      if (selectedBoard === 'Other / Custom Board') {
+        setIsCustomBoard(true);
+        setBooks([]);
+        setSelectedBookId('');
+        setIsCustomHierarchy(true);
+        return;
+      }
+      setIsCustomBoard(false);
       contentApi
         .getBooks(selectedBoard)
         .then((bks) => {
           setBooks(bks);
           if (bks.length > 0) {
             setSelectedBookId(bks[0].id);
+            setIsCustomHierarchy(false);
           } else {
             setSelectedBookId('');
+            setIsCustomHierarchy(true);
           }
         })
-        .catch(() => setBooks([]));
+        .catch(() => {
+          setBooks([]);
+          setIsCustomHierarchy(true);
+        });
     }
   }, [selectedBoard]);
 
@@ -238,9 +260,30 @@ export const QBMDashboard: React.FC = () => {
     setIngestSuccessMsg(null);
     setIngestErrorMsg(null);
 
-    if (!selectedTopicId) {
-      setIngestErrorMsg('Please select a curriculum Board, Book, Chapter, and Topic.');
+    const effectiveBoard = isCustomBoard ? customBoardName.trim() : selectedBoard;
+    if (!effectiveBoard) {
+      setIngestErrorMsg('Please specify an educational Board.');
       return;
+    }
+
+    if (!isCustomHierarchy && !selectedTopicId) {
+      setIngestErrorMsg('Please select a curriculum Board, Book, Chapter, and Topic (or switch to Custom Curriculum).');
+      return;
+    }
+
+    if (isCustomHierarchy) {
+      if (!customSubject.trim()) {
+        setIngestErrorMsg('Subject is required for custom curriculum.');
+        return;
+      }
+      if (!customChapterTitle.trim()) {
+        setIngestErrorMsg('Chapter Title is required for custom curriculum.');
+        return;
+      }
+      if (!customTopicName.trim()) {
+        setIngestErrorMsg('Topic Name is required for custom curriculum.');
+        return;
+      }
     }
 
     if (!questionText.trim()) {
@@ -265,7 +308,13 @@ export const QBMDashboard: React.FC = () => {
     }
 
     const payload: IngestQuestionPayload = {
-      topic: Number(selectedTopicId),
+      topic: !isCustomHierarchy && selectedTopicId ? Number(selectedTopicId) : null,
+      board: effectiveBoard,
+      book_title: isCustomHierarchy ? (customBookTitle.trim() || `${customSubject.trim()} (${customGrade.trim()})`) : undefined,
+      subject: isCustomHierarchy ? customSubject.trim() : undefined,
+      grade: isCustomHierarchy ? customGrade.trim() : undefined,
+      chapter_title: isCustomHierarchy ? customChapterTitle.trim() : undefined,
+      topic_name: isCustomHierarchy ? customTopicName.trim() : undefined,
       question_text: questionText.trim(),
       question_type: questionType,
       marks,
@@ -298,6 +347,9 @@ export const QBMDashboard: React.FC = () => {
       setExplanation('');
       setSourceReference('');
       setVariants([]);
+      if (isCustomHierarchy) {
+        contentApi.getBooks(effectiveBoard).then((bks) => setBooks(bks));
+      }
       loadQuestions();
     } catch (err: any) {
       setIngestErrorMsg(
@@ -610,24 +662,62 @@ export const QBMDashboard: React.FC = () => {
 
           {/* ── STEP 1: Hierarchy Selection (Board → Book → Chapter → Topic) ── */}
           <section className="space-y-4">
-            <div className="border-b border-border pb-2 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-forest text-white text-[11px] font-bold flex items-center justify-center">
-                1
-              </span>
-              <h2 className="font-heading font-bold text-sm text-ink uppercase tracking-wider">
-                Curriculum Hierarchy (Board → Book → Chapter → Topic)
-              </h2>
+            <div className="border-b border-border pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-forest text-white text-[11px] font-bold flex items-center justify-center">
+                  1
+                </span>
+                <h2 className="font-heading font-bold text-sm text-ink uppercase tracking-wider">
+                  Curriculum Hierarchy (Board → Book → Chapter → Topic)
+                </h2>
+              </div>
+              {/* Toggle switch between Existing DB Curriculum and Custom Curriculum */}
+              <div className="flex items-center gap-2 bg-bg px-2.5 py-1 rounded-card border border-border text-xs self-start sm:self-auto">
+                <span className="text-ink/60 font-medium">Mode:</span>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomHierarchy(false)}
+                  disabled={books.length === 0}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                    !isCustomHierarchy
+                      ? 'bg-forest text-white shadow-xs'
+                      : 'text-ink/60 hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed'
+                  }`}
+                  title={books.length === 0 ? 'No pre-configured books available for this board' : undefined}
+                >
+                  Existing Books ({books.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomHierarchy(true)}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                    isCustomHierarchy
+                      ? 'bg-forest text-white shadow-xs'
+                      : 'text-ink/60 hover:text-ink'
+                  }`}
+                >
+                  + Custom / Expand Syllabus
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Board */}
+            {/* Board Selection Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="block font-heading text-xs font-semibold text-ink">
                   1. Board *
                 </label>
                 <select
                   value={selectedBoard}
-                  onChange={(e) => setSelectedBoard(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedBoard(val);
+                    if (val === 'Other / State Board' || val === 'Other / Custom Board') {
+                      setIsCustomBoard(true);
+                    } else {
+                      setIsCustomBoard(false);
+                    }
+                  }}
                   className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
                 >
                   {boards.map((b) => (
@@ -638,60 +728,173 @@ export const QBMDashboard: React.FC = () => {
                 </select>
               </div>
 
-              {/* Book */}
-              <div className="space-y-1.5">
-                <label className="block font-heading text-xs font-semibold text-ink">
-                  2. Book / Curriculum *
-                </label>
-                <select
-                  value={selectedBookId}
-                  onChange={(e) => setSelectedBookId(Number(e.target.value))}
-                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                >
-                  {books.map((bk) => (
-                    <option key={bk.id} value={bk.id}>
-                      {bk.title} ({bk.grade})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Chapter */}
-              <div className="space-y-1.5">
-                <label className="block font-heading text-xs font-semibold text-ink">
-                  3. Chapter *
-                </label>
-                <select
-                  value={selectedChapterId}
-                  onChange={(e) => setSelectedChapterId(Number(e.target.value))}
-                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                >
-                  {chapters.map((ch) => (
-                    <option key={ch.id} value={ch.id}>
-                      Ch.{ch.chapter_order}: {ch.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Topic */}
-              <div className="space-y-1.5">
-                <label className="block font-heading text-xs font-semibold text-ink">
-                  4. Topic *
-                </label>
-                <select
-                  value={selectedTopicId}
-                  onChange={(e) => setSelectedTopicId(Number(e.target.value))}
-                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                >
-                  {topics.map((tp) => (
-                    <option key={tp.id} value={tp.id}>
-                      {tp.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {isCustomBoard && (
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    Specify Custom Board Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={customBoardName}
+                    onChange={(e) => setCustomBoardName(e.target.value)}
+                    placeholder="e.g. Goa State Board, AP Inter, etc."
+                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none"
+                    required
+                  />
+                </div>
+              )}
             </div>
+
+            {/* Notice if no existing books for selected board */}
+            {books.length === 0 && !isCustomBoard && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-card text-xs text-amber-800 flex items-start gap-2">
+                <span className="font-semibold shrink-0">Note:</span>
+                <span>
+                  No pre-configured books found for <strong>{selectedBoard}</strong> in database yet.
+                  Fill in the custom fields below to ingest questions and automatically create this curriculum hierarchy.
+                </span>
+              </div>
+            )}
+
+            {/* Existing Dropdowns OR Custom Hierarchy Inputs */}
+            {!isCustomHierarchy ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Book */}
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    2. Book / Curriculum *
+                  </label>
+                  <select
+                    value={selectedBookId}
+                    onChange={(e) => setSelectedBookId(Number(e.target.value))}
+                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                  >
+                    {books.map((bk) => (
+                      <option key={bk.id} value={bk.id}>
+                        {bk.title} ({bk.grade})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Chapter */}
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    3. Chapter *
+                  </label>
+                  <select
+                    value={selectedChapterId}
+                    onChange={(e) => setSelectedChapterId(Number(e.target.value))}
+                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                  >
+                    {chapters.map((ch) => (
+                      <option key={ch.id} value={ch.id}>
+                        Ch.{ch.chapter_order}: {ch.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Topic */}
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    4. Topic *
+                  </label>
+                  <select
+                    value={selectedTopicId}
+                    onChange={(e) => setSelectedTopicId(Number(e.target.value))}
+                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                  >
+                    {topics.map((tp) => (
+                      <option key={tp.id} value={tp.id}>
+                        {tp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-4 rounded-card bg-surface-muted/60 border border-border">
+                {/* Subject */}
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    Subject *
+                  </label>
+                  <input
+                    type="text"
+                    value={customSubject}
+                    onChange={(e) => setCustomSubject(e.target.value)}
+                    placeholder="e.g. Mathematics"
+                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                    required={isCustomHierarchy}
+                  />
+                </div>
+
+                {/* Grade */}
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    Grade / Class *
+                  </label>
+                  <select
+                    value={customGrade}
+                    onChange={(e) => setCustomGrade(e.target.value)}
+                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                  >
+                    {[
+                      'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
+                      'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
+                      'Class 11', 'Class 12'
+                    ].map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Book Title */}
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    Book Title (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={customBookTitle}
+                    onChange={(e) => setCustomBookTitle(e.target.value)}
+                    placeholder="e.g. Balbharati Math 10"
+                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                  />
+                </div>
+
+                {/* Chapter Title */}
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    Chapter Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={customChapterTitle}
+                    onChange={(e) => setCustomChapterTitle(e.target.value)}
+                    placeholder="e.g. Quadratic Equations"
+                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                    required={isCustomHierarchy}
+                  />
+                </div>
+
+                {/* Topic Name */}
+                <div className="space-y-1.5">
+                  <label className="block font-heading text-xs font-semibold text-ink">
+                    Topic Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={customTopicName}
+                    onChange={(e) => setCustomTopicName(e.target.value)}
+                    placeholder="e.g. Nature of Roots"
+                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                    required={isCustomHierarchy}
+                  />
+                </div>
+              </div>
+            )}
           </section>
 
           {/* ── STEP 2: Difficulty & Marks ── */}

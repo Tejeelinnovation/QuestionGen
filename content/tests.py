@@ -237,3 +237,32 @@ class QuestionBankTests(APITestCase):
         res_b = self.client.post("/api/questions/ingest/", payload, format="json")
         self.assertEqual(res_b.status_code, status.HTTP_403_FORBIDDEN)
         self.assertIn("Question bank is disabled", res_b.data["detail"])
+
+    def test_qbm_ingest_with_custom_board_and_curriculum(self):
+        """Verify QBM can ingest questions with a custom/state board and on-the-fly curriculum resolution."""
+        self.client.force_authenticate(user=self.qbm)
+        payload = {
+            "board": "State Board - Maharashtra",
+            "subject": "Mathematics",
+            "grade": "Class 10",
+            "chapter_title": "Similarity of Triangles",
+            "topic_name": "Basic Proportionality Theorem",
+            "question_text": "State and prove Basic Proportionality Theorem.",
+            "question_type": QuestionType.LONG_ANSWER,
+            "marks": "5.00",
+            "difficulty": Difficulty.MEDIUM,
+            "correct_answer": "Proof: In a triangle, a line drawn parallel...",
+        }
+        res = self.client.post("/api/questions/ingest/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["bank_source"], BankSource.GLOBAL)
+        self.assertEqual(res.data["topic_name"], "Basic Proportionality Theorem")
+        self.assertEqual(res.data["chapter_title"], "Similarity of Triangles")
+        self.assertEqual(res.data["book_board"], "State Board - Maharashtra")
+
+        # Check that Book, Chapter, and Topic were created in the database
+        created_book = Book.objects.get(board="State Board - Maharashtra", subject="Mathematics", grade="Class 10")
+        created_chapter = Chapter.objects.get(book=created_book, title="Similarity of Triangles")
+        created_topic = Topic.objects.get(chapter=created_chapter, name="Basic Proportionality Theorem")
+        self.assertEqual(res.data["topic"], created_topic.id)
+

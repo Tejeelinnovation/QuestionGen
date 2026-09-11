@@ -179,8 +179,17 @@ export const TeacherDashboardMobile: React.FC = () => {
                     <h3 className="font-heading font-bold text-sm text-ink leading-snug">
                       {p.title}
                     </h3>
-                    <div className="text-[11px] text-ink/60 font-mono">
-                      Chapter: {p.chapter_title || `#${p.chapter}`}
+                    <div className="text-[11px] text-ink/60 font-medium flex items-center gap-1.5 flex-wrap">
+                      {p.duration_minutes ? (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-50 text-amber-700 border border-amber-200">
+                          ⏱ {p.duration_minutes}m
+                        </span>
+                      ) : null}
+                      {p.subjects && p.subjects.length > 0 ? (
+                        <span>{p.subjects.join(', ')}</span>
+                      ) : (
+                        <span>{p.chapter_title || (p.chapter ? `Chapter #${p.chapter}` : 'General')}</span>
+                      )}
                     </div>
                   </div>
                   <span

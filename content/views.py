@@ -39,27 +39,58 @@ from .serializers import (
 )
 
 
+INDIAN_BOARDS = [
+    "CBSE",
+    "ICSE / ISC",
+    "State Board - Maharashtra",
+    "State Board - Karnataka",
+    "State Board - Tamil Nadu",
+    "State Board - Andhra Pradesh",
+    "State Board - Telangana",
+    "State Board - Uttar Pradesh",
+    "State Board - Gujarat",
+    "State Board - Rajasthan",
+    "State Board - West Bengal",
+    "State Board - Kerala",
+    "State Board - Madhya Pradesh",
+    "State Board - Bihar",
+    "State Board - Punjab",
+    "State Board - Haryana",
+    "State Board - Odisha",
+    "State Board - Assam",
+    "State Board - Jharkhand",
+    "State Board - Chhattisgarh",
+    "State Board - Uttarakhand",
+    "State Board - Himachal Pradesh",
+    "State Board - Goa",
+    "State Board - Jammu & Kashmir",
+    "NIOS",
+    "IB (International Baccalaureate)",
+    "Cambridge (IGCSE)",
+    "Other / State Board",
+]
+
+
 class BoardListView(APIView):
     """
     GET /api/boards/
 
-    Returns list of distinct educational boards available in the system.
+    Returns comprehensive list of Indian educational boards and existing boards in the system.
     """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        boards = list(
+        db_boards = list(
             Book.objects.filter(is_active=True)
             .values_list("board", flat=True)
             .distinct()
-            .order_by("board")
         )
-        if not boards:
-            boards = ["CBSE", "ICSE", "State Board"]
-        elif "CBSE" not in boards:
-            boards.insert(0, "CBSE")
-        return Response(boards)
+        combined = list(INDIAN_BOARDS)
+        for b in db_boards:
+            if b and b not in combined:
+                combined.append(b)
+        return Response(combined)
 
 
 class BookListView(ListAPIView):
@@ -293,6 +324,18 @@ class QuestionVariantCreateView(APIView):
         serializer = QuestionVariantSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         variant = serializer.save()
+
+        log_action(
+            user,
+            "question_variant.created",
+            variant,
+            metadata={
+                "variant_id": variant.id,
+                "parent_question_id": question.id,
+                "difficulty": variant.difficulty,
+                "marks": float(variant.marks),
+            },
+        )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

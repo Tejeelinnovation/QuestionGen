@@ -2,7 +2,13 @@ import { apiClient } from './client';
 import type { Book, Chapter, Question, QuestionVariant, Topic } from '../types';
 
 export interface IngestQuestionPayload {
-  topic: number;
+  topic?: number | null;
+  board?: string;
+  book_title?: string;
+  subject?: string;
+  grade?: string;
+  chapter_title?: string;
+  topic_name?: string;
   question_text: string;
   question_type: string;
   marks: number | string;

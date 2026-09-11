@@ -378,6 +378,20 @@ class BulkImportViewSet(viewsets.ViewSet):
 
         file_bytes = uploaded_file.read()
         report = BulkImporter.import_students_from_excel(file_bytes, school.id, request.user)
+        summary = report.get("summary", {})
+        if "error" not in report:
+            log_action(
+                request.user,
+                "excel_import.executed",
+                school,
+                metadata={
+                    "type": "student",
+                    "created_count": summary.get("created_count", 0),
+                    "rejected_count": summary.get("invalid_count", 0),
+                    "duplicate_count": summary.get("duplicate_count", 0),
+                    "overlimit_count": summary.get("over_limit_count", 0),
+                },
+            )
         return Response(
             report,
             status=status.HTTP_200_OK if "error" not in report else status.HTTP_400_BAD_REQUEST,
@@ -408,6 +422,20 @@ class BulkImportViewSet(viewsets.ViewSet):
 
         file_bytes = uploaded_file.read()
         report = BulkImporter.import_teachers_from_excel(file_bytes, school.id, request.user)
+        summary = report.get("summary", {})
+        if "error" not in report:
+            log_action(
+                request.user,
+                "excel_import.executed",
+                school,
+                metadata={
+                    "type": "teacher",
+                    "created_count": summary.get("created_count", 0),
+                    "rejected_count": summary.get("invalid_count", 0),
+                    "duplicate_count": summary.get("duplicate_count", 0),
+                    "overlimit_count": summary.get("over_limit_count", 0),
+                },
+            )
         return Response(
             report,
             status=status.HTTP_200_OK if "error" not in report else status.HTTP_400_BAD_REQUEST,
