@@ -374,6 +374,7 @@ export interface School {
   config?: Record<string, any>;
   max_students?: number;
   max_teachers?: number;
+  question_bank_enabled?: boolean;
   student_count?: number;
   teacher_count?: number;
   created_at?: string;
@@ -393,6 +394,7 @@ export interface SchoolCreateInput {
   name: string;
   max_students?: number;
   max_teachers?: number;
+  question_bank_enabled?: boolean;
   config?: Record<string, any>;
   admin?: SchoolAdminCreateInput;
 }
@@ -401,6 +403,7 @@ export interface SchoolUpdateInput {
   name?: string;
   max_students?: number;
   max_teachers?: number;
+  question_bank_enabled?: boolean;
   config?: Record<string, any>;
 }
 

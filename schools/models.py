@@ -35,6 +35,12 @@ class School(models.Model):
         help_text="Maximum teacher accounts capacity permitted by Super Admin.",
     )
 
+    # Organization-level Question Bank capability configuration (AC-11)
+    question_bank_enabled = models.BooleanField(
+        default=False,
+        help_text="Whether Question Bank capability is enabled for this organization by Super Admin.",
+    )
+
     # Reserved for future school-level configuration (e.g. logo URL, timezone,
     # feature flags). Stored as JSON so schema changes don't require migrations.
     config = models.JSONField(

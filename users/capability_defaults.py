@@ -53,14 +53,17 @@ def _grant(user: "User", capability_name: str, granted_by: "User | None") -> Non
 
 def grant_super_admin_defaults(user: "User", granted_by: "User | None" = None) -> None:
     """
-    Grant ALL capabilities.
+    Grant Super Admin capabilities.
 
-    Called during bootstrap (management command).  ``granted_by`` is None
-    for system-initiated grants.
+    Per specification (AC-21): Super Admin can create schools/coaching classes,
+    students, and future QBMs, but CANNOT directly create teachers. Teacher creation
+    belongs strictly to School / Coaching Class Admins.
     """
     from users.models import CapabilityName  # noqa: PLC0415
 
     for cap in CapabilityName.values:
+        if cap == CapabilityName.CREATE_TEACHER:
+            continue
         _grant(user, cap, granted_by)
 
 
@@ -84,16 +87,23 @@ def grant_teacher_defaults(user: "User", granted_by: "User | None" = None) -> No
     """
     Typical Teacher capability set.
 
-    Grants: CREATE_STUDENT, GENERATE_SELECT_QUESTIONS, CREATE_PAPER, ASSIGN_TEST
+    Grants: CREATE_STUDENT, CREATE_PAPER, ASSIGN_TEST.
+    Per specification (AC-11, AC-12): GENERATE_SELECT_QUESTIONS (Question Bank)
+    is ONLY granted if Question Bank capability is enabled for the organization.
     """
     from users.models import CapabilityName  # noqa: PLC0415
 
-    for cap in [
+    caps = [
         CapabilityName.CREATE_STUDENT,
-        CapabilityName.GENERATE_SELECT_QUESTIONS,
         CapabilityName.CREATE_PAPER,
         CapabilityName.ASSIGN_TEST,
-    ]:
+    ]
+
+    # Only include Question Bank capability if organization has it enabled
+    if user.school and getattr(user.school, "question_bank_enabled", False):
+        caps.append(CapabilityName.GENERATE_SELECT_QUESTIONS)
+
+    for cap in caps:
         _grant(user, cap, granted_by)
 
 

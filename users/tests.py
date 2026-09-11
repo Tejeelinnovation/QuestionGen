@@ -205,15 +205,18 @@ class CompulsoryMobileAndEmailTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        for cap_name in CapabilityName.values:
+            Capability.objects.get_or_create(name=cap_name)
         self.school = School.objects.create(name="Demo School")
-        self.superadmin = User.objects.create_user(
-            username="super_test",
-            email="sa@demo.com",
+        self.school_admin = User.objects.create_user(
+            username="school_admin_test",
+            email="admin@demo.com",
             mobile_number="+919876543210",
-            role="Super Admin",
+            role="School Admin",
+            school=self.school,
         )
-        grant_super_admin_defaults(self.superadmin)
-        self.client.force_authenticate(user=self.superadmin)
+        grant_school_admin_defaults(self.school_admin)
+        self.client.force_authenticate(user=self.school_admin)
 
     def test_create_user_fails_without_email(self):
         res = self.client.post(
@@ -381,4 +384,119 @@ class UnifiedSchoolAndAdminCreationTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         # Verify rollback: school was NOT created in DB
         self.assertFalse(School.objects.filter(name="Should Rollback School").exists())
+
+
+class RoleModificationAndQuestionBankTests(TestCase):
+    """
+    Test suite verifying the P0 role modifications and question bank configuration:
+    - Super Admin cannot directly create teachers (AC-21)
+    - School / Coaching Class Admin can create teachers within their own school (AC-22)
+    - Super Admin can configure question_bank_enabled on an organization (AC-11)
+    - Teacher cannot be granted GENERATE_SELECT_QUESTIONS if organization question_bank_enabled is False (AC-12)
+    - Teacher can be granted GENERATE_SELECT_QUESTIONS if organization question_bank_enabled is True (AC-12)
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        for cap_name in CapabilityName.values:
+            Capability.objects.get_or_create(name=cap_name)
+
+        self.school = School.objects.create(name="Apex Coaching", question_bank_enabled=False)
+        self.superadmin = User.objects.create_user(
+            username="super_admin_p0",
+            email="sa_p0@system.local",
+            mobile_number="+919876543210",
+            role="Super Admin",
+        )
+        grant_super_admin_defaults(self.superadmin)
+
+        self.school_admin = User.objects.create_user(
+            username="apex_admin",
+            email="admin@apex.local",
+            mobile_number="+919876543211",
+            role="School Admin",
+            school=self.school,
+        )
+        grant_school_admin_defaults(self.school_admin, granted_by=self.superadmin)
+
+    def test_super_admin_cannot_directly_create_teacher(self):
+        self.client.force_authenticate(user=self.superadmin)
+        res = self.client.post(
+            "/api/users/",
+            {
+                "username": "new_teacher",
+                "password": "password123!",
+                "email": "teacher@apex.local",
+                "mobile_number": "+919876543212",
+                "profile": "teacher",
+                "school": self.school.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("Super Admins cannot directly create teachers", res.data["detail"])
+
+    def test_school_admin_can_create_teacher(self):
+        self.client.force_authenticate(user=self.school_admin)
+        res = self.client.post(
+            "/api/users/",
+            {
+                "username": "apex_math_teacher",
+                "password": "password123!",
+                "email": "math@apex.local",
+                "mobile_number": "+919876543213",
+                "profile": "teacher",
+                "school": self.school.id,
+                "primary_subject": "Mathematics",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        teacher = User.objects.get(username="apex_math_teacher")
+        self.assertEqual(teacher.school_id, self.school.id)
+        # Verify GENERATE_SELECT_QUESTIONS was NOT granted because question_bank_enabled is False
+        self.assertFalse(teacher.has_capability(CapabilityName.GENERATE_SELECT_QUESTIONS))
+
+    def test_super_admin_can_toggle_question_bank_enabled(self):
+        self.client.force_authenticate(user=self.superadmin)
+        res = self.client.patch(
+            f"/api/schools/{self.school.id}/",
+            {"question_bank_enabled": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.school.refresh_from_db()
+        self.assertTrue(self.school.question_bank_enabled)
+
+    def test_granting_question_bank_to_teacher_respects_organization_enablement(self):
+        teacher = User.objects.create_user(
+            username="science_teacher",
+            email="science@apex.local",
+            mobile_number="+919876543214",
+            role="Teacher",
+            school=self.school,
+        )
+        grant_teacher_defaults(teacher, granted_by=self.school_admin)
+
+        self.client.force_authenticate(user=self.school_admin)
+        # 1. When organization question_bank_enabled is False -> rejected
+        res = self.client.post(
+            f"/api/users/{teacher.id}/permissions/",
+            {"capability_name": CapabilityName.GENERATE_SELECT_QUESTIONS},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Question Bank capability is not enabled for this organization", res.data["detail"])
+
+        # 2. When Super Admin enables question_bank_enabled -> grant succeeds
+        self.school.question_bank_enabled = True
+        self.school.save()
+
+        res2 = self.client.post(
+            f"/api/users/{teacher.id}/permissions/",
+            {"capability_name": CapabilityName.GENERATE_SELECT_QUESTIONS},
+            format="json",
+        )
+        self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(teacher.has_capability(CapabilityName.GENERATE_SELECT_QUESTIONS))
 

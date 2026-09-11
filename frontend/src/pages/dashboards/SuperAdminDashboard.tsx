@@ -9,7 +9,7 @@ import { EditSchoolModal } from '../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../components/schools/BulkImportModal';
-import { Plus, Edit2, Building2, Search, Loader2, X, FileSpreadsheet } from 'lucide-react';
+import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet } from 'lucide-react';
 import type { User, School, UserStats } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonTable, Skeleton } from '../../components/ui/skeleton';
@@ -109,26 +109,16 @@ const SuperAdminDashboardDesktop: React.FC = () => {
           </p>
         </div>
 
-        {/* Primary Action Buttons (Part A) */}
+        {/* Primary Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
           <button
             type="button"
             id="superadmin-create-school-btn"
             onClick={() => setIsCreateSchoolOpen(true)}
-            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-forest hover:text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Add School & Admin</span>
-          </button>
-
-          <button
-            type="button"
-            id="superadmin-create-teacher-btn"
-            onClick={() => setCreateUserProfile('teacher')}
             className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Teacher</span>
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Add School / Coaching Class & Admin</span>
           </button>
         </div>
       </div>
@@ -516,7 +506,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                   <div>
                     <span className="pill pill-forest text-[10px] mb-1">Tenant Clusters</span>
                     <h3 className="font-heading font-bold text-lg text-ink">
-                      Registered Institutions
+                      Schools & Coaching Classes
                     </h3>
                   </div>
                   <button
@@ -554,7 +544,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                             id={`edit-school-${s.id}`}
                             onClick={() => setEditingSchool(s)}
                             className="p-1 rounded-sm text-ink/50 hover:text-forest hover:bg-forest/10 transition-colors cursor-pointer"
-                            title="Edit Student & Teacher Quota"
+                            title="Edit Student & Teacher Quota and Q-Bank Access"
                           >
                             <Edit2 className="w-3 h-3" />
                           </button>
@@ -568,12 +558,21 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                         <span>•</span>
                         <span>{s.config?.curriculum || 'NCERT'}</span>
                       </div>
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
                         <span className="pill text-[10px] bg-forest/10 text-forest border border-forest/20">
                           Students: {s.student_count ?? 0} / {s.max_students ?? 500}
                         </span>
                         <span className="pill text-[10px] bg-grape/10 text-grape border border-grape/20">
                           Teachers: {s.teacher_count ?? 0} / {s.max_teachers ?? 50}
+                        </span>
+                        <span
+                          className={`pill text-[10px] ${
+                            s.question_bank_enabled
+                              ? 'bg-sky-500/10 text-sky-700 border border-sky-500/20 font-medium'
+                              : 'bg-ink/5 text-ink/45 border border-border'
+                          }`}
+                        >
+                          Q-Bank: {s.question_bank_enabled ? 'Active' : 'Disabled'}
                         </span>
                       </div>
                     </div>

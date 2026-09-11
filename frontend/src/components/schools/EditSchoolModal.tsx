@@ -19,6 +19,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
   const [name, setName] = useState('');
   const [maxStudents, setMaxStudents] = useState<number>(500);
   const [maxTeachers, setMaxTeachers] = useState<number>(50);
+  const [questionBankEnabled, setQuestionBankEnabled] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
       setName(school.name || '');
       setMaxStudents(school.max_students ?? 500);
       setMaxTeachers(school.max_teachers ?? 50);
+      setQuestionBankEnabled(Boolean(school.question_bank_enabled));
       setErrorMessage(null);
       setSuccessMessage(null);
     }
@@ -44,7 +46,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
     setSuccessMessage(null);
 
     if (!name.trim()) {
-      setErrorMessage('School name cannot be empty.');
+      setErrorMessage('School / Coaching Class name cannot be empty.');
       return;
     }
 
@@ -79,9 +81,10 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
         name: name.trim(),
         max_students: Number(maxStudents),
         max_teachers: Number(maxTeachers),
+        question_bank_enabled: questionBankEnabled,
       });
 
-      setSuccessMessage('School quotas updated successfully!');
+      setSuccessMessage('Organization settings & quotas updated successfully!');
       setTimeout(() => {
         onSchoolUpdated();
         onClose();
@@ -110,7 +113,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
               <Building2 className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-heading font-bold text-sm text-ink">Edit School Quotas</h3>
+              <h3 className="font-heading font-bold text-sm text-ink">Edit School / Coaching Class</h3>
               <p className="text-[11px] text-ink/50 font-mono">ID #{school.id} • {school.name}</p>
             </div>
           </div>
@@ -141,7 +144,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
 
           {/* School Name */}
           <div className="space-y-1">
-            <label className="text-xs font-heading font-semibold text-ink">Institution Name</label>
+            <label className="text-xs font-heading font-semibold text-ink">School / Coaching Class Name</label>
             <input
               type="text"
               value={name}
@@ -199,6 +202,29 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
             </div>
           </div>
 
+          {/* Question Bank Feature Access Toggle (AC-11) */}
+          <div className="bg-surface-muted/40 border border-border rounded-card p-3.5 flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <span className="text-xs font-heading font-semibold text-ink block">
+                Question Bank Capability (AC-11)
+              </span>
+              <span className="text-[11px] text-ink/65 block">
+                Allow organization and its teachers to generate and select questions.
+              </span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                id="edit-school-question-bank-enabled"
+                checked={questionBankEnabled}
+                onChange={(e) => setQuestionBankEnabled(e.target.checked)}
+                disabled={isSubmitting}
+                className="sr-only peer"
+              />
+              <div className="w-10 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-forest"></div>
+            </label>
+          </div>
+
           {/* Action buttons */}
           <div className="pt-3 border-t border-border flex items-center justify-end gap-2">
             <button
@@ -213,7 +239,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
               disabled={isSubmitting}
               className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 active:scale-95 transition-all shadow-xs cursor-pointer disabled:opacity-50"
             >
-              {isSubmitting ? 'Saving...' : 'Save Quotas'}
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

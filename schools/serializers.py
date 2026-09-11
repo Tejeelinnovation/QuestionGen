@@ -26,6 +26,7 @@ class SchoolSerializer(serializers.ModelSerializer):
             "name",
             "max_students",
             "max_teachers",
+            "question_bank_enabled",
             "student_count",
             "teacher_count",
             "config",

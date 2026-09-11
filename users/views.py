@@ -271,6 +271,16 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Super Admin cannot directly create teachers (AC-21)
+        if profile == "teacher":
+            if request.user.school_id is None or not request.user.has_capability(CapabilityName.CREATE_TEACHER):
+                return Response(
+                    {
+                        "detail": "Super Admins cannot directly create teachers. Teacher creation belongs to the School / Coaching Class."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         # Capability gate — enforced server-side regardless of UI.
         if not request.user.has_capability(required_cap):
             return Response(
@@ -351,7 +361,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
 
     # Role-based scope boundaries: maps each role to its strictly allowed capability set.
     ROLE_ALLOWED_CAPABILITIES = {
-        "Super Admin": [cap.value for cap in CapabilityName],
+        "Super Admin": [cap.value for cap in CapabilityName if cap != CapabilityName.CREATE_TEACHER],
         "School Admin": [
             CapabilityName.CREATE_TEACHER,
             CapabilityName.CREATE_STUDENT,
@@ -443,6 +453,20 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Question Bank capability gating (AC-11, AC-12):
+        # Teacher cannot be granted GENERATE_SELECT_QUESTIONS if organization does not have it enabled.
+        if cap_name == CapabilityName.GENERATE_SELECT_QUESTIONS and target_role == "Teacher":
+            if not target_user.school or not getattr(target_user.school, "question_bank_enabled", False):
+                return Response(
+                    {
+                        "detail": (
+                            "Question Bank capability is not enabled for this organization. "
+                            "Super Admin must enable Question Bank capability for the School / Coaching Class first."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         cap = Capability.objects.get(name=cap_name)
 

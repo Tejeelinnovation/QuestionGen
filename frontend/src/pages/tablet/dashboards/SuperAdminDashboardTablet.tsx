@@ -6,7 +6,7 @@ import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../../components/schools/BulkImportModal';
-import { Plus, Edit2, Building2, Search, Loader2, X, FileSpreadsheet } from 'lucide-react';
+import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster, Skeleton } from '../../../components/ui/skeleton';
@@ -136,18 +136,10 @@ export const SuperAdminDashboardTablet: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsCreateSchoolOpen(true)}
-            className="px-3 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-forest hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>School & Admin</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCreateUserProfile('teacher')}
-            className="px-3 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Teacher</span>
+            <span>School / Coaching Class & Admin</span>
           </button>
         </div>
       </div>
@@ -232,7 +224,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
                 onClick={() => setIsCreateSchoolOpen(true)}
                 className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-colors cursor-pointer"
               >
-                + New School
+                + New Organization
               </button>
             </div>
 
@@ -261,7 +253,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
                         id={`tablet-edit-school-${s.id}`}
                         onClick={() => setEditingSchool(s)}
                         className="p-1 rounded-sm text-ink/60 hover:text-forest hover:bg-forest/10 transition-colors cursor-pointer"
-                        title="Edit Quotas"
+                        title="Edit Quotas and Q-Bank Access"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
@@ -275,12 +267,21 @@ export const SuperAdminDashboardTablet: React.FC = () => {
                     <span>•</span>
                     <span>{s.config?.curriculum || 'NCERT'}</span>
                   </div>
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     <span className="pill text-[10px] bg-forest/10 text-forest border border-forest/20">
                       Students: {s.student_count ?? 0} / {s.max_students ?? 500}
                     </span>
                     <span className="pill text-[10px] bg-grape/10 text-grape border border-grape/20">
                       Teachers: {s.teacher_count ?? 0} / {s.max_teachers ?? 50}
+                    </span>
+                    <span
+                      className={`pill text-[10px] ${
+                        s.question_bank_enabled
+                          ? 'bg-sky-500/10 text-sky-700 border border-sky-500/20 font-medium'
+                          : 'bg-ink/5 text-ink/45 border border-border'
+                      }`}
+                    >
+                      Q-Bank: {s.question_bank_enabled ? 'Active' : 'Disabled'}
                     </span>
                   </div>
                 </div>

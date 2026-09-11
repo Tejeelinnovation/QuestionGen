@@ -23,6 +23,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
   const [curriculum, setCurriculum] = useState('NCERT');
   const [maxStudents, setMaxStudents] = useState<number>(500);
   const [maxTeachers, setMaxTeachers] = useState<number>(50);
+  const [questionBankEnabled, setQuestionBankEnabled] = useState<boolean>(false);
   // System timezone is fixed to 'Asia/Kolkata' for Indian institutions (hidden from UI)
   const [timezone] = useState('Asia/Kolkata');
   const [isCustomJson] = useState(false);
@@ -47,7 +48,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
 
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setErrorMsg('School name is required.');
+      setErrorMsg('School / Coaching Class name is required.');
       return;
     }
 
@@ -93,6 +94,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
       name: trimmedName,
       max_students: Number(maxStudents) > 0 ? Number(maxStudents) : 500,
       max_teachers: Number(maxTeachers) > 0 ? Number(maxTeachers) : 50,
+      question_bank_enabled: questionBankEnabled,
       config: configPayload,
       admin: {
         username: uName,
@@ -115,6 +117,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
       setCurriculum('NCERT');
       setMaxStudents(500);
       setMaxTeachers(50);
+      setQuestionBankEnabled(false);
       setAdminUsername('');
       setAdminPassword('');
       setAdminEmail('');
@@ -169,10 +172,10 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
             </div>
             <div>
               <h2 className="font-heading font-bold text-lg text-ink">
-                Register School & Administrator
+                Register School / Coaching Class & Administrator
               </h2>
               <p className="text-xs text-ink/65">
-                Register a new institutional tenant and its designated school administrator at once.
+                Register a new institutional tenant (School or Coaching Class) and its designated administrator at once.
               </p>
             </div>
           </div>
@@ -201,19 +204,19 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
             <div className="flex items-center gap-2 pb-1 border-b border-border">
               <span className="w-2 h-2 rounded-full bg-forest" />
               <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-ink/60">
-                1. Institutional Partition
+                1. School / Coaching Class Partition
               </span>
             </div>
 
             <div className="space-y-1.5">
               <label htmlFor="school-name" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
-                Institution Name *
+                School / Coaching Class Name *
               </label>
               <input
                 id="school-name"
                 type="text"
                 required
-                placeholder="e.g. Greenwood High International"
+                placeholder="e.g. Greenwood High or Apex Coaching Institute"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isSubmitting}
@@ -268,7 +271,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
                     className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
                     placeholder="e.g. 500"
                   />
-                  <p className="text-[10px] text-ink/50">Total student limit for entire school</p>
+                  <p className="text-[10px] text-ink/50">Total student limit for organization</p>
                 </div>
 
                 <div className="space-y-1">
@@ -287,25 +290,53 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
                     className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
                     placeholder="e.g. 50"
                   />
-                  <p className="text-[10px] text-ink/50">Total faculty limit for entire school</p>
+                  <p className="text-[10px] text-ink/50">Total faculty limit for organization</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Question Bank Capability (AC-11) */}
+            <div className="pt-2">
+              <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                Question Bank Feature Access (AC-11)
+              </label>
+              <div className="bg-surface-muted/40 border border-border rounded-card p-3.5 flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-heading font-semibold text-ink block">
+                    Enable Question Bank Capability
+                  </span>
+                  <span className="text-[11px] text-ink/65 block">
+                    When enabled, School / Coaching Class Admins and authorized teachers can use Question Bank generation tools.
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    id="school-question-bank-enabled"
+                    checked={questionBankEnabled}
+                    onChange={(e) => setQuestionBankEnabled(e.target.checked)}
+                    disabled={isSubmitting}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-forest"></div>
+                </label>
               </div>
             </div>
           </div>
 
-          {/* Section 2: Atomic School Administrator Account */}
+          {/* Section 2: Atomic School / Coaching Class Administrator Account */}
           <div className="space-y-4 pt-4 border-t border-border">
             <div className="flex items-center gap-2 pb-1">
               <span className="w-2 h-2 rounded-full bg-ember" />
               <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-ink/60">
-                2. Designated School Administrator *
+                2. Designated Administrator *
               </span>
             </div>
 
             <div className="space-y-3.5 bg-surface-muted/30 border border-border rounded-card p-4">
               <div className="flex items-center gap-2 text-xs text-ink/70">
                 <UserPlus className="w-3.5 h-3.5 text-ember" />
-                <span>Provision primary administrator credentials with school-wide governance (mandatory).</span>
+                <span>Provision primary administrator credentials with organization-wide governance (mandatory).</span>
               </div>
 
               {/* Name Fields */}
