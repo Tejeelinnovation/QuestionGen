@@ -33,7 +33,7 @@ from .models import (
 # ---------------------------------------------------------------------------
 
 class PaperListSerializer(serializers.ModelSerializer):
-    chapter_title = serializers.CharField(source="chapter.title", read_only=True)
+    chapter_title = serializers.SerializerMethodField()
     created_by_username = serializers.CharField(source="created_by.username", read_only=True)
     school_name = serializers.CharField(source="school.name", read_only=True, default=None)
     version_count = serializers.SerializerMethodField()
@@ -46,6 +46,10 @@ class PaperListSerializer(serializers.ModelSerializer):
             "instructions",
             "chapter",
             "chapter_title",
+            "subjects",
+            "duration_minutes",
+            "total_question_count",
+            "specifications",
             "created_by",
             "created_by_username",
             "school",
@@ -56,19 +60,53 @@ class PaperListSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def get_chapter_title(self, obj: Paper) -> str | None:
+        return obj.chapter.title if obj.chapter else None
+
     def get_version_count(self, obj: Paper) -> int:
         return obj.versions.count()
 
 
 class PaperCreateSerializer(serializers.ModelSerializer):
+    chapter = serializers.PrimaryKeyRelatedField(
+        queryset=Chapter.objects.all(), required=False, allow_null=True
+    )
+    subjects = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    duration_minutes = serializers.IntegerField(
+        required=False, default=60, min_value=1
+    )
+    total_question_count = serializers.IntegerField(
+        required=False, default=0, min_value=0
+    )
+    specifications = serializers.JSONField(
+        required=False, default=dict
+    )
+
     class Meta:
         model = Paper
-        fields = ["id", "title", "instructions", "chapter"]
+        fields = [
+            "id",
+            "title",
+            "instructions",
+            "chapter",
+            "subjects",
+            "duration_minutes",
+            "total_question_count",
+            "specifications",
+        ]
 
-    def validate_chapter(self, value: Chapter) -> Chapter:
-        if not value.book.is_active:
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        chapter = attrs.get("chapter")
+        subjects = attrs.get("subjects")
+        if not chapter and not subjects:
+            raise serializers.ValidationError(
+                "Either a chapter or a list of subjects must be specified for the paper."
+            )
+        if chapter and not chapter.book.is_active:
             raise serializers.ValidationError("Cannot create a paper for an inactive book.")
-        return value
+        return attrs
 
 
 class PaperDetailSerializer(PaperListSerializer):
@@ -101,6 +139,29 @@ class SelectQuestionsRequestSerializer(serializers.Serializer):
         required=False,
         default=list,
         help_text="Optional list of topic IDs to filter candidate questions.",
+    )
+    chapter_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        default=list,
+        help_text="Optional list of chapter IDs for multi-chapter/subject filtering.",
+    )
+    subjects = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+        help_text="Optional list of subjects for multi-subject filtering.",
+    )
+    subject_breakdown = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        default=list,
+        help_text="Optional list of subject quotas: [{'subject': 'Physics', 'marks': 25, 'count': 10}].",
+    )
+    difficulty_distribution = serializers.DictField(
+        required=False,
+        default=dict,
+        help_text="Optional distribution of difficulty: {'EASY': 40, 'MEDIUM': 40, 'HARD': 20}.",
     )
     difficulty = serializers.ChoiceField(
         choices=Difficulty.choices,
@@ -139,6 +200,18 @@ class SelectQuestionsRequestSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Maximum number of candidate questions to select.",
     )
+    total_question_count = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        allow_null=True,
+        help_text="Target total question count (AC-18).",
+    )
+    duration_minutes = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        allow_null=True,
+        help_text="Exam duration in minutes (AC-18).",
+    )
 
 
 class QuestionPreviewSerializer(serializers.ModelSerializer):
@@ -148,9 +221,11 @@ class QuestionPreviewSerializer(serializers.ModelSerializer):
 
     topic_name = serializers.CharField(source="topic.name", read_only=True)
     chapter_title = serializers.CharField(source="topic.chapter.title", read_only=True)
+    subject = serializers.CharField(source="topic.chapter.book.subject", read_only=True, default="")
     question_type_display = serializers.CharField(source="get_question_type_display", read_only=True)
     difficulty_display = serializers.CharField(source="get_difficulty_display", read_only=True)
     learner_level_display = serializers.CharField(source="get_learner_level_display", read_only=True)
+    variants_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
@@ -159,6 +234,7 @@ class QuestionPreviewSerializer(serializers.ModelSerializer):
             "topic",
             "topic_name",
             "chapter_title",
+            "subject",
             "question_text",
             "question_type",
             "question_type_display",
@@ -167,10 +243,18 @@ class QuestionPreviewSerializer(serializers.ModelSerializer):
             "difficulty_display",
             "learner_level",
             "learner_level_display",
+            "bank_source",
+            "variants_count",
             "options",
             "correct_answer",
+            "explanation",
             "source_reference",
         ]
+
+    def get_variants_count(self, obj: Question) -> int:
+        if hasattr(obj, "variants"):
+            return obj.variants.count()
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -431,6 +515,9 @@ class PaperPrintSerializer(serializers.Serializer):
     school_name = serializers.CharField(required=False, allow_blank=True, default="")
     instructions = serializers.CharField(required=False, allow_blank=True, default="")
     version_label = serializers.CharField()
+    duration_minutes = serializers.IntegerField(default=60)
+    total_question_count = serializers.IntegerField(default=0)
+    subjects = serializers.ListField(child=serializers.CharField(), default=list)
     total_marks = serializers.IntegerField()
     question_count = serializers.IntegerField()
     questions = serializers.ListField(child=serializers.DictField())

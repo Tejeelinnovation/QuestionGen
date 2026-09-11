@@ -30,10 +30,24 @@ const PaperSetupPageDesktop: React.FC = () => {
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [chapterId, setChapterId] = useState<number | ''>('');
+  const [examMode, setExamMode] = useState<'single' | 'multi'>('single');
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['Mathematics']);
+  const [durationMinutes, setDurationMinutes] = useState<number>(60);
+  const [totalQuestionCount, setTotalQuestionCount] = useState<number>(20);
 
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const availableSubjects = [
+    'Mathematics',
+    'Physics',
+    'Chemistry',
+    'Biology',
+    'Science',
+    'Social Science',
+    'English',
+  ];
 
   useEffect(() => {
     const loadChapters = async () => {
@@ -57,6 +71,12 @@ const PaperSetupPageDesktop: React.FC = () => {
     loadChapters();
   }, []);
 
+  const handleSubjectToggle = (subj: string) => {
+    setSelectedSubjects((prev) =>
+      prev.includes(subj) ? prev.filter((s) => s !== subj) : [...prev, subj]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -65,8 +85,12 @@ const PaperSetupPageDesktop: React.FC = () => {
       setErrorMessage('Paper title is required.');
       return;
     }
-    if (!chapterId) {
+    if (examMode === 'single' && !chapterId) {
       setErrorMessage('Please select a chapter.');
+      return;
+    }
+    if (examMode === 'multi' && selectedSubjects.length === 0) {
+      setErrorMessage('Please select at least one subject for the combined test.');
       return;
     }
 
@@ -75,7 +99,10 @@ const PaperSetupPageDesktop: React.FC = () => {
       const paper = await papersApi.createPaper({
         title: title.trim(),
         instructions: instructions.trim(),
-        chapter: Number(chapterId),
+        chapter: examMode === 'single' ? Number(chapterId) : null,
+        subjects: examMode === 'multi' ? selectedSubjects : [],
+        duration_minutes: Number(durationMinutes) || 60,
+        total_question_count: Number(totalQuestionCount) || 0,
       });
 
       navigate(`/papers/${paper.id}/configure`);
@@ -161,70 +188,218 @@ const PaperSetupPageDesktop: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Chapter Selector Styled with Select Component */}
+                {/* Exam Mode Toggle: Single vs Multi-Subject (AC-17) */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label
-                      htmlFor="paper-chapter-trigger"
-                      className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider"
+                  <label className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider mb-2">
+                    Blueprint Scope Mode *
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setExamMode('single')}
+                      className={`p-3 rounded-card border text-left transition-all cursor-pointer ${
+                        examMode === 'single'
+                          ? 'border-forest bg-forest/5 text-ink ring-1 ring-forest'
+                          : 'border-border bg-bg text-ink/70 hover:bg-surface'
+                      }`}
                     >
-                      Curriculum Chapter *
-                    </label>
-                    <span className="text-[11px] font-mono text-ink/40">Question Bank Scope</span>
+                      <div className="flex items-center gap-2 font-heading font-semibold text-xs">
+                        <span className={`w-2 h-2 rounded-full ${examMode === 'single' ? 'bg-forest' : 'bg-ink/30'}`} />
+                        Single Chapter Focus
+                      </div>
+                      <p className="text-[11px] text-ink/60 mt-1">
+                        Chapter-specific unit test or weekly assessment.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setExamMode('multi')}
+                      className={`p-3 rounded-card border text-left transition-all cursor-pointer ${
+                        examMode === 'multi'
+                          ? 'border-forest bg-forest/5 text-ink ring-1 ring-forest'
+                          : 'border-border bg-bg text-ink/70 hover:bg-surface'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 font-heading font-semibold text-xs">
+                        <span className={`w-2 h-2 rounded-full ${examMode === 'multi' ? 'bg-forest' : 'bg-ink/30'}`} />
+                        Multi-Subject / Combined Exam
+                      </div>
+                      <p className="text-[11px] text-ink/60 mt-1">
+                        Competitive mock (JEE/NEET) or term exam across disciplines.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Single Chapter Selector / Multi-Subject Selection */}
+                {examMode === 'single' ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label
+                        htmlFor="paper-chapter-trigger"
+                        className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider"
+                      >
+                        Curriculum Chapter *
+                      </label>
+                      <span className="text-[11px] font-mono text-ink/40">Question Bank Scope</span>
+                    </div>
+
+                    <Select
+                      value={chapterId ? String(chapterId) : ''}
+                      onValueChange={(val) => setChapterId(Number(val))}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger
+                        id="paper-chapter-trigger"
+                        className="w-full h-auto py-2.5 px-4 rounded-card border border-border bg-bg text-sm text-ink focus:border-forest focus:bg-surface transition-colors"
+                      >
+                        <SelectValue placeholder="Select a syllabus chapter..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-surface border border-border rounded-card shadow-float max-h-72">
+                        {chapters.map((c) => (
+                          <SelectItem
+                            key={c.id}
+                            value={String(c.id)}
+                            className="py-2.5 px-3 text-xs hover:bg-surface-muted cursor-pointer"
+                          >
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-heading font-semibold text-ink">
+                                {c.book_title ? `[${c.book_title}] ` : ''}
+                                {c.title}
+                              </span>
+                              <span className="font-mono text-[10px] text-ink/50">
+                                {c.topic_count} Topics available in syllabus
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <select
+                      id="paper-chapter"
+                      value={chapterId}
+                      onChange={(e) => setChapterId(Number(e.target.value))}
+                      className="sr-only"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                    >
+                      {chapters.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider">
+                        Participating Subjects *
+                      </label>
+                      <span className="text-[11px] font-mono text-ink/40">
+                        {selectedSubjects.length} selected
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {availableSubjects.map((subj) => {
+                        const isSelected = selectedSubjects.includes(subj);
+                        return (
+                          <button
+                            key={subj}
+                            type="button"
+                            onClick={() => handleSubjectToggle(subj)}
+                            className={`px-3 py-1.5 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer border ${
+                              isSelected
+                                ? 'bg-forest text-white border-forest shadow-xs'
+                                : 'bg-bg text-ink/70 border-border hover:bg-surface hover:text-ink'
+                            }`}
+                          >
+                            {isSelected ? '✓ ' : '+ '}
+                            {subj}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-ink/50 mt-1.5">
+                      Questions from both global QBM banks and your organization's private bank will be pooled across these subjects.
+                    </p>
+                  </div>
+                )}
+
+                {/* Duration & Target Question Count (AC-18) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border/70">
+                  {/* Duration in Minutes */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label
+                        htmlFor="paper-duration"
+                        className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider"
+                      >
+                        Exam Duration (Minutes) *
+                      </label>
+                      <span className="text-[11px] font-mono text-forest font-semibold">
+                        {durationMinutes} min
+                      </span>
+                    </div>
+                    <input
+                      id="paper-duration"
+                      type="number"
+                      min={1}
+                      max={600}
+                      value={durationMinutes}
+                      onChange={(e) => setDurationMinutes(Math.max(1, Number(e.target.value)))}
+                      className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-sm font-mono text-ink focus:border-forest focus:outline-none"
+                    />
+                    {/* Quick Presets */}
+                    <div className="flex items-center gap-1.5 mt-2">
+                      {[45, 60, 90, 120, 180].map((mins) => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => setDurationMinutes(mins)}
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-pill border transition-colors cursor-pointer ${
+                            durationMinutes === mins
+                              ? 'bg-forest text-white border-forest'
+                              : 'bg-surface text-ink/60 border-border hover:text-ink'
+                          }`}
+                        >
+                          {mins}m
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <Select
-                    value={chapterId ? String(chapterId) : ''}
-                    onValueChange={(val) => setChapterId(Number(val))}
-                    disabled={isSubmitting}
-                  >
-                    <SelectTrigger
-                      id="paper-chapter-trigger"
-                      className="w-full h-auto py-2.5 px-4 rounded-card border border-border bg-bg text-sm text-ink focus:border-forest focus:bg-surface transition-colors"
-                    >
-                      <SelectValue placeholder="Select a syllabus chapter..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-surface border border-border rounded-card shadow-float max-h-72">
-                      {chapters.map((c) => (
-                        <SelectItem
-                          key={c.id}
-                          value={String(c.id)}
-                          className="py-2.5 px-3 text-xs hover:bg-surface-muted cursor-pointer"
-                        >
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-heading font-semibold text-ink">
-                              {c.book_title ? `[${c.book_title}] ` : ''}
-                              {c.title}
-                            </span>
-                            <span className="font-mono text-[10px] text-ink/50">
-                              {c.topic_count} Topics available in syllabus
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Synchronized accessible select with matching ID for automated scripts/testing */}
-                  <select
-                    id="paper-chapter"
-                    value={chapterId}
-                    onChange={(e) => setChapterId(Number(e.target.value))}
-                    className="sr-only"
-                    tabIndex={-1}
-                    aria-hidden="true"
-                    required
-                  >
-                    {chapters.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.title}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Target Question Count */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label
+                        htmlFor="paper-target-count"
+                        className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider"
+                      >
+                        Target Total Questions
+                      </label>
+                      <span className="text-[11px] font-mono text-ink/40">Optional</span>
+                    </div>
+                    <input
+                      id="paper-target-count"
+                      type="number"
+                      min={0}
+                      max={200}
+                      value={totalQuestionCount}
+                      onChange={(e) => setTotalQuestionCount(Math.max(0, Number(e.target.value)))}
+                      placeholder="e.g. 25"
+                      className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-sm font-mono text-ink focus:border-forest focus:outline-none"
+                    />
+                    <p className="text-[11px] text-ink/50 mt-2">
+                      Target total question volume displayed on exam blueprint.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Instructions / Notes */}
-                <div>
+                <div className="pt-2 border-t border-border/70">
                   <div className="flex items-center justify-between mb-1.5">
                     <label
                       htmlFor="paper-instructions"
@@ -239,7 +414,7 @@ const PaperSetupPageDesktop: React.FC = () => {
                     value={instructions}
                     onChange={(e) => setInstructions(e.target.value)}
                     placeholder="e.g. All questions are compulsory. Calculators are strictly prohibited. Time allowed: 90 minutes."
-                    rows={4}
+                    rows={3}
                     disabled={isSubmitting}
                     className="w-full rounded-card border border-border bg-bg px-4 py-2.5 text-sm text-ink placeholder:text-ink/40 focus:bg-surface focus:border-forest focus:outline-none transition-colors"
                   />
@@ -261,7 +436,7 @@ const PaperSetupPageDesktop: React.FC = () => {
                 <button
                   type="submit"
                   id="submit-paper-setup-btn"
-                  disabled={isSubmitting || chapters.length === 0}
+                  disabled={isSubmitting}
                   className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
                   <span>{isSubmitting ? 'Creating Blueprint...' : 'Continue to Configuration'}</span>
@@ -285,25 +460,50 @@ const PaperSetupPageDesktop: React.FC = () => {
               </span>
             </div>
 
-            {selectedChapter ? (
+            {examMode === 'single' ? (
+              selectedChapter ? (
+                <div className="space-y-3">
+                  <div className="font-heading font-bold text-xl text-ink">
+                    {selectedChapter.title}
+                  </div>
+                  {selectedChapter.book_title && (
+                    <div className="text-xs text-ink/70 flex items-center gap-1.5">
+                      <span className="font-medium text-forest">Course Textbook:</span>
+                      <span>{selectedChapter.book_title}</span>
+                    </div>
+                  )}
+                  <div className="p-3 bg-bg rounded-lg border border-border/70 flex items-center justify-between text-xs font-mono">
+                    <span className="text-ink/60">Registered Syllabus Topics:</span>
+                    <span className="font-bold text-forest">{selectedChapter.topic_count} Topics</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-ink/60 py-2">
+                  Select a chapter to review curriculum coverage.
+                </div>
+              )
+            ) : (
               <div className="space-y-3">
                 <div className="font-heading font-bold text-xl text-ink">
-                  {selectedChapter.title}
+                  Multi-Subject Examination
                 </div>
-                {selectedChapter.book_title && (
-                  <div className="text-xs text-ink/70 flex items-center gap-1.5">
-                    <span className="font-medium text-forest">Course Textbook:</span>
-                    <span>{selectedChapter.book_title}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedSubjects.map((s) => (
+                    <span key={s} className="pill pill-forest text-[10px]">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+                <div className="p-3 bg-bg rounded-lg border border-border/70 space-y-1.5 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-ink/60">Duration:</span>
+                    <span className="font-bold text-forest">{durationMinutes} Minutes</span>
                   </div>
-                )}
-                <div className="p-3 bg-bg rounded-lg border border-border/70 flex items-center justify-between text-xs font-mono">
-                  <span className="text-ink/60">Registered Syllabus Topics:</span>
-                  <span className="font-bold text-forest">{selectedChapter.topic_count} Topics</span>
+                  <div className="flex justify-between">
+                    <span className="text-ink/60">Target Volume:</span>
+                    <span className="font-bold text-forest">{totalQuestionCount || 'Flexible'} Questions</span>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="text-xs text-ink/60 py-2">
-                Select a chapter to review curriculum coverage.
               </div>
             )}
 
@@ -312,10 +512,10 @@ const PaperSetupPageDesktop: React.FC = () => {
                 What happens in Step 2:
               </div>
               <ul className="text-xs text-ink/70 space-y-1.5 list-disc list-inside">
-                <li>Filter by specific syllabus sub-topics</li>
+                <li>Multi-source candidate retrieval (Global QBM + School Banks)</li>
                 <li>Apply Bloom’s taxonomy & difficulty balancing</li>
                 <li>Constrain question types (MCQ, Short, Long Answer)</li>
-                <li>Target precise total examination marks</li>
+                <li>Target precise total examination marks & quotas</li>
               </ul>
             </div>
           </div>

@@ -10,17 +10,27 @@ import type {
 export interface CreatePaperInput {
   title: string;
   instructions: string;
-  chapter: number;
+  chapter?: number | null;
+  subjects?: string[];
+  duration_minutes?: number;
+  total_question_count?: number;
+  specifications?: Record<string, any>;
 }
 
 export interface SelectQuestionsConstraints {
   topic_ids?: number[];
+  chapter_ids?: number[];
+  subjects?: string[];
+  subject_breakdown?: Array<{ subject: string; marks?: number; count?: number }>;
+  difficulty_distribution?: Record<string, number>;
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD' | '';
   question_type?: 'MCQ' | 'SHORT_ANSWER' | 'LONG_ANSWER' | '';
   learner_level?: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | '';
   marks_per_question?: number | string | null;
   total_marks?: number | null;
   quantity?: number | null;
+  total_question_count?: number | null;
+  duration_minutes?: number | null;
 }
 
 export interface CreateVersionInput {

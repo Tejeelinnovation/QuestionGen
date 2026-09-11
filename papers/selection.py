@@ -7,7 +7,7 @@ and max_quantity constraints from a filtered question pool.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from content.models import Question
@@ -116,3 +116,108 @@ def select_questions_for_quota(
     return [], (
         f"Cannot assemble questions to meet {target_display} marks with the selected constraints."
     )
+
+
+def select_questions_for_specification(
+    pool: list[Question],
+    spec: dict[str, Any],
+) -> tuple[list[Question], str | None]:
+    """
+    Select candidate questions satisfying a blueprint specification.
+    Supports:
+    - Multi-subject breakdown (e.g. Physics, Chemistry, Math marks/counts quotas, AC-17)
+    - Difficulty distribution (e.g. Easy/Medium/Hard percentages or counts)
+    - Fallback to total marks & max quantity knapsack solver (AC-18)
+    """
+    if not pool:
+        return [], None
+
+    # 1. Multi-Subject Breakdown (AC-17)
+    subject_breakdown = spec.get("subject_breakdown")
+    if subject_breakdown and isinstance(subject_breakdown, list):
+        # Group pool by subject
+        by_subject: dict[str, list[Question]] = {}
+        for q in pool:
+            subj = ""
+            if hasattr(q, "topic") and q.topic and hasattr(q.topic, "chapter") and q.topic.chapter:
+                if hasattr(q.topic.chapter, "book") and q.topic.chapter.book:
+                    subj = q.topic.chapter.book.subject
+                if not subj:
+                    subj = q.topic.chapter.title
+            subj_key = subj.strip().lower() if subj else "general"
+            by_subject.setdefault(subj_key, []).append(q)
+
+        all_selected: list[Question] = []
+        for s_spec in subject_breakdown:
+            target_subj = (s_spec.get("subject") or "").strip().lower()
+            s_marks = s_spec.get("marks")
+            s_count = s_spec.get("count") or s_spec.get("quantity")
+
+            # Match candidates for this subject
+            s_pool = by_subject.get(target_subj, [])
+            if not s_pool:
+                # Try partial matching
+                for k, v in by_subject.items():
+                    if target_subj in k or k in target_subj:
+                        s_pool = v
+                        break
+
+            if not s_pool:
+                return [], f"No questions available in question bank for subject '{s_spec.get('subject')}'."
+
+            selected_subj, err = select_questions_for_quota(
+                s_pool,
+                target_marks=float(s_marks) if s_marks is not None else None,
+                max_quantity=int(s_count) if s_count is not None else None,
+            )
+            if err:
+                return [], f"[{s_spec.get('subject')}] {err}"
+            all_selected.extend(selected_subj)
+
+        all_selected.sort(key=lambda x: (x.topic_id, x.difficulty, x.id))
+        return all_selected, None
+
+    # 2. Difficulty Distribution
+    diff_dist = spec.get("difficulty_distribution")
+    if diff_dist and isinstance(diff_dist, dict):
+        total_target_count = spec.get("total_question_count") or spec.get("quantity")
+        by_diff: dict[str, list[Question]] = {}
+        for q in pool:
+            by_diff.setdefault(q.difficulty, []).append(q)
+
+        all_selected = []
+        # Check if values are percentages (sum ~= 100) or explicit counts
+        vals = [float(v) for v in diff_dist.values() if v]
+        is_percentage = sum(vals) <= 100 and any(v > 10 for v in vals) and total_target_count
+
+        for diff, quota in diff_dist.items():
+            diff_upper = diff.upper()
+            d_pool = by_diff.get(diff_upper, [])
+            if is_percentage and total_target_count:
+                count_needed = int(round(float(total_target_count) * (float(quota) / 100.0)))
+            else:
+                count_needed = int(quota)
+
+            if count_needed > 0:
+                if len(d_pool) < count_needed:
+                    return [], (
+                        f"Requested {count_needed} {diff_upper} questions, but only {len(d_pool)} are available."
+                    )
+                all_selected.extend(d_pool[:count_needed])
+
+        if all_selected:
+            all_selected.sort(key=lambda x: (x.topic_id, x.difficulty, x.id))
+            return all_selected, None
+
+    # 3. Standard Marks / Quantity Quota (AC-18)
+    target_marks = spec.get("total_marks")
+    max_quantity = spec.get("total_question_count") or spec.get("quantity")
+    if target_marks is not None or max_quantity is not None:
+        return select_questions_for_quota(
+            pool,
+            target_marks=float(target_marks) if target_marks is not None else None,
+            max_quantity=int(max_quantity) if max_quantity is not None else None,
+        )
+
+    return pool, None
+

@@ -598,3 +598,117 @@ class PapersWorkflowTests(APITestCase):
         res_del_assigned = self.client.get("/api/deliveries/")
         self.assertEqual(len(res_del_assigned.data), 1)
         self.assertEqual(res_del_assigned.data[0]["id"], delivery.id)
+
+    def test_multi_subject_paper_creation_and_blueprint_metadata(self):
+        """AC-17, AC-18: Verify paper creation with multiple subjects, duration, and question count."""
+        self.client.force_authenticate(user=self.teacher_1)
+        payload = {
+            "title": "Combined Science & Math Entrance Exam",
+            "instructions": "Attempt all sections. No calculators allowed.",
+            "subjects": ["Mathematics", "Physics"],
+            "duration_minutes": 120,
+            "total_question_count": 25,
+            "specifications": {
+                "subject_breakdown": [
+                    {"subject": "Mathematics", "marks": 20, "count": 10},
+                    {"subject": "Physics", "marks": 20, "count": 10},
+                ]
+            },
+        }
+        res = self.client.post("/api/papers/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["title"], "Combined Science & Math Entrance Exam")
+        self.assertEqual(res.data["subjects"], ["Mathematics", "Physics"])
+        self.assertEqual(res.data["duration_minutes"], 120)
+        self.assertEqual(res.data["total_question_count"], 25)
+        self.assertIsNone(res.data["chapter"])
+
+    def test_multi_source_candidate_selection_includes_global_and_own_school(self):
+        """AC-19: Retrieval pools both QBM Global questions and teacher's own school questions."""
+        # Create private question for School A
+        q_school_a = Question.objects.create(
+            topic=self.topic_1,
+            question_text="School A Proprietary Question on Euclid.",
+            question_type=QuestionType.SHORT_ANSWER,
+            marks=2,
+            difficulty=Difficulty.EASY,
+            bank_source="ORGANIZATION",
+            school=self.school_a,
+            created_by=self.teacher_1,
+            is_active=True,
+        )
+
+        paper = Paper.objects.create(
+            title="School A Unit Test",
+            created_by=self.teacher_1,
+            school=self.school_a,
+            chapter=self.chapter,
+            duration_minutes=45,
+        )
+
+        self.client.force_authenticate(user=self.teacher_1)
+        res = self.client.post(f"/api/papers/{paper.id}/select-questions/", {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        returned_ids = [q["id"] for q in res.data["questions"]]
+
+        # Both Global (q1) and School A private (q_school_a) must be present
+        self.assertIn(self.q1.id, returned_ids)
+        self.assertIn(q_school_a.id, returned_ids)
+
+    def test_cross_organization_question_exclusion(self):
+        """AC-20: Questions belonging to School B are strictly EXCLUDED from School A's candidate pool."""
+        # Create private question for School B
+        q_school_b = Question.objects.create(
+            topic=self.topic_1,
+            question_text="School B Proprietary Question on Euclid.",
+            question_type=QuestionType.SHORT_ANSWER,
+            marks=2,
+            difficulty=Difficulty.EASY,
+            bank_source="ORGANIZATION",
+            school=self.school_b,
+            is_active=True,
+        )
+
+        paper_a = Paper.objects.create(
+            title="School A Test",
+            created_by=self.teacher_1,
+            school=self.school_a,
+            chapter=self.chapter,
+        )
+
+        self.client.force_authenticate(user=self.teacher_1)
+        res = self.client.post(f"/api/papers/{paper_a.id}/select-questions/", {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        returned_ids = [q["id"] for q in res.data["questions"]]
+
+        # School B question must NEVER appear in School A's paper candidates
+        self.assertNotIn(q_school_b.id, returned_ids)
+
+    def test_print_representation_includes_duration_and_subjects(self):
+        """AC-18: Verify that print layout exposes duration_minutes and subjects."""
+        paper = Paper.objects.create(
+            title="Class 10 Mid-Term Exam",
+            created_by=self.teacher_1,
+            school=self.school_a,
+            chapter=self.chapter,
+            subjects=["Mathematics"],
+            duration_minutes=90,
+            total_question_count=2,
+        )
+        version = PaperVersion.objects.create(
+            paper=paper,
+            version_label="A",
+            question_snapshot=[
+                {"question_id": self.q1.id, "marks": 2, "question_text": self.q1.question_text},
+                {"question_id": self.q2.id, "marks": 3, "question_text": self.q2.question_text},
+            ],
+            status=VersionStatus.FINALIZED,
+        )
+
+        self.client.force_authenticate(user=self.teacher_1)
+        res = self.client.get(f"/api/papers/{paper.id}/versions/{version.id}/print/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["duration_minutes"], 90)
+        self.assertEqual(res.data["subjects"], ["Mathematics"])
+        self.assertEqual(res.data["total_question_count"], 2)
+

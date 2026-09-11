@@ -94,9 +94,29 @@ class Paper(TimestampedModel):
     )
     chapter = models.ForeignKey(
         "content.Chapter",
+        null=True,
+        blank=True,
         on_delete=models.CASCADE,
         related_name="papers",
-        help_text="The curriculum chapter this paper covers.",
+        help_text="The curriculum chapter this paper covers (optional for multi-subject papers).",
+    )
+    subjects = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of subjects/books included in multi-subject papers (AC-17).",
+    )
+    duration_minutes = models.PositiveIntegerField(
+        default=60,
+        help_text="Exam duration in minutes (AC-18).",
+    )
+    total_question_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Target total question count (AC-18).",
+    )
+    specifications = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Blueprint specifications: subject breakdown, difficulty distribution, section/bucket quotas.",
     )
     status = models.CharField(
         max_length=20,

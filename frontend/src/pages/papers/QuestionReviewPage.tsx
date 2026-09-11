@@ -278,6 +278,24 @@ const QuestionReviewPageDesktop: React.FC = () => {
                     {q.difficulty_display || q.difficulty}
                   </span>
 
+                  {/* Bank Source Badge (AC-19) */}
+                  <span
+                    className={`pill text-[10px] ${
+                      q.bank_source === 'GLOBAL'
+                        ? 'bg-forest/10 text-forest border border-forest/20'
+                        : 'bg-ocean/10 text-ocean border border-ocean/20'
+                    }`}
+                  >
+                    {q.bank_source === 'GLOBAL' ? 'Global Bank' : 'School Bank'}
+                  </span>
+
+                  {/* Subject Pill */}
+                  {q.subject && (
+                    <span className="pill pill-muted text-[10px] font-mono">
+                      {q.subject}
+                    </span>
+                  )}
+
                   {/* Topic name */}
                   {q.topic_name && (
                     <span className="text-xs text-ink/60 font-medium">

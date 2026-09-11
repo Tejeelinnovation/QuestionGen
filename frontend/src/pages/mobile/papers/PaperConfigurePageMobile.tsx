@@ -36,8 +36,12 @@ export const PaperConfigurePageMobile: React.FC = () => {
         const paperData = await papersApi.getPaper(paperId);
         setPaper(paperData);
 
-        const topicsData = await contentApi.getTopics(paperData.chapter);
-        setTopics(topicsData);
+        if (paperData.chapter) {
+          const topicsData = await contentApi.getTopics(paperData.chapter);
+          setTopics(topicsData);
+        } else {
+          setTopics([]);
+        }
       } catch (err: any) {
         setErrorMessage(
           err.response?.data?.detail || 'Failed to load paper details and curriculum topics.'
@@ -78,6 +82,9 @@ export const PaperConfigurePageMobile: React.FC = () => {
       marks_per_question: marksPerQuestion ? Number(marksPerQuestion) : undefined,
       total_marks: totalMarks ? Number(totalMarks) : undefined,
       quantity: quantity ? Number(quantity) : undefined,
+      subjects: paper?.subjects?.length ? paper.subjects : undefined,
+      duration_minutes: paper?.duration_minutes,
+      total_question_count: paper?.total_question_count,
     };
 
     setIsSubmitting(true);

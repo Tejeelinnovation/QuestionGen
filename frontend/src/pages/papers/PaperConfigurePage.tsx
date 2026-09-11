@@ -36,8 +36,16 @@ const PaperConfigurePageDesktop: React.FC = () => {
         const paperData = await papersApi.getPaper(paperId);
         setPaper(paperData);
 
-        const topicsData = await contentApi.getTopics(paperData.chapter);
-        setTopics(topicsData);
+        if (paperData.chapter) {
+          const topicsData = await contentApi.getTopics(paperData.chapter);
+          setTopics(topicsData);
+        } else {
+          setTopics([]);
+        }
+
+        if (paperData.total_question_count && !quantity) {
+          setQuantity(String(paperData.total_question_count));
+        }
       } catch (err: any) {
         setErrorMessage(
           err.response?.data?.detail || 'Failed to load paper details and curriculum topics.'
@@ -78,6 +86,9 @@ const PaperConfigurePageDesktop: React.FC = () => {
       marks_per_question: marksPerQuestion ? Number(marksPerQuestion) : undefined,
       total_marks: totalMarks ? Number(totalMarks) : undefined,
       quantity: quantity ? Number(quantity) : undefined,
+      subjects: paper?.subjects?.length ? paper.subjects : undefined,
+      duration_minutes: paper?.duration_minutes,
+      total_question_count: paper?.total_question_count,
     };
 
     setIsSubmitting(true);
@@ -86,7 +97,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
 
       if (candidateQuestions.length === 0) {
         setErrorMessage(
-          'No questions found matching the specified constraints in this chapter. Try broadening your criteria.'
+          'No questions found matching the specified constraints. Try broadening your criteria or difficulty filters.'
         );
         setIsSubmitting(false);
         return;
@@ -367,75 +378,128 @@ const PaperConfigurePageDesktop: React.FC = () => {
         {/* ── SECTION 2 & 3: Staggered Constraints & Topics Split (Ref: 11_jobstobe_staggered_cards.jpg) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
-          {/* Topics Multi-Select (7 cols) */}
+          {/* Scope Selector: Multi-Subject vs Chapter Topics (7 cols) */}
           <div className="lg:col-span-7 bg-surface border border-border rounded-card p-6 shadow-card space-y-4">
-            <div className="flex items-center justify-between border-b border-border/80 pb-3">
-              <div>
-                <h3 className="font-heading font-bold text-base text-ink">
-                  Syllabus Topic Coverage
-                </h3>
-                <p className="text-xs text-ink/60">
-                  Select specific syllabus topics or leave all unselected for full chapter inclusion
+            {paper?.subjects && paper.subjects.length > 0 ? (
+              <div className="space-y-4">
+                <div className="border-b border-border/80 pb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-heading font-bold text-base text-ink">
+                      Multi-Subject Examination Scope
+                    </h3>
+                    <p className="text-xs text-ink/60">
+                      Sampling candidate questions across registered disciplines
+                    </p>
+                  </div>
+                  <span className="pill pill-forest text-[10px]">
+                    Combined Blueprint
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {paper.subjects.map((subj) => (
+                    <div
+                      key={subj}
+                      className="px-3.5 py-2 rounded-card border border-forest/30 bg-forest/5 flex items-center gap-2"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-forest" />
+                      <span className="font-heading font-semibold text-xs text-ink">
+                        {subj}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 rounded-card bg-bg border border-border space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-ink/60 font-medium">Multi-Source Question Banks:</span>
+                    <span className="font-mono font-semibold text-forest">Global QBM + School Private Bank</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-ink/60 font-medium">Configured Exam Duration:</span>
+                    <span className="font-mono font-semibold text-ink">{paper.duration_minutes || 60} Minutes</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-ink/60 font-medium">Target Total Questions:</span>
+                    <span className="font-mono font-semibold text-ink">{paper.total_question_count || 'Flexible'}</span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-ink/50 leading-relaxed">
+                  Questions will be automatically balanced across all participating subjects and difficulty criteria while strictly enforcing organization privacy isolation.
                 </p>
               </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-b border-border/80 pb-3">
+                  <div>
+                    <h3 className="font-heading font-bold text-base text-ink">
+                      Syllabus Topic Coverage
+                    </h3>
+                    <p className="text-xs text-ink/60">
+                      Select specific syllabus topics or leave all unselected for full chapter inclusion
+                    </p>
+                  </div>
 
-              {topics.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleSelectAllTopics}
-                  className="text-xs font-heading font-semibold text-forest hover:underline cursor-pointer"
-                >
-                  {selectedTopicIds.length === topics.length ? 'Deselect All' : 'Select All Topics'}
-                </button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
-              {topics.map((t) => {
-                const isChecked = selectedTopicIds.includes(t.id);
-                return (
-                  <label
-                    key={t.id}
-                    className={`p-3 rounded-card border transition-all cursor-pointer flex items-start gap-2.5 ${
-                      isChecked
-                        ? 'border-forest bg-forest/5 text-ink'
-                        : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => handleTopicToggle(t.id)}
-                      disabled={isSubmitting}
-                      className="mt-0.5 rounded text-forest focus:ring-forest accent-forest"
-                    />
-                    <div className="flex-1 text-xs">
-                      <div className="font-heading font-semibold leading-tight">
-                        {t.name}
-                      </div>
-                      <div className="font-mono text-[10px] text-ink/50 mt-1">
-                        {t.question_count} candidate {t.question_count === 1 ? 'question' : 'questions'}
-                      </div>
-                    </div>
-                  </label>
-                );
-              })}
-
-              {topics.length === 0 && (
-                <div className="col-span-2 text-center py-6 text-xs text-ink/50 italic">
-                  No syllabus topics mapped for this chapter.
+                  {topics.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllTopics}
+                      className="text-xs font-heading font-semibold text-forest hover:underline cursor-pointer"
+                    >
+                      {selectedTopicIds.length === topics.length ? 'Deselect All' : 'Select All Topics'}
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="pt-2 text-[11px] font-mono text-ink/60 flex items-center justify-between border-t border-border/60">
-              <span>Selected Scope:</span>
-              <span className="font-bold text-forest">
-                {selectedTopicIds.length === 0
-                  ? `Full Chapter (${topics.length} topics included)`
-                  : `${selectedTopicIds.length} of ${topics.length} topics selected`}
-              </span>
-            </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                  {topics.map((t) => {
+                    const isChecked = selectedTopicIds.includes(t.id);
+                    return (
+                      <label
+                        key={t.id}
+                        className={`p-3 rounded-card border transition-all cursor-pointer flex items-start gap-2.5 ${
+                          isChecked
+                            ? 'border-forest bg-forest/5 text-ink'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleTopicToggle(t.id)}
+                          disabled={isSubmitting}
+                          className="mt-0.5 rounded text-forest focus:ring-forest accent-forest"
+                        />
+                        <div className="flex-1 text-xs">
+                          <div className="font-heading font-semibold leading-tight">
+                            {t.name}
+                          </div>
+                          <div className="font-mono text-[10px] text-ink/50 mt-1">
+                            {t.question_count} candidate {t.question_count === 1 ? 'question' : 'questions'}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+
+                  {topics.length === 0 && (
+                    <div className="col-span-2 text-center py-6 text-xs text-ink/50 italic">
+                      No syllabus topics mapped for this chapter.
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2 text-[11px] font-mono text-ink/60 flex items-center justify-between border-t border-border/60">
+                  <span>Selected Scope:</span>
+                  <span className="font-bold text-forest">
+                    {selectedTopicIds.length === 0
+                      ? `Full Chapter (${topics.length} topics included)`
+                      : `${selectedTopicIds.length} of ${topics.length} topics selected`}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Staggered Numeric Cards (Ref 11 - 5 cols) */}

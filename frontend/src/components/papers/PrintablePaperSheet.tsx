@@ -25,8 +25,17 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({ printD
         <div className="flex flex-wrap justify-between items-center text-xs font-mono pt-3 border-t border-gray-300 font-semibold text-black gap-2">
           <span>VERSION: {printData.version_label}</span>
           <span>TOTAL QUESTIONS: {printData.question_count}</span>
+          {printData.duration_minutes ? (
+            <span>TIME ALLOWED: {printData.duration_minutes} MIN</span>
+          ) : null}
           <span>MAXIMUM MARKS: {printData.total_marks}</span>
         </div>
+
+        {printData.subjects && printData.subjects.length > 0 && (
+          <div className="text-xs font-mono font-medium text-black text-center pt-1">
+            SUBJECTS: {printData.subjects.join(' • ')}
+          </div>
+        )}
 
         {printData.instructions && (
           <div className="pt-2 text-left text-xs italic text-gray-800 border-t border-dashed border-gray-300">

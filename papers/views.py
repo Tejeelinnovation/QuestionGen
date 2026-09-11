@@ -21,7 +21,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.db import transaction
+from django.db import models, transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -42,7 +43,7 @@ from .models import (
     VersionStatus,
     get_next_version_label,
 )
-from .selection import select_questions_for_quota
+from .selection import select_questions_for_quota, select_questions_for_specification
 from .permissions import (
     CanAssignTest,
     CanCreatePaper,
@@ -66,9 +67,19 @@ from .serializers import (
 
 
 def _build_question_snapshot(questions: list[Question]) -> list[dict[str, Any]]:
-    """Build the immutable question snapshot dictionary list."""
-    return [
-        {
+    """Build the immutable question snapshot dictionary list with source fidelity."""
+    snapshot = []
+    for q in questions:
+        subj = ""
+        chap = ""
+        top = ""
+        if hasattr(q, "topic") and q.topic:
+            top = q.topic.name
+            if hasattr(q.topic, "chapter") and q.topic.chapter:
+                chap = q.topic.chapter.title
+                if hasattr(q.topic.chapter, "book") and q.topic.chapter.book:
+                    subj = q.topic.chapter.book.subject
+        snapshot.append({
             "question_id": q.id,
             "question_text": q.question_text,
             "question_type": q.question_type,
@@ -77,10 +88,15 @@ def _build_question_snapshot(questions: list[Question]) -> list[dict[str, Any]]:
             "learner_level": q.learner_level,
             "options": q.options,
             "correct_answer": q.correct_answer,
+            "explanation": getattr(q, "explanation", "") or "",
+            "bank_source": getattr(q, "bank_source", "GLOBAL"),
+            "variant_id": getattr(q, "selected_variant_id", None),
+            "subject": subj,
+            "chapter_title": chap,
+            "topic_name": top,
             "source_reference": q.source_reference,
-        }
-        for q in questions
-    ]
+        })
+    return snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +138,9 @@ class PaperListCreateView(APIView):
                 metadata={
                     "title": paper.title,
                     "chapter_id": paper.chapter_id,
+                    "subjects": paper.subjects,
+                    "duration_minutes": paper.duration_minutes,
+                    "total_question_count": paper.total_question_count,
                     "school_id": paper.school_id,
                 },
             )
@@ -183,23 +202,37 @@ class PaperSelectQuestionsView(APIView):
         req_serializer.is_valid(raise_exception=True)
         data = req_serializer.validated_data
 
-        # Base questions strictly belonging to the paper's chapter
-        qs = Question.objects.select_related("topic", "topic__chapter").filter(
-            topic__chapter=paper.chapter,
+        # Multi-source candidate pooling (AC-19, AC-20):
+        # Include Global QBM questions + own school's private questions.
+        # Strictly exclude other organizations' question banks.
+        target_school_id = paper.school_id or getattr(request.user, "school_id", None)
+        scope_filter = Q(bank_source="GLOBAL")
+        if target_school_id:
+            scope_filter |= Q(school_id=target_school_id)
+
+        qs = Question.objects.select_related(
+            "topic", "topic__chapter", "topic__chapter__book"
+        ).prefetch_related("variants").filter(
+            scope_filter,
             is_active=True,
         )
 
-        # Filter by topic_ids if supplied
+        # Syllabus scoping (AC-17)
+        chapter_ids = data.get("chapter_ids")
+        if chapter_ids:
+            qs = qs.filter(topic__chapter_id__in=chapter_ids)
+        elif paper.chapter_id:
+            qs = qs.filter(topic__chapter=paper.chapter)
+
+        subjects_filter = data.get("subjects") or paper.subjects
+        if subjects_filter:
+            qs = qs.filter(topic__chapter__book__subject__in=subjects_filter)
+
         topic_ids = data.get("topic_ids")
         if topic_ids:
             qs = qs.filter(topic_id__in=topic_ids)
 
-        # Delegate standard filters to content.filters.filter_questions()
-        #
-        # Future integration point: papers/views.py's select-questions endpoint can be
-        # refactored to call get_generation_service().generate_questions(...) instead of
-        # filter_questions() directly, once a real LLM/RAG backend exists.
-        # Intentionally not wired in yet to avoid destabilizing the tested MVP flow.
+        # Standard filters
         filter_params = {}
         if data.get("difficulty"):
             filter_params["difficulty"] = data["difficulty"]
@@ -211,35 +244,33 @@ class PaperSelectQuestionsView(APIView):
             filter_params["marks"] = data["marks_per_question"]
 
         qs = filter_questions(qs, filter_params)
-
-        # Order consistently
         qs = qs.order_by("topic_id", "difficulty", "id")
 
-        total_marks = data.get("total_marks")
-        quantity = data.get("quantity")
+        pool = list(qs)
+        spec = dict(data)
+        if paper.specifications:
+            for k, v in paper.specifications.items():
+                if k not in spec or spec[k] is None:
+                    spec[k] = v
+        if paper.total_question_count and not spec.get("total_question_count") and not spec.get("quantity"):
+            spec["total_question_count"] = paper.total_question_count
 
-        if total_marks is not None:
-            pool = list(qs)
-            selected_questions, error_msg = select_questions_for_quota(
-                pool,
-                target_marks=float(total_marks),
-                max_quantity=quantity,
+        selected_questions, error_msg = select_questions_for_specification(pool, spec)
+        if error_msg:
+            return Response(
+                {"detail": error_msg, "total_marks": [error_msg]},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            if error_msg:
-                return Response(
-                    {"detail": error_msg, "total_marks": [error_msg]},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            serializer = QuestionPreviewSerializer(selected_questions, many=True)
-        else:
-            if quantity:
-                qs = qs[:quantity]
-            serializer = QuestionPreviewSerializer(qs, many=True)
+
+        serializer = QuestionPreviewSerializer(selected_questions, many=True)
 
         return Response(
             {
                 "paper_id": paper.id,
                 "chapter_id": paper.chapter_id,
+                "subjects": paper.subjects,
+                "duration_minutes": paper.duration_minutes,
+                "total_question_count": paper.total_question_count,
                 "count": len(serializer.data),
                 "questions": serializer.data,
             },
@@ -671,6 +702,9 @@ class PaperVersionPrintView(APIView):
             "school_name": school_name,
             "instructions": paper.instructions,
             "version_label": version.version_label,
+            "duration_minutes": paper.duration_minutes,
+            "total_question_count": paper.total_question_count or len(version.question_snapshot),
+            "subjects": paper.subjects,
             "total_marks": version.total_marks,
             "question_count": len(version.question_snapshot),
             "questions": formatted_questions,

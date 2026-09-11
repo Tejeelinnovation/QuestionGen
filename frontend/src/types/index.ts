@@ -189,6 +189,7 @@ export interface QuestionPreview {
   topic: number;
   topic_name?: string;
   chapter_title?: string;
+  subject?: string;
   question_text: string;
   question_type: QuestionType;
   question_type_display?: string;
@@ -197,8 +198,11 @@ export interface QuestionPreview {
   difficulty_display?: string;
   learner_level: LearnerLevel;
   learner_level_display?: string;
+  bank_source?: 'GLOBAL' | 'ORGANIZATION' | 'TEACHER';
+  variants_count?: number;
   options?: Record<string, string> | null;
   correct_answer?: string;
+  explanation?: string;
   source_reference?: string;
 }
 
@@ -209,6 +213,12 @@ export interface QuestionSnapshotItem {
   marks: number;
   difficulty: string;
   learner_level: string;
+  bank_source?: string;
+  variant_id?: number | null;
+  subject?: string;
+  chapter_title?: string;
+  topic_name?: string;
+  explanation?: string;
   options?: Record<string, string> | null;
   correct_answer?: string;
   source_reference?: string;
@@ -227,8 +237,12 @@ export interface Paper {
   id: number;
   title: string;
   instructions: string;
-  chapter: number;
+  chapter?: number | null;
   chapter_title?: string;
+  subjects?: string[];
+  duration_minutes?: number;
+  total_question_count?: number;
+  specifications?: Record<string, any>;
   created_by: number;
   created_by_username?: string;
   school: number;
@@ -260,6 +274,9 @@ export interface PaperPrintData {
   school_name?: string;
   instructions: string;
   version_label: string;
+  duration_minutes?: number;
+  total_question_count?: number;
+  subjects?: string[];
   total_marks: number;
   question_count: number;
   questions: QuestionSnapshotItem[];

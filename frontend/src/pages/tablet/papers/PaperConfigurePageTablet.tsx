@@ -32,8 +32,12 @@ export const PaperConfigurePageTablet: React.FC = () => {
         const paperData = await papersApi.getPaper(paperId);
         setPaper(paperData);
 
-        const topicsData = await contentApi.getTopics(paperData.chapter);
-        setTopics(topicsData);
+        if (paperData.chapter) {
+          const topicsData = await contentApi.getTopics(paperData.chapter);
+          setTopics(topicsData);
+        } else {
+          setTopics([]);
+        }
       } catch (err: any) {
         setErrorMessage(
           err.response?.data?.detail || 'Failed to load paper details and curriculum topics.'
@@ -74,6 +78,9 @@ export const PaperConfigurePageTablet: React.FC = () => {
       marks_per_question: marksPerQuestion ? Number(marksPerQuestion) : undefined,
       total_marks: totalMarks ? Number(totalMarks) : undefined,
       quantity: quantity ? Number(quantity) : undefined,
+      subjects: paper?.subjects?.length ? paper.subjects : undefined,
+      duration_minutes: paper?.duration_minutes,
+      total_question_count: paper?.total_question_count,
     };
 
     setIsSubmitting(true);
@@ -82,7 +89,7 @@ export const PaperConfigurePageTablet: React.FC = () => {
 
       if (candidateQuestions.length === 0) {
         setErrorMessage(
-          'No questions found matching the specified constraints in this chapter. Try broadening your criteria.'
+          'No questions found matching the specified constraints. Try broadening your criteria.'
         );
         setIsSubmitting(false);
         return;
