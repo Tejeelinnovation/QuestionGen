@@ -120,3 +120,19 @@ def grant_student_defaults(user: "User", granted_by: "User | None" = None) -> No
         CapabilityName.VIEW_OWN_RESULT,
     ]:
         _grant(user, cap, granted_by)
+
+
+def grant_qbm_defaults(user: "User", granted_by: "User | None" = None) -> None:
+    """
+    Typical Question Bank Manager (QBM) capability set (AC-10).
+
+    Grants: INGEST_GLOBAL_QUESTIONS, GENERATE_SELECT_QUESTIONS
+    """
+    from users.models import CapabilityName  # noqa: PLC0415
+
+    for cap in [
+        CapabilityName.INGEST_GLOBAL_QUESTIONS,
+        CapabilityName.GENERATE_SELECT_QUESTIONS,
+    ]:
+        _grant(user, cap, granted_by)
+

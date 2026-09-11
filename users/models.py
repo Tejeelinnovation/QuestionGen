@@ -36,6 +36,7 @@ class CapabilityName(models.TextChoices):
     ATTEMPT_TEST = "ATTEMPT_TEST", _("Attempt Test")
     VIEW_OWN_RESULT = "VIEW_OWN_RESULT", _("View Own Result")
     VIEW_SCHOOL_WIDE_CONTROLS = "VIEW_SCHOOL_WIDE_CONTROLS", _("View School-Wide Controls")
+    INGEST_GLOBAL_QUESTIONS = "INGEST_GLOBAL_QUESTIONS", _("Ingest Global Questions")
 
 
 class Capability(models.Model):
@@ -190,10 +191,12 @@ class User(AbstractUser):
                 "school_admin": "School Admin",
                 "teacher": "Teacher",
                 "student": "Student",
+                "qbm": "Question Bank Manager",
                 "Super Admin": "Super Admin",
                 "School Admin": "School Admin",
                 "Teacher": "Teacher",
                 "Student": "Student",
+                "Question Bank Manager": "Question Bank Manager",
             }
             return role_map.get(self.role, self.role)
 
@@ -204,6 +207,8 @@ class User(AbstractUser):
 
         if CapabilityName.CREATE_SCHOOL in caps:
             return "Super Admin"
+        if CapabilityName.INGEST_GLOBAL_QUESTIONS in caps:
+            return "Question Bank Manager"
         if CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS in caps and self.school_id:
             return "School Admin"
         if CapabilityName.CREATE_STUDENT in caps and self.school_id:

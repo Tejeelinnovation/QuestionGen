@@ -10,11 +10,24 @@ Mounted at /api/ in the root urls.py so paths resolve as:
 
 from django.urls import path
 
-from .views import BookListView, ChapterListView, QuestionListView, TopicListView
+from .views import (
+    BoardListView,
+    BookListView,
+    ChapterListView,
+    QuestionDetailView,
+    QuestionIngestView,
+    QuestionListView,
+    QuestionVariantCreateView,
+    TopicListView,
+)
 
 urlpatterns = [
-    path("books/",     BookListView.as_view(),    name="book-list"),
-    path("chapters/",  ChapterListView.as_view(), name="chapter-list"),
-    path("topics/",    TopicListView.as_view(),   name="topic-list"),
+    path("boards/", BoardListView.as_view(), name="board-list"),
+    path("books/", BookListView.as_view(), name="book-list"),
+    path("chapters/", ChapterListView.as_view(), name="chapter-list"),
+    path("topics/", TopicListView.as_view(), name="topic-list"),
     path("questions/", QuestionListView.as_view(), name="question-list"),
+    path("questions/ingest/", QuestionIngestView.as_view(), name="question-ingest"),
+    path("questions/<int:pk>/", QuestionDetailView.as_view(), name="question-detail"),
+    path("questions/<int:pk>/variants/", QuestionVariantCreateView.as_view(), name="question-variant-create"),
 ]

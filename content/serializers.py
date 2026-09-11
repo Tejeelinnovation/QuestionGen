@@ -12,7 +12,17 @@ serializers writable) to avoid confusion.
 
 from rest_framework import serializers
 
-from .models import Book, Chapter, Question, Topic
+from .models import (
+    BankSource,
+    Book,
+    Chapter,
+    Difficulty,
+    LearnerLevel,
+    Question,
+    QuestionType,
+    QuestionVariant,
+    Topic,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -27,6 +37,7 @@ class BookSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "title",
+            "board",
             "subject",
             "grade",
             "publisher",
@@ -103,6 +114,46 @@ class TopicSerializer(serializers.ModelSerializer):
 
 
 # ---------------------------------------------------------------------------
+# QuestionVariant
+# ---------------------------------------------------------------------------
+
+class QuestionVariantSerializer(serializers.ModelSerializer):
+    variant_type_display = serializers.CharField(source="get_variant_type_display", read_only=True)
+    difficulty_display = serializers.CharField(source="get_difficulty_display", read_only=True)
+
+    class Meta:
+        model = QuestionVariant
+        fields = [
+            "id",
+            "parent_question",
+            "variant_type",
+            "variant_type_display",
+            "marks",
+            "difficulty",
+            "difficulty_display",
+            "question_text",
+            "options",
+            "correct_answer",
+            "explanation",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def validate(self, attrs):
+        parent = attrs.get("parent_question")
+        difficulty = attrs.get("difficulty")
+        if parent:
+            if not difficulty:
+                attrs["difficulty"] = parent.difficulty
+            elif difficulty != parent.difficulty:
+                raise serializers.ValidationError(
+                    {"difficulty": f"Variant difficulty ({difficulty}) must match parent question difficulty ({parent.difficulty}). (AC-15)"}
+                )
+        return attrs
+
+
+# ---------------------------------------------------------------------------
 # Question — list (no correct_answer; keeps browsing safe before P4 auth)
 # ---------------------------------------------------------------------------
 
@@ -111,14 +162,13 @@ class QuestionListSerializer(serializers.ModelSerializer):
     Compact representation for list/filter responses.
 
     ``correct_answer`` and ``options`` are intentionally excluded here —
-    the detail serializer exposes them.  When the attempts app (P4) adds
-    student-facing endpoints, it should use this serializer (or a subset)
-    and never expose the answer to a student during an active attempt.
+    the detail serializer exposes them.
     """
 
     topic_name = serializers.CharField(source="topic.name", read_only=True)
     chapter_title = serializers.CharField(source="topic.chapter.title", read_only=True)
     book_title = serializers.CharField(source="topic.chapter.book.title", read_only=True)
+    book_board = serializers.CharField(source="topic.chapter.book.board", read_only=True)
     question_type_display = serializers.CharField(
         source="get_question_type_display", read_only=True
     )
@@ -126,6 +176,10 @@ class QuestionListSerializer(serializers.ModelSerializer):
     learner_level_display = serializers.CharField(
         source="get_learner_level_display", read_only=True
     )
+    bank_source_display = serializers.CharField(
+        source="get_bank_source_display", read_only=True
+    )
+    variants_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
@@ -135,6 +189,7 @@ class QuestionListSerializer(serializers.ModelSerializer):
             "topic_name",
             "chapter_title",
             "book_title",
+            "book_board",
             "question_text",
             "question_type",
             "question_type_display",
@@ -143,27 +198,110 @@ class QuestionListSerializer(serializers.ModelSerializer):
             "difficulty_display",
             "learner_level",
             "learner_level_display",
+            "bank_source",
+            "bank_source_display",
+            "school",
+            "created_by",
+            "variants_count",
             "source_reference",
             "is_active",
             "created_at",
             "updated_at",
         ]
 
+    def get_variants_count(self, obj) -> int:
+        return obj.variants.count()
+
 
 # ---------------------------------------------------------------------------
-# Question — detail (full, including answer key)
+# Question — detail (full, including answer key & variants)
 # ---------------------------------------------------------------------------
 
 class QuestionDetailSerializer(QuestionListSerializer):
     """
-    Full representation including ``correct_answer`` and ``options``.
+    Full representation including options, correct_answer, explanation, and variants.
 
-    Used for teacher-facing detail views.  Do NOT use this serializer
+    Used for teacher-facing detail views. Do NOT use this serializer
     on student-facing endpoints during an active test attempt.
     """
+
+    variants = QuestionVariantSerializer(many=True, read_only=True)
 
     class Meta(QuestionListSerializer.Meta):
         fields = QuestionListSerializer.Meta.fields + [
             "options",
             "correct_answer",
+            "explanation",
+            "variants",
         ]
+
+
+# ---------------------------------------------------------------------------
+# Question Ingestion (Write / Ingest)
+# ---------------------------------------------------------------------------
+
+class QuestionVariantInputSerializer(serializers.Serializer):
+    variant_type = serializers.ChoiceField(choices=QuestionType.choices)
+    marks = serializers.DecimalField(max_digits=5, decimal_places=2)
+    question_text = serializers.CharField()
+    options = serializers.JSONField(required=False, allow_null=True)
+    correct_answer = serializers.CharField()
+    explanation = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class QuestionIngestSerializer(serializers.ModelSerializer):
+    """
+    Serializer for structured Question Ingestion workflow (AC-10, AC-13, AC-14, AC-15, AC-16).
+    Supports single question creation with optional nested variants.
+    """
+
+    learner_level = serializers.ChoiceField(
+        choices=LearnerLevel.choices,
+        default=LearnerLevel.INTERMEDIATE,
+        required=False,
+    )
+    variants = QuestionVariantInputSerializer(many=True, required=False, write_only=True)
+
+    class Meta:
+        model = Question
+        fields = [
+            "id",
+            "topic",
+            "question_text",
+            "question_type",
+            "marks",
+            "difficulty",
+            "learner_level",
+            "bank_source",
+            "school",
+            "options",
+            "correct_answer",
+            "explanation",
+            "source_reference",
+            "variants",
+        ]
+        read_only_fields = ["id", "created_by"]
+
+    def create(self, validated_data):
+        variants_data = validated_data.pop("variants", [])
+        request = self.context.get("request")
+        user = request.user if request else None
+
+        if user and user.is_authenticated:
+            validated_data["created_by"] = user
+
+        question = Question.objects.create(**validated_data)
+
+        for vdata in variants_data:
+            QuestionVariant.objects.create(
+                parent_question=question,
+                variant_type=vdata["variant_type"],
+                marks=vdata["marks"],
+                difficulty=question.difficulty,  # Strictly enforce AC-15
+                question_text=vdata["question_text"],
+                options=vdata.get("options"),
+                correct_answer=vdata["correct_answer"],
+                explanation=vdata.get("explanation", ""),
+            )
+
+        return question

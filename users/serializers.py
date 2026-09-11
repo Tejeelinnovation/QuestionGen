@@ -131,7 +131,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
     )
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
     profile = serializers.ChoiceField(
-        choices=["school_admin", "teacher", "student"],
+        choices=["school_admin", "teacher", "student", "qbm"],
         write_only=True,
         help_text=(
             "Desired capability profile for the new user. "
@@ -238,6 +238,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "school_admin": "School Admin",
             "teacher": "Teacher",
             "student": "Student",
+            "qbm": "Question Bank Manager",
         }
         user = User(role=role_map.get(profile, profile), **validated_data)
         user.set_password(password)
@@ -245,6 +246,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
 
         # Grant default capabilities based on requested profile.
         from users.capability_defaults import (  # noqa: PLC0415
+            grant_qbm_defaults,
             grant_school_admin_defaults,
             grant_student_defaults,
             grant_teacher_defaults,
@@ -255,6 +257,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "school_admin": grant_school_admin_defaults,
             "teacher": grant_teacher_defaults,
             "student": grant_student_defaults,
+            "qbm": grant_qbm_defaults,
         }
         dispatch[profile](user, granted_by=granted_by)
 

@@ -229,6 +229,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
             "school_admin": sum(1 for u in users if u.role_label == "School Admin"),
             "teacher": sum(1 for u in users if u.role_label == "Teacher"),
             "student": sum(1 for u in users if u.role_label == "Student"),
+            "qbm": sum(1 for u in users if u.role_label == "Question Bank Manager"),
         }
         return Response(counts)
 
@@ -241,6 +242,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         "school_admin": CapabilityName.CREATE_SCHOOL_ADMIN,
         "teacher": CapabilityName.CREATE_TEACHER,
         "student": CapabilityName.CREATE_STUDENT,
+        "qbm": CapabilityName.CREATE_SCHOOL,
     }
 
     def create(self, request):
@@ -278,6 +280,14 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                     {
                         "detail": "Super Admins cannot directly create teachers. Teacher creation belongs to the School / Coaching Class."
                     },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # Only Super Admins can create QBM accounts (AC-10)
+        if profile == "qbm":
+            if request.user.school_id is not None or not request.user.has_capability(CapabilityName.CREATE_SCHOOL):
+                return Response(
+                    {"detail": "Only Super Admins can provision Question Bank Manager accounts."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
@@ -376,6 +386,10 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         "Student": [
             CapabilityName.ATTEMPT_TEST,
             CapabilityName.VIEW_OWN_RESULT,
+        ],
+        "Question Bank Manager": [
+            CapabilityName.INGEST_GLOBAL_QUESTIONS,
+            CapabilityName.GENERATE_SELECT_QUESTIONS,
         ],
     }
 

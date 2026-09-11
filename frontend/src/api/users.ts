@@ -21,7 +21,7 @@ export interface UserQueryParams {
 export interface CreateUserInput {
   username: string;
   password: string;
-  profile: 'school_admin' | 'teacher' | 'student';
+  profile: 'school_admin' | 'teacher' | 'student' | 'qbm';
   email: string;
   mobile_number: string;
   first_name?: string;

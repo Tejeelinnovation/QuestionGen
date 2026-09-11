@@ -10,7 +10,7 @@ import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
 interface CreateUserDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  targetProfile: 'teacher' | 'student';
+  targetProfile: 'teacher' | 'student' | 'qbm';
   onUserCreated: (newUser: User) => void;
 }
 
@@ -82,6 +82,8 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
         return 'Create Teacher';
       case 'student':
         return 'Enroll New Student';
+      case 'qbm':
+        return 'Create Question Bank Manager';
       default:
         return 'Create Account';
     }
@@ -93,6 +95,8 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
         return 'Provision authoring faculty with test assembly and evaluation rights.';
       case 'student':
         return 'Quickly enroll a candidate for assessments and test attempts.';
+      case 'qbm':
+        return 'Provision a platform Question Bank Manager authorized to curate and ingest central curriculum question banks.';
       default:
         return 'Create an institutional user account.';
     }
@@ -119,8 +123,8 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
       return;
     }
 
-    const schoolIdToUse = currentUser?.school || (selectedSchoolId ? Number(selectedSchoolId) : undefined);
-    if (!schoolIdToUse && !currentUser?.school) {
+    const schoolIdToUse = targetProfile === 'qbm' ? undefined : (currentUser?.school || (selectedSchoolId ? Number(selectedSchoolId) : undefined));
+    if (targetProfile !== 'qbm' && !schoolIdToUse && !currentUser?.school) {
       setErrorMsg('Please select a school for this account.');
       return;
     }
@@ -217,8 +221,8 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
             </div>
           )}
 
-          {/* School Selector (visible if Super Admin) */}
-          {!currentUser?.school && (
+          {/* School Selector (visible if Super Admin and profile is not QBM) */}
+          {!currentUser?.school && targetProfile !== 'qbm' && (
             <div className="space-y-1.5 pb-2 border-b border-border">
               <label htmlFor="user-school-select" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                 Assigned Institution *
@@ -393,7 +397,9 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
               Automatic Permission Grants
             </div>
             <p>
-              Standard {targetProfile.replace('_', ' ')} capabilities will be granted automatically on creation.
+              {targetProfile === 'qbm'
+                ? 'Question Bank Manager capabilities (INGEST_GLOBAL_QUESTIONS, GENERATE_SELECT_QUESTIONS) will be granted automatically on creation.'
+                : `Standard ${targetProfile.replace('_', ' ')} capabilities will be granted automatically on creation.`}
             </p>
           </div>
         </form>

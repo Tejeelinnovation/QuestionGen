@@ -104,6 +104,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const dashboardPath = user
     ? hasCapability('CREATE_SCHOOL')
       ? '/dashboard/super-admin'
+      : hasCapability('INGEST_GLOBAL_QUESTIONS')
+      ? '/dashboard/qbm'
       : hasCapability('VIEW_SCHOOL_WIDE_CONTROLS')
       ? '/dashboard/school-admin'
       : hasCapability('CREATE_PAPER')

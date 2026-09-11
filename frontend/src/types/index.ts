@@ -8,15 +8,32 @@ export type CapabilityName =
   | 'ASSIGN_TEST'
   | 'ATTEMPT_TEST'
   | 'VIEW_OWN_RESULT'
-  | 'VIEW_SCHOOL_WIDE_CONTROLS';
+  | 'VIEW_SCHOOL_WIDE_CONTROLS'
+  | 'INGEST_GLOBAL_QUESTIONS';
 
 export type RoleLabel =
   | 'Super Admin'
   | 'School Admin'
   | 'Teacher'
   | 'Student'
+  | 'Question Bank Manager'
   | 'Custom'
   | string;
+
+export type QuestionType =
+  | 'MCQ'
+  | 'MSQ'
+  | 'ONE_WORD'
+  | 'FILL_IN_THE_BLANKS'
+  | 'MATCH_THE_FOLLOWING'
+  | 'DIAGRAM_BASED'
+  | 'COMPREHENSION_BASED'
+  | 'SHORT_ANSWER'
+  | 'LONG_ANSWER';
+
+export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+export type LearnerLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+export type BankSource = 'GLOBAL' | 'ORGANIZATION' | 'TEACHER';
 
 export interface Capability {
   id: number;
@@ -81,10 +98,24 @@ export interface LoginResponse {
   refresh: string;
 }
 
+export interface Book {
+  id: number;
+  title: string;
+  board?: string;
+  subject: string;
+  grade: string;
+  publisher?: string;
+  is_active?: boolean;
+  chapter_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Chapter {
   id: number;
   book: number;
   book_title?: string;
+  book_board?: string;
   book_subject?: string;
   book_grade?: string;
   title: string;
@@ -107,18 +138,64 @@ export interface Topic {
   updated_at?: string;
 }
 
+export interface QuestionVariant {
+  id?: number;
+  parent_question?: number;
+  variant_type: QuestionType;
+  variant_type_display?: string;
+  marks: number | string;
+  difficulty: Difficulty;
+  difficulty_display?: string;
+  question_text: string;
+  options?: Record<string, string> | any;
+  correct_answer: string;
+  explanation?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Question {
+  id: number;
+  topic: number;
+  topic_name?: string;
+  chapter_title?: string;
+  book_title?: string;
+  book_board?: string;
+  question_text: string;
+  question_type: QuestionType;
+  question_type_display?: string;
+  marks: number | string;
+  difficulty: Difficulty;
+  difficulty_display?: string;
+  learner_level: LearnerLevel;
+  learner_level_display?: string;
+  bank_source?: BankSource;
+  bank_source_display?: string;
+  school?: number | null;
+  created_by?: number | null;
+  options?: Record<string, string> | any;
+  correct_answer?: string;
+  explanation?: string;
+  source_reference?: string;
+  variants_count?: number;
+  variants?: QuestionVariant[];
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface QuestionPreview {
   id: number;
   topic: number;
   topic_name?: string;
   chapter_title?: string;
   question_text: string;
-  question_type: 'MCQ' | 'SHORT_ANSWER' | 'LONG_ANSWER';
+  question_type: QuestionType;
   question_type_display?: string;
   marks: number | string;
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  difficulty: Difficulty;
   difficulty_display?: string;
-  learner_level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  learner_level: LearnerLevel;
   learner_level_display?: string;
   options?: Record<string, string> | null;
   correct_answer?: string;

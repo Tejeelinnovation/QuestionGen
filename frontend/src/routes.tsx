@@ -6,6 +6,7 @@ import { SuperAdminDashboard } from './pages/dashboards/SuperAdminDashboard';
 import { SchoolAdminDashboard } from './pages/dashboards/SchoolAdminDashboard';
 import { TeacherDashboard } from './pages/dashboards/TeacherDashboard';
 import { StudentDashboard } from './pages/dashboards/StudentDashboard';
+import { QBMDashboard } from './pages/dashboards/QBMDashboard';
 import { TestAttemptPage } from './pages/attempts/TestAttemptPage';
 import { ResultPage } from './pages/attempts/ResultPage';
 import { ResultsRosterPage } from './pages/attempts/ResultsRosterPage';
@@ -57,6 +58,14 @@ export const routes: RouteObject[] = [
         element: (
           <RequireCapability capability="CREATE_SCHOOL">
             <SuperAdminDashboard />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'dashboard/qbm',
+        element: (
+          <RequireCapability capability="INGEST_GLOBAL_QUESTIONS">
+            <QBMDashboard />
           </RequireCapability>
         ),
       },
