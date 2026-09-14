@@ -180,7 +180,10 @@ class ChangePasswordView(APIView):
         user = request.user
         if not user.check_password(serializer.validated_data["current_password"]):
             return Response(
-                {"current_password": "The current password entered is incorrect."},
+                {
+                    "current_password": "The current password entered is incorrect.",
+                    "detail": "The current password entered is incorrect.",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

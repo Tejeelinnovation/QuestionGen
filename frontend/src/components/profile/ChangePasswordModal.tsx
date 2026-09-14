@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { authApi } from '../../api/auth';
-import { X, KeyRound, Check, AlertCircle, Loader2, Mail, Copy, CheckCheck } from 'lucide-react';
+import { X, KeyRound, Check, AlertCircle, Loader2, Mail, Copy, CheckCheck, Eye, EyeOff } from 'lucide-react';
 import { MOTION } from '../../lib/motion';
 
 interface ChangePasswordModalProps {
@@ -20,6 +20,9 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
   const [directError, setDirectError] = useState<string | null>(null);
   const [directSuccess, setDirectSuccess] = useState<string | null>(null);
@@ -63,11 +66,21 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       }, 1500);
     } catch (err: any) {
       const data = err?.response?.data;
+      const getFirstError = (val: any): string | null => {
+        if (!val) return null;
+        if (Array.isArray(val) && val.length > 0) return String(val[0]);
+        if (typeof val === 'string') return val;
+        return null;
+      };
+
       const msg =
         data?.detail ||
-        (Array.isArray(data?.old_password) && data.old_password[0]) ||
-        (Array.isArray(data?.new_password) && data.new_password[0]) ||
-        (Array.isArray(data?.non_field_errors) && data.non_field_errors[0]) ||
+        getFirstError(data?.current_password) ||
+        getFirstError(data?.old_password) ||
+        getFirstError(data?.new_password) ||
+        getFirstError(data?.confirm_password) ||
+        getFirstError(data?.new_password_confirm) ||
+        getFirstError(data?.non_field_errors) ||
         'Failed to change password. Verify your current password and try again.';
       setDirectError(msg);
     } finally {
@@ -176,38 +189,86 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-ink">Current Password</label>
-              <input
-                type="password"
-                required
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="Enter current password"
-                className="w-full px-3 py-2 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
-              />
+              <div className="relative">
+                <input
+                  type={showOldPassword ? 'text' : 'password'}
+                  required
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full px-3 py-2 pr-9 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowOldPassword(!showOldPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink transition-colors p-1 focus:outline-none cursor-pointer flex items-center justify-center rounded-sm"
+                  aria-label={showOldPassword ? 'Hide password' : 'Show password'}
+                  title={showOldPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showOldPassword ? (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-ink">New Password</label>
-              <input
-                type="password"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimum 8 characters"
-                className="w-full px-3 py-2 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
-              />
+              <div className="relative">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 8 characters"
+                  className="w-full px-3 py-2 pr-9 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink transition-colors p-1 focus:outline-none cursor-pointer flex items-center justify-center rounded-sm"
+                  aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                  title={showNewPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-ink">Confirm New Password</label>
-              <input
-                type="password"
-                required
-                value={newPasswordConfirm}
-                onChange={(e) => setNewPasswordConfirm(e.target.value)}
-                placeholder="Re-enter new password"
-                className="w-full px-3 py-2 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={newPasswordConfirm}
+                  onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="w-full px-3 py-2 pr-9 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink transition-colors p-1 focus:outline-none cursor-pointer flex items-center justify-center rounded-sm"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">

@@ -500,3 +500,59 @@ class RoleModificationAndQuestionBankTests(TestCase):
         self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
         self.assertTrue(teacher.has_capability(CapabilityName.GENERATE_SELECT_QUESTIONS))
 
+
+class ChangePasswordViewTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="student_tester",
+            email="student_tester@school.edu",
+            password="InitialPassword123!",
+            role="Student",
+        )
+
+    def test_change_password_with_canonical_fields(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/auth/change-password/",
+            {
+                "current_password": "InitialPassword123!",
+                "new_password": "NewSecurePassword456!",
+                "confirm_password": "NewSecurePassword456!",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NewSecurePassword456!"))
+
+    def test_change_password_with_alias_fields(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/auth/change-password/",
+            {
+                "old_password": "InitialPassword123!",
+                "new_password": "NewSecurePassword789!",
+                "new_password_confirm": "NewSecurePassword789!",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NewSecurePassword789!"))
+
+    def test_change_password_incorrect_current_password(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            "/api/auth/change-password/",
+            {
+                "current_password": "WrongPassword!",
+                "new_password": "NewSecurePassword456!",
+                "confirm_password": "NewSecurePassword456!",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("current_password", response.data)
+
+

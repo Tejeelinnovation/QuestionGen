@@ -3,7 +3,7 @@ import { usersApi } from '../../api/users';
 import { classesApi } from '../../api/classes';
 import { useAuth } from '../../auth/AuthContext';
 import type { User, School, ClassSection } from '../../types';
-import { X, UserPlus, Check, AlertCircle } from 'lucide-react';
+import { X, UserPlus, Check, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
 import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
 
@@ -28,6 +28,7 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
   const [primarySubject, setPrimarySubject] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -271,16 +272,33 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
               <label htmlFor="u-password" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                 Initial Password *
               </label>
-              <input
-                id="u-password"
-                type="password"
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isSubmitting}
-                className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  id="u-password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isSubmitting}
+                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2 pr-9 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  disabled={isSubmitting}
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink transition-colors p-1 focus:outline-none cursor-pointer flex items-center justify-center rounded-sm"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 

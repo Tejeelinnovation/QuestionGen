@@ -23,6 +23,8 @@ import {
   Search,
   ExternalLink,
   X,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import {
   SkeletonFacultyRoster,
@@ -57,6 +59,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -318,14 +321,30 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
 
                 <div className="space-y-1">
                   <label className="font-heading font-semibold text-ink">Temporary Password *</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="w-full px-3 py-2 rounded-card bg-surface border border-border text-xs focus:outline-none focus:border-forest"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      className="w-full px-3 py-2 pr-9 rounded-card bg-surface border border-border text-xs focus:outline-none focus:border-forest"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink transition-colors p-1 focus:outline-none cursor-pointer flex items-center justify-center rounded-sm"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-3.5 h-3.5" />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

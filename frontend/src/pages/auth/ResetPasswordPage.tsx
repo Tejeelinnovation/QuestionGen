@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../../api/auth';
-import { KeyRound, Check, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { KeyRound, Check, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { MOTION } from '../../lib/motion';
 
 export const ResetPasswordPage: React.FC = () => {
@@ -15,6 +15,8 @@ export const ResetPasswordPage: React.FC = () => {
   const [token, setToken] = useState(tokenFromQuery);
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -56,6 +58,8 @@ export const ResetPasswordPage: React.FC = () => {
         data?.detail ||
         data?.token?.[0] ||
         data?.new_password?.[0] ||
+        data?.confirm_password?.[0] ||
+        data?.non_field_errors?.[0] ||
         'Password reset failed. The link may be expired or invalid.';
       setError(msg);
     } finally {
@@ -126,26 +130,58 @@ export const ResetPasswordPage: React.FC = () => {
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-ink">New Password</label>
-              <input
-                type="password"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 8 characters"
-                className="w-full px-3 py-2 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
-              />
+              <div className="relative">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className="w-full px-3 py-2 pr-9 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink transition-colors p-1 focus:outline-none cursor-pointer flex items-center justify-center rounded-sm"
+                  aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                  title={showNewPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-ink">Confirm New Password</label>
-              <input
-                type="password"
-                required
-                value={newPasswordConfirm}
-                onChange={(e) => setNewPasswordConfirm(e.target.value)}
-                placeholder="Re-enter password"
-                className="w-full px-3 py-2 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={newPasswordConfirm}
+                  onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                  placeholder="Re-enter password"
+                  className="w-full px-3 py-2 pr-9 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink transition-colors p-1 focus:outline-none cursor-pointer flex items-center justify-center rounded-sm"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button

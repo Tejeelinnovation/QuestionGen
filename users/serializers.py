@@ -37,11 +37,23 @@ class LoginSerializer(serializers.Serializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    current_password = serializers.CharField(required=True, write_only=True)
+    current_password = serializers.CharField(required=False, write_only=True)
+    old_password = serializers.CharField(required=False, write_only=True)
     new_password = serializers.CharField(required=True, write_only=True, min_length=8)
-    confirm_password = serializers.CharField(required=True, write_only=True, min_length=8)
+    confirm_password = serializers.CharField(required=False, write_only=True)
+    new_password_confirm = serializers.CharField(required=False, write_only=True)
 
     def validate(self, attrs):
+        current_pass = attrs.get("current_password") or attrs.get("old_password")
+        if not current_pass:
+            raise serializers.ValidationError({"current_password": "This field is required."})
+        attrs["current_password"] = current_pass
+
+        confirm_pass = attrs.get("confirm_password") or attrs.get("new_password_confirm")
+        if not confirm_pass:
+            raise serializers.ValidationError({"confirm_password": "This field is required."})
+        attrs["confirm_password"] = confirm_pass
+
         if attrs["new_password"] != attrs["confirm_password"]:
             raise serializers.ValidationError({"confirm_password": "New passwords do not match."})
         return attrs
@@ -55,9 +67,15 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField(required=True)
     token = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True, write_only=True, min_length=8)
-    confirm_password = serializers.CharField(required=True, write_only=True, min_length=8)
+    confirm_password = serializers.CharField(required=False, write_only=True)
+    new_password_confirm = serializers.CharField(required=False, write_only=True)
 
     def validate(self, attrs):
+        confirm_pass = attrs.get("confirm_password") or attrs.get("new_password_confirm")
+        if not confirm_pass:
+            raise serializers.ValidationError({"confirm_password": "This field is required."})
+        attrs["confirm_password"] = confirm_pass
+
         if attrs["new_password"] != attrs["confirm_password"]:
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
         return attrs

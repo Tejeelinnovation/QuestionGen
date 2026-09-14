@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { usersApi } from '../../api/users';
 import type { School, SchoolCreateInput } from '../../types';
-import { X, Building2, UserPlus, Check, AlertCircle } from 'lucide-react';
+import { X, Building2, UserPlus, Check, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { SearchableSelect } from '../ui/searchable-select';
 import { PhoneInput } from '../ui/phone-input';
 import { INDIAN_BOARDS, INDIAN_CURRICULA } from '../../constants/educationData';
@@ -32,6 +32,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
   // Administrator Details (Atomic Unified Creation)
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminMobile, setAdminMobile] = useState('');
   const [adminFirstName, setAdminFirstName] = useState('');
@@ -393,16 +394,33 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
                   <label htmlFor="admin-password" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                     Password *
                   </label>
-                  <input
-                    id="admin-password"
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
-                  />
+                  <div className="relative">
+                    <input
+                      id="admin-password"
+                      type={showAdminPassword ? 'text' : 'password'}
+                      required
+                      placeholder="••••••••"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      disabled={isSubmitting}
+                      className="w-full rounded-card border border-border bg-bg px-3 py-2 pr-9 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      disabled={isSubmitting}
+                      onClick={() => setShowAdminPassword((prev) => !prev)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink transition-colors p-1 focus:outline-none cursor-pointer flex items-center justify-center rounded-sm"
+                      aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
+                      title={showAdminPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showAdminPassword ? (
+                        <EyeOff className="w-3.5 h-3.5" />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 

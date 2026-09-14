@@ -34,11 +34,20 @@ export const authApi = {
   },
 
   changePassword: async (data: {
-    old_password: string;
+    old_password?: string;
+    current_password?: string;
     new_password: string;
-    new_password_confirm: string;
+    new_password_confirm?: string;
+    confirm_password?: string;
   }): Promise<{ detail: string }> => {
-    const response = await apiClient.post<{ detail: string }>('/api/auth/change-password/', data);
+    const payload = {
+      current_password: data.current_password || data.old_password,
+      old_password: data.old_password || data.current_password,
+      new_password: data.new_password,
+      confirm_password: data.confirm_password || data.new_password_confirm,
+      new_password_confirm: data.new_password_confirm || data.confirm_password,
+    };
+    const response = await apiClient.post<{ detail: string }>('/api/auth/change-password/', payload);
     return response.data;
   },
 
@@ -53,9 +62,15 @@ export const authApi = {
     uid: string;
     token: string;
     new_password: string;
-    new_password_confirm: string;
+    confirm_password?: string;
+    new_password_confirm?: string;
   }): Promise<{ detail: string }> => {
-    const response = await apiClient.post<{ detail: string }>('/api/auth/password-reset/confirm/', payload);
+    const data = {
+      ...payload,
+      confirm_password: payload.confirm_password || payload.new_password_confirm,
+      new_password_confirm: payload.new_password_confirm || payload.confirm_password,
+    };
+    const response = await apiClient.post<{ detail: string }>('/api/auth/password-reset/confirm/', data);
     return response.data;
   },
 };
