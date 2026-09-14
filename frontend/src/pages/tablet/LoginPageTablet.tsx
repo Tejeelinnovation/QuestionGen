@@ -117,6 +117,14 @@ export const LoginPageTablet: React.FC = () => {
                 >
                   ⚡ Student
                 </button>
+                <button
+                  type="button"
+                  id="tab-quick-qbm"
+                  onClick={() => handleQuickFill('qbm1', 'password123')}
+                  className="col-span-2 px-3.5 py-2.5 rounded-pill bg-[#0F766E] text-white font-heading font-semibold text-xs active:scale-95 transition-transform min-h-[44px] flex items-center justify-center cursor-pointer"
+                >
+                  ⚡ QBM
+                </button>
               </div>
             </div>
           </div>

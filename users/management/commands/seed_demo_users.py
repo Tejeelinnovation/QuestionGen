@@ -22,6 +22,7 @@ from django.db import transaction
 from core.audit import log_action
 from schools.models import School
 from users.capability_defaults import (
+    grant_qbm_defaults,
     grant_school_admin_defaults,
     grant_student_defaults,
     grant_super_admin_defaults,
@@ -31,7 +32,7 @@ from users.models import User
 
 
 class Command(BaseCommand):
-    help = "Seed demo users for all 4 roles (Super Admin, School Admin, Teacher, Student)."
+    help = "Seed demo users for all system roles (Super Admin, School Admin, Teacher, Student, QBM)."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -42,7 +43,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         clear = options["clear"]
-        demo_usernames = ["superadmin", "schooladmin1", "teacher1", "student1", "student2"]
+        demo_usernames = ["superadmin", "schooladmin1", "teacher1", "student1", "student2", "qbm1"]
 
         if clear:
             self.stdout.write("Clearing existing demo users...")
@@ -195,6 +196,26 @@ class Command(BaseCommand):
                 stu.save()
                 grant_student_defaults(stu, granted_by=teacher)
                 self.stdout.write(f"  {'Created' if created else 'Updated'} {uname} (Student - Class 10-A)")
+
+            # 6. Question Bank Manager (QBM)
+            qbm, created = User.objects.get_or_create(
+                username="qbm1",
+                defaults={
+                    "email": "qbm1@system.local",
+                    "mobile_number": "+919876543219",
+                    "first_name": "Quinn",
+                    "last_name": "BankManager",
+                    "role": "QBM",
+                    "school": None,
+                    "created_by": superadmin,
+                },
+            )
+            qbm.role = "QBM"
+            qbm.mobile_number = "+919876543219"
+            qbm.set_password("password123")
+            qbm.save()
+            grant_qbm_defaults(qbm, granted_by=superadmin)
+            self.stdout.write(f"  {'Created' if created else 'Updated'} qbm1 (Question Bank Manager)")
 
         self.stdout.write(
             self.style.SUCCESS(

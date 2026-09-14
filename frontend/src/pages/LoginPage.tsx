@@ -152,6 +152,14 @@ const LoginPageDesktop: React.FC = () => {
                 >
                   ⚡ Student
                 </button>
+                <button
+                  type="button"
+                  id="quick-qbm"
+                  onClick={() => handleQuickFill('qbm1', 'password123')}
+                  className="pill pill-teal hover:opacity-90 transition-opacity cursor-pointer text-xs"
+                >
+                  ⚡ QBM
+                </button>
               </div>
             </div>
           </div>

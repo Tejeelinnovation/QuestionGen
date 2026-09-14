@@ -195,6 +195,7 @@
   .pill-grape  { background-color: var(--color-grape);  color: #fff; }
   .pill-lime   { background-color: var(--color-lime);   color: var(--color-ink); }
   .pill-muted  { background-color: var(--color-border); color: var(--color-ink); }
+  .pill-teal   { background-color: #0F766E;             color: #fff; }
 
   /* Breakpoint indicator badge (dev tool, removed in Prompt 2) */
   .breakpoint-badge {
