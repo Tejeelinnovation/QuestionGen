@@ -223,3 +223,22 @@ SIMPLE_JWT = {
 # ---------------------------------------------------------------------------
 GENERATION_SERVICE_BACKEND = env("GENERATION_SERVICE_BACKEND", default="seeded_bank")
 
+# ---------------------------------------------------------------------------
+# Email Configuration
+# ---------------------------------------------------------------------------
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_HOST = env("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@questiongen.local")
+
+# Use live SMTP if user and password are provided; otherwise use console backend for dev/testing
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+else:
+    EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+
+

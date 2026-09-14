@@ -15,6 +15,9 @@ DELETE /api/users/{id}/permissions/{cap}/   → UserViewSet.revoke_permission
 
 from __future__ import annotations
 
+import logging
+from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
@@ -31,6 +34,8 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
 from core.audit import log_action
 from core.pagination import StandardPageNumberPagination
+
+logger = logging.getLogger(__name__)
 from .models import Capability, CapabilityName, User, UserCapability
 from .permissions import (
     HasCapability,
@@ -201,7 +206,7 @@ class PasswordResetRequestView(APIView):
     """
     POST /api/auth/password-reset/request/
 
-    Generates signed, secure password reset token for account recovery.
+    Generates signed, secure password reset token for account recovery and dispatches an email.
     """
 
     permission_classes = []
@@ -215,22 +220,34 @@ class PasswordResetRequestView(APIView):
         if user:
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            reset_url = f"/reset-password?uid={uid}&token={token}"
+            frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+            reset_url = f"{frontend_url}/reset-password?uid={uid}&token={token}"
             log_action(user, "user.password_reset_requested", user)
 
-            return Response(
-                {
-                    "detail": "If an active account exists with this email address, password reset instructions have been dispatched.",
-                    "uid": uid,
-                    "token": token,
-                    "reset_url": reset_url,
-                },
-                status=status.HTTP_200_OK,
+            subject = "Reset Your Password - Question Generation System"
+            message = (
+                f"Hello {user.get_full_name() or user.username},\n\n"
+                "We received a request to reset the password for your account.\n\n"
+                f"Click the link below to set a new password:\n{reset_url}\n\n"
+                "If you did not request a password reset, please ignore this email. Your password will remain unchanged.\n"
+                "This link is valid for 24 hours.\n\n"
+                "Best regards,\nQuestion Generation System Team"
             )
+
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception as exc:
+                logger.error("Failed to send password reset email to %s: %s", user.email, exc)
 
         return Response(
             {
-                "detail": "If an active account exists with this email address, password reset instructions have been dispatched.",
+                "detail": "If an active account exists with this email address, password reset instructions have been dispatched to your email.",
             },
             status=status.HTTP_200_OK,
         )

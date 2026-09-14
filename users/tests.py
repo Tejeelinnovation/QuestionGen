@@ -1,3 +1,7 @@
+from django.core import mail
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -554,5 +558,69 @@ class ChangePasswordViewTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("current_password", response.data)
+
+
+class PasswordResetFlowTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="student_reset_tester",
+            email="reset_student@school.edu",
+            password="OldPassword123!",
+            role="Student",
+        )
+
+    def test_request_password_reset_sends_email_without_leaking_tokens(self):
+        mail.outbox.clear()
+        response = self.client.post(
+            "/api/auth/password-reset/request/",
+            {"email": "reset_student@school.edu"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Verify tokens and URLs are NOT leaked in response body
+        self.assertNotIn("token", response.data)
+        self.assertNotIn("uid", response.data)
+        self.assertNotIn("reset_url", response.data)
+        self.assertIn("detail", response.data)
+
+        # Verify an actual email was dispatched
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+        self.assertIn("reset_student@school.edu", sent_email.to)
+        self.assertIn("Reset Your Password", sent_email.subject)
+        self.assertIn("/reset-password?uid=", sent_email.body)
+
+    def test_confirm_password_reset_success(self):
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+
+        response = self.client.post(
+            "/api/auth/password-reset/confirm/",
+            {
+                "uid": uid,
+                "token": token,
+                "new_password": "BrandNewPassword999!",
+                "confirm_password": "BrandNewPassword999!",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("BrandNewPassword999!"))
+
+        # Test single-use security: token cannot be reused
+        repeat_response = self.client.post(
+            "/api/auth/password-reset/confirm/",
+            {
+                "uid": uid,
+                "token": token,
+                "new_password": "AnotherNewPassword111!",
+                "confirm_password": "AnotherNewPassword111!",
+            },
+            format="json",
+        )
+        self.assertEqual(repeat_response.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 

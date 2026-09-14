@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { authApi } from '../../api/auth';
-import { X, KeyRound, Check, AlertCircle, Loader2, Mail, Copy, CheckCheck, Eye, EyeOff } from 'lucide-react';
+import { X, KeyRound, Check, AlertCircle, Loader2, Mail, Eye, EyeOff } from 'lucide-react';
 import { MOTION } from '../../lib/motion';
 
 interface ChangePasswordModalProps {
@@ -31,8 +31,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   const [isSendingLink, setIsSendingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
-  const [generatedResetUrl, setGeneratedResetUrl] = useState<string | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
 
   if (!isOpen) return null;
 
@@ -96,14 +94,12 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     setIsSendingLink(true);
     setLinkError(null);
     setLinkSuccess(null);
-    setGeneratedResetUrl(null);
 
     try {
       const res = await authApi.requestPasswordReset(user.email);
-      setLinkSuccess(res.detail || 'Password reset link generated.');
-      if (res.reset_url) {
-        setGeneratedResetUrl(res.reset_url);
-      }
+      setLinkSuccess(
+        res.detail || 'Password reset instructions have been dispatched to your email address.'
+      );
     } catch (err: any) {
       setLinkError(
         err?.response?.data?.detail ||
@@ -113,12 +109,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     } finally {
       setIsSendingLink(false);
     }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   return (
@@ -332,33 +322,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               </p>
             </div>
 
-            {generatedResetUrl && (
-              <div className="p-3.5 rounded-card bg-forest/10 border border-forest/30 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-forest">Direct Reset URL Generated:</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(window.location.origin + generatedResetUrl)}
-                    className="inline-flex items-center gap-1 text-[11px] font-mono text-forest font-bold hover:underline cursor-pointer"
-                  >
-                    {copiedLink ? <CheckCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedLink ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </div>
-                <div className="font-mono text-[10px] break-all p-2 rounded bg-surface border border-border text-ink/80 max-h-16 overflow-y-auto">
-                  {window.location.origin + generatedResetUrl}
-                </div>
-                <a
-                  href={generatedResetUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-block text-[11px] text-forest font-semibold underline hover:text-forest/80"
-                >
-                  Open Password Reset Page in new tab &rarr;
-                </a>
-              </div>
-            )}
-
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
               <button
                 type="button"
@@ -376,12 +339,12 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 {isSendingLink ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Generating...</span>
+                    <span>Sending Email...</span>
                   </>
                 ) : (
                   <>
                     <Mail className="w-3.5 h-3.5" />
-                    <span>Generate Reset Link</span>
+                    <span>Send Reset Email</span>
                   </>
                 )}
               </button>
