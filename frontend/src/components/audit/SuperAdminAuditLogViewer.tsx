@@ -11,12 +11,9 @@ import {
   CheckCircle2,
   Eye,
   X,
-  Laptop,
   GraduationCap,
-  Sparkles,
 } from 'lucide-react';
 import { Pagination } from '../ui/pagination';
-import { MOTION } from '../../lib/motion';
 
 export const SuperAdminAuditLogViewer: React.FC = () => {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
@@ -60,7 +57,27 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
     fetchLogs();
   }, [currentPage, pageSize, selectedCategory, debouncedSearch]);
 
-  const getCategoryBadge = (category: string) => {
+  const formatTimestamp = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  const formatFullTimestamp = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString();
+  };
+
+  const getCategoryBadge = (category?: string) => {
     switch (category) {
       case 'PROCTORING':
         return 'pill-ember';
@@ -75,7 +92,7 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
     }
   };
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryIcon = (category?: string) => {
     switch (category) {
       case 'PROCTORING':
         return <ShieldAlert className="w-3.5 h-3.5 text-ember" />;
@@ -83,6 +100,8 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
         return <GraduationCap className="w-3.5 h-3.5 text-forest" />;
       case 'PAPERS':
         return <FileText className="w-3.5 h-3.5 text-grape" />;
+      case 'USERS':
+        return <User className="w-3.5 h-3.5 text-forest" />;
       default:
         return <Clock className="w-3.5 h-3.5 text-ink/50" />;
     }
@@ -90,7 +109,10 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
 
   const formatSummary = (log: AuditLogItem) => {
     const meta = log.metadata || {};
-    if (log.category === 'PROCTORING') {
+    const action = log.action || log.event_type || '';
+    const category = log.category || '';
+
+    if (category === 'PROCTORING' || action.includes('proctoring')) {
       const reason = meta.event_type || meta.reason || 'Integrity warning';
       const warningCount = meta.warning_count ?? log.target_id;
       return (
@@ -100,7 +122,39 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
       );
     }
 
-    if (log.event_type === 'paper.created') {
+    if (action === 'user.login') {
+      return <span>User logged into the platform</span>;
+    }
+
+    if (action === 'user.logout') {
+      return <span>User logged out of session</span>;
+    }
+
+    if (action === 'user.profile_updated') {
+      return <span>User profile updated for @{meta.username || log.actor?.username || log.target_id}</span>;
+    }
+
+    if (action === 'user.created') {
+      return <span>New user created: @{meta.username || log.target_id}</span>;
+    }
+
+    if (action === 'user.password_changed') {
+      return <span>Password updated</span>;
+    }
+
+    if (action === 'user.password_reset_requested') {
+      return <span>Password reset link requested</span>;
+    }
+
+    if (action === 'user.password_reset_confirmed') {
+      return <span>Password reset successfully confirmed</span>;
+    }
+
+    if (action.startsWith('capability.')) {
+      return <span>Permissions & capabilities updated</span>;
+    }
+
+    if (action === 'paper.created') {
       return (
         <span>
           Paper Created: <strong>{meta.title || meta.paper_title || `Paper #${log.target_id}`}</strong>
@@ -109,7 +163,27 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
       );
     }
 
-    if (log.event_type === 'attempt.started') {
+    if (action === 'paper.cloned') {
+      return (
+        <span>
+          Paper Cloned: <strong>{meta.title || meta.paper_title || `Paper #${log.target_id}`}</strong>
+        </span>
+      );
+    }
+
+    if (action === 'version.created') {
+      return (
+        <span>
+          Paper Version Created: <strong>{meta.title || `Version #${log.target_id}`}</strong>
+        </span>
+      );
+    }
+
+    if (action === 'delivery.created') {
+      return <span>Exam Delivery Scheduled</span>;
+    }
+
+    if (action === 'attempt.started') {
       return (
         <span>
           Exam Started: <strong>{meta.test_title || meta.paper_title || `Attempt #${log.target_id}`}</strong>
@@ -117,7 +191,7 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
       );
     }
 
-    if (log.event_type === 'attempt.submitted') {
+    if (action === 'attempt.submitted') {
       return (
         <span>
           Exam Completed: <strong>{meta.test_title || `Attempt #${log.target_id}`}</strong>
@@ -126,11 +200,15 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
       );
     }
 
-    if (log.event_type === 'user.profile_updated') {
-      return <span>User profile updated for @{meta.username || log.target_id}</span>;
+    if (action === 'answer.graded') {
+      return <span>Answer Graded for Question #{meta.question_id || log.target_id}</span>;
     }
 
-    return <span>{log.event_type}</span>;
+    const formattedAction = action
+      ? action.replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+      : 'System Event';
+
+    return <span className="font-mono text-ink/80">{formattedAction}</span>;
   };
 
   return (
@@ -249,7 +327,7 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
                 onClick={() => setSearchTerm('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink cursor-pointer"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -292,13 +370,7 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
                   >
                     {/* Timestamp */}
                     <td className="py-3 px-4 whitespace-nowrap font-mono text-[11px] text-ink/75">
-                      {new Date(log.created_at).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                      })}
+                      {formatTimestamp(log.created_at || log.timestamp)}
                     </td>
 
                     {/* Category */}
@@ -307,7 +379,7 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
                         className={`pill ${getCategoryBadge(log.category)} text-[10px] inline-flex items-center gap-1`}
                       >
                         {getCategoryIcon(log.category)}
-                        <span>{log.category}</span>
+                        <span>{log.category || 'SYSTEM'}</span>
                       </span>
                     </td>
 
@@ -316,9 +388,11 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
                       {log.actor ? (
                         <div className="flex items-center gap-1.5">
                           <span className="font-medium text-ink">@{log.actor.username}</span>
-                          <span className="text-[10px] text-ink/40 font-mono">
-                            ({log.actor.role_label})
-                          </span>
+                          {(log.actor.role_label || log.actor.role) && (
+                            <span className="text-[10px] text-ink/40 font-mono">
+                              ({log.actor.role_label || log.actor.role})
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-ink/40 font-mono italic">System Core</span>
@@ -356,8 +430,11 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
           <div className="pt-2">
             <Pagination
               currentPage={currentPage}
-              totalPages={Math.ceil(totalCount / pageSize)}
+              totalCount={totalCount}
+              pageSize={pageSize}
               onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              itemName="audit records"
             />
           </div>
         )}
@@ -370,7 +447,7 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
             <div className="flex items-center justify-between p-5 border-b border-border bg-surface-muted/30">
               <div className="flex items-center gap-2">
                 <span className={`pill ${getCategoryBadge(selectedLog.category)} text-xs`}>
-                  {selectedLog.category}
+                  {selectedLog.category || 'SYSTEM'}
                 </span>
                 <span className="font-mono text-xs text-ink/50">ID #{selectedLog.id}</span>
               </div>
@@ -386,7 +463,7 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="space-y-1">
                 <h3 className="font-heading font-bold text-lg text-ink">
-                  {selectedLog.event_type}
+                  {selectedLog.event_type || selectedLog.action || 'Audit Record'}
                 </h3>
                 <p className="text-xs text-ink/65">
                   Target: <strong className="font-mono">{selectedLog.target_type} #{selectedLog.target_id}</strong>
@@ -404,19 +481,19 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
                 <div>
                   <span className="text-ink/50 block text-[10px] uppercase">Actor Role</span>
                   <span className="text-ink font-semibold">
-                    {selectedLog.actor?.role_label || 'Core Service'}
+                    {selectedLog.actor?.role_label || selectedLog.actor?.role || 'Core Service'}
                   </span>
                 </div>
                 <div>
                   <span className="text-ink/50 block text-[10px] uppercase">Timestamp</span>
                   <span className="text-ink font-medium">
-                    {new Date(selectedLog.created_at).toLocaleString()}
+                    {formatFullTimestamp(selectedLog.created_at || selectedLog.timestamp)}
                   </span>
                 </div>
                 <div>
                   <span className="text-ink/50 block text-[10px] uppercase">IP Address</span>
                   <span className="text-ink font-medium">
-                    {selectedLog.ip_address || '127.0.0.1'}
+                    {selectedLog.ip_address || selectedLog.metadata?.ip || selectedLog.metadata?.ip_address || '127.0.0.1'}
                   </span>
                 </div>
               </div>

@@ -15,6 +15,20 @@ from core.models import AuditLog
 from core.pagination import StandardPageNumberPagination
 
 
+def get_category_for_action(action: str) -> str:
+    if not action:
+        return "SYSTEM"
+    if "proctoring" in action:
+        return "PROCTORING"
+    if action.startswith(("attempt.", "exam.", "answer.")):
+        return "EXAMS"
+    if action.startswith(("paper.", "version.", "delivery.", "blueprint.")):
+        return "PAPERS"
+    if action.startswith(("user.", "capability.")):
+        return "USERS"
+    return "SYSTEM"
+
+
 class AuditLogListView(APIView):
     """
     GET /api/audit-logs/
@@ -23,7 +37,7 @@ class AuditLogListView(APIView):
     - Proctoring warnings & cheating alerts
     - Student exam sittings (start, submission, scores)
     - Teacher paper creation and versioning
-    - Role and permission changes
+    - Role, session, and security changes
     """
 
     permission_classes = [IsAuthenticated]
@@ -41,13 +55,13 @@ class AuditLogListView(APIView):
         # Category filtering
         category = request.query_params.get("category", "ALL").upper()
         if category == "PROCTORING":
-            qs = qs.filter(action__in=["exam.proctoring_warning"])
+            qs = qs.filter(Q(action__in=["exam.proctoring_warning"]) | Q(action__icontains="proctoring"))
         elif category == "EXAMS":
-            qs = qs.filter(action__in=["attempt.started", "attempt.submitted", "exam.proctoring_warning", "answer.graded"])
+            qs = qs.filter(Q(action__startswith="attempt.") | Q(action__startswith="exam.") | Q(action__startswith="answer."))
         elif category == "PAPERS":
-            qs = qs.filter(action__in=["paper.created", "version.created", "paper.cloned", "delivery.created"])
+            qs = qs.filter(Q(action__startswith="paper.") | Q(action__startswith="version.") | Q(action__startswith="delivery.") | Q(action__startswith="blueprint."))
         elif category == "USERS":
-            qs = qs.filter(action__in=["user.created", "user.profile_updated", "user.password_changed", "capability.granted", "capability.revoked"])
+            qs = qs.filter(Q(action__startswith="user.") | Q(action__startswith="capability."))
 
         # Specific action filter
         action_filter = request.query_params.get("action")
@@ -70,22 +84,48 @@ class AuditLogListView(APIView):
 
         results = []
         for log in (page if page is not None else qs[:100]):
-            actor = {
-                "id": log.user_id,
-                "username": log.user.username if log.user else "System",
-                "role": getattr(log.user, "role", "SYSTEM") if log.user else "SYSTEM",
-            }
+            actor = None
+            if log.user:
+                role_val = getattr(log.user, "role", "USER")
+                role_label = getattr(log.user, "get_role_display", None)
+                if callable(role_label):
+                    try:
+                        role_label = role_label()
+                    except Exception:
+                        role_label = role_val
+                else:
+                    role_label = role_val
+
+                actor = {
+                    "id": log.user_id,
+                    "username": log.user.username,
+                    "first_name": getattr(log.user, "first_name", ""),
+                    "last_name": getattr(log.user, "last_name", ""),
+                    "role": role_val,
+                    "role_label": role_label or role_val,
+                }
+
+            meta = log.metadata or {}
+            ip_address = meta.get("ip") or meta.get("ip_address") or None
+            item_category = get_category_for_action(log.action)
+            iso_time = log.timestamp.isoformat()
+
             results.append({
                 "id": log.id,
                 "actor": actor,
                 "action": log.action,
+                "event_type": log.action,
+                "category": item_category,
                 "target_type": log.target_type,
                 "target_id": log.target_id,
-                "timestamp": log.timestamp.isoformat(),
-                "metadata": log.metadata or {},
+                "timestamp": iso_time,
+                "created_at": iso_time,
+                "ip_address": ip_address,
+                "metadata": meta,
             })
 
         if page is not None:
             return paginator.get_paginated_response(results)
 
         return Response({"results": results}, status=status.HTTP_200_OK)
+

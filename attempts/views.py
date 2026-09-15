@@ -110,6 +110,19 @@ class AttemptStartResumeView(APIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if attempt.warning_count >= 5:
+                if attempt.status == AttemptStatus.IN_PROGRESS:
+                    attempt.status = AttemptStatus.SUBMITTED
+                    attempt.submitted_at = now
+                    attempt.save(update_fields=["status", "submitted_at", "updated_at"])
+                return Response(
+                    {
+                        "detail": "This test has been locked due to proctoring violations.",
+                        "attempt_id": attempt.id,
+                        "status": attempt.status,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             # Resume existing in-progress attempt
             serializer = AttemptStartResponseSerializer(attempt)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -186,6 +199,12 @@ class AttemptAnswerSaveView(APIView):
         if attempt.status != AttemptStatus.IN_PROGRESS:
             return Response(
                 {"detail": "Cannot modify answers on a submitted or evaluated attempt."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if attempt.warning_count >= 5:
+            return Response(
+                {"detail": "Proctoring violation limit reached. This attempt has been locked."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -585,7 +604,44 @@ class AttemptProctoringWarningView(APIView):
         current_logs = list(attempt.proctoring_logs or [])
         current_logs.append(log_entry)
         attempt.proctoring_logs = current_logs
-        attempt.save(update_fields=["warning_count", "proctoring_logs", "updated_at"])
+
+        auto_submitted = False
+        if attempt.warning_count >= 5 and attempt.status == AttemptStatus.IN_PROGRESS:
+            answers = list(attempt.answers.all())
+            has_pending = False
+            running_score = 0.0
+
+            for ans in answers:
+                snap = ans.question_snapshot
+                q_type = snap.get("question_type")
+                q_marks = float(snap.get("marks", 0))
+
+                if q_type == "MCQ":
+                    student_choice = ans.student_response.strip().upper()
+                    correct_choice = str(snap.get("correct_answer", "")).strip().upper()
+
+                    if student_choice and student_choice == correct_choice:
+                        ans.is_correct = True
+                        ans.marks_awarded = q_marks
+                        running_score += q_marks
+                    else:
+                        ans.is_correct = False
+                        ans.marks_awarded = 0.0
+                    ans.save()
+                else:
+                    ans.is_correct = None
+                    ans.marks_awarded = None
+                    ans.save()
+                    has_pending = True
+
+            attempt.score = running_score
+            attempt.submitted_at = timezone.now()
+            attempt.status = (
+                AttemptStatus.SUBMITTED if has_pending else AttemptStatus.EVALUATED
+            )
+            auto_submitted = True
+
+        attempt.save()
 
         # Write immutable audit log entry for Super Admin
         log_action(
@@ -601,6 +657,7 @@ class AttemptProctoringWarningView(APIView):
                 "warning_count": attempt.warning_count,
                 "event_type": event_type,
                 "details": details,
+                "auto_submitted": auto_submitted,
             },
         )
 
@@ -610,6 +667,8 @@ class AttemptProctoringWarningView(APIView):
                 "warning_count": attempt.warning_count,
                 "event_type": event_type,
                 "details": details,
+                "auto_submitted": auto_submitted,
+                "status": attempt.status,
                 "message": f"Proctoring warning recorded (#{attempt.warning_count}).",
             },
             status=status.HTTP_200_OK,

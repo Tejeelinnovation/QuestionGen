@@ -55,14 +55,18 @@ export const ProctoringWarningModal: React.FC<ProctoringWarningModalProps> = ({
 
         <div className="text-xs text-ink/70 leading-relaxed space-y-2 font-sans">
           <p>
-            You navigated away from the active assessment screen or attempted an unauthorized shortcut.
-            All proctoring events are strictly recorded in the official audit log for review by the Super Admin and course instructor.
+            You navigated away from the active assessment screen or attempted an unauthorized action.
+            All proctoring events are strictly recorded in the official immutable audit log.
           </p>
-          {isSevere && (
+          {warning.warningNumber >= maxWarnings ? (
             <p className="font-bold text-ember">
-              Notice: Reaching {maxWarnings} warnings may result in automatic submission or invalidation of this assessment sitting.
+              Maximum violation threshold reached ({warning.warningNumber}/{maxWarnings}). Your assessment is being automatically locked and submitted.
             </p>
-          )}
+          ) : isSevere ? (
+            <p className="font-bold text-ember">
+              Notice: Reaching {maxWarnings} warnings will result in automatic submission of this assessment.
+            </p>
+          ) : null}
         </div>
 
         <button
@@ -70,7 +74,9 @@ export const ProctoringWarningModal: React.FC<ProctoringWarningModalProps> = ({
           onClick={onDismiss}
           className="w-full py-3 px-4 rounded-pill bg-ember text-white font-heading font-bold text-xs hover:bg-ember/90 transition-all shadow-md active:scale-98 cursor-pointer"
         >
-          I Understand & Return to Exam →
+          {warning.warningNumber >= maxWarnings
+            ? 'Finalize & Submit Assessment →'
+            : 'I Understand & Return to Exam →'}
         </button>
       </div>
     </div>

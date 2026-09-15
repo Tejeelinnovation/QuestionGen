@@ -3,21 +3,24 @@ import { apiClient } from './client';
 export interface AuditLogActor {
   id: number;
   username: string;
-  first_name: string;
-  last_name: string;
-  role_label: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  role_label?: string;
 }
 
 export interface AuditLogItem {
   id: number;
   actor: AuditLogActor | null;
   event_type: string;
+  action?: string;
   target_type: string;
   target_id: string;
-  category: 'PROCTORING' | 'EXAMS' | 'PAPERS' | 'USERS' | 'SYSTEM';
+  category: 'PROCTORING' | 'EXAMS' | 'PAPERS' | 'USERS' | 'SYSTEM' | string;
   metadata: Record<string, any>;
   ip_address: string | null;
   created_at: string;
+  timestamp?: string;
 }
 
 export interface AuditLogsResponse {

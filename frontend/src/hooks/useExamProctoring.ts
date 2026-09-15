@@ -3,7 +3,9 @@ import { attemptsApi } from '../api/attempts';
 
 interface UseExamProctoringOptions {
   attemptId?: number;
+  initialWarningCount?: number;
   isActive: boolean;
+  hasStarted?: boolean;
   maxWarnings?: number;
   onMaxWarningsReached?: () => void;
 }
@@ -17,14 +19,35 @@ export interface ProctoringWarningState {
 
 export const useExamProctoring = ({
   attemptId,
+  initialWarningCount = 0,
   isActive,
+  hasStarted = true,
   maxWarnings = 5,
   onMaxWarningsReached,
 }: UseExamProctoringOptions) => {
-  const [warningCount, setWarningCount] = useState(0);
+  const [warningCount, setWarningCount] = useState(initialWarningCount);
   const [activeWarning, setActiveWarning] = useState<ProctoringWarningState | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const isHandlingViolation = useRef(false);
+
+  // Sync with initialWarningCount when attempt data loads
+  useEffect(() => {
+    if (initialWarningCount !== undefined && initialWarningCount > warningCount) {
+      setWarningCount(initialWarningCount);
+      if (initialWarningCount >= maxWarnings && onMaxWarningsReached) {
+        onMaxWarningsReached();
+      }
+    }
+  }, [initialWarningCount, maxWarnings, onMaxWarningsReached]);
+
+  // Maintain real-time fullscreen state
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
 
   // Request fullscreen
   const requestFullscreen = useCallback(async () => {
@@ -40,7 +63,7 @@ export const useExamProctoring = ({
 
   const triggerWarning = useCallback(
     async (eventType: string, details: string) => {
-      if (!isActive || !attemptId || isHandlingViolation.current) return;
+      if (!isActive || !hasStarted || !attemptId || isHandlingViolation.current) return;
 
       isHandlingViolation.current = true;
       const nextCount = warningCount + 1;
@@ -56,7 +79,14 @@ export const useExamProctoring = ({
       setActiveWarning(warningObj);
 
       try {
-        await attemptsApi.logProctoringWarning(attemptId, eventType, details);
+        const res: any = await attemptsApi.logProctoringWarning(attemptId, eventType, details);
+        const serverCount = res?.data?.warning_count ?? res?.warning_count;
+        if (typeof serverCount === 'number' && serverCount > nextCount) {
+          setWarningCount(serverCount);
+        }
+        if ((nextCount >= maxWarnings || (typeof serverCount === 'number' && serverCount >= maxWarnings) || res?.auto_submitted) && onMaxWarningsReached) {
+          onMaxWarningsReached();
+        }
       } catch (err) {
         console.error('Failed to report proctoring warning to server:', err);
       }
@@ -70,7 +100,7 @@ export const useExamProctoring = ({
         isHandlingViolation.current = false;
       }, 1500);
     },
-    [isActive, attemptId, warningCount, maxWarnings, onMaxWarningsReached]
+    [isActive, hasStarted, attemptId, warningCount, maxWarnings, onMaxWarningsReached]
   );
 
   const dismissWarning = useCallback(() => {

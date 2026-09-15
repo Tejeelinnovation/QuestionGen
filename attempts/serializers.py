@@ -46,6 +46,8 @@ class AttemptStartResponseSerializer(serializers.Serializer):
     total_marks = serializers.DecimalField(source="max_score", max_digits=6, decimal_places=2)
     status = serializers.CharField()
     started_at = serializers.DateTimeField()
+    warning_count = serializers.IntegerField(default=0)
+    available_until = serializers.DateTimeField(source="delivery.available_until", allow_null=True)
     questions = serializers.SerializerMethodField()
 
     def get_questions(self, obj: Attempt) -> list[dict[str, Any]]:

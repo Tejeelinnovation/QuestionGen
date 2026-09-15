@@ -29,6 +29,18 @@ export const TestAttemptPageMobile: React.FC = () => {
   const [isExpired, setIsExpired] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
 
+  const handleAutoSubmitOnMaxWarnings = useCallback(async () => {
+    if (!attemptData || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await attemptsApi.submitAttempt(attemptData.attempt_id);
+    } catch {
+      // Ignore if already submitted
+    } finally {
+      navigate(`/attempts/${attemptData.attempt_id}/result`, { replace: true });
+    }
+  }, [attemptData, isSubmitting, navigate]);
+
   // Anti-cheating exam proctoring hook
   const {
     warningCount,
@@ -36,8 +48,23 @@ export const TestAttemptPageMobile: React.FC = () => {
     dismissWarning,
   } = useExamProctoring({
     attemptId: attemptData?.attempt_id,
+    initialWarningCount: attemptData?.warning_count ?? 0,
     isActive: Boolean(attemptData && !isSubmitting && !isExpired),
+    maxWarnings: 5,
+    onMaxWarningsReached: handleAutoSubmitOnMaxWarnings,
   });
+
+  // Prevent student from closing or reloading tab without warning
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (attemptData && !isSubmitting && !isExpired) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [attemptData, isSubmitting, isExpired]);
 
   // Swipe detection refs
   const touchStartX = useRef<number | null>(null);

@@ -7,6 +7,7 @@ import { useExamProctoring } from '../../hooks/useExamProctoring';
 import { ProctoringWarningModal } from '../../components/attempts/ProctoringWarningModal';
 import { TestAttemptPageTablet } from '../tablet/attempts/TestAttemptPageTablet';
 import { TestAttemptPageMobile } from '../mobile/attempts/TestAttemptPageMobile';
+import { Maximize2, ShieldAlert } from 'lucide-react';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -22,8 +23,21 @@ const TestAttemptPageDesktop: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
 
-  // Anti-cheating exam proctoring hook
+  const handleAutoSubmitOnMaxWarnings = useCallback(async () => {
+    if (!attemptData || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await attemptsApi.submitAttempt(attemptData.attempt_id);
+    } catch {
+      // Ignore if already submitted
+    } finally {
+      navigate(`/attempts/${attemptData.attempt_id}/result`, { replace: true });
+    }
+  }, [attemptData, isSubmitting, navigate]);
+
+  // Anti-cheating exam proctoring hook with persistent warning count & auto-submit
   const {
     warningCount,
     activeWarning,
@@ -32,7 +46,11 @@ const TestAttemptPageDesktop: React.FC = () => {
     requestFullscreen,
   } = useExamProctoring({
     attemptId: attemptData?.attempt_id,
+    initialWarningCount: attemptData?.warning_count ?? 0,
     isActive: Boolean(attemptData && !isSubmitting && !isExpired),
+    hasStarted: hasEnteredFullscreen,
+    maxWarnings: 5,
+    onMaxWarningsReached: handleAutoSubmitOnMaxWarnings,
   });
 
   // Debounce timers map
@@ -44,6 +62,18 @@ const TestAttemptPageDesktop: React.FC = () => {
       Object.values(debounceTimers.current).forEach((timer) => clearTimeout(timer));
     };
   }, []);
+
+  // Prevent student from closing or reloading tab without warning
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (attemptData && !isSubmitting && !isExpired) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [attemptData, isSubmitting, isExpired]);
 
   useEffect(() => {
     const startOrResume = async () => {
@@ -201,6 +231,54 @@ const TestAttemptPageDesktop: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto pb-24 font-body space-y-8">
+      {/* ── MANDATORY SECURE FULLSCREEN GATE & MONITORING LOCK ── */}
+      {!isFullscreen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-bg/95 backdrop-blur-md animate-in fade-in">
+          <div className="max-w-md w-full bg-surface border border-forest/30 rounded-2xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
+            <div className="w-16 h-16 rounded-full bg-forest/10 border border-forest/20 flex items-center justify-center mx-auto text-forest">
+              <Maximize2 className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="font-heading font-bold text-xl text-ink">
+                {hasEnteredFullscreen ? 'Assessment Locked: Full Screen Required' : 'Full-Screen Assessment Mode Required'}
+              </h2>
+              <p className="text-xs text-ink/70 leading-relaxed">
+                {hasEnteredFullscreen
+                  ? 'You exited full-screen mode. To maintain test integrity, questions are hidden until you return to full-screen view.'
+                  : 'This examination is proctored with active anti-cheating controls. You must enter and remain in full-screen mode before accessing questions.'}
+              </p>
+            </div>
+
+            <div className="rounded-card bg-surface-muted/60 border border-border p-3.5 text-left text-xs font-mono text-ink/75 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-forest shrink-0" />
+                <span>Tab switching & window minimizing recorded</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-forest shrink-0" />
+                <span>Clipboard shortcuts & developer tools are blocked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-ember shrink-0" />
+                <span>Exceeding 5 warnings will auto-submit exam</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await requestFullscreen();
+                setHasEnteredFullscreen(true);
+              }}
+              className="w-full py-3.5 px-6 rounded-pill bg-forest text-white font-heading font-semibold text-sm hover:bg-forest/90 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span>{hasEnteredFullscreen ? 'Return to Full Screen to Continue' : 'Enter Full Screen & Begin Assessment'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── CALM, RESTRAINED EXAMINATION HEADER ── */}
       <div className="bg-surface border border-border rounded-card p-6 sm:p-8 shadow-card space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-border/70 pb-4">
@@ -423,12 +501,10 @@ const TestAttemptPageDesktop: React.FC = () => {
 
       {/* ── WEIGHTY COMMITTED SUBMIT ACTION STRIP (STICKY BOTTOM) ── */}
       <div className="sticky bottom-4 z-30 bg-surface/95 backdrop-blur-sm border border-border rounded-card p-4 sm:p-5 shadow-float flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <Link
-          to="/dashboard/student"
-          className="text-xs font-heading font-semibold text-ink/60 hover:text-ink transition-colors self-start sm:self-auto"
-        >
-          ← Pause & Return to Portal
-        </Link>
+        <div className="flex items-center gap-2 text-xs font-heading font-medium text-ink/60 self-start sm:self-auto">
+          <ShieldAlert className="w-4 h-4 text-forest shrink-0" />
+          <span>Live Monitored Exam • Pausing Disabled</span>
+        </div>
 
         <div className="flex items-center gap-4 self-end sm:self-auto">
           <div className="text-right">
