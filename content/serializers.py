@@ -259,6 +259,8 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
     topic = serializers.PrimaryKeyRelatedField(
         queryset=Topic.objects.all(), required=False, allow_null=True
     )
+    book_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
+    chapter_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     board = serializers.CharField(required=False, allow_blank=True, write_only=True)
     book_title = serializers.CharField(required=False, allow_blank=True, write_only=True)
     subject = serializers.CharField(required=False, allow_blank=True, write_only=True)
@@ -278,6 +280,8 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "topic",
+            "book_id",
+            "chapter_id",
             "board",
             "book_title",
             "subject",
@@ -308,6 +312,8 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         variants_data = validated_data.pop("variants", [])
+        book_id = validated_data.pop("book_id", None)
+        chapter_id = validated_data.pop("chapter_id", None)
         board = validated_data.pop("board", None) or "CBSE"
         book_title = validated_data.pop("book_title", None)
         subject = validated_data.pop("subject", None)
@@ -316,28 +322,59 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
         topic_name = validated_data.pop("topic_name", None)
 
         if not validated_data.get("topic"):
+            clean_topic = (topic_name or "General Topic").strip()
+            clean_chapter = (chapter_title or "Chapter 1").strip()
             clean_subject = (subject or "General").strip()
             clean_grade = (grade or "Standard").strip()
             clean_book = (book_title or f"{clean_subject} ({clean_grade})").strip()
-            clean_chapter = (chapter_title or "Chapter 1").strip()
-            clean_topic = (topic_name or "General Topic").strip()
 
-            book, _ = Book.objects.get_or_create(
-                board=board.strip(),
-                title=clean_book,
-                subject=clean_subject,
-                grade=clean_grade,
-            )
-            chapter, _ = Chapter.objects.get_or_create(
-                book=book,
-                title=clean_chapter,
-                defaults={"chapter_order": book.chapters.count() + 1},
-            )
-            topic, _ = Topic.objects.get_or_create(
-                chapter=chapter,
-                name=clean_topic,
-            )
-            validated_data["topic"] = topic
+            # Case 1: Existing chapter ID provided -> add new topic under this chapter
+            if chapter_id:
+                try:
+                    chapter = Chapter.objects.get(id=chapter_id)
+                except Chapter.DoesNotExist:
+                    raise serializers.ValidationError({"chapter_id": f"Chapter with id {chapter_id} does not exist."})
+                topic, _ = Topic.objects.get_or_create(
+                    chapter=chapter,
+                    name=clean_topic,
+                )
+                validated_data["topic"] = topic
+
+            # Case 2: Existing book ID provided -> add new chapter and topic under this book
+            elif book_id:
+                try:
+                    book = Book.objects.get(id=book_id)
+                except Book.DoesNotExist:
+                    raise serializers.ValidationError({"book_id": f"Book with id {book_id} does not exist."})
+                chapter, _ = Chapter.objects.get_or_create(
+                    book=book,
+                    title=clean_chapter,
+                    defaults={"chapter_order": book.chapters.count() + 1},
+                )
+                topic, _ = Topic.objects.get_or_create(
+                    chapter=chapter,
+                    name=clean_topic,
+                )
+                validated_data["topic"] = topic
+
+            # Case 3: Complete custom hierarchy (board, book, chapter, topic)
+            else:
+                book, _ = Book.objects.get_or_create(
+                    board=board.strip(),
+                    title=clean_book,
+                    subject=clean_subject,
+                    grade=clean_grade,
+                )
+                chapter, _ = Chapter.objects.get_or_create(
+                    book=book,
+                    title=clean_chapter,
+                    defaults={"chapter_order": book.chapters.count() + 1},
+                )
+                topic, _ = Topic.objects.get_or_create(
+                    chapter=chapter,
+                    name=clean_topic,
+                )
+                validated_data["topic"] = topic
 
         request = self.context.get("request")
         user = request.user if request else None

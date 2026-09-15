@@ -45,20 +45,27 @@ export const QBMDashboard: React.FC = () => {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
 
-  // Selected Ingestion hierarchy
+  // 1. Board
   const [selectedBoard, setSelectedBoard] = useState('CBSE');
-  const [isCustomBoard, setIsCustomBoard] = useState(false);
-  const [customBoardName, setCustomBoardName] = useState('');
-  const [isCustomHierarchy, setIsCustomHierarchy] = useState(false);
-  const [customSubject, setCustomSubject] = useState('');
-  const [customGrade, setCustomGrade] = useState('Class 10');
-  const [customBookTitle, setCustomBookTitle] = useState('');
-  const [customChapterTitle, setCustomChapterTitle] = useState('');
-  const [customTopicName, setCustomTopicName] = useState('');
+  const [isNewBoard, setIsNewBoard] = useState(false);
+  const [newBoardName, setNewBoardName] = useState('');
 
-  const [selectedBookId, setSelectedBookId] = useState<number | ''>('');
-  const [selectedChapterId, setSelectedChapterId] = useState<number | ''>('');
-  const [selectedTopicId, setSelectedTopicId] = useState<number | ''>('');
+  // 2. Book
+  const [selectedBookId, setSelectedBookId] = useState<number | '' | 'NEW'>('');
+  const [isNewBook, setIsNewBook] = useState(false);
+  const [newBookTitle, setNewBookTitle] = useState('');
+  const [newBookSubject, setNewBookSubject] = useState('');
+  const [newBookGrade, setNewBookGrade] = useState('Class 10');
+
+  // 3. Chapter
+  const [selectedChapterId, setSelectedChapterId] = useState<number | '' | 'NEW'>('');
+  const [isNewChapter, setIsNewChapter] = useState(false);
+  const [newChapterTitle, setNewChapterTitle] = useState('');
+
+  // 4. Topic
+  const [selectedTopicId, setSelectedTopicId] = useState<number | '' | 'NEW'>('');
+  const [isNewTopic, setIsNewTopic] = useState(false);
+  const [newTopicName, setNewTopicName] = useState('');
 
   // Step 2 & 3: Question properties
   const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
@@ -116,75 +123,88 @@ export const QBMDashboard: React.FC = () => {
       .catch(() => setBoards(['CBSE', 'ICSE', 'State Board']));
   }, []);
 
-  // Load Books when selectedBoard changes
+  // Load Books when selectedBoard or isNewBoard changes
   useEffect(() => {
+    if (isNewBoard) {
+      setBooks([]);
+      setSelectedBookId('NEW');
+      setIsNewBook(true);
+      return;
+    }
     if (selectedBoard) {
-      if (selectedBoard === 'Other / Custom Board') {
-        setIsCustomBoard(true);
-        setBooks([]);
-        setSelectedBookId('');
-        setIsCustomHierarchy(true);
-        return;
-      }
-      setIsCustomBoard(false);
       contentApi
         .getBooks(selectedBoard)
         .then((bks) => {
           setBooks(bks);
           if (bks.length > 0) {
             setSelectedBookId(bks[0].id);
-            setIsCustomHierarchy(false);
+            setIsNewBook(false);
           } else {
-            setSelectedBookId('');
-            setIsCustomHierarchy(true);
+            setSelectedBookId('NEW');
+            setIsNewBook(true);
           }
         })
         .catch(() => {
           setBooks([]);
-          setIsCustomHierarchy(true);
+          setSelectedBookId('NEW');
+          setIsNewBook(true);
         });
     }
-  }, [selectedBoard]);
+  }, [selectedBoard, isNewBoard]);
 
-  // Load Chapters when selectedBookId changes
+  // Load Chapters when selectedBookId or isNewBook changes
   useEffect(() => {
-    if (selectedBookId) {
-      contentApi
-        .getChapters(Number(selectedBookId))
-        .then((chaps) => {
-          setChapters(chaps);
-          if (chaps.length > 0) {
-            setSelectedChapterId(chaps[0].id);
-          } else {
-            setSelectedChapterId('');
-          }
-        })
-        .catch(() => setChapters([]));
-    } else {
+    if (isNewBook || selectedBookId === 'NEW' || !selectedBookId) {
       setChapters([]);
-      setSelectedChapterId('');
+      setSelectedChapterId('NEW');
+      setIsNewChapter(true);
+      return;
     }
-  }, [selectedBookId]);
+    contentApi
+      .getChapters(Number(selectedBookId))
+      .then((chaps) => {
+        setChapters(chaps);
+        if (chaps.length > 0) {
+          setSelectedChapterId(chaps[0].id);
+          setIsNewChapter(false);
+        } else {
+          setSelectedChapterId('NEW');
+          setIsNewChapter(true);
+        }
+      })
+      .catch(() => {
+        setChapters([]);
+        setSelectedChapterId('NEW');
+        setIsNewChapter(true);
+      });
+  }, [selectedBookId, isNewBook]);
 
-  // Load Topics when selectedChapterId changes
+  // Load Topics when selectedChapterId or isNewChapter changes
   useEffect(() => {
-    if (selectedChapterId) {
-      contentApi
-        .getTopics(Number(selectedChapterId))
-        .then((topList) => {
-          setTopics(topList);
-          if (topList.length > 0) {
-            setSelectedTopicId(topList[0].id);
-          } else {
-            setSelectedTopicId('');
-          }
-        })
-        .catch(() => setTopics([]));
-    } else {
+    if (isNewChapter || selectedChapterId === 'NEW' || !selectedChapterId) {
       setTopics([]);
-      setSelectedTopicId('');
+      setSelectedTopicId('NEW');
+      setIsNewTopic(true);
+      return;
     }
-  }, [selectedChapterId]);
+    contentApi
+      .getTopics(Number(selectedChapterId))
+      .then((topList) => {
+        setTopics(topList);
+        if (topList.length > 0) {
+          setSelectedTopicId(topList[0].id);
+          setIsNewTopic(false);
+        } else {
+          setSelectedTopicId('NEW');
+          setIsNewTopic(true);
+        }
+      })
+      .catch(() => {
+        setTopics([]);
+        setSelectedTopicId('NEW');
+        setIsNewTopic(true);
+      });
+  }, [selectedChapterId, isNewChapter]);
 
   // Load Platform Repository Stats
   const loadStats = () => {
@@ -316,30 +336,42 @@ export const QBMDashboard: React.FC = () => {
     setIngestSuccessMsg(null);
     setIngestErrorMsg(null);
 
-    const effectiveBoard = isCustomBoard ? customBoardName.trim() : selectedBoard;
+    const effectiveBoard = isNewBoard ? newBoardName.trim() : selectedBoard;
     if (!effectiveBoard) {
-      setIngestErrorMsg('Please specify an educational Board.');
+      setIngestErrorMsg('Please specify or select an educational Board.');
       return;
     }
 
-    if (!isCustomHierarchy && !selectedTopicId) {
-      setIngestErrorMsg('Please select a curriculum Board, Book, Chapter, and Topic (or switch to Custom Curriculum).');
+    if (isNewBook) {
+      if (!newBookSubject.trim()) {
+        setIngestErrorMsg('Please specify a Subject for the new book.');
+        return;
+      }
+      if (!newChapterTitle.trim()) {
+        setIngestErrorMsg('Please enter a Chapter Title.');
+        return;
+      }
+      if (!newTopicName.trim()) {
+        setIngestErrorMsg('Please enter a Topic Name.');
+        return;
+      }
+    } else if (isNewChapter) {
+      if (!newChapterTitle.trim()) {
+        setIngestErrorMsg('Please enter a Chapter Title.');
+        return;
+      }
+      if (!newTopicName.trim()) {
+        setIngestErrorMsg('Please enter a Topic Name.');
+        return;
+      }
+    } else if (isNewTopic) {
+      if (!newTopicName.trim()) {
+        setIngestErrorMsg('Please enter a Topic Name.');
+        return;
+      }
+    } else if (!selectedTopicId || selectedTopicId === 'NEW') {
+      setIngestErrorMsg('Please select an existing Topic or create a new one.');
       return;
-    }
-
-    if (isCustomHierarchy) {
-      if (!customSubject.trim()) {
-        setIngestErrorMsg('Subject is required for custom curriculum.');
-        return;
-      }
-      if (!customChapterTitle.trim()) {
-        setIngestErrorMsg('Chapter Title is required for custom curriculum.');
-        return;
-      }
-      if (!customTopicName.trim()) {
-        setIngestErrorMsg('Topic Name is required for custom curriculum.');
-        return;
-      }
     }
 
     if (!questionText.trim()) {
@@ -364,13 +396,6 @@ export const QBMDashboard: React.FC = () => {
     }
 
     const payload: IngestQuestionPayload = {
-      topic: !isCustomHierarchy && selectedTopicId ? Number(selectedTopicId) : null,
-      board: effectiveBoard,
-      book_title: isCustomHierarchy ? (customBookTitle.trim() || `${customSubject.trim()} (${customGrade.trim()})`) : undefined,
-      subject: isCustomHierarchy ? customSubject.trim() : undefined,
-      grade: isCustomHierarchy ? customGrade.trim() : undefined,
-      chapter_title: isCustomHierarchy ? customChapterTitle.trim() : undefined,
-      topic_name: isCustomHierarchy ? customTopicName.trim() : undefined,
       question_text: questionText.trim(),
       question_type: questionType,
       marks,
@@ -392,20 +417,110 @@ export const QBMDashboard: React.FC = () => {
         })),
     };
 
+    if (!isNewBook && selectedBookId && selectedBookId !== 'NEW') {
+      if (!isNewChapter && selectedChapterId && selectedChapterId !== 'NEW') {
+        if (!isNewTopic && selectedTopicId && selectedTopicId !== 'NEW') {
+          // 1. All existing
+          payload.topic = Number(selectedTopicId);
+        } else {
+          // 2. Existing Book & Chapter, but new Topic
+          payload.topic = null;
+          payload.chapter_id = Number(selectedChapterId);
+          payload.topic_name = newTopicName.trim();
+        }
+      } else {
+        // 3. Existing Book, but new Chapter & new Topic
+        payload.topic = null;
+        payload.book_id = Number(selectedBookId);
+        payload.chapter_title = newChapterTitle.trim();
+        payload.topic_name = newTopicName.trim();
+      }
+    } else {
+      // 4. New Book (and optionally new Board), new Chapter, new Topic
+      payload.topic = null;
+      payload.board = effectiveBoard;
+      payload.book_title = newBookTitle.trim() || `${newBookSubject.trim()} (${newBookGrade.trim()})`;
+      payload.subject = newBookSubject.trim();
+      payload.grade = newBookGrade.trim();
+      payload.chapter_title = newChapterTitle.trim();
+      payload.topic_name = newTopicName.trim();
+    }
+
     setIsSubmitting(true);
     try {
       const created = await contentApi.ingestQuestion(payload);
       setIngestSuccessMsg(
         `Question #${created.id} and ${created.variants?.length || variants.length} variant(s) successfully ingested into the Global Question Bank!`
       );
-      // Reset form fields
+      // Reset question input fields
       setQuestionText('');
       setExplanation('');
       setSourceReference('');
       setVariants([]);
-      if (isCustomHierarchy) {
-        contentApi.getBooks(effectiveBoard).then((bks) => setBooks(bks));
+
+      // Refresh Boards
+      const updatedBoards = await contentApi.getBoards().catch(() => boards);
+      setBoards(updatedBoards);
+
+      // If new board was added, switch to it as selectedBoard
+      if (isNewBoard) {
+        setIsNewBoard(false);
+        setSelectedBoard(effectiveBoard);
       }
+
+      // Refresh Books for this board
+      const updatedBooks = await contentApi.getBooks(effectiveBoard).catch(() => []);
+      setBooks(updatedBooks);
+
+      if (isNewBook) {
+        const targetBookTitle = (newBookTitle.trim() || `${newBookSubject.trim()} (${newBookGrade.trim()})`).toLowerCase();
+        const createdBook = updatedBooks.find((b) => b.title.toLowerCase() === targetBookTitle) || updatedBooks[updatedBooks.length - 1];
+        if (createdBook) {
+          setSelectedBookId(createdBook.id);
+          setIsNewBook(false);
+          const chaps = await contentApi.getChapters(createdBook.id).catch(() => []);
+          setChapters(chaps);
+          const createdChap = chaps.find((c) => c.title.toLowerCase() === newChapterTitle.trim().toLowerCase()) || chaps[chaps.length - 1];
+          if (createdChap) {
+            setSelectedChapterId(createdChap.id);
+            setIsNewChapter(false);
+            const tops = await contentApi.getTopics(createdChap.id).catch(() => []);
+            setTopics(tops);
+            if (created.topic) {
+              setSelectedTopicId(created.topic);
+            } else if (tops.length > 0) {
+              setSelectedTopicId(tops[tops.length - 1].id);
+            }
+            setIsNewTopic(false);
+          }
+        }
+      } else if (isNewChapter && selectedBookId && selectedBookId !== 'NEW') {
+        const chaps = await contentApi.getChapters(Number(selectedBookId)).catch(() => []);
+        setChapters(chaps);
+        const createdChap = chaps.find((c) => c.title.toLowerCase() === newChapterTitle.trim().toLowerCase()) || chaps[chaps.length - 1];
+        if (createdChap) {
+          setSelectedChapterId(createdChap.id);
+          setIsNewChapter(false);
+          const tops = await contentApi.getTopics(createdChap.id).catch(() => []);
+          setTopics(tops);
+          if (created.topic) {
+            setSelectedTopicId(created.topic);
+          } else if (tops.length > 0) {
+            setSelectedTopicId(tops[tops.length - 1].id);
+          }
+          setIsNewTopic(false);
+        }
+      } else if (isNewTopic && selectedChapterId && selectedChapterId !== 'NEW') {
+        const tops = await contentApi.getTopics(Number(selectedChapterId)).catch(() => []);
+        setTopics(tops);
+        if (created.topic) {
+          setSelectedTopicId(created.topic);
+        } else if (tops.length > 0) {
+          setSelectedTopicId(tops[tops.length - 1].id);
+        }
+        setIsNewTopic(false);
+      }
+
       loadQuestions();
       loadStats();
     } catch (err: any) {
@@ -759,228 +874,408 @@ export const QBMDashboard: React.FC = () => {
                   Curriculum Hierarchy (Board → Book → Chapter → Topic)
                 </h2>
               </div>
-              {/* Toggle switch between Existing DB Curriculum and Custom Curriculum */}
-              <div className="flex items-center gap-2 bg-bg px-2.5 py-1 rounded-card border border-border text-xs self-start sm:self-auto">
-                <span className="text-ink/60 font-medium">Mode:</span>
-                <button
-                  type="button"
-                  onClick={() => setIsCustomHierarchy(false)}
-                  disabled={books.length === 0}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
-                    !isCustomHierarchy
-                      ? 'bg-forest text-white shadow-xs'
-                      : 'text-ink/60 hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed'
-                  }`}
-                  title={books.length === 0 ? 'No pre-configured books available for this board' : undefined}
-                >
-                  Existing Books ({books.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsCustomHierarchy(true)}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
-                    isCustomHierarchy
-                      ? 'bg-forest text-white shadow-xs'
-                      : 'text-ink/60 hover:text-ink'
-                  }`}
-                >
-                  + Custom / Expand Syllabus
-                </button>
+              <div className="text-[11px] text-ink/60 flex items-center gap-1.5 bg-surface-muted/50 px-2.5 py-1 rounded border border-border">
+                <span className="font-semibold text-ink">Tip:</span>
+                <span>Select previously filled entries or click <span className="font-semibold text-forest">+ New</span> at any level to add new items.</span>
               </div>
             </div>
 
-            {/* Board Selection Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block font-heading text-xs font-semibold text-ink">
-                  1. Board *
-                </label>
-                <select
-                  value={selectedBoard}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedBoard(val);
-                    if (val === 'Other / State Board' || val === 'Other / Custom Board') {
-                      setIsCustomBoard(true);
-                    } else {
-                      setIsCustomBoard(false);
-                    }
-                  }}
-                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                >
-                  {boards.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {isCustomBoard && (
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    Specify Custom Board Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={customBoardName}
-                    onChange={(e) => setCustomBoardName(e.target.value)}
-                    placeholder="e.g. Goa State Board, AP Inter, etc."
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none"
-                    required
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Notice if no existing books for selected board */}
-            {books.length === 0 && !isCustomBoard && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-card text-xs text-amber-800 flex items-start gap-2">
-                <span className="font-semibold shrink-0">Note:</span>
-                <span>
-                  No pre-configured books found for <strong>{selectedBoard}</strong> in database yet.
-                  Fill in the custom fields below to ingest questions and automatically create this curriculum hierarchy.
+            {/* Visual Target Hierarchy Breadcrumb */}
+            <div className="p-3 bg-surface-muted/40 rounded-card border border-border/80 text-xs flex flex-wrap items-center gap-2">
+              <span className="font-heading font-semibold text-ink/60 uppercase tracking-wide text-[10px]">
+                Target Hierarchy:
+              </span>
+              {/* Board crumb */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-ink">
+                  {isNewBoard ? (newBoardName.trim() || 'New Board') : selectedBoard}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${isNewBoard ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                  {isNewBoard ? 'NEW' : 'EXISTING'}
                 </span>
               </div>
-            )}
+              <span className="text-ink/40">›</span>
+              {/* Book crumb */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-ink">
+                  {isNewBook
+                    ? (newBookTitle.trim() || (newBookSubject.trim() ? `${newBookSubject} (${newBookGrade})` : 'New Book'))
+                    : (books.find((b) => b.id === Number(selectedBookId))?.title || 'Select Book')}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${isNewBook ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                  {isNewBook ? 'NEW' : 'EXISTING'}
+                </span>
+              </div>
+              <span className="text-ink/40">›</span>
+              {/* Chapter crumb */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-ink">
+                  {isNewChapter
+                    ? (newChapterTitle.trim() || 'New Chapter')
+                    : (chapters.find((c) => c.id === Number(selectedChapterId))?.title || 'Select Chapter')}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${isNewChapter ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                  {isNewChapter ? 'NEW' : 'EXISTING'}
+                </span>
+              </div>
+              <span className="text-ink/40">›</span>
+              {/* Topic crumb */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-ink">
+                  {isNewTopic
+                    ? (newTopicName.trim() || 'New Topic')
+                    : (topics.find((t) => t.id === Number(selectedTopicId))?.name || 'Select Topic')}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${isNewTopic ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                  {isNewTopic ? 'NEW' : 'EXISTING'}
+                </span>
+              </div>
+            </div>
 
-            {/* Existing Dropdowns OR Custom Hierarchy Inputs */}
-            {!isCustomHierarchy ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Book */}
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    2. Book / Curriculum *
-                  </label>
-                  <select
-                    value={selectedBookId}
-                    onChange={(e) => setSelectedBookId(Number(e.target.value))}
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                  >
-                    {books.map((bk) => (
-                      <option key={bk.id} value={bk.id}>
-                        {bk.title} ({bk.grade})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* 4 Hierarchy Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {/* 1. Board Card */}
+              <div className="p-4 rounded-card bg-surface border border-border flex flex-col justify-between gap-3 shadow-xs">
+                <div>
+                  <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
+                    <label className="font-heading text-xs font-bold text-ink">
+                      1. Board *
+                    </label>
+                    {!isNewBoard ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNewBoard(true);
+                          setSelectedBoard('');
+                        }}
+                        className="text-[11px] text-forest hover:underline font-semibold cursor-pointer"
+                      >
+                        + New Board
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNewBoard(false);
+                          if (boards.length > 0) setSelectedBoard(boards[0]);
+                        }}
+                        className="text-[11px] text-ink/60 hover:underline font-medium cursor-pointer"
+                      >
+                        ← Existing Boards
+                      </button>
+                    )}
+                  </div>
 
-                {/* Chapter */}
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    3. Chapter *
-                  </label>
-                  <select
-                    value={selectedChapterId}
-                    onChange={(e) => setSelectedChapterId(Number(e.target.value))}
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                  >
-                    {chapters.map((ch) => (
-                      <option key={ch.id} value={ch.id}>
-                        Ch.{ch.chapter_order}: {ch.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Topic */}
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    4. Topic *
-                  </label>
-                  <select
-                    value={selectedTopicId}
-                    onChange={(e) => setSelectedTopicId(Number(e.target.value))}
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                  >
-                    {topics.map((tp) => (
-                      <option key={tp.id} value={tp.id}>
-                        {tp.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="mt-2.5">
+                    {!isNewBoard ? (
+                      <select
+                        value={selectedBoard}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__NEW__') {
+                            setIsNewBoard(true);
+                            setSelectedBoard('');
+                          } else {
+                            setSelectedBoard(val);
+                          }
+                        }}
+                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                      >
+                        {boards.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                        <option value="__NEW__" className="font-semibold text-forest">
+                          + Add New Board...
+                        </option>
+                      </select>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          value={newBoardName}
+                          onChange={(e) => setNewBoardName(e.target.value)}
+                          placeholder="e.g. Cambridge IGCSE, Goa Board"
+                          className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none"
+                          required
+                          autoFocus
+                        />
+                        <p className="text-[11px] text-ink/60">
+                          Creating a new board will allow adding its books below.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-4 rounded-card bg-surface-muted/60 border border-border">
-                {/* Subject */}
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    Subject *
-                  </label>
-                  <SearchableSubjectSelect
-                    value={customSubject}
-                    onChange={setCustomSubject}
-                    placeholder="Search or enter subject..."
-                    required={isCustomHierarchy}
-                  />
-                </div>
 
-                {/* Grade */}
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    Grade / Class *
-                  </label>
-                  <select
-                    value={customGrade}
-                    onChange={(e) => setCustomGrade(e.target.value)}
-                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                  >
-                    {[
-                      'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
-                      'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
-                      'Class 11', 'Class 12'
-                    ].map((g) => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
-                </div>
+              {/* 2. Book / Curriculum Card */}
+              <div className="p-4 rounded-card bg-surface border border-border flex flex-col justify-between gap-3 shadow-xs">
+                <div>
+                  <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
+                    <label className="font-heading text-xs font-bold text-ink">
+                      2. Book / Curriculum *
+                    </label>
+                    {!isNewBook ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNewBook(true);
+                          setSelectedBookId('NEW');
+                        }}
+                        className="text-[11px] text-forest hover:underline font-semibold cursor-pointer"
+                      >
+                        + New Book
+                      </button>
+                    ) : (
+                      books.length > 0 && !isNewBoard && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsNewBook(false);
+                            setSelectedBookId(books[0].id);
+                          }}
+                          className="text-[11px] text-ink/60 hover:underline font-medium cursor-pointer"
+                        >
+                          ← Existing ({books.length})
+                        </button>
+                      )
+                    )}
+                  </div>
 
-                {/* Book Title */}
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    Book Title (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={customBookTitle}
-                    onChange={(e) => setCustomBookTitle(e.target.value)}
-                    placeholder="e.g. Balbharati Math 10"
-                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
-                  />
-                </div>
-
-                {/* Chapter Title */}
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    Chapter Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={customChapterTitle}
-                    onChange={(e) => setCustomChapterTitle(e.target.value)}
-                    placeholder="e.g. Quadratic Equations"
-                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
-                    required={isCustomHierarchy}
-                  />
-                </div>
-
-                {/* Topic Name */}
-                <div className="space-y-1.5">
-                  <label className="block font-heading text-xs font-semibold text-ink">
-                    Topic Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={customTopicName}
-                    onChange={(e) => setCustomTopicName(e.target.value)}
-                    placeholder="e.g. Nature of Roots"
-                    className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
-                    required={isCustomHierarchy}
-                  />
+                  <div className="mt-2.5">
+                    {!isNewBook && books.length > 0 ? (
+                      <select
+                        value={selectedBookId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__NEW__') {
+                            setIsNewBook(true);
+                            setSelectedBookId('NEW');
+                          } else {
+                            setSelectedBookId(Number(val));
+                          }
+                        }}
+                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                      >
+                        {books.map((bk) => (
+                          <option key={bk.id} value={bk.id}>
+                            {bk.title} ({bk.grade})
+                          </option>
+                        ))}
+                        <option value="__NEW__" className="font-semibold text-forest">
+                          + Add New Book...
+                        </option>
+                      </select>
+                    ) : (
+                      <div className="space-y-2">
+                        {books.length === 0 && !isNewBoard && (
+                          <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 p-1.5 rounded">
+                            No books yet for {selectedBoard}. Fill details to create one:
+                          </div>
+                        )}
+                        <div>
+                          <label className="block text-[10px] font-semibold text-ink/70 mb-0.5">Subject *</label>
+                          <SearchableSubjectSelect
+                            value={newBookSubject}
+                            onChange={setNewBookSubject}
+                            placeholder="Subject (e.g. Mathematics)..."
+                            required={isNewBook}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-ink/70 mb-0.5">Grade *</label>
+                            <select
+                              value={newBookGrade}
+                              onChange={(e) => setNewBookGrade(e.target.value)}
+                              className="w-full rounded-card border border-border bg-bg px-2.5 py-1.5 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                            >
+                              {[
+                                'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
+                                'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
+                                'Class 11', 'Class 12'
+                              ].map((g) => (
+                                <option key={g} value={g}>{g}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-ink/70 mb-0.5">Book Title</label>
+                            <input
+                              type="text"
+                              value={newBookTitle}
+                              onChange={(e) => setNewBookTitle(e.target.value)}
+                              placeholder="e.g. Balbharati 7"
+                              className="w-full rounded-card border border-border bg-bg px-2.5 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
+
+              {/* 3. Chapter Card */}
+              <div className="p-4 rounded-card bg-surface border border-border flex flex-col justify-between gap-3 shadow-xs">
+                <div>
+                  <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
+                    <label className="font-heading text-xs font-bold text-ink">
+                      3. Chapter *
+                    </label>
+                    {!isNewChapter ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNewChapter(true);
+                          setSelectedChapterId('NEW');
+                        }}
+                        className="text-[11px] text-forest hover:underline font-semibold cursor-pointer"
+                      >
+                        + New Chapter
+                      </button>
+                    ) : (
+                      chapters.length > 0 && !isNewBook && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsNewChapter(false);
+                            setSelectedChapterId(chapters[0].id);
+                          }}
+                          className="text-[11px] text-ink/60 hover:underline font-medium cursor-pointer"
+                        >
+                          ← Existing ({chapters.length})
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  <div className="mt-2.5">
+                    {!isNewChapter && chapters.length > 0 ? (
+                      <select
+                        value={selectedChapterId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__NEW__') {
+                            setIsNewChapter(true);
+                            setSelectedChapterId('NEW');
+                          } else {
+                            setSelectedChapterId(Number(val));
+                          }
+                        }}
+                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                      >
+                        {chapters.map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            Ch.{ch.chapter_order}: {ch.title}
+                          </option>
+                        ))}
+                        <option value="__NEW__" className="font-semibold text-forest">
+                          + Add New Chapter...
+                        </option>
+                      </select>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          value={newChapterTitle}
+                          onChange={(e) => setNewChapterTitle(e.target.value)}
+                          placeholder="e.g. Ch. 1: Kavita / Quadratic Eqns"
+                          className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none"
+                          required={isNewChapter}
+                        />
+                        <p className="text-[11px] text-ink/60">
+                          {isNewBook
+                            ? 'New chapter will be created under the new book.'
+                            : 'Will create a new chapter in this existing book.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Topic Card */}
+              <div className="p-4 rounded-card bg-surface border border-border flex flex-col justify-between gap-3 shadow-xs">
+                <div>
+                  <div className="flex items-center justify-between pb-1.5 border-b border-border/60">
+                    <label className="font-heading text-xs font-bold text-ink">
+                      4. Topic *
+                    </label>
+                    {!isNewTopic ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNewTopic(true);
+                          setSelectedTopicId('NEW');
+                        }}
+                        className="text-[11px] text-forest hover:underline font-semibold cursor-pointer"
+                      >
+                        + New Topic
+                      </button>
+                    ) : (
+                      topics.length > 0 && !isNewChapter && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsNewTopic(false);
+                            setSelectedTopicId(topics[0].id);
+                          }}
+                          className="text-[11px] text-ink/60 hover:underline font-medium cursor-pointer"
+                        >
+                          ← Existing ({topics.length})
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  <div className="mt-2.5">
+                    {!isNewTopic && topics.length > 0 ? (
+                      <select
+                        value={selectedTopicId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__NEW__') {
+                            setIsNewTopic(true);
+                            setSelectedTopicId('NEW');
+                          } else {
+                            setSelectedTopicId(Number(val));
+                          }
+                        }}
+                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                      >
+                        {topics.map((tp) => (
+                          <option key={tp.id} value={tp.id}>
+                            {tp.name}
+                          </option>
+                        ))}
+                        <option value="__NEW__" className="font-semibold text-forest">
+                          + Add New Topic...
+                        </option>
+                      </select>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <input
+                          type="text"
+                          value={newTopicName}
+                          onChange={(e) => setNewTopicName(e.target.value)}
+                          placeholder="e.g. Poem / Nature of Roots"
+                          className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none"
+                          required={isNewTopic}
+                        />
+                        <p className="text-[11px] text-ink/60">
+                          {isNewChapter
+                            ? 'New topic will be added to the new chapter.'
+                            : 'Will create a new topic in this chapter.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           {/* ── STEP 2: Difficulty & Marks ── */}

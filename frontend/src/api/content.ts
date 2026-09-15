@@ -10,6 +10,8 @@ export interface QuestionStats {
 
 export interface IngestQuestionPayload {
   topic?: number | null;
+  book_id?: number | null;
+  chapter_id?: number | null;
   board?: string;
   book_title?: string;
   subject?: string;
