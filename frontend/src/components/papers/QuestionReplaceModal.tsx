@@ -47,8 +47,9 @@ export const QuestionReplaceModal: React.FC<QuestionReplaceModalProps> = ({
         }
 
         const data = await contentApi.getQuestions(params);
+        const list = Array.isArray(data) ? data : (data.results || []);
         // Exclude currently used questions in the review list
-        const filtered = data.filter((q) => !existingQuestionIds.includes(q.id));
+        const filtered = list.filter((q) => !existingQuestionIds.includes(q.id));
         setCandidates(filtered);
       } catch (err: any) {
         console.error('Failed to fetch replacement questions:', err);

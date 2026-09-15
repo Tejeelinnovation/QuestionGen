@@ -266,3 +266,86 @@ class QuestionBankTests(APITestCase):
         created_topic = Topic.objects.get(chapter=created_chapter, name="Basic Proportionality Theorem")
         self.assertEqual(res.data["topic"], created_topic.id)
 
+    def test_questions_pagination_and_sorting(self):
+        """Verify server-side pagination, search, and sorting across questions."""
+        # Create 3 questions with varying marks and keywords
+        q_easy = Question.objects.create(
+            topic=self.topic,
+            question_text="Alpha question on polynomials",
+            question_type=QuestionType.MCQ,
+            marks="1.00",
+            difficulty=Difficulty.EASY,
+            learner_level=LearnerLevel.BEGINNER,
+            bank_source=BankSource.GLOBAL,
+            created_by=self.qbm,
+        )
+        q_med = Question.objects.create(
+            topic=self.topic,
+            question_text="Beta standard calculus problem",
+            question_type=QuestionType.SHORT_ANSWER,
+            marks="2.00",
+            difficulty=Difficulty.MEDIUM,
+            learner_level=LearnerLevel.INTERMEDIATE,
+            bank_source=BankSource.GLOBAL,
+            created_by=self.qbm,
+        )
+        q_hard = Question.objects.create(
+            topic=self.topic,
+            question_text="Zeta advanced trigonometry question",
+            question_type=QuestionType.LONG_ANSWER,
+            marks="5.00",
+            difficulty=Difficulty.HARD,
+            learner_level=LearnerLevel.ADVANCED,
+            bank_source=BankSource.GLOBAL,
+            created_by=self.qbm,
+        )
+
+        self.client.force_authenticate(user=self.qbm)
+
+        # 1. Test pagination (page=1, page_size=2)
+        res = self.client.get("/api/questions/?page=1&page_size=2")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("count", res.data)
+        self.assertIn("results", res.data)
+        self.assertEqual(len(res.data["results"]), 2)
+        self.assertEqual(res.data["count"], 3)
+
+        # 2. Test server-side keyword search
+        res_search = self.client.get("/api/questions/?search=trigonometry&page=1")
+        self.assertEqual(res_search.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_search.data["count"], 1)
+        self.assertEqual(res_search.data["results"][0]["id"], q_hard.id)
+
+        # 3. Test server-side sorting (marks_desc)
+        res_sort = self.client.get("/api/questions/?ordering=marks_desc&page=1&page_size=10")
+        self.assertEqual(res_sort.status_code, status.HTTP_200_OK)
+        marks_list = [float(q["marks"]) for q in res_sort.data["results"]]
+        self.assertEqual(marks_list, sorted(marks_list, reverse=True))
+
+        # 4. Test board filtering
+        res_board = self.client.get(f"/api/questions/?board={self.book.board}&page=1")
+        self.assertEqual(res_board.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_board.data["count"], 3)
+
+    def test_questions_stats_endpoint(self):
+        """Verify GET /api/questions/stats/ returns platform counts."""
+        Question.objects.create(
+            topic=self.topic,
+            question_text="Sample global question for stats",
+            question_type=QuestionType.MCQ,
+            marks="1.00",
+            difficulty=Difficulty.EASY,
+            learner_level=LearnerLevel.BEGINNER,
+            bank_source=BankSource.GLOBAL,
+            created_by=self.qbm,
+        )
+        self.client.force_authenticate(user=self.qbm)
+        res = self.client.get("/api/questions/stats/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("total_questions", res.data)
+        self.assertIn("with_variants", res.data)
+        self.assertIn("boards_count", res.data)
+        self.assertIn("active_chapters", res.data)
+        self.assertGreaterEqual(res.data["total_questions"], 1)
+
+

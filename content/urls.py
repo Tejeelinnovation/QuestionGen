@@ -17,6 +17,7 @@ from .views import (
     QuestionDetailView,
     QuestionIngestView,
     QuestionListView,
+    QuestionStatsView,
     QuestionVariantCreateView,
     TopicListView,
 )
@@ -27,6 +28,7 @@ urlpatterns = [
     path("chapters/", ChapterListView.as_view(), name="chapter-list"),
     path("topics/", TopicListView.as_view(), name="topic-list"),
     path("questions/", QuestionListView.as_view(), name="question-list"),
+    path("questions/stats/", QuestionStatsView.as_view(), name="question-stats"),
     path("questions/ingest/", QuestionIngestView.as_view(), name="question-ingest"),
     path("questions/<int:pk>/", QuestionDetailView.as_view(), name="question-detail"),
     path("questions/<int:pk>/variants/", QuestionVariantCreateView.as_view(), name="question-variant-create"),

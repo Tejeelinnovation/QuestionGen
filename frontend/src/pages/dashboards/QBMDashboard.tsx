@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { contentApi, type IngestQuestionPayload } from '../../api/content';
+import { contentApi, type IngestQuestionPayload, type QuestionStats } from '../../api/content';
 import type { Book, Chapter, Question, Topic } from '../../types';
 import {
   Database,
@@ -15,20 +15,29 @@ import {
   FileQuestion,
 } from 'lucide-react';
 import { SearchableSubjectSelect } from '../../components/ui/searchable-subject-select';
+import { Pagination } from '../../components/ui/pagination';
 
 export const QBMDashboard: React.FC = () => {
 
   // Active view tab: 'explore' or 'ingest'
   const [activeTab, setActiveTab] = useState<'explore' | 'ingest'>('explore');
 
-  // Question bank explorer state
+  // Question bank explorer state (Server-Side Paginated & Filtered)
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortBy, setSortBy] = useState('newest');
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBoard, setFilterBoard] = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
   const [filterDifficulty, setFilterDifficulty] = useState('ALL');
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
+
+  // Platform repository stats
+  const [stats, setStats] = useState<QuestionStats | null>(null);
 
   // Ingestion workflow hierarchy state
   const [boards, setBoards] = useState<string[]>([]);
@@ -177,17 +186,45 @@ export const QBMDashboard: React.FC = () => {
     }
   }, [selectedChapterId]);
 
-  // Load Questions for Explorer
+  // Load Platform Repository Stats
+  const loadStats = () => {
+    contentApi
+      .getQuestionStats()
+      .then((data) => setStats(data))
+      .catch((err) => console.error('Failed to load question stats:', err));
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  // Debounce search input to avoid thrashing backend
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Load Questions for Explorer with server-side pagination, search, filter, and sorting
   const loadQuestions = () => {
     setIsLoadingQuestions(true);
-    const params: Record<string, any> = {};
+    const params: Record<string, any> = {
+      page: currentPage,
+      page_size: pageSize,
+    };
+    if (filterBoard !== 'ALL') params.board = filterBoard;
     if (filterType !== 'ALL') params.question_type = filterType;
     if (filterDifficulty !== 'ALL') params.difficulty = filterDifficulty;
+    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    if (sortBy) params.ordering = sortBy;
 
     contentApi
       .getQuestions(params)
       .then((data) => {
-        setQuestions(data);
+        setQuestions(data.results || []);
+        setTotalCount(data.count || 0);
       })
       .catch((err) => {
         console.error('Failed to load questions:', err);
@@ -199,7 +236,25 @@ export const QBMDashboard: React.FC = () => {
 
   useEffect(() => {
     loadQuestions();
-  }, [filterType, filterDifficulty]);
+  }, [currentPage, pageSize, debouncedSearch, filterBoard, filterType, filterDifficulty, sortBy]);
+
+  // Handler helpers that reset pagination to page 1
+  const handleBoardChange = (b: string) => {
+    setFilterBoard(b);
+    setCurrentPage(1);
+  };
+  const handleTypeChange = (t: string) => {
+    setFilterType(t);
+    setCurrentPage(1);
+  };
+  const handleDifficultyChange = (d: string) => {
+    setFilterDifficulty(d);
+    setCurrentPage(1);
+  };
+  const handleSortChange = (s: string) => {
+    setSortBy(s);
+    setCurrentPage(1);
+  };
 
   // Handle Option change
   const handleOptionChange = (idx: number, text: string) => {
@@ -352,6 +407,7 @@ export const QBMDashboard: React.FC = () => {
         contentApi.getBooks(effectiveBoard).then((bks) => setBooks(bks));
       }
       loadQuestions();
+      loadStats();
     } catch (err: any) {
       setIngestErrorMsg(
         err.response?.data?.detail ||
@@ -393,6 +449,7 @@ export const QBMDashboard: React.FC = () => {
       setQuickVariantAnswer('');
       setQuickVariantExplanation('');
       loadQuestions();
+      loadStats();
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Failed to add variant.');
     } finally {
@@ -400,19 +457,8 @@ export const QBMDashboard: React.FC = () => {
     }
   };
 
-  // Filtered explorer questions
-  const filteredQuestions = questions.filter((q) => {
-    if (filterBoard !== 'ALL' && q.book_board && q.book_board !== filterBoard) return false;
-    if (searchTerm.trim()) {
-      const match =
-        q.question_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (q.topic_name && q.topic_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (q.chapter_title && q.chapter_title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (q.book_title && q.book_title.toLowerCase().includes(searchTerm.toLowerCase()));
-      if (!match) return false;
-    }
-    return true;
-  });
+  // Display questions on current page (server-side filtered, sorted, and paginated)
+  const displayQuestions = questions;
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
@@ -444,7 +490,7 @@ export const QBMDashboard: React.FC = () => {
             }`}
           >
             <Database className="w-3.5 h-3.5" />
-            <span>Question Explorer ({questions.length})</span>
+            <span>Question Explorer ({stats?.total_questions ?? totalCount})</span>
           </button>
           <button
             type="button"
@@ -465,24 +511,30 @@ export const QBMDashboard: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-surface border border-border rounded-card p-4 shadow-card">
           <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Global Repository</span>
-          <div className="font-heading font-bold text-2xl text-ink mt-1">{questions.length}</div>
+          <div className="font-heading font-bold text-2xl text-ink mt-1">
+            {stats?.total_questions ?? totalCount}
+          </div>
           <p className="text-[11px] text-forest font-medium mt-0.5">Platform Available</p>
         </div>
         <div className="bg-surface border border-border rounded-card p-4 shadow-card">
           <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">With Variants</span>
           <div className="font-heading font-bold text-2xl text-forest mt-1">
-            {questions.filter((q) => (q.variants_count || 0) > 0).length}
+            {stats?.with_variants ?? 0}
           </div>
           <p className="text-[11px] text-ink/60 mt-0.5">AC-15 Difficulty Locked</p>
         </div>
         <div className="bg-surface border border-border rounded-card p-4 shadow-card">
           <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Curriculum Boards</span>
-          <div className="font-heading font-bold text-2xl text-ink mt-1">{boards.length || 3}</div>
+          <div className="font-heading font-bold text-2xl text-ink mt-1">
+            {stats?.boards_count ?? (boards.length || 3)}
+          </div>
           <p className="text-[11px] text-ink/60 mt-0.5">CBSE, ICSE & State</p>
         </div>
         <div className="bg-surface border border-border rounded-card p-4 shadow-card">
           <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Active Chapters</span>
-          <div className="font-heading font-bold text-2xl text-ink mt-1">{chapters.length || 1}</div>
+          <div className="font-heading font-bold text-2xl text-ink mt-1">
+            {stats?.active_chapters ?? (chapters.length || 1)}
+          </div>
           <p className="text-[11px] text-ink/60 mt-0.5">Structured Topics</p>
         </div>
       </div>
@@ -508,8 +560,9 @@ export const QBMDashboard: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               {/* Board selector */}
               <select
+                id="qbm-filter-board"
                 value={filterBoard}
-                onChange={(e) => setFilterBoard(e.target.value)}
+                onChange={(e) => handleBoardChange(e.target.value)}
                 className="text-xs px-3 py-1.5 rounded-pill border border-border bg-bg text-ink cursor-pointer focus:border-forest focus:outline-none"
               >
                 <option value="ALL">All Boards</option>
@@ -522,8 +575,9 @@ export const QBMDashboard: React.FC = () => {
 
               {/* Type filter */}
               <select
+                id="qbm-filter-type"
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 className="text-xs px-3 py-1.5 rounded-pill border border-border bg-bg text-ink cursor-pointer focus:border-forest focus:outline-none"
               >
                 <option value="ALL">All Question Types</option>
@@ -540,8 +594,9 @@ export const QBMDashboard: React.FC = () => {
 
               {/* Difficulty filter */}
               <select
+                id="qbm-filter-difficulty"
                 value={filterDifficulty}
-                onChange={(e) => setFilterDifficulty(e.target.value)}
+                onChange={(e) => handleDifficultyChange(e.target.value)}
                 className="text-xs px-3 py-1.5 rounded-pill border border-border bg-bg text-ink cursor-pointer focus:border-forest focus:outline-none"
               >
                 <option value="ALL">All Difficulties</option>
@@ -549,18 +604,34 @@ export const QBMDashboard: React.FC = () => {
                 <option value="MEDIUM">Medium</option>
                 <option value="HARD">Hard</option>
               </select>
+
+              {/* Sort Order Selector */}
+              <select
+                id="qbm-sort-order"
+                value={sortBy}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="text-xs px-3 py-1.5 rounded-pill border border-border bg-bg text-ink cursor-pointer focus:border-forest focus:outline-none font-medium"
+              >
+                <option value="newest">Sort: Newest First</option>
+                <option value="oldest">Sort: Oldest First</option>
+                <option value="marks_desc">Sort: Marks (High → Low)</option>
+                <option value="marks_asc">Sort: Marks (Low → High)</option>
+                <option value="difficulty_asc">Sort: Difficulty (Easy → Hard)</option>
+                <option value="difficulty_desc">Sort: Difficulty (Hard → Easy)</option>
+                <option value="text_asc">Sort: Question Text (A–Z)</option>
+              </select>
             </div>
           </div>
 
           {/* Question Cards Grid */}
           {isLoadingQuestions ? (
-            <div className="p-12 text-center text-xs text-ink/60">Loading global questions repository...</div>
-          ) : filteredQuestions.length === 0 ? (
+            <div className="p-12 text-center text-xs text-ink/60">Loading questions repository...</div>
+          ) : displayQuestions.length === 0 ? (
             <div className="bg-surface border border-border rounded-card p-12 text-center space-y-3 shadow-card">
               <FileQuestion className="w-10 h-10 text-ink/30 mx-auto" />
               <h3 className="font-heading font-semibold text-ink text-sm">No Questions Found</h3>
               <p className="text-xs text-ink/60 max-w-sm mx-auto">
-                No questions match your filter criteria, or none have been ingested yet.
+                No questions match your filter or search criteria, or none have been ingested yet.
               </p>
               <button
                 type="button"
@@ -571,62 +642,78 @@ export const QBMDashboard: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredQuestions.map((q) => (
-                <div
-                  key={q.id}
-                  onClick={() => setSelectedQuestion(q)}
-                  className="bg-surface border border-border hover:border-forest/50 transition-all rounded-card p-4 shadow-card flex flex-col justify-between cursor-pointer group"
-                >
-                  <div className="space-y-2.5">
-                    {/* Tags row */}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-pill bg-forest/10 text-forest border border-forest/20">
-                          {q.question_type_display || q.question_type}
-                        </span>
-                        <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-pill bg-surface-muted text-ink/70 border border-border">
-                          {q.marks} Marks
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-pill ${
-                            q.difficulty === 'EASY'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : q.difficulty === 'MEDIUM'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200'
-                          }`}
-                        >
-                          {q.difficulty}
-                        </span>
-                        {(q.variants_count || 0) > 0 && (
-                          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-pill bg-grape/10 text-grape border border-grape/20">
-                            {q.variants_count} Variant(s)
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {displayQuestions.map((q) => (
+                  <div
+                    key={q.id}
+                    onClick={() => setSelectedQuestion(q)}
+                    className="bg-surface border border-border hover:border-forest/50 transition-all rounded-card p-4 shadow-card flex flex-col justify-between cursor-pointer group"
+                  >
+                    <div className="space-y-2.5">
+                      {/* Tags row */}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-pill bg-forest/10 text-forest border border-forest/20">
+                            {q.question_type_display || q.question_type}
                           </span>
-                        )}
+                          <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-pill bg-surface-muted text-ink/70 border border-border">
+                            {q.marks} Marks
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-mono font-semibold rounded-pill ${
+                              q.difficulty === 'EASY'
+                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : q.difficulty === 'MEDIUM'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}
+                          >
+                            {q.difficulty}
+                          </span>
+                          {(q.variants_count || 0) > 0 && (
+                            <span className="px-2 py-0.5 text-[10px] font-semibold rounded-pill bg-grape/10 text-grape border border-grape/20">
+                              {q.variants_count} Variant(s)
+                            </span>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Question text */}
+                      <p className="text-xs text-ink font-medium line-clamp-3 leading-relaxed">
+                        {q.question_text}
+                      </p>
                     </div>
 
-                    {/* Question text */}
-                    <p className="text-xs text-ink font-medium line-clamp-3 leading-relaxed">
-                      {q.question_text}
-                    </p>
+                    {/* Context footer */}
+                    <div className="border-t border-border mt-3 pt-2.5 flex items-center justify-between text-[11px] text-ink/60">
+                      <span className="truncate max-w-[200px]">
+                        {q.chapter_title ? `${q.chapter_title} • ` : ''}
+                        {q.topic_name || 'General Topic'}
+                      </span>
+                      <span className="font-heading font-semibold text-forest group-hover:translate-x-0.5 transition-transform flex items-center gap-1 text-[11px]">
+                        View & Add Variants <ChevronRight className="w-3 h-3" />
+                      </span>
+                    </div>
                   </div>
+                ))}
+              </div>
 
-                  {/* Context footer */}
-                  <div className="border-t border-border mt-3 pt-2.5 flex items-center justify-between text-[11px] text-ink/60">
-                    <span className="truncate max-w-[200px]">
-                      {q.chapter_title ? `${q.chapter_title} • ` : ''}
-                      {q.topic_name || 'General Topic'}
-                    </span>
-                    <span className="font-heading font-semibold text-forest group-hover:translate-x-0.5 transition-transform flex items-center gap-1 text-[11px]">
-                      View & Add Variants <ChevronRight className="w-3 h-3" />
-                    </span>
-                  </div>
-                </div>
-              ))}
+              {/* Pagination Controls */}
+              <Pagination
+                currentPage={currentPage}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={(page) => setCurrentPage(page)}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
+                pageSizeOptions={[10, 20, 50]}
+                itemName="questions"
+              />
             </div>
           )}
         </div>

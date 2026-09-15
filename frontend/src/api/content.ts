@@ -1,5 +1,12 @@
 import { apiClient } from './client';
-import type { Book, Chapter, Question, QuestionVariant, Topic } from '../types';
+import type { Book, Chapter, PaginatedResponse, Question, QuestionVariant, Topic } from '../types';
+
+export interface QuestionStats {
+  total_questions: number;
+  with_variants: number;
+  boards_count: number;
+  active_chapters: number;
+}
 
 export interface IngestQuestionPayload {
   topic?: number | null;
@@ -53,8 +60,21 @@ export const contentApi = {
     return res.data;
   },
 
-  getQuestions: async (params?: Record<string, any>): Promise<Question[]> => {
-    const res = await apiClient.get<Question[]>('/api/questions/', { params });
+  getQuestions: async (params?: Record<string, any>): Promise<PaginatedResponse<Question>> => {
+    const res = await apiClient.get<any>('/api/questions/', { params });
+    if (Array.isArray(res.data)) {
+      return {
+        count: res.data.length,
+        next: null,
+        previous: null,
+        results: res.data,
+      };
+    }
+    return res.data;
+  },
+
+  getQuestionStats: async (): Promise<QuestionStats> => {
+    const res = await apiClient.get<QuestionStats>('/api/questions/stats/');
     return res.data;
   },
 

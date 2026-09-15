@@ -26,6 +26,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.audit import log_action
+from core.pagination import StandardPageNumberPagination
 from .filters import filter_questions
 from .models import Book, Chapter, Question, QuestionVariant, Topic
 from .serializers import (
@@ -37,6 +38,75 @@ from .serializers import (
     QuestionVariantSerializer,
     TopicSerializer,
 )
+
+
+class QuestionPagination(StandardPageNumberPagination):
+    """
+    Pagination class for Questions:
+    - Default 10 items per page.
+    - Customizable via ?page_size=.
+    - Max 100 per page.
+    - Activates when page, page_size, or paginate=true is present.
+    - Returns unpaginated flat list when omitted, maintaining backward compatibility.
+    """
+
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+    def paginate_queryset(self, queryset, request, view=None):
+        paginate_param = request.query_params.get("paginate", "").lower()
+        all_param = request.query_params.get("all", "").lower()
+        if paginate_param in ("false", "0", "no") or all_param in ("true", "1", "yes"):
+            return None
+
+        has_page = "page" in request.query_params
+        has_page_size = "page_size" in request.query_params
+        is_explicit = paginate_param in ("true", "1", "yes")
+
+        if has_page or has_page_size or is_explicit:
+            return super().paginate_queryset(queryset, request, view=view)
+
+        return None
+
+
+class QuestionStatsView(APIView):
+    """
+    GET /api/questions/stats/
+
+    Aggregated statistics for QBM and Admin dashboard cards:
+    - total_questions
+    - with_variants
+    - boards_count
+    - active_chapters
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not user.is_authenticated:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+        qs = Question.objects.filter(is_active=True)
+        if user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL")):
+            pass
+        elif user.school_id is not None:
+            qs = qs.filter(Q(bank_source="GLOBAL") | Q(school_id=user.school_id))
+        else:
+            qs = qs.filter(bank_source="GLOBAL")
+
+        total_questions = qs.count()
+        with_variants = qs.filter(variants__isnull=False).distinct().count()
+        boards_count = Book.objects.filter(is_active=True).values("board").distinct().count() or len(INDIAN_BOARDS)
+        active_chapters = Chapter.objects.filter(topics__questions__in=qs).distinct().count() or Chapter.objects.count()
+
+        return Response({
+            "total_questions": total_questions,
+            "with_variants": with_variants,
+            "boards_count": boards_count,
+            "active_chapters": active_chapters,
+        })
 
 
 INDIAN_BOARDS = [
@@ -168,6 +238,7 @@ class QuestionListView(ListAPIView):
 
     serializer_class = QuestionDetailSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = QuestionPagination
 
     def get_queryset(self):
         user = self.request.user
