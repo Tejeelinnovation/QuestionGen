@@ -195,4 +195,9 @@ export const papersApi = {
     const response = await apiClient.get<Delivery[]>('/api/deliveries/');
     return response.data;
   },
+
+  deletePaper: async (id: number): Promise<{ detail: string }> => {
+    const response = await apiClient.delete<{ detail: string }>(`/api/papers/${id}/`);
+    return response.data;
+  },
 };

@@ -184,6 +184,50 @@ class PaperDetailView(APIView):
         paper.save()
         return Response(PaperDetailSerializer(paper).data, status=status.HTTP_200_OK)
 
+    def delete(self, request, pk):
+        paper = get_scoped_papers(request.user).filter(pk=pk).first()
+        if not paper:
+            return Response({"detail": "Paper not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.user.has_capability("CREATE_PAPER") and paper.created_by != request.user and not request.user.is_superuser:
+            return Response(
+                {"detail": "You do not have permission to delete this paper."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Validation: check if this paper has been assigned/delivered to any class or student
+        delivery_qs = Delivery.objects.filter(paper_version__paper=paper)
+        delivery_count = delivery_qs.count()
+        if delivery_count > 0:
+            return Response(
+                {
+                    "detail": (
+                        f"Cannot delete paper: It has already been assigned or delivered "
+                        f"({delivery_count} test delivery session(s) exist). "
+                        "To protect student records and academic integrity, assigned papers cannot be deleted."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            log_action(
+                user=request.user,
+                action="paper.deleted",
+                target=paper,
+                metadata={
+                    "paper_id": paper.id,
+                    "title": paper.title,
+                    "school_id": paper.school_id,
+                },
+            )
+            paper.delete()
+
+        return Response(
+            {"detail": f"Paper '{paper.title}' (Paper #{paper.id}) was deleted successfully."},
+            status=status.HTTP_200_OK,
+        )
+
 
 
 # ---------------------------------------------------------------------------

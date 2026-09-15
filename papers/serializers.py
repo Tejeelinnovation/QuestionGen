@@ -37,6 +37,8 @@ class PaperListSerializer(serializers.ModelSerializer):
     created_by_username = serializers.CharField(source="created_by.username", read_only=True)
     school_name = serializers.CharField(source="school.name", read_only=True, default=None)
     version_count = serializers.SerializerMethodField()
+    is_assigned = serializers.SerializerMethodField()
+    delivery_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Paper
@@ -56,6 +58,8 @@ class PaperListSerializer(serializers.ModelSerializer):
             "school_name",
             "status",
             "version_count",
+            "is_assigned",
+            "delivery_count",
             "created_at",
             "updated_at",
         ]
@@ -65,6 +69,12 @@ class PaperListSerializer(serializers.ModelSerializer):
 
     def get_version_count(self, obj: Paper) -> int:
         return obj.versions.count()
+
+    def get_is_assigned(self, obj: Paper) -> bool:
+        return Delivery.objects.filter(paper_version__paper=obj).exists()
+
+    def get_delivery_count(self, obj: Paper) -> int:
+        return Delivery.objects.filter(paper_version__paper=obj).count()
 
 
 class PaperCreateSerializer(serializers.ModelSerializer):

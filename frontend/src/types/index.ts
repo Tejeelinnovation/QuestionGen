@@ -249,6 +249,8 @@ export interface Paper {
   school_name?: string;
   status: string;
   version_count?: number;
+  is_assigned?: boolean;
+  delivery_count?: number;
   versions?: PaperVersionSummary[];
   created_at: string;
   updated_at: string;

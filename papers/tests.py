@@ -712,3 +712,70 @@ class PapersWorkflowTests(APITestCase):
         self.assertEqual(res.data["subjects"], ["Mathematics"])
         self.assertEqual(res.data["total_question_count"], 2)
 
+    def test_delete_unassigned_paper_success(self):
+        """Teacher can successfully delete an unassigned draft paper."""
+        paper = Paper.objects.create(
+            title="Draft Paper to Delete",
+            created_by=self.teacher_1,
+            school=self.school_a,
+            chapter=self.chapter,
+            subjects=["Mathematics"],
+        )
+        PaperVersion.objects.create(
+            paper=paper,
+            version_label="A",
+            question_snapshot=[{"question_id": self.q1.id, "marks": 2}],
+            status=VersionStatus.DRAFT,
+        )
+
+        self.client.force_authenticate(user=self.teacher_1)
+        res = self.client.delete(f"/api/papers/{paper.id}/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(Paper.objects.filter(id=paper.id).exists())
+        self.assertFalse(PaperVersion.objects.filter(paper_id=paper.id).exists())
+
+    def test_delete_assigned_paper_blocked(self):
+        """Deleting a paper that has active or past delivery sessions is strictly blocked."""
+        paper = Paper.objects.create(
+            title="Active Assigned Paper",
+            created_by=self.teacher_1,
+            school=self.school_a,
+            chapter=self.chapter,
+            subjects=["Mathematics"],
+        )
+        version = PaperVersion.objects.create(
+            paper=paper,
+            version_label="A",
+            question_snapshot=[{"question_id": self.q1.id, "marks": 2}],
+            status=VersionStatus.FINALIZED,
+        )
+        # Create a delivery record
+        Delivery.objects.create(
+            paper_version=version,
+            mode=DeliveryMode.ONLINE,
+            created_by=self.teacher_1,
+            status=DeliveryStatus.ACTIVE,
+        )
+
+        self.client.force_authenticate(user=self.teacher_1)
+        res = self.client.delete(f"/api/papers/{paper.id}/")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already been assigned or delivered", res.data["detail"])
+        # Paper must still exist in DB
+        self.assertTrue(Paper.objects.filter(id=paper.id).exists())
+
+    def test_delete_paper_permission_denied(self):
+        """Student or unauthorized user cannot delete a paper."""
+        paper = Paper.objects.create(
+            title="School A Paper",
+            created_by=self.teacher_1,
+            school=self.school_a,
+            chapter=self.chapter,
+        )
+        self.client.force_authenticate(user=self.student_1)
+        res = self.client.delete(f"/api/papers/{paper.id}/")
+        # Student cannot see or delete the paper
+        self.assertIn(res.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
+        self.assertTrue(Paper.objects.filter(id=paper.id).exists())
+
+

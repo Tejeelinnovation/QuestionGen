@@ -6,7 +6,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { canEditUser } from '../../../utils/userPermissions';
-import { Plus, Edit2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Lock, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import type { Paper, User, Delivery } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import {
@@ -27,6 +27,12 @@ export const TeacherDashboardTablet: React.FC = () => {
   const [papersError, setPapersError] = useState<string | null>(null);
   const [deliveriesError, setDeliveriesError] = useState<string | null>(null);
   const [studentsError, setStudentsError] = useState<string | null>(null);
+
+  // Paper deletion state & modal
+  const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
+  const [isDeletingPaper, setIsDeletingPaper] = useState(false);
+  const [deletePaperError, setDeletePaperError] = useState<string | null>(null);
+  const [deletePaperSuccess, setDeletePaperSuccess] = useState<string | null>(null);
 
   // Modals state
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -76,6 +82,25 @@ export const TeacherDashboardTablet: React.FC = () => {
     fetchDeliveries();
     fetchStudents();
   }, []);
+
+  const handleDeletePaper = async () => {
+    if (!paperToDelete) return;
+    setIsDeletingPaper(true);
+    setDeletePaperError(null);
+    try {
+      await papersApi.deletePaper(paperToDelete.id);
+      setPapers((prev) => prev.filter((p) => p.id !== paperToDelete.id));
+      setDeletePaperSuccess(`Paper "${paperToDelete.title}" was deleted successfully.`);
+      setPaperToDelete(null);
+      setTimeout(() => setDeletePaperSuccess(null), 4000);
+    } catch (err: any) {
+      setDeletePaperError(
+        err.response?.data?.detail || 'Failed to delete paper. Please try again.'
+      );
+    } finally {
+      setIsDeletingPaper(false);
+    }
+  };
 
   return (
     <div className="space-y-8 font-body">
@@ -129,6 +154,22 @@ export const TeacherDashboardTablet: React.FC = () => {
             {papers.length} Papers
           </span>
         </div>
+
+        {deletePaperSuccess && (
+          <div className="p-3 rounded-card bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center justify-between gap-2 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{deletePaperSuccess}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDeletePaperSuccess(null)}
+              className="text-emerald-800 hover:text-emerald-950 font-semibold cursor-pointer p-1"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {isLoadingPapers && (
           <SkeletonPaperGrid count={2} />
@@ -202,12 +243,29 @@ export const TeacherDashboardTablet: React.FC = () => {
                   <span className="font-mono text-[11px] text-ink/50">
                     {new Date(p.created_at).toLocaleDateString()}
                   </span>
-                  <Link
-                    to={`/papers/${p.id}`}
-                    className="px-4 py-2 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors min-h-[40px] flex items-center"
-                  >
-                    Open Studio →
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeletePaperError(null);
+                        setPaperToDelete(p);
+                      }}
+                      title={p.is_assigned ? 'Cannot delete: Paper has active deliveries' : 'Delete paper'}
+                      className={`p-2 rounded-pill border transition-colors flex items-center gap-1 text-xs cursor-pointer ${
+                        p.is_assigned
+                          ? 'border-border/60 bg-surface-muted/60 text-ink/40'
+                          : 'border-rose-200/80 bg-rose-50/40 text-rose-600 hover:bg-rose-100 hover:border-rose-300'
+                      }`}
+                    >
+                      {p.is_assigned ? <Lock className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                    <Link
+                      to={`/papers/${p.id}`}
+                      className="px-4 py-2 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors min-h-[40px] flex items-center"
+                    >
+                      Open Studio →
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}
@@ -403,6 +461,113 @@ export const TeacherDashboardTablet: React.FC = () => {
         onClose={() => setEditUserId(null)}
         onUserUpdated={() => fetchStudents()}
       />
+
+      {/* Delete Paper Modal with Assignment Validation */}
+      {paperToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs animate-fade-in">
+          <div className="bg-surface border border-border rounded-card max-w-md w-full p-6 shadow-modal space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                    paperToDelete.is_assigned ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-600'
+                  }`}
+                >
+                  {paperToDelete.is_assigned ? <Lock className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                </div>
+                <div>
+                  <h3 className="font-heading font-bold text-base text-ink">
+                    {paperToDelete.is_assigned ? 'Cannot Delete Assigned Paper' : 'Delete Question Paper'}
+                  </h3>
+                  <span className="font-mono text-xs text-ink/50">Paper #{paperToDelete.id}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPaperToDelete(null);
+                  setDeletePaperError(null);
+                }}
+                className="text-ink/40 hover:text-ink p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {deletePaperError && (
+              <div className="p-3 rounded-card bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{deletePaperError}</span>
+              </div>
+            )}
+
+            {paperToDelete.is_assigned ? (
+              <div className="space-y-3 text-xs text-ink/75 leading-relaxed">
+                <p>
+                  This paper is currently associated with{' '}
+                  <strong className="text-ink">
+                    {paperToDelete.delivery_count || 'active'} delivery session(s)
+                  </strong>{' '}
+                  assigned to classes or students.
+                </p>
+                <div className="p-3 rounded-card bg-amber-50 border border-amber-200 text-amber-800 space-y-1">
+                  <span className="font-semibold block">Academic Integrity Guard:</span>
+                  <span>
+                    To preserve student test history, grading logs, and official performance records, question papers that have been delivered or assigned cannot be deleted.
+                  </span>
+                </div>
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaperToDelete(null);
+                      setDeletePaperError(null);
+                    }}
+                    className="px-4 py-2 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors cursor-pointer"
+                  >
+                    Understood
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-xs text-ink/75 leading-relaxed">
+                  Are you sure you want to permanently delete{' '}
+                  <strong className="text-ink">"{paperToDelete.title}"</strong>? All drafted versions and syllabus blueprints associated with this paper will be removed.
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    disabled={isDeletingPaper}
+                    onClick={() => {
+                      setPaperToDelete(null);
+                      setDeletePaperError(null);
+                    }}
+                    className="px-4 py-2 rounded-pill border border-border text-ink/70 font-heading font-semibold text-xs hover:text-ink hover:border-ink/40 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingPaper}
+                    onClick={handleDeletePaper}
+                    className="px-4 py-2 rounded-pill bg-rose-600 text-white font-heading font-semibold text-xs hover:bg-rose-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                  >
+                    {isDeletingPaper ? (
+                      <span>Deleting...</span>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Paper</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
