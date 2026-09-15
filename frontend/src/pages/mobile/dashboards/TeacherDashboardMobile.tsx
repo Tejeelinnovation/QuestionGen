@@ -16,6 +16,11 @@ import {
   Plus,
   Edit2,
   Users,
+  Trash2,
+  Lock,
+  AlertCircle,
+  CheckCircle2,
+  X,
 } from 'lucide-react';
 import {
   SkeletonPaperGrid,
@@ -35,6 +40,12 @@ export const TeacherDashboardMobile: React.FC = () => {
   const [papersError, setPapersError] = useState<string | null>(null);
   const [deliveriesError, setDeliveriesError] = useState<string | null>(null);
   const [studentsError, setStudentsError] = useState<string | null>(null);
+
+  // Paper deletion states
+  const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
+  const [isDeletingPaper, setIsDeletingPaper] = useState<boolean>(false);
+  const [deletePaperError, setDeletePaperError] = useState<string | null>(null);
+  const [deletePaperSuccess, setDeletePaperSuccess] = useState<string | null>(null);
 
   // Modal / Drawer state
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -85,6 +96,25 @@ export const TeacherDashboardMobile: React.FC = () => {
     fetchDeliveries();
     fetchStudents();
   }, [fetchStudents]);
+
+  const handleDeletePaper = async () => {
+    if (!paperToDelete) return;
+    setIsDeletingPaper(true);
+    setDeletePaperError(null);
+    try {
+      await papersApi.deletePaper(paperToDelete.id);
+      setPapers((prev) => prev.filter((p) => p.id !== paperToDelete.id));
+      setDeletePaperSuccess(`Paper "${paperToDelete.title}" was deleted successfully.`);
+      setPaperToDelete(null);
+      setTimeout(() => setDeletePaperSuccess(null), 4000);
+    } catch (err: any) {
+      setDeletePaperError(
+        err.response?.data?.detail || 'Failed to delete paper. Please try again.'
+      );
+    } finally {
+      setIsDeletingPaper(false);
+    }
+  };
 
   return (
     <div className="space-y-5 font-body">
@@ -149,8 +179,24 @@ export const TeacherDashboardMobile: React.FC = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
           <span>CURRICULUM PAPERS ({papers.length})</span>
-          <span className="text-[11px]">Tap to configure</span>
+          <span className="text-[11px]">Blueprints & Question Banks</span>
         </div>
+
+        {deletePaperSuccess && (
+          <div className="p-3 rounded-card bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center justify-between gap-2 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{deletePaperSuccess}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDeletePaperSuccess(null)}
+              className="text-emerald-800 hover:text-emerald-950 font-semibold cursor-pointer p-1 active:scale-95"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {isLoadingPapers ? (
           <SkeletonPaperGrid count={2} />
@@ -168,23 +214,27 @@ export const TeacherDashboardMobile: React.FC = () => {
           papers.map((p, idx) => {
             const isFinal = p.status === 'FINALIZED';
             return (
-              <Link
+              <div
                 key={p.id}
-                to={`/papers/${p.id}`}
                 style={getStaggerDelay(idx, true)}
-                className={`animate-card-enter block p-4 rounded-card bg-surface border border-border shadow-xs space-y-2.5 ${MOTION.touch.card.className}`}
+                className={`animate-card-enter p-4 rounded-card bg-surface border border-border shadow-xs space-y-3 ${MOTION.touch.card.className}`}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-0.5">
-                    <h3 className="font-heading font-bold text-sm text-ink leading-snug">
-                      {p.title}
-                    </h3>
-                    <div className="text-[11px] text-ink/60 font-medium flex items-center gap-1.5 flex-wrap">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-[10px] text-ink/50">Paper #{p.id}</span>
                       {p.duration_minutes ? (
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-amber-50 text-amber-700 border border-amber-200">
                           ⏱ {p.duration_minutes}m
                         </span>
                       ) : null}
+                    </div>
+                    <h3 className="font-heading font-bold text-sm text-ink leading-snug">
+                      <Link to={`/papers/${p.id}`} className="hover:text-forest transition-colors">
+                        {p.title}
+                      </Link>
+                    </h3>
+                    <div className="text-[11px] text-ink/60 font-medium flex items-center gap-1.5 flex-wrap">
                       {p.subjects && p.subjects.length > 0 ? (
                         <span>{p.subjects.join(', ')}</span>
                       ) : (
@@ -201,16 +251,44 @@ export const TeacherDashboardMobile: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[11px]">
-                  <span className="font-mono text-ink/50">
-                    {p.versions?.length || 1} Version{(p.versions?.length || 1) === 1 ? '' : 's'}
-                  </span>
-                  <div className="flex items-center gap-1 text-forest font-heading font-semibold text-xs">
-                    <span>Manage</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
+                <div className="flex items-center justify-between pt-2.5 border-t border-border/50 text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-ink/50">
+                      {p.version_count ?? (p.versions?.length || 1)} Version{(p.version_count ?? (p.versions?.length || 1)) === 1 ? '' : 's'}
+                    </span>
+                    <span className="text-ink/30">•</span>
+                    <span className="font-mono text-[10px] text-ink/40">
+                      {new Date(p.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      id={`mobile-delete-paper-${p.id}`}
+                      onClick={() => {
+                        setDeletePaperError(null);
+                        setPaperToDelete(p);
+                      }}
+                      title={p.is_assigned ? 'Cannot delete: Paper has active deliveries' : 'Delete paper'}
+                      className={`p-2 min-h-[36px] min-w-[36px] rounded-pill border transition-all flex items-center justify-center cursor-pointer active:scale-95 ${
+                        p.is_assigned
+                          ? 'border-border/60 bg-surface-muted/60 text-ink/40'
+                          : 'border-rose-200/80 bg-rose-50/40 text-rose-600 hover:bg-rose-100 hover:border-rose-300'
+                      }`}
+                    >
+                      {p.is_assigned ? <Lock className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                    <Link
+                      to={`/papers/${p.id}`}
+                      className="px-3 py-1.5 rounded-pill bg-surface-muted border border-border text-[11px] font-heading font-semibold text-forest hover:bg-forest hover:text-white transition-colors min-h-[36px] flex items-center gap-1 active:scale-95 cursor-pointer"
+                    >
+                      <span>Studio</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 </div>
-              </Link>
+              </div>
             );
           })
         )}
@@ -340,6 +418,121 @@ export const TeacherDashboardMobile: React.FC = () => {
         onClose={() => setEditUserId(null)}
         onUserUpdated={() => fetchStudents()}
       />
+
+      {/* ── Mobile Delete Confirmation / Academic Integrity Guard Modal ── */}
+      {paperToDelete && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-xs flex items-end sm:items-center justify-center p-3 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-surface rounded-card border border-border p-5 max-w-md w-full shadow-lg space-y-4 animate-scale-up">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                {paperToDelete.is_assigned ? (
+                  <div className="p-2 rounded-pill bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                ) : (
+                  <div className="p-2 rounded-pill bg-rose-50 border border-rose-200 text-rose-600 shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="font-heading font-bold text-base text-ink">
+                    {paperToDelete.is_assigned ? 'Paper Locked' : 'Delete Question Paper'}
+                  </h3>
+                  <p className="text-[11px] font-mono text-ink/50 truncate">
+                    Paper #{paperToDelete.id} • {paperToDelete.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPaperToDelete(null);
+                  setDeletePaperError(null);
+                }}
+                className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-pill hover:bg-surface-muted text-ink/50 hover:text-ink transition-colors cursor-pointer active:scale-95 shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {deletePaperError && (
+              <div className="p-3 rounded-card bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{deletePaperError}</span>
+              </div>
+            )}
+
+            {paperToDelete.is_assigned ? (
+              <div className="space-y-3 text-xs text-ink/75 leading-relaxed">
+                <p>
+                  This paper is currently associated with{' '}
+                  <strong className="text-ink">
+                    {paperToDelete.delivery_count || 'active'} test delivery session(s)
+                  </strong>{' '}
+                  assigned to classes or cohorts.
+                </p>
+                <div className="p-3 rounded-card bg-amber-50 border border-amber-200 text-amber-800 space-y-1">
+                  <span className="font-semibold block font-heading">Academic Integrity Guard:</span>
+                  <span className="text-[11px] leading-normal block">
+                    To preserve student test history, grading logs, and official performance records, question papers that have been delivered or assigned cannot be deleted.
+                  </span>
+                </div>
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaperToDelete(null);
+                      setDeletePaperError(null);
+                    }}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors cursor-pointer min-h-[44px] active:scale-95"
+                  >
+                    Understood
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-xs text-ink/75 leading-relaxed">
+                  Are you sure you want to permanently delete{' '}
+                  <strong className="text-ink">"{paperToDelete.title}"</strong>? All drafted versions and syllabus blueprints associated with this paper will be permanently removed.
+                </p>
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    disabled={isDeletingPaper}
+                    onClick={() => {
+                      setPaperToDelete(null);
+                      setDeletePaperError(null);
+                    }}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-pill border border-border text-ink/70 font-heading font-semibold text-xs hover:text-ink hover:border-ink/40 transition-colors cursor-pointer disabled:opacity-50 min-h-[44px] active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingPaper}
+                    onClick={handleDeletePaper}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-pill bg-rose-600 text-white font-heading font-semibold text-xs hover:bg-rose-700 transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 min-h-[44px] active:scale-95"
+                  >
+                    {isDeletingPaper ? (
+                      <span>Deleting...</span>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Paper</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

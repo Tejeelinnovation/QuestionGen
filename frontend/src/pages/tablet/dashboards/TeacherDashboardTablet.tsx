@@ -246,12 +246,13 @@ export const TeacherDashboardTablet: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
+                      id={`tablet-delete-paper-${p.id}`}
                       onClick={() => {
                         setDeletePaperError(null);
                         setPaperToDelete(p);
                       }}
                       title={p.is_assigned ? 'Cannot delete: Paper has active deliveries' : 'Delete paper'}
-                      className={`p-2 rounded-pill border transition-colors flex items-center gap-1 text-xs cursor-pointer ${
+                      className={`p-2 min-h-[40px] min-w-[40px] rounded-pill border transition-colors flex items-center justify-center text-xs cursor-pointer active:scale-95 ${
                         p.is_assigned
                           ? 'border-border/60 bg-surface-muted/60 text-ink/40'
                           : 'border-rose-200/80 bg-rose-50/40 text-rose-600 hover:bg-rose-100 hover:border-rose-300'
@@ -261,7 +262,7 @@ export const TeacherDashboardTablet: React.FC = () => {
                     </button>
                     <Link
                       to={`/papers/${p.id}`}
-                      className="px-4 py-2 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors min-h-[40px] flex items-center"
+                      className="px-4 py-2 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors min-h-[40px] flex items-center active:scale-95"
                     >
                       Open Studio →
                     </Link>
@@ -523,7 +524,7 @@ export const TeacherDashboardTablet: React.FC = () => {
                       setPaperToDelete(null);
                       setDeletePaperError(null);
                     }}
-                    className="px-4 py-2 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors cursor-pointer"
+                    className="px-5 py-2.5 rounded-pill bg-surface-muted border border-border text-ink font-heading font-semibold text-xs hover:bg-forest hover:text-white hover:border-forest transition-colors cursor-pointer min-h-[40px] active:scale-95"
                   >
                     Understood
                   </button>
@@ -543,7 +544,7 @@ export const TeacherDashboardTablet: React.FC = () => {
                       setPaperToDelete(null);
                       setDeletePaperError(null);
                     }}
-                    className="px-4 py-2 rounded-pill border border-border text-ink/70 font-heading font-semibold text-xs hover:text-ink hover:border-ink/40 transition-colors cursor-pointer disabled:opacity-50"
+                    className="px-4 py-2.5 rounded-pill border border-border text-ink/70 font-heading font-semibold text-xs hover:text-ink hover:border-ink/40 transition-colors cursor-pointer disabled:opacity-50 min-h-[40px] active:scale-95"
                   >
                     Cancel
                   </button>
@@ -551,7 +552,7 @@ export const TeacherDashboardTablet: React.FC = () => {
                     type="button"
                     disabled={isDeletingPaper}
                     onClick={handleDeletePaper}
-                    className="px-4 py-2 rounded-pill bg-rose-600 text-white font-heading font-semibold text-xs hover:bg-rose-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                    className="px-4 py-2.5 rounded-pill bg-rose-600 text-white font-heading font-semibold text-xs hover:bg-rose-700 transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50 min-h-[40px] active:scale-95"
                   >
                     {isDeletingPaper ? (
                       <span>Deleting...</span>

@@ -41,6 +41,8 @@ db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
+*_data.json
+db_backup.json
 
 # Environment variables — NEVER commit secrets
 .env

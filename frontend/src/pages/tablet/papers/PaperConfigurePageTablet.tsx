@@ -122,6 +122,13 @@ export const PaperConfigurePageTablet: React.FC = () => {
   );
   const rubricTotalQuestions = markTiers.reduce((acc, t) => acc + Number(t.count), 0);
 
+  // Automatically count and synchronize Grand Total Marks from rubric formats and question counts
+  useEffect(() => {
+    if (useDistributionRubric) {
+      setTotalMarks(String(rubricTotalMarks));
+    }
+  }, [rubricTotalMarks, useDistributionRubric]);
+
   const handleUpdateTierCount = (tierId: string, count: number) => {
     setMarkTiers((prev) =>
       prev.map((t) => (t.id === tierId ? { ...t, count: Math.max(0, count) } : t))
@@ -412,7 +419,7 @@ export const PaperConfigurePageTablet: React.FC = () => {
                 );
               })}
 
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center justify-between pt-2 flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={handleAddTier}
@@ -422,8 +429,14 @@ export const PaperConfigurePageTablet: React.FC = () => {
                   <span>Add Custom Mark Tier</span>
                 </button>
 
-                <div className="font-mono text-xs text-ink/70">
-                  Rubric Total: <strong>{rubricTotalQuestions} Questions</strong> ({rubricTotalMarks} Marks)
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="font-mono text-xs text-ink/70">
+                    Rubric Total: <strong>{rubricTotalQuestions} Questions</strong> ({rubricTotalMarks} Marks)
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Auto-Counted
+                  </span>
                 </div>
               </div>
             </div>
@@ -533,9 +546,20 @@ export const PaperConfigurePageTablet: React.FC = () => {
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-ink flex items-center gap-1.5">
                   <span>Grand Total Marks *</span>
-                  <span className="text-[10px] font-bold text-ember uppercase">(Compulsory)</span>
+                  {useDistributionRubric ? (
+                    <span className="text-forest font-bold text-[10px] uppercase">(Auto-Counted)</span>
+                  ) : (
+                    <span className="text-ember font-bold text-[10px] uppercase">(Compulsory)</span>
+                  )}
                 </label>
-                <span className="pill pill-ember text-[10px] uppercase font-mono">Required</span>
+                {useDistributionRubric ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold font-mono">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Auto-Counted
+                  </span>
+                ) : (
+                  <span className="pill pill-ember text-[10px] uppercase font-mono">Required</span>
+                )}
               </div>
 
               <input
@@ -544,11 +568,21 @@ export const PaperConfigurePageTablet: React.FC = () => {
                 min="1"
                 value={totalMarks}
                 onChange={(e) => setTotalMarks(e.target.value)}
-                placeholder="e.g. 37, 50, 80"
-                className="w-full px-3 py-2 text-xs font-mono font-bold rounded-card border border-border bg-bg text-ink focus:border-forest focus:outline-hidden"
+                placeholder={useDistributionRubric ? String(rubricTotalMarks) : "e.g. 37, 50, 80"}
+                className={`w-full px-3 py-2 text-xs font-mono font-bold rounded-card border transition-all ${
+                  useDistributionRubric
+                    ? 'border-emerald-300 bg-emerald-50/25 text-ink focus:border-forest focus:bg-surface'
+                    : 'border-border bg-bg text-ink focus:border-forest'
+                } focus:outline-hidden`}
               />
               <p className="text-[10px] text-ink/60">
-                Compulsory total score for this test. All questions generated must sum to this exact mark.
+                {useDistributionRubric ? (
+                  <>
+                    Automatically counted from your question format & rubric breakdown: <strong className="text-ink">{rubricTotalQuestions} questions</strong> = <strong className="text-forest">{rubricTotalMarks} marks</strong>.
+                  </>
+                ) : (
+                  'Compulsory total score for this test. All questions generated must sum to this exact mark.'
+                )}
               </p>
             </div>
 

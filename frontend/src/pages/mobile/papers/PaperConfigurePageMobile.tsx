@@ -125,6 +125,13 @@ export const PaperConfigurePageMobile: React.FC = () => {
   );
   const rubricTotalQuestions = markTiers.reduce((acc, t) => acc + Number(t.count), 0);
 
+  // Automatically count and synchronize Grand Total Marks from rubric formats and question counts
+  useEffect(() => {
+    if (useDistributionRubric) {
+      setTotalMarks(String(rubricTotalMarks));
+    }
+  }, [rubricTotalMarks, useDistributionRubric]);
+
   const handleUpdateTierCount = (tierId: string, count: number) => {
     setMarkTiers((prev) =>
       prev.map((t) => (t.id === tierId ? { ...t, count: Math.max(0, count) } : t))
@@ -243,8 +250,6 @@ export const PaperConfigurePageMobile: React.FC = () => {
     );
   }
 
-  const isMarksMatching = Number(totalMarks) === rubricTotalMarks;
-
   return (
     <div className="space-y-4 font-body pb-24">
       <PaperWorkflowNavMobile currentStep="configure" backTo="/papers/create" />
@@ -303,38 +308,11 @@ export const PaperConfigurePageMobile: React.FC = () => {
             </div>
 
             {/* Rubric Match Pill */}
-            <div
-              className={`p-2.5 rounded-card border flex items-center justify-between text-xs ${
-                isMarksMatching
-                  ? 'bg-forest/10 border-forest/30 text-forest'
-                  : 'bg-ember/10 border-ember/30 text-ember'
-              }`}
-            >
+            <div className="p-2.5 rounded-card border border-emerald-200 bg-emerald-50 text-emerald-800 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 font-medium">
-                {isMarksMatching ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Rubric matches Total Marks ({totalMarks})</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-4 h-4" />
-                    <span>
-                      Rubric: {rubricTotalMarks}M vs Total: {totalMarks || 0}M
-                    </span>
-                  </>
-                )}
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Grand Total Auto-Counted: {rubricTotalMarks} Marks ({rubricTotalQuestions} Qs)</span>
               </div>
-
-              {!isMarksMatching && (
-                <button
-                  type="button"
-                  onClick={() => setTotalMarks(String(rubricTotalMarks))}
-                  className="text-[11px] font-bold underline cursor-pointer"
-                >
-                  Sync to {rubricTotalMarks}M
-                </button>
-              )}
             </div>
 
             {/* Tier Cards */}
@@ -480,9 +458,20 @@ export const PaperConfigurePageMobile: React.FC = () => {
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-ink flex items-center gap-1">
                 <span>Grand Total Marks *</span>
-                <span className="text-[10px] font-bold text-ember uppercase">(Compulsory)</span>
+                {useDistributionRubric ? (
+                  <span className="text-forest font-bold text-[10px] uppercase">(Auto-Counted)</span>
+                ) : (
+                  <span className="text-ember font-bold text-[10px] uppercase">(Compulsory)</span>
+                )}
               </label>
-              <span className="pill pill-ember text-[10px] uppercase font-mono">Required</span>
+              {useDistributionRubric ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-pill bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold font-mono">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  Auto-Counted
+                </span>
+              ) : (
+                <span className="pill pill-ember text-[10px] uppercase font-mono">Required</span>
+              )}
             </div>
             <input
               type="number"
@@ -490,11 +479,21 @@ export const PaperConfigurePageMobile: React.FC = () => {
               min="1"
               value={totalMarks}
               onChange={(e) => setTotalMarks(e.target.value)}
-              placeholder="e.g. 37, 50, 80, 100"
-              className="w-full px-3 py-2 text-xs font-mono font-bold rounded-card border border-border bg-bg text-ink focus:border-forest focus:outline-hidden"
+              placeholder={useDistributionRubric ? String(rubricTotalMarks) : "e.g. 37, 50, 80, 100"}
+              className={`w-full px-3 py-2 text-xs font-mono font-bold rounded-card border transition-all ${
+                useDistributionRubric
+                  ? 'border-emerald-300 bg-emerald-50/25 text-ink focus:border-forest focus:bg-surface'
+                  : 'border-border bg-bg text-ink focus:border-forest'
+              } focus:outline-hidden`}
             />
             <p className="text-[10px] text-ink/60">
-              Total score for this test. All selected questions will sum to this exact mark.
+              {useDistributionRubric ? (
+                <>
+                  Automatically counted from your question format & rubric breakdown: <strong className="text-ink">{rubricTotalQuestions} questions</strong> = <strong className="text-forest">{rubricTotalMarks} marks</strong>.
+                </>
+              ) : (
+                'Total score for this test. All selected questions will sum to this exact mark.'
+              )}
             </p>
           </div>
 
