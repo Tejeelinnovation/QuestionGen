@@ -7,7 +7,9 @@ import { useExamProctoring } from '../../hooks/useExamProctoring';
 import { ProctoringWarningModal } from '../../components/attempts/ProctoringWarningModal';
 import { TestAttemptPageTablet } from '../tablet/attempts/TestAttemptPageTablet';
 import { TestAttemptPageMobile } from '../mobile/attempts/TestAttemptPageMobile';
-import { Maximize2, ShieldAlert } from 'lucide-react';
+import { Maximize2, ShieldAlert, Clock } from 'lucide-react';
+import { useExamCountdown } from '../../hooks/useExamCountdown';
+import { ConfirmSubmitModal } from '../../components/attempts/ConfirmSubmitModal';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -24,6 +26,7 @@ const TestAttemptPageDesktop: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleAutoSubmitOnMaxWarnings = useCallback(async () => {
     if (!attemptData || isSubmitting) return;
@@ -36,6 +39,14 @@ const TestAttemptPageDesktop: React.FC = () => {
       navigate(`/attempts/${attemptData.attempt_id}/result`, { replace: true });
     }
   }, [attemptData, isSubmitting, navigate]);
+
+  // Reverse countdown timer with auto-submit on 00:00
+  const { formattedTime, isUrgent } = useExamCountdown({
+    startedAt: attemptData?.started_at,
+    durationMinutes: attemptData?.duration_minutes ?? 60,
+    availableUntil: attemptData?.available_until,
+    onTimeExpired: handleAutoSubmitOnMaxWarnings,
+  });
 
   // Anti-cheating exam proctoring hook with persistent warning count & auto-submit
   const {
@@ -171,13 +182,13 @@ const TestAttemptPageDesktop: React.FC = () => {
     performSave(attemptData.attempt_id, questionId, optionKey);
   };
 
-  const handleSubmit = async () => {
+  const handleOpenSubmitModal = () => {
     if (!attemptData || isSubmitting || isExpired) return;
+    setShowConfirmModal(true);
+  };
 
-    const confirmed = window.confirm(
-      'Are you sure you want to submit your test? You will not be able to make any further changes after submission.'
-    );
-    if (!confirmed) return;
+  const handleConfirmSubmit = async () => {
+    if (!attemptData || isSubmitting || isExpired) return;
 
     setIsSubmitting(true);
     setErrorMessage(null);
@@ -194,6 +205,7 @@ const TestAttemptPageDesktop: React.FC = () => {
         detail || JSON.stringify(err.response?.data) || 'Failed to submit test attempt.'
       );
       setIsSubmitting(false);
+      setShowConfirmModal(false);
     }
   };
 
@@ -313,6 +325,19 @@ const TestAttemptPageDesktop: React.FC = () => {
             >
               <span>🛡️ Proctoring Active</span>
               {warningCount > 0 && <span>({warningCount} Warnings)</span>}
+            </span>
+
+            {/* Reverse Countdown Timer */}
+            <span
+              className={`pill text-[11px] font-mono font-bold flex items-center gap-1.5 ${
+                isUrgent
+                  ? 'bg-ember/15 text-ember border border-ember/30 animate-pulse'
+                  : 'bg-forest/10 text-forest border border-forest/20'
+              }`}
+              title="Time remaining in this examination"
+            >
+              <Clock className={`w-3.5 h-3.5 ${isUrgent ? 'text-ember' : 'text-forest'}`} />
+              <span>{formattedTime} remaining</span>
             </span>
 
             <span className="pill pill-forest text-[11px] font-semibold">
@@ -520,7 +545,7 @@ const TestAttemptPageDesktop: React.FC = () => {
 
           {/* Heavy, high-contrast committed submit button */}
           <button
-            onClick={handleSubmit}
+            onClick={handleOpenSubmitModal}
             id="submit-test-btn"
             disabled={isSubmitting || isExpired}
             className="px-7 py-3 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
@@ -530,6 +555,18 @@ const TestAttemptPageDesktop: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Custom Confirm Submit Modal (No native JS alert/blur) */}
+      <ConfirmSubmitModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmSubmit}
+        isSubmitting={isSubmitting}
+        answeredCount={answeredCount}
+        totalQuestions={totalQuestions}
+        formattedTimeRemaining={formattedTime}
+        isTimeUrgent={isUrgent}
+      />
 
       {/* Proctoring Warning Modal */}
       <ProctoringWarningModal

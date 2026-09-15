@@ -6,11 +6,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Send,
-  AlertCircle,
   Shield,
+  Clock,
 } from 'lucide-react';
 import { useExamProctoring } from '../../../hooks/useExamProctoring';
+import { useExamCountdown } from '../../../hooks/useExamCountdown';
 import { ProctoringWarningModal } from '../../../components/attempts/ProctoringWarningModal';
+import { ConfirmSubmitModal } from '../../../components/attempts/ConfirmSubmitModal';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -52,6 +54,14 @@ export const TestAttemptPageMobile: React.FC = () => {
     isActive: Boolean(attemptData && !isSubmitting && !isExpired),
     maxWarnings: 5,
     onMaxWarningsReached: handleAutoSubmitOnMaxWarnings,
+  });
+
+  // Reverse countdown timer
+  const { formattedTime, isUrgent } = useExamCountdown({
+    startedAt: attemptData?.started_at,
+    durationMinutes: attemptData?.duration_minutes ?? 60,
+    availableUntil: attemptData?.available_until,
+    onTimeExpired: handleAutoSubmitOnMaxWarnings,
   });
 
   // Prevent student from closing or reloading tab without warning
@@ -263,8 +273,20 @@ export const TestAttemptPageMobile: React.FC = () => {
           </div>
         </div>
 
-        {/* Auto-Save, Proctoring & Marks Pills */}
+        {/* Countdown, Auto-Save, Proctoring & Marks Pills */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <span
+            className={`pill text-[10px] py-0.5 px-2 font-mono font-bold flex items-center gap-1 ${
+              isUrgent
+                ? 'bg-ember/15 text-ember border border-ember/30 animate-pulse'
+                : 'bg-forest/10 text-forest border border-forest/20'
+            }`}
+            title="Time Remaining"
+          >
+            <Clock className={`w-3 h-3 ${isUrgent ? 'text-ember' : 'text-forest'}`} />
+            <span>{formattedTime}</span>
+          </span>
+
           <span
             className={`pill text-[10px] py-0.5 px-2 flex items-center gap-1 ${
               warningCount > 0
@@ -432,51 +454,17 @@ export const TestAttemptPageMobile: React.FC = () => {
         )}
       </div>
 
-      {/* ── Submission Confirmation Bottom Modal ── */}
-      {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <div
-            className="fixed inset-0 bg-ink/50 backdrop-blur-xs"
-            onClick={() => setShowSubmitModal(false)}
-          />
-          <div className="relative z-10 w-full bg-surface border-t border-border rounded-t-lg p-5 shadow-float space-y-4 max-w-lg mx-auto animate-in slide-in-from-bottom duration-200">
-            <div className="space-y-1">
-              <h3 className="font-heading font-bold text-base text-ink">
-                Submit Assessment?
-              </h3>
-              <p className="text-xs text-ink/70">
-                You have answered <strong>{answeredCount}</strong> out of <strong>{totalQuestions}</strong> questions. Once submitted, your answers will be locked for grading.
-              </p>
-            </div>
-
-            {answeredCount < totalQuestions && (
-              <div className="p-2.5 rounded-card bg-ember/10 border border-ember/30 text-ember text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>You still have {totalQuestions - answeredCount} unanswered questions.</span>
-              </div>
-            )}
-
-            <div className="space-y-2 pt-1">
-              <button
-                type="button"
-                id="mobile-confirm-submit-btn"
-                disabled={isSubmitting}
-                onClick={handleSubmitAttempt}
-                className="w-full py-3.5 px-4 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 min-h-[48px] cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? 'Submitting Responses...' : 'Yes, Finalize & Submit Test'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowSubmitModal(false)}
-                className="w-full py-3 px-4 rounded-pill border border-border bg-surface text-ink font-heading font-semibold text-xs active:scale-95 transition-all min-h-[44px]"
-              >
-                Continue Answering
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Custom in-DOM Submission Confirmation Modal */}
+      <ConfirmSubmitModal
+        isOpen={showSubmitModal}
+        onClose={() => setShowSubmitModal(false)}
+        onConfirm={handleSubmitAttempt}
+        isSubmitting={isSubmitting}
+        answeredCount={answeredCount}
+        totalQuestions={totalQuestions}
+        formattedTimeRemaining={formattedTime}
+        isTimeUrgent={isUrgent}
+      />
 
       {/* Proctoring Warning Modal */}
       <ProctoringWarningModal

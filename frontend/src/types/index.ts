@@ -332,6 +332,7 @@ export interface AttemptStartResponse {
   total_marks: string | number;
   status: string;
   started_at: string;
+  duration_minutes?: number;
   warning_count?: number;
   available_until?: string | null;
   questions: AttemptQuestionItem[];

@@ -46,6 +46,7 @@ class AttemptStartResponseSerializer(serializers.Serializer):
     total_marks = serializers.DecimalField(source="max_score", max_digits=6, decimal_places=2)
     status = serializers.CharField()
     started_at = serializers.DateTimeField()
+    duration_minutes = serializers.IntegerField(source="delivery.paper_version.paper.duration_minutes", default=60)
     warning_count = serializers.IntegerField(default=0)
     available_until = serializers.DateTimeField(source="delivery.available_until", allow_null=True)
     questions = serializers.SerializerMethodField()
