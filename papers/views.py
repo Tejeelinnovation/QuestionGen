@@ -262,7 +262,7 @@ class PaperSelectQuestionsView(APIView):
         req_serializer.is_valid(raise_exception=True)
         data = req_serializer.validated_data
 
-        # Multi-source candidate pooling (AC-19, AC-20):
+        # Multi-source candidate pooling:
         # Include Global QBM questions + own school's private questions.
         # Strictly exclude other organizations' question banks.
         target_school_id = paper.school_id or getattr(request.user, "school_id", None)
@@ -277,7 +277,7 @@ class PaperSelectQuestionsView(APIView):
             is_active=True,
         )
 
-        # Syllabus scoping (AC-17)
+        # Syllabus scoping
         chapter_ids = data.get("chapter_ids")
         if chapter_ids:
             qs = qs.filter(topic__chapter_id__in=chapter_ids)

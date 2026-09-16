@@ -125,14 +125,14 @@ def select_questions_for_specification(
     """
     Select candidate questions satisfying a blueprint specification.
     Supports:
-    - Multi-subject breakdown (e.g. Physics, Chemistry, Math marks/counts quotas, AC-17)
+    - Multi-subject breakdown (e.g. Physics, Chemistry, Math marks/counts quotas)
     - Difficulty distribution (e.g. Easy/Medium/Hard percentages or counts)
-    - Fallback to total marks & max quantity knapsack solver (AC-18)
+    - Fallback to total marks & max quantity knapsack solver
     """
     if not pool:
         return [], None
 
-    # 1. Multi-Subject Breakdown (AC-17)
+    # 1. Multi-Subject Breakdown
     subject_breakdown = spec.get("subject_breakdown")
     if subject_breakdown and isinstance(subject_breakdown, list):
         # Group pool by subject
@@ -254,7 +254,7 @@ def select_questions_for_specification(
             selected_distribution.sort(key=lambda x: (float(x.marks), x.topic_id, x.id))
             return selected_distribution, None
 
-    # 4. Standard Marks / Quantity Quota (AC-18)
+    # 4. Standard Marks / Quantity Quota
     target_marks = spec.get("total_marks")
     max_quantity = spec.get("total_question_count") or spec.get("quantity")
     if target_marks is not None or max_quantity is not None:

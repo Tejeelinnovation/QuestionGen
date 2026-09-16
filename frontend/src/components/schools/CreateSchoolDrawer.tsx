@@ -296,10 +296,10 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
               </div>
             </div>
 
-            {/* Question Bank Capability (AC-11) */}
+            {/* Question Bank Capability */}
             <div className="pt-2">
               <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
-                Question Bank Feature Access (AC-11)
+                Question Bank Feature Access
               </label>
               <div className="bg-surface-muted/40 border border-border rounded-card p-3.5 flex items-center justify-between gap-4">
                 <div className="space-y-0.5">

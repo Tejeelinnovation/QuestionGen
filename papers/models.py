@@ -103,15 +103,15 @@ class Paper(TimestampedModel):
     subjects = models.JSONField(
         default=list,
         blank=True,
-        help_text="List of subjects/books included in multi-subject papers (AC-17).",
+        help_text="List of subjects/books included in multi-subject papers.",
     )
     duration_minutes = models.PositiveIntegerField(
         default=60,
-        help_text="Exam duration in minutes (AC-18).",
+        help_text="Exam duration in minutes.",
     )
     total_question_count = models.PositiveIntegerField(
         default=0,
-        help_text="Target total question count (AC-18).",
+        help_text="Target total question count.",
     )
     specifications = models.JSONField(
         default=dict,

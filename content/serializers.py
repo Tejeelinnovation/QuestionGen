@@ -148,7 +148,7 @@ class QuestionVariantSerializer(serializers.ModelSerializer):
                 attrs["difficulty"] = parent.difficulty
             elif difficulty != parent.difficulty:
                 raise serializers.ValidationError(
-                    {"difficulty": f"Variant difficulty ({difficulty}) must match parent question difficulty ({parent.difficulty}). (AC-15)"}
+                    {"difficulty": f"Variant difficulty ({difficulty}) must match parent question difficulty ({parent.difficulty})."}
                 )
         return attrs
 
@@ -251,7 +251,7 @@ class QuestionVariantInputSerializer(serializers.Serializer):
 
 class QuestionIngestSerializer(serializers.ModelSerializer):
     """
-    Serializer for structured Question Ingestion workflow (AC-10, AC-13, AC-14, AC-15, AC-16).
+    Serializer for structured Question Ingestion workflow.
     Supports single question creation with optional nested variants.
     Accepts an existing `topic` ID or creates curriculum hierarchy (board, book, chapter, topic) dynamically.
     """
@@ -389,7 +389,7 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
                 parent_question=question,
                 variant_type=vdata["variant_type"],
                 marks=vdata["marks"],
-                difficulty=question.difficulty,  # Strictly enforce AC-15
+                difficulty=question.difficulty,  # Strictly enforce matching parent difficulty
                 question_text=vdata["question_text"],
                 options=vdata.get("options"),
                 correct_answer=vdata["correct_answer"],

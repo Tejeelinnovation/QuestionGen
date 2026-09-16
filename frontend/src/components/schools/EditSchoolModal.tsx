@@ -202,11 +202,11 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
             </div>
           </div>
 
-          {/* Question Bank Feature Access Toggle (AC-11) */}
+          {/* Question Bank Feature Access Toggle */}
           <div className="bg-surface-muted/40 border border-border rounded-card p-3.5 flex items-center justify-between gap-4">
             <div className="space-y-0.5">
               <span className="text-xs font-heading font-semibold text-ink block">
-                Question Bank Capability (AC-11)
+                Question Bank Capability
               </span>
               <span className="text-[11px] text-ink/65 block">
                 Allow organization and its teachers to generate and select questions.

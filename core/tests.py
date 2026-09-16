@@ -14,7 +14,7 @@ from papers.models import Paper, PaperVersion
 
 class EndToEndTargetFlowTests(TestCase):
     """
-    Comprehensive verification of Section 14: End-to-End Target Flow:
+    Comprehensive verification of End-to-End Target Flow:
     1. Super Admin provisions School/Coaching Class with capacity limits & Question Bank capability, and creates QBM.
     2. School Admin imports Excel workbook with students & teachers:
        - Capacity limit enforcement
@@ -22,11 +22,11 @@ class EndToEndTargetFlowTests(TestCase):
        - Class/division normalization ('Std 6' -> 'Class 6')
        - Audit log recording ('excel_import.executed')
     3. School Admin toggles Question Bank capability for a teacher.
-    4. QBM ingests global questions with difficulty-consistent variants (AC-15).
-    5. Teacher creates an organization-private question (AC-13, AC-14).
+    4. QBM ingests global questions with difficulty-consistent variants.
+    5. Teacher creates an organization-private question.
     6. Another School B teacher creates a private question for School B.
-    7. Teacher creates a multi-subject test blueprint (AC-17, AC-18).
-    8. Multi-source candidate pooling includes Global QBM + Teacher's School, strictly excluding School B (AC-19, AC-20).
+    7. Teacher creates a multi-subject test blueprint.
+    8. Multi-source candidate pooling includes Global QBM + Teacher's School, strictly excluding School B.
     9. Paper is frozen into an immutable version snapshot with duration, subjects, and print representation verified.
     """
 
@@ -260,7 +260,7 @@ class EndToEndTargetFlowTests(TestCase):
         self.assertTrue(alice.has_capability("GENERATE_SELECT_QUESTIONS"))
 
         # -------------------------------------------------------------
-        # STEP 4: QBM ingests global questions with difficulty-consistent variants (AC-15)
+        # STEP 4: QBM ingests global questions with difficulty-consistent variants
         # -------------------------------------------------------------
         self.client.force_authenticate(user=qbm_user)
 
@@ -309,7 +309,7 @@ class EndToEndTargetFlowTests(TestCase):
         )
         self.assertEqual(var_res.status_code, status.HTTP_201_CREATED)
         variant = QuestionVariant.objects.get(id=var_res.data["id"])
-        # Enforce AC-15: variant preserves parent difficulty, type, marks
+        # Variant preserves parent difficulty, type, marks
         self.assertEqual(variant.difficulty, global_q.difficulty)
         self.assertEqual(variant.variant_type, global_q.question_type)
         self.assertEqual(variant.marks, global_q.marks)
@@ -335,7 +335,7 @@ class EndToEndTargetFlowTests(TestCase):
         global_sci_q = Question.objects.get(id=qbm_sci_res.data["id"])
 
         # -------------------------------------------------------------
-        # STEP 5: Teacher Alice creates an organization-private question (AC-13, AC-14)
+        # STEP 5: Teacher Alice creates an organization-private question
         # -------------------------------------------------------------
         self.client.force_authenticate(user=alice)
 
@@ -388,7 +388,7 @@ class EndToEndTargetFlowTests(TestCase):
         )
 
         # -------------------------------------------------------------
-        # STEP 7: Teacher Alice creates a multi-subject test blueprint (AC-17, AC-18)
+        # STEP 7: Teacher Alice creates a multi-subject test blueprint
         # -------------------------------------------------------------
         paper_res = self.client.post(
             "/api/papers/",
@@ -418,7 +418,7 @@ class EndToEndTargetFlowTests(TestCase):
         self.assertEqual(paper.subjects, ["Mathematics", "Science"])
 
         # -------------------------------------------------------------
-        # STEP 8: Multi-source candidate pooling & Cross-organization exclusion (AC-19, AC-20)
+        # STEP 8: Multi-source candidate pooling & Cross-organization exclusion
         # -------------------------------------------------------------
         candidates_res = self.client.post(
             f"/api/papers/{paper_id}/select-questions/",
@@ -433,7 +433,7 @@ class EndToEndTargetFlowTests(TestCase):
         self.assertIn(global_sci_q.id, candidate_ids)
         # MUST include Teacher Alice's own school questions
         self.assertIn(alice_q.id, candidate_ids)
-        # MUST strictly EXCLUDE School B private questions (AC-20)
+        # MUST strictly EXCLUDE School B private questions
         self.assertNotIn(school_b_q.id, candidate_ids)
 
         # -------------------------------------------------------------

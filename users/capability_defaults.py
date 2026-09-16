@@ -55,9 +55,9 @@ def grant_super_admin_defaults(user: "User", granted_by: "User | None" = None) -
     """
     Grant Super Admin capabilities.
 
-    Per specification (AC-21): Super Admin can create schools/coaching classes,
-    students, and future QBMs, but CANNOT directly create teachers. Teacher creation
-    belongs strictly to School / Coaching Class Admins.
+    Super Admin can create schools/coaching classes, students, and QBMs,
+    but cannot directly create teachers. Teacher creation belongs to
+    School / Coaching Class Admins.
     """
     from users.models import CapabilityName  # noqa: PLC0415
 
@@ -88,8 +88,8 @@ def grant_teacher_defaults(user: "User", granted_by: "User | None" = None) -> No
     Typical Teacher capability set.
 
     Grants: CREATE_STUDENT, CREATE_PAPER, ASSIGN_TEST.
-    Per specification (AC-11, AC-12): GENERATE_SELECT_QUESTIONS (Question Bank)
-    is ONLY granted if Question Bank capability is enabled for the organization.
+    GENERATE_SELECT_QUESTIONS (Question Bank) is granted only if
+    Question Bank capability is enabled for the organization.
     """
     from users.models import CapabilityName  # noqa: PLC0415
 
@@ -124,7 +124,7 @@ def grant_student_defaults(user: "User", granted_by: "User | None" = None) -> No
 
 def grant_qbm_defaults(user: "User", granted_by: "User | None" = None) -> None:
     """
-    Typical Question Bank Manager (QBM) capability set (AC-10).
+    Typical Question Bank Manager (QBM) capability set.
 
     Grants: INGEST_GLOBAL_QUESTIONS, GENERATE_SELECT_QUESTIONS
     """

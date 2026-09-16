@@ -550,7 +550,7 @@ export const QBMDashboard: React.FC = () => {
       await contentApi.addVariant(quickVariantModalQuestion.id, {
         variant_type: quickVariantType as any,
         marks: quickVariantMarks,
-        difficulty: quickVariantModalQuestion.difficulty, // Enforce AC-15
+        difficulty: quickVariantModalQuestion.difficulty, // Enforce matching parent difficulty
         question_text: quickVariantText.trim(),
         correct_answer: quickVariantAnswer.trim(),
         explanation: quickVariantExplanation.trim(),
@@ -636,7 +636,7 @@ export const QBMDashboard: React.FC = () => {
           <div className="font-heading font-bold text-2xl text-forest mt-1">
             {stats?.with_variants ?? 0}
           </div>
-          <p className="text-[11px] text-ink/60 mt-0.5">AC-15 Difficulty Locked</p>
+          <p className="text-[11px] text-ink/60 mt-0.5">Difficulty Locked</p>
         </div>
         <div className="bg-surface border border-border rounded-card p-4 shadow-card">
           <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Curriculum Boards</span>
@@ -1293,7 +1293,7 @@ export const QBMDashboard: React.FC = () => {
               {/* Difficulty */}
               <div className="space-y-1.5">
                 <label className="block font-heading text-xs font-semibold text-ink">
-                  Difficulty (Locks Child Variants per AC-15) *
+                  Difficulty (Locks Child Variants) *
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['EASY', 'MEDIUM', 'HARD'] as const).map((diff) => (
@@ -1354,7 +1354,7 @@ export const QBMDashboard: React.FC = () => {
                 3
               </span>
               <h2 className="font-heading font-bold text-sm text-ink uppercase tracking-wider">
-                Question Content & Format (AC-16)
+                Question Content & Format
               </h2>
             </div>
 
@@ -1503,7 +1503,7 @@ export const QBMDashboard: React.FC = () => {
             </div>
           </section>
 
-          {/* ── STEP 4: Question Variants Architecture (AC-15, AC-16) ── */}
+          {/* ── STEP 4: Question Variants Architecture ── */}
           <section className="space-y-4">
             <div className="border-b border-border pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -1512,7 +1512,7 @@ export const QBMDashboard: React.FC = () => {
                 </span>
                 <div>
                   <h2 className="font-heading font-bold text-sm text-ink uppercase tracking-wider">
-                    Question Variants Architecture (AC-15, AC-16)
+                    Question Variants Architecture
                   </h2>
                   <p className="text-[11px] text-ink/60">
                     Difficulty is strictly locked to parent difficulty (<strong>{difficulty}</strong>) to prevent evaluation bias.
@@ -1830,7 +1830,7 @@ export const QBMDashboard: React.FC = () => {
                   Append Variant to Q#{quickVariantModalQuestion.id}
                 </h3>
                 <p className="text-xs text-forest font-semibold mt-0.5">
-                  Locked Difficulty: {quickVariantModalQuestion.difficulty} (AC-15 Strict Policy)
+                  Locked Difficulty: {quickVariantModalQuestion.difficulty}
                 </p>
               </div>
               <button

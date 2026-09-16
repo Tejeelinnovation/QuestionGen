@@ -214,13 +214,13 @@ class SelectQuestionsRequestSerializer(serializers.Serializer):
         min_value=1,
         required=False,
         allow_null=True,
-        help_text="Target total question count (AC-18).",
+        help_text="Target total question count.",
     )
     duration_minutes = serializers.IntegerField(
         min_value=1,
         required=False,
         allow_null=True,
-        help_text="Exam duration in minutes (AC-18).",
+        help_text="Exam duration in minutes.",
     )
     mark_distribution = serializers.ListField(
         child=serializers.DictField(),

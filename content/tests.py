@@ -90,7 +90,7 @@ class QuestionBankTests(APITestCase):
         )
 
     def test_qbm_can_ingest_global_question_with_variants(self):
-        """AC-10, AC-16: QBM can ingest a GLOBAL question with multiple variants."""
+        """QBM can ingest a GLOBAL question with multiple variants."""
         self.client.force_authenticate(user=self.qbm)
         payload = {
             "topic": self.topic.id,
@@ -132,11 +132,11 @@ class QuestionBankTests(APITestCase):
         self.assertEqual(q.variants.count(), 2)
 
         v1 = q.variants.first()
-        # AC-15: Variant difficulty must match parent question difficulty
+        # Variant difficulty must match parent question difficulty
         self.assertEqual(v1.difficulty, q.difficulty)
 
-    def test_variant_difficulty_strictly_enforced_ac15(self):
-        """AC-15: Variant difficulty cannot differ from parent difficulty."""
+    def test_variant_difficulty_strictly_enforced(self):
+        """Variant difficulty cannot differ from parent difficulty."""
         parent_q = Question.objects.create(
             topic=self.topic,
             question_text="Parent question",
@@ -163,9 +163,9 @@ class QuestionBankTests(APITestCase):
         with self.assertRaises(ValidationError):
             variant.save()
 
-    def test_multi_tenant_privacy_isolation_ac13_ac14_ac20(self):
+    def test_multi_tenant_privacy_isolation(self):
         """
-        AC-13, AC-14, AC-20: Questions belonging to School A are NEVER visible to School B.
+        Questions belonging to School A are NEVER visible to School B.
         Global questions are visible to all schools.
         """
         # 1. Global Question
@@ -203,7 +203,7 @@ class QuestionBankTests(APITestCase):
         self.assertIn(global_q.id, ids_seen_by_a)
         self.assertIn(school_a_q.id, ids_seen_by_a)
 
-        # Teacher B queries /api/questions/ -> Should see global_q, but NEVER school_a_q (AC-20)
+        # Teacher B queries /api/questions/ -> Should see global_q, but NEVER school_a_q
         self.client.force_authenticate(user=self.teacher_b)
         res_b = self.client.get("/api/questions/")
         self.assertEqual(res_b.status_code, status.HTTP_200_OK)
@@ -215,8 +215,8 @@ class QuestionBankTests(APITestCase):
         detail_res = self.client.get(f"/api/questions/{school_a_q.id}/")
         self.assertEqual(detail_res.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_teacher_question_bank_enabled_gating_ac11_ac12(self):
-        """AC-11, AC-12: Teacher can only ingest if school.question_bank_enabled is True."""
+    def test_teacher_question_bank_enabled_gating(self):
+        """Teacher can only ingest if school.question_bank_enabled is True."""
         # School A has question_bank_enabled = True -> Allowed
         self.client.force_authenticate(user=self.teacher_a)
         payload = {

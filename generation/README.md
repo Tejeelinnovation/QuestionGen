@@ -187,11 +187,11 @@ The returned payload directly deserializes into `QuestionDraft` objects and flow
 
 ---
 
-## Scope Exclusions (Explicitly Not in Immediate MVP)
+## Scope Exclusions
 
-Per the project specification:
-- **Multi-book ingestion pipelines**: Vector database indexing and PDF parsing are out of scope for this boundary stub.
-- **Live LLM API credentials & prompt engineering**: No external AI provider calls are made in this phase.
+Out of scope for this boundary stub:
+- **Multi-book ingestion pipelines**: Vector database indexing and document parsing are reserved for future work.
+- **Live LLM API credentials & prompt engineering**: No external AI provider calls are made in this baseline.
 - **Bloom taxonomy auto-classification**: Cognitive taxonomy tags remain extension slots in `QuestionDraft.metadata`.
 
-The current interface boundary satisfies all contract prerequisites for future AI integration without destabilizing the validated MVP workflow.
+The current interface boundary satisfies all contract prerequisites for future AI integration without destabilizing the validated workflow.

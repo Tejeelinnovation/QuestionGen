@@ -600,7 +600,7 @@ class PapersWorkflowTests(APITestCase):
         self.assertEqual(res_del_assigned.data[0]["id"], delivery.id)
 
     def test_multi_subject_paper_creation_and_blueprint_metadata(self):
-        """AC-17, AC-18: Verify paper creation with multiple subjects, duration, and question count."""
+        """Verify paper creation with multiple subjects, duration, and question count."""
         self.client.force_authenticate(user=self.teacher_1)
         payload = {
             "title": "Combined Science & Math Entrance Exam",
@@ -624,7 +624,7 @@ class PapersWorkflowTests(APITestCase):
         self.assertIsNone(res.data["chapter"])
 
     def test_multi_source_candidate_selection_includes_global_and_own_school(self):
-        """AC-19: Retrieval pools both QBM Global questions and teacher's own school questions."""
+        """Retrieval pools both QBM Global questions and teacher's own school questions."""
         # Create private question for School A
         q_school_a = Question.objects.create(
             topic=self.topic_1,
@@ -656,7 +656,7 @@ class PapersWorkflowTests(APITestCase):
         self.assertIn(q_school_a.id, returned_ids)
 
     def test_cross_organization_question_exclusion(self):
-        """AC-20: Questions belonging to School B are strictly EXCLUDED from School A's candidate pool."""
+        """Questions belonging to School B are strictly EXCLUDED from School A's candidate pool."""
         # Create private question for School B
         q_school_b = Question.objects.create(
             topic=self.topic_1,
@@ -685,7 +685,7 @@ class PapersWorkflowTests(APITestCase):
         self.assertNotIn(q_school_b.id, returned_ids)
 
     def test_print_representation_includes_duration_and_subjects(self):
-        """AC-18: Verify that print layout exposes duration_minutes and subjects."""
+        """Verify that print layout exposes duration_minutes and subjects."""
         paper = Paper.objects.create(
             title="Class 10 Mid-Term Exam",
             created_by=self.teacher_1,

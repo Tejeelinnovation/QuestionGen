@@ -392,12 +392,12 @@ class UnifiedSchoolAndAdminCreationTests(TestCase):
 
 class RoleModificationAndQuestionBankTests(TestCase):
     """
-    Test suite verifying the P0 role modifications and question bank configuration:
-    - Super Admin cannot directly create teachers (AC-21)
-    - School / Coaching Class Admin can create teachers within their own school (AC-22)
-    - Super Admin can configure question_bank_enabled on an organization (AC-11)
-    - Teacher cannot be granted GENERATE_SELECT_QUESTIONS if organization question_bank_enabled is False (AC-12)
-    - Teacher can be granted GENERATE_SELECT_QUESTIONS if organization question_bank_enabled is True (AC-12)
+    Test suite verifying role modifications and question bank configuration:
+    - Super Admin cannot directly create teachers
+    - School / Coaching Class Admin can create teachers within their own school
+    - Super Admin can configure question_bank_enabled on an organization
+    - Teacher cannot be granted GENERATE_SELECT_QUESTIONS if organization question_bank_enabled is False
+    - Teacher can be granted GENERATE_SELECT_QUESTIONS if organization question_bank_enabled is True
     """
 
     def setUp(self):

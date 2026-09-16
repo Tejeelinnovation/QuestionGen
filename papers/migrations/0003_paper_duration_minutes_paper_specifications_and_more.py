@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='paper',
             name='duration_minutes',
-            field=models.PositiveIntegerField(default=60, help_text='Exam duration in minutes (AC-18).'),
+            field=models.PositiveIntegerField(default=60, help_text='Exam duration in minutes.'),
         ),
         migrations.AddField(
             model_name='paper',
@@ -25,12 +25,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='paper',
             name='subjects',
-            field=models.JSONField(blank=True, default=list, help_text='List of subjects/books included in multi-subject papers (AC-17).'),
+            field=models.JSONField(blank=True, default=list, help_text='List of subjects/books included in multi-subject papers.'),
         ),
         migrations.AddField(
             model_name='paper',
             name='total_question_count',
-            field=models.PositiveIntegerField(default=0, help_text='Target total question count (AC-18).'),
+            field=models.PositiveIntegerField(default=0, help_text='Target total question count.'),
         ),
         migrations.AlterField(
             model_name='paper',

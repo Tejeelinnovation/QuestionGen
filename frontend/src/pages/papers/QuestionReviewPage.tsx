@@ -319,7 +319,7 @@ const QuestionReviewPageDesktop: React.FC = () => {
                     {q.difficulty_display || q.difficulty}
                   </span>
 
-                  {/* Bank Source Badge (AC-19) */}
+                  {/* Bank Source Badge */}
                   <span
                     className={`pill text-[10px] ${
                       q.bank_source === 'GLOBAL'

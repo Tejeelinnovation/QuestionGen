@@ -452,7 +452,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Super Admin cannot directly create teachers (AC-21)
+        # Super Admin cannot directly create teachers
         if profile == "teacher":
             if request.user.school_id is None or not request.user.has_capability(CapabilityName.CREATE_TEACHER):
                 return Response(
@@ -462,7 +462,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
-        # Only Super Admins can create QBM accounts (AC-10)
+        # Only Super Admins can create QBM accounts
         if profile == "qbm":
             if request.user.school_id is not None or not request.user.has_capability(CapabilityName.CREATE_SCHOOL):
                 return Response(
@@ -647,7 +647,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Question Bank capability gating (AC-11, AC-12):
+        # Question Bank capability gating:
         # Teacher cannot be granted GENERATE_SELECT_QUESTIONS if organization does not have it enabled.
         if cap_name == CapabilityName.GENERATE_SELECT_QUESTIONS and target_role == "Teacher":
             if not target_user.school or not getattr(target_user.school, "question_bank_enabled", False):

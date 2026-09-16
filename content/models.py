@@ -220,7 +220,7 @@ class Question(TimestampedModel):
         choices=BankSource.choices,
         default=BankSource.GLOBAL,
         db_index=True,
-        help_text="GLOBAL | ORGANIZATION | TEACHER (AC-13, AC-14)",
+        help_text="GLOBAL | ORGANIZATION | TEACHER",
     )
     school = models.ForeignKey(
         "schools.School",
@@ -228,7 +228,7 @@ class Question(TimestampedModel):
         null=True,
         blank=True,
         related_name="questions",
-        help_text="Organization owning this question. Null for GLOBAL bank questions (AC-14).",
+        help_text="Organization owning this question. Null for GLOBAL bank questions.",
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -305,7 +305,7 @@ class QuestionVariant(TimestampedModel):
     A variant of a parent question (e.g. 2-mark, 3-mark, 5-mark variation,
     or alternate format of the core concept).
 
-    Enforces AC-15: Variant difficulty must NEVER differ from parent question difficulty.
+    Variant difficulty must match parent question difficulty.
     """
 
     parent_question = models.ForeignKey(
@@ -323,12 +323,12 @@ class QuestionVariant(TimestampedModel):
     marks = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        help_text="Marks for this variant (e.g. 2.00, 3.00, 5.00) (AC-16).",
+        help_text="Marks for this variant (e.g. 2.00, 3.00, 5.00).",
     )
     difficulty = models.CharField(
         max_length=10,
         choices=Difficulty.choices,
-        help_text="Must match parent question difficulty (AC-15).",
+        help_text="Must match parent question difficulty.",
     )
     question_text = models.TextField(help_text="Full text of the variant question.")
     options = models.JSONField(
@@ -360,7 +360,7 @@ class QuestionVariant(TimestampedModel):
                     {
                         "difficulty": (
                             f"Variant difficulty '{self.difficulty}' must match parent question "
-                            f"difficulty '{parent_diff}'. (AC-15)"
+                            f"difficulty '{parent_diff}'."
                         )
                     }
                 )
@@ -374,7 +374,7 @@ class QuestionVariant(TimestampedModel):
                 from django.core.exceptions import ValidationError
 
                 raise ValidationError(
-                    f"Variant difficulty '{self.difficulty}' must match parent question difficulty '{parent_diff}'. (AC-15)"
+                    f"Variant difficulty '{self.difficulty}' must match parent question difficulty '{parent_diff}'."
                 )
         super().save(*args, **kwargs)
 

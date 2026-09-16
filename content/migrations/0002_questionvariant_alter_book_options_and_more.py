@@ -21,8 +21,8 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True, db_index=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('variant_type', models.CharField(choices=[('MCQ', 'Multiple Choice'), ('MSQ', 'Multiple Select'), ('ONE_WORD', 'One Word'), ('FILL_IN_THE_BLANKS', 'Fill in the Blanks'), ('MATCH_THE_FOLLOWING', 'Match the Following'), ('DIAGRAM_BASED', 'Diagram Based'), ('COMPREHENSION_BASED', 'Comprehension Based'), ('SHORT_ANSWER', 'Short Answer'), ('LONG_ANSWER', 'Long Answer')], db_index=True, help_text='MCQ | MSQ | ONE_WORD | FILL_IN_THE_BLANKS | MATCH_THE_FOLLOWING | DIAGRAM_BASED | COMPREHENSION_BASED | SHORT_ANSWER | LONG_ANSWER', max_length=30)),
-                ('marks', models.DecimalField(decimal_places=2, help_text='Marks for this variant (e.g. 2.00, 3.00, 5.00) (AC-16).', max_digits=5)),
-                ('difficulty', models.CharField(choices=[('EASY', 'Easy'), ('MEDIUM', 'Medium'), ('HARD', 'Hard')], help_text='Must match parent question difficulty (AC-15).', max_length=10)),
+                ('marks', models.DecimalField(decimal_places=2, help_text='Marks for this variant (e.g. 2.00, 3.00, 5.00).', max_digits=5)),
+                ('difficulty', models.CharField(choices=[('EASY', 'Easy'), ('MEDIUM', 'Medium'), ('HARD', 'Hard')], help_text='Must match parent question difficulty.', max_length=10)),
                 ('question_text', models.TextField(help_text='Full text of the variant question.')),
                 ('options', models.JSONField(blank=True, help_text='Options for choice-based questions (dict or list).', null=True)),
                 ('correct_answer', models.TextField(help_text='Answer or marking rubric for this variant.')),
@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='question',
             name='bank_source',
-            field=models.CharField(choices=[('GLOBAL', 'Global'), ('ORGANIZATION', 'Organization'), ('TEACHER', 'Teacher')], db_index=True, default='GLOBAL', help_text='GLOBAL | ORGANIZATION | TEACHER (AC-13, AC-14)', max_length=20),
+            field=models.CharField(choices=[('GLOBAL', 'Global'), ('ORGANIZATION', 'Organization'), ('TEACHER', 'Teacher')], db_index=True, default='GLOBAL', help_text='GLOBAL | ORGANIZATION | TEACHER', max_length=20),
         ),
         migrations.AddField(
             model_name='question',
@@ -65,7 +65,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='question',
             name='school',
-            field=models.ForeignKey(blank=True, help_text='Organization owning this question. Null for GLOBAL bank questions (AC-14).', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='questions', to='schools.school'),
+            field=models.ForeignKey(blank=True, help_text='Organization owning this question. Null for GLOBAL bank questions.', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='questions', to='schools.school'),
         ),
         migrations.AlterField(
             model_name='question',

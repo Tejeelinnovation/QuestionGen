@@ -411,14 +411,14 @@ frontend/src/
   - [x] Backend-Driven Attempt State: `DeliverySerializer` returns `my_attempt: { id, status, score, max_score }` for the authenticated student; `AttemptStartResumeView` returns `attempt_id` and `status` in the 400 response on already-submitted attempts for immediate frontend redirection.
   - [x] **Completes ALL P1 Frontend Work** (Auth shell, 4 role dashboards, complete Teacher paper-builder workflow through print/delivery, and Student test attempt sitting through results).
 
-- [x] **P2 (Part 1) — Hardening: Teacher Grading UI, Results Roster & §9 Acceptance Verification**
+- [x] **P2 (Part 1) — Hardening: Teacher Grading UI, Results Roster & Verification**
   - [x] `src/pages/attempts/ResultsRosterPage.tsx` (`/deliveries/:id/results`): Teacher delivery results roster view displaying delivery metadata, summary counter cards (Assigned, In Progress / Started, Submitted, Evaluated), and sortable attempts table with direct links to grade each student attempt.
   - [x] `src/pages/attempts/GradeAttemptPage.tsx` (`/attempts/:id/grade`): Teacher manual grading UI fetching attempt detail (`GET /api/attempts/{id}/result/`), per-question input for `marks_awarded` bounded 0 to max_marks, correctness toggle, inline editing for previously graded responses, real-time score accumulation, and auto-transition to `EVALUATED` once descriptive answers are graded (`POST /api/attempts/{id}/answers/{question_id}/grade/`).
   - [x] Routing & Guards: `/deliveries/:id/results` and `/attempts/:id/grade` registered in `routes.tsx` guarded by `anyOf={['ASSIGN_TEST', 'CREATE_PAPER']}` via updated `RequireCapability` component.
   - [x] Navigation links added in `DeliveryPage.tsx` and `TeacherDashboard.tsx` linking directly to results roster.
   - [x] Environment Seed & Reset: Consolidated "Full Demo Environment Reset" section added to `README.md` and new Django management command `python manage.py seed_demo_users` created to populate all 4 user roles with their capability sets.
   - [x] Error state audit & Double-submit protection: Verified every page displays informative red error banners when network/API calls fail, and all teacher/student forms disable submit buttons while requests are in flight.
-  - [x] Full §9 Acceptance Checklist Pass executed and verified.
+  - [x] Full verification pass executed and confirmed.
 
 - [x] **P2 (Part 2) — Generation Service Boundary (Interface Stub)**
   - [x] `generation/interfaces.py`: `QuestionDraft` dataclass (shape parity with `content.Question`, JSON serializable `to_dict()`, constructed via `from_question()`) and `QuestionGenerationService` abstract base class defining `generate_questions(chapter, constraints)`.
@@ -431,7 +431,7 @@ frontend/src/
 
 ---
 
-## Acceptance Checklist Verification Report (Doc 2 §9)
+## Verification Report
 
 | Checklist Item | Status | Verification Evidence & Notes |
 |----------------|--------|-------------------------------|

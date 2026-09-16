@@ -186,7 +186,7 @@ const PaperSetupPageDesktop: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Exam Mode Toggle: Single vs Multi-Subject (AC-17) */}
+                {/* Exam Mode Toggle: Single vs Multi-Subject */}
                 <div>
                   <label className="block font-heading text-xs font-semibold text-ink uppercase tracking-wider mb-2">
                     Blueprint Scope Mode *

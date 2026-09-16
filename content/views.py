@@ -229,7 +229,7 @@ class QuestionListView(ListAPIView):
     """
     GET /api/questions/?topic_id=&difficulty=&question_type=&learner_level=&marks=
 
-    Multi-Tenant Privacy Isolation (AC-13, AC-14, AC-20):
+    Multi-Tenant Privacy Isolation:
     - Super Admin: sees all questions.
     - QBM: sees GLOBAL questions.
     - School users: see GLOBAL questions + their own school's private questions.
@@ -254,7 +254,7 @@ class QuestionListView(ListAPIView):
             # Super Admin
             pass
         elif user.school_id is not None:
-            # School user sees GLOBAL questions + their own school's questions (AC-13, AC-14)
+            # School user sees GLOBAL questions + their own school's questions
             qs = qs.filter(Q(bank_source="GLOBAL") | Q(school_id=user.school_id))
         else:
             # QBM or standalone user sees GLOBAL questions only
@@ -296,7 +296,7 @@ class QuestionIngestView(APIView):
     """
     POST /api/questions/ingest/
 
-    Structured Question Ingestion workflow (AC-10, AC-13, AC-14, AC-15, AC-16).
+    Structured Question Ingestion workflow.
     - QBM: creates GLOBAL questions. Gated by INGEST_GLOBAL_QUESTIONS capability.
     - Super Admin: creates GLOBAL questions.
     - Teacher: creates ORGANIZATION / TEACHER questions if school has question_bank_enabled.
@@ -365,7 +365,7 @@ class QuestionVariantCreateView(APIView):
     POST /api/questions/<id>/variants/
 
     Add a variant to an existing question.
-    Enforces AC-15: Variant difficulty automatically syncs to parent question difficulty.
+    Variant difficulty automatically syncs to parent question difficulty.
     """
 
     permission_classes = [IsAuthenticated]
@@ -390,7 +390,7 @@ class QuestionVariantCreateView(APIView):
 
         data = request.data.copy()
         data["parent_question"] = question.id
-        data["difficulty"] = question.difficulty  # AC-15 strict sync
+        data["difficulty"] = question.difficulty  # Strict sync with parent difficulty
 
         serializer = QuestionVariantSerializer(data=data)
         serializer.is_valid(raise_exception=True)
