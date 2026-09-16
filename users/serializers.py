@@ -176,7 +176,7 @@ class CreateUserSerializer(serializers.ModelSerializer):
     )
     password = serializers.CharField(write_only=True, style={"input_type": "password"})
     profile = serializers.ChoiceField(
-        choices=["school_admin", "teacher", "student", "qbm"],
+        choices=["school_admin", "teacher", "student", "qbm", "deo", "validator", "deo_validator"],
         write_only=True,
         help_text=(
             "Desired capability profile for the new user. "
@@ -222,11 +222,18 @@ class CreateUserSerializer(serializers.ModelSerializer):
         profile = attrs.get("profile")
         school = attrs.get("school")
 
-        # School Admins, Teachers, Students MUST belong to a school.
-        if profile in ("school_admin", "teacher", "student") and not school:
+        # School Admins, Teachers, Students, DEOs, and Validators MUST belong to a school.
+        if profile in ("school_admin", "teacher", "student", "deo", "validator", "deo_validator") and not school:
             raise serializers.ValidationError(
                 {"school": "A school must be specified for this user type."}
             )
+
+        # Enforce validation workflow enabled on school for DEO/Validator profiles
+        if profile in ("deo", "validator", "deo_validator") and school:
+            if not getattr(school, "validation_workflow_enabled", False):
+                raise serializers.ValidationError(
+                    {"school": f"The validation workflow is not enabled for {school.name}. Contact Super Admin to enable it."}
+                )
 
         # Capacity Quota Enforcement
         if school and profile == "teacher":
@@ -284,6 +291,9 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "teacher": "Teacher",
             "student": "Student",
             "qbm": "Question Bank Manager",
+            "deo": "Data Entry Operator",
+            "validator": "Validator",
+            "deo_validator": "DEO & Validator",
         }
         user = User(role=role_map.get(profile, profile), **validated_data)
         user.set_password(password)
@@ -291,10 +301,13 @@ class CreateUserSerializer(serializers.ModelSerializer):
 
         # Grant default capabilities based on requested profile.
         from users.capability_defaults import (  # noqa: PLC0415
+            grant_deo_and_validator_defaults,
+            grant_deo_defaults,
             grant_qbm_defaults,
             grant_school_admin_defaults,
             grant_student_defaults,
             grant_teacher_defaults,
+            grant_validator_defaults,
         )
 
         granted_by = self.context.get("request").user if self.context.get("request") else None
@@ -303,6 +316,9 @@ class CreateUserSerializer(serializers.ModelSerializer):
             "teacher": grant_teacher_defaults,
             "student": grant_student_defaults,
             "qbm": grant_qbm_defaults,
+            "deo": grant_deo_defaults,
+            "validator": grant_validator_defaults,
+            "deo_validator": grant_deo_and_validator_defaults,
         }
         dispatch[profile](user, granted_by=granted_by)
 

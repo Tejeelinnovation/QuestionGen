@@ -179,7 +179,12 @@ class QuestionListSerializer(serializers.ModelSerializer):
     bank_source_display = serializers.CharField(
         source="get_bank_source_display", read_only=True
     )
+    validation_status_display = serializers.CharField(
+        source="get_validation_status_display", read_only=True
+    )
     variants_count = serializers.SerializerMethodField()
+    topics = serializers.SerializerMethodField()
+    latest_comment = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
@@ -187,6 +192,7 @@ class QuestionListSerializer(serializers.ModelSerializer):
             "id",
             "topic",
             "topic_name",
+            "topics",
             "chapter_title",
             "book_title",
             "book_board",
@@ -200,17 +206,28 @@ class QuestionListSerializer(serializers.ModelSerializer):
             "learner_level_display",
             "bank_source",
             "bank_source_display",
+            "validation_status",
+            "validation_status_display",
+            "revision",
             "school",
             "created_by",
             "variants_count",
             "source_reference",
             "is_active",
+            "latest_comment",
             "created_at",
             "updated_at",
         ]
 
     def get_variants_count(self, obj) -> int:
         return obj.variants.count()
+
+    def get_topics(self, obj):
+        return [{"id": t.id, "name": t.name} for t in obj.topics.all()]
+
+    def get_latest_comment(self, obj) -> str:
+        last_item = obj.validation_history.filter(comment__gt="").order_by("-created_at").first()
+        return last_item.comment if last_item else ""
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +237,6 @@ class QuestionListSerializer(serializers.ModelSerializer):
 class QuestionDetailSerializer(QuestionListSerializer):
     """
     Full representation including options, correct_answer, explanation, and variants.
-
-    Used for teacher-facing detail views. Do NOT use this serializer
-    on student-facing endpoints during an active test attempt.
     """
 
     variants = QuestionVariantSerializer(many=True, read_only=True)
@@ -234,6 +248,73 @@ class QuestionDetailSerializer(QuestionListSerializer):
             "explanation",
             "variants",
         ]
+
+
+# ---------------------------------------------------------------------------
+# Validation Serializers (Task 8)
+# ---------------------------------------------------------------------------
+
+class QuestionValidationHistorySerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True, default="System")
+    actor_role = serializers.CharField(source="actor.role_label", read_only=True, default="System")
+    action_display = serializers.CharField(source="get_action_display", read_only=True)
+
+    class Meta:
+        from .models import QuestionValidationHistory
+        model = QuestionValidationHistory
+        fields = [
+            "id",
+            "question",
+            "actor",
+            "actor_username",
+            "actor_role",
+            "action",
+            "action_display",
+            "comment",
+            "changed_fields",
+            "revision",
+            "created_at",
+        ]
+
+
+class QuestionValidationActionSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["APPROVE", "SEND_FOR_CORRECTION", "REJECT"])
+    comment = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        action = attrs["action"]
+        comment = attrs.get("comment", "").strip()
+        if action in ("SEND_FOR_CORRECTION", "REJECT") and not comment:
+            raise serializers.ValidationError(
+                {"comment": f"A comment explaining the reason is mandatory when performing '{action}'."}
+            )
+        attrs["comment"] = comment
+        return attrs
+
+
+class VariantMarkUpdateSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    marks = serializers.DecimalField(max_digits=5, decimal_places=2)
+
+
+class ValidatorMetadataSerializer(serializers.Serializer):
+    topic_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False
+    )
+    difficulty = serializers.ChoiceField(choices=Difficulty.choices, required=False)
+    marks = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
+    variant_marks = VariantMarkUpdateSerializer(many=True, required=False)
+
+
+class QuestionResubmitSerializer(serializers.Serializer):
+    question_text = serializers.CharField(required=False)
+    options = serializers.JSONField(required=False, allow_null=True)
+    correct_answer = serializers.CharField(required=False)
+    explanation = serializers.CharField(required=False, allow_blank=True)
+    topic_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False
+    )
+    comment = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +340,9 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
     topic = serializers.PrimaryKeyRelatedField(
         queryset=Topic.objects.all(), required=False, allow_null=True
     )
+    topic_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False, write_only=True
+    )
     book_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     chapter_id = serializers.IntegerField(required=False, allow_null=True, write_only=True)
     board = serializers.CharField(required=False, allow_blank=True, write_only=True)
@@ -280,14 +364,7 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "topic",
-            "book_id",
-            "chapter_id",
-            "board",
-            "book_title",
-            "subject",
-            "grade",
-            "chapter_title",
-            "topic_name",
+            "topic_ids",
             "question_text",
             "question_type",
             "marks",
@@ -299,12 +376,20 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
             "correct_answer",
             "explanation",
             "source_reference",
+            "book_id",
+            "chapter_id",
+            "board",
+            "book_title",
+            "subject",
+            "grade",
+            "chapter_title",
+            "topic_name",
             "variants",
         ]
         read_only_fields = ["id", "created_by"]
 
     def validate(self, attrs):
-        if not attrs.get("topic") and not attrs.get("topic_name"):
+        if not attrs.get("topic") and not attrs.get("topic_name") and not attrs.get("topic_ids"):
             raise serializers.ValidationError(
                 {"topic": "Either a valid topic ID or a custom topic_name must be provided."}
             )
@@ -312,6 +397,7 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         variants_data = validated_data.pop("variants", [])
+        topic_ids = validated_data.pop("topic_ids", None)
         book_id = validated_data.pop("book_id", None)
         chapter_id = validated_data.pop("chapter_id", None)
         board = validated_data.pop("board", None) or "CBSE"
@@ -322,59 +408,62 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
         topic_name = validated_data.pop("topic_name", None)
 
         if not validated_data.get("topic"):
-            clean_topic = (topic_name or "General Topic").strip()
-            clean_chapter = (chapter_title or "Chapter 1").strip()
-            clean_subject = (subject or "General").strip()
-            clean_grade = (grade or "Standard").strip()
-            clean_book = (book_title or f"{clean_subject} ({clean_grade})").strip()
-
-            # Case 1: Existing chapter ID provided -> add new topic under this chapter
-            if chapter_id:
-                try:
-                    chapter = Chapter.objects.get(id=chapter_id)
-                except Chapter.DoesNotExist:
-                    raise serializers.ValidationError({"chapter_id": f"Chapter with id {chapter_id} does not exist."})
-                topic, _ = Topic.objects.get_or_create(
-                    chapter=chapter,
-                    name=clean_topic,
-                )
-                validated_data["topic"] = topic
-
-            # Case 2: Existing book ID provided -> add new chapter and topic under this book
-            elif book_id:
-                try:
-                    book = Book.objects.get(id=book_id)
-                except Book.DoesNotExist:
-                    raise serializers.ValidationError({"book_id": f"Book with id {book_id} does not exist."})
-                chapter, _ = Chapter.objects.get_or_create(
-                    book=book,
-                    title=clean_chapter,
-                    defaults={"chapter_order": book.chapters.count() + 1},
-                )
-                topic, _ = Topic.objects.get_or_create(
-                    chapter=chapter,
-                    name=clean_topic,
-                )
-                validated_data["topic"] = topic
-
-            # Case 3: Complete custom hierarchy (board, book, chapter, topic)
+            if topic_ids:
+                validated_data["topic"] = Topic.objects.get(id=topic_ids[0])
             else:
-                book, _ = Book.objects.get_or_create(
-                    board=board.strip(),
-                    title=clean_book,
-                    subject=clean_subject,
-                    grade=clean_grade,
-                )
-                chapter, _ = Chapter.objects.get_or_create(
-                    book=book,
-                    title=clean_chapter,
-                    defaults={"chapter_order": book.chapters.count() + 1},
-                )
-                topic, _ = Topic.objects.get_or_create(
-                    chapter=chapter,
-                    name=clean_topic,
-                )
-                validated_data["topic"] = topic
+                clean_topic = (topic_name or "General Topic").strip()
+                clean_chapter = (chapter_title or "Chapter 1").strip()
+                clean_subject = (subject or "General").strip()
+                clean_grade = (grade or "Standard").strip()
+                clean_book = (book_title or f"{clean_subject} ({clean_grade})").strip()
+
+                # Case 1: Existing chapter ID provided -> add new topic under this chapter
+                if chapter_id:
+                    try:
+                        chapter = Chapter.objects.get(id=chapter_id)
+                    except Chapter.DoesNotExist:
+                        raise serializers.ValidationError({"chapter_id": f"Chapter with id {chapter_id} does not exist."})
+                    topic, _ = Topic.objects.get_or_create(
+                        chapter=chapter,
+                        name=clean_topic,
+                    )
+                    validated_data["topic"] = topic
+
+                # Case 2: Existing book ID provided -> add new chapter and topic under this book
+                elif book_id:
+                    try:
+                        book = Book.objects.get(id=book_id)
+                    except Book.DoesNotExist:
+                        raise serializers.ValidationError({"book_id": f"Book with id {book_id} does not exist."})
+                    chapter, _ = Chapter.objects.get_or_create(
+                        book=book,
+                        title=clean_chapter,
+                        defaults={"chapter_order": book.chapters.count() + 1},
+                    )
+                    topic, _ = Topic.objects.get_or_create(
+                        chapter=chapter,
+                        name=clean_topic,
+                    )
+                    validated_data["topic"] = topic
+
+                # Case 3: Complete custom hierarchy (board, book, chapter, topic)
+                else:
+                    book, _ = Book.objects.get_or_create(
+                        board=board.strip(),
+                        title=clean_book,
+                        subject=clean_subject,
+                        grade=clean_grade,
+                    )
+                    chapter, _ = Chapter.objects.get_or_create(
+                        book=book,
+                        title=clean_chapter,
+                        defaults={"chapter_order": book.chapters.count() + 1},
+                    )
+                    topic, _ = Topic.objects.get_or_create(
+                        chapter=chapter,
+                        name=clean_topic,
+                    )
+                    validated_data["topic"] = topic
 
         request = self.context.get("request")
         user = request.user if request else None
@@ -382,7 +471,44 @@ class QuestionIngestSerializer(serializers.ModelSerializer):
         if user and user.is_authenticated:
             validated_data["created_by"] = user
 
+        # Determine validation status:
+        # If school has validation_workflow_enabled=True and user is not global admin/QBM:
+        school = validated_data.get("school")
+        validation_enabled = False
+        if school:
+            validation_enabled = getattr(school, "validation_workflow_enabled", False)
+
+        is_qbm_or_super = user and (
+            user.is_superuser
+            or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+            or user.has_capability("INGEST_GLOBAL_QUESTIONS")
+        )
+        if validation_enabled and not is_qbm_or_super:
+            validated_data["validation_status"] = "SUBMITTED"
+        else:
+            validated_data["validation_status"] = "APPROVED"
+
         question = Question.objects.create(**validated_data)
+
+        # Associate multiple topics
+        if topic_ids:
+            question.topics.set(topic_ids)
+            if not question.topic_id and topic_ids:
+                question.topic_id = topic_ids[0]
+                question.save(update_fields=["topic"])
+        elif question.topic_id:
+            question.topics.add(question.topic_id)
+
+        # Log initial validation history record
+        from .models import QuestionValidationHistory
+        initial_action = "SUBMIT" if question.validation_status == "SUBMITTED" else "APPROVE"
+        QuestionValidationHistory.objects.create(
+            question=question,
+            actor=user,
+            action=initial_action,
+            comment="Initial question entry",
+            revision=1,
+        )
 
         for vdata in variants_data:
             QuestionVariant.objects.create(

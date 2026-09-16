@@ -371,6 +371,16 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                     Q(role__in=["Student", "student"])
                     | Q(user_capabilities__capability__name=CapabilityName.ATTEMPT_TEST)
                 )
+            elif role_norm in ("deo", "data entry operator"):
+                queryset = queryset.filter(
+                    Q(role__in=["Data Entry Operator", "DEO & Validator", "deo"])
+                    | Q(user_capabilities__capability__name=CapabilityName.DATA_ENTRY_OPERATOR)
+                )
+            elif role_norm in ("validator",):
+                queryset = queryset.filter(
+                    Q(role__in=["Validator", "DEO & Validator", "validator"])
+                    | Q(user_capabilities__capability__name=CapabilityName.VALIDATOR)
+                )
 
         search = request.query_params.get("search")
         if search and search.strip():
@@ -409,6 +419,8 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
             "teacher": sum(1 for u in users if u.role_label == "Teacher"),
             "student": sum(1 for u in users if u.role_label == "Student"),
             "qbm": sum(1 for u in users if u.role_label == "Question Bank Manager"),
+            "deo": sum(1 for u in users if u.role_label in ("Data Entry Operator", "DEO & Validator")),
+            "validator": sum(1 for u in users if u.role_label in ("Validator", "DEO & Validator")),
         }
         return Response(counts)
 
@@ -422,6 +434,9 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         "teacher": CapabilityName.CREATE_TEACHER,
         "student": CapabilityName.CREATE_STUDENT,
         "qbm": CapabilityName.CREATE_SCHOOL,
+        "deo": CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS,
+        "validator": CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS,
+        "deo_validator": CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS,
     }
 
     def create(self, request):
@@ -471,7 +486,10 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                 )
 
         # Capability gate — enforced server-side regardless of UI.
-        if not request.user.has_capability(required_cap):
+        is_super = request.user.is_superuser or (
+            request.user.school_id is None and request.user.has_capability(CapabilityName.CREATE_SCHOOL)
+        )
+        if not is_super and not request.user.has_capability(required_cap):
             return Response(
                 {"detail": f"You do not have the '{required_cap}' capability required to create this user type."},
                 status=status.HTTP_403_FORBIDDEN,

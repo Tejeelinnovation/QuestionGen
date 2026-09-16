@@ -138,8 +138,12 @@ All demo accounts share the password: `password123`
 | **Super Admin** | `superadmin` | `password123` | *None (Global)* | All 10 capabilities (`CREATE_SCHOOL`, `CREATE_SCHOOL_ADMIN`, etc.) | `/dashboard/super-admin` |
 | **School Admin** | `schooladmin1` | `password123` | Greenwood High (`1`) | `CREATE_TEACHER`, `CREATE_STUDENT`, `VIEW_SCHOOL_WIDE_CONTROLS` | `/dashboard/school-admin` |
 | **Teacher** | `teacher1` | `password123` | Greenwood High (`1`) | `CREATE_PAPER`, `ASSIGN_TEST`, `GENERATE_SELECT_QUESTIONS`, `CREATE_STUDENT` | `/dashboard/teacher` |
+| **Data Entry Operator (DEO)** | `deo1` | `password123` | Greenwood High (`1`) | `DATA_ENTRY_OPERATOR`, `QUESTION_BANK_MANAGEMENT` | `/qbm/my-submissions` |
+| **Validator** | `validator1` | `password123` | Greenwood High (`1`) | `VALIDATOR`, `QUESTION_BANK_MANAGEMENT` | `/qbm/validation-queue` |
+| **Dual Role (DEO + Validator)** | `dualuser1` | `password123` | Greenwood High (`1`) | `DATA_ENTRY_OPERATOR`, `VALIDATOR`, `QUESTION_BANK_MANAGEMENT` | `/qbm/my-submissions` / `/qbm/validation-queue` |
 | **Student** | `student1` | `password123` | Greenwood High (`1`) | `ATTEMPT_TEST`, `VIEW_OWN_RESULT` | `/dashboard/student` |
 | **Student (Alt)** | `student2` | `password123` | Greenwood High (`1`) | `ATTEMPT_TEST`, `VIEW_OWN_RESULT` | `/dashboard/student` |
+| **Direct Mode B Teacher** | `teacher_direct` | `password123` | Oakridge Academy (`2` - Validation Disabled) | `CREATE_PAPER`, `ASSIGN_TEST`, `GENERATE_SELECT_QUESTIONS` | `/dashboard/teacher` |
 
 ---
 
@@ -619,3 +623,97 @@ curl -X POST http://127.0.0.1:8000/api/attempts/1/answers/102/grade/ \
   }'
 ```
 Awards marks, updates question correctness, recalculates attempt total score, and transitions attempt status to `EVALUATED` once all questions are graded.
+
+---
+
+## Task 8 — QBM -> DEO -> Validator -> Approved Question Bank Workflow
+
+### Seeding Task 8 Demo Data
+
+To seed the Task 8 demo environment:
+```bash
+python manage.py seed_task8_demo
+```
+This sets up:
+- **Mode A (Validation Enabled)**: Greenwood High (`validation_workflow_enabled = True`)
+  - `deo1`: Enters questions, maps multiple topics, edits and resubmits flagged questions.
+  - `validator1`: Reviews queue, edits metadata (topics, difficulty with variant cascade, marks), sends questions for correction with mandatory comments, or approves questions into the Approved Question Bank.
+  - `dualuser1`: Holds both DEO and Validator capabilities simultaneously.
+- **Mode B (Validation Disabled)**: Oakridge Academy (`validation_workflow_enabled = False`)
+  - `teacher_direct`: Direct paper generation without requiring validation stages.
+
+### Workflow API Endpoints
+
+#### 1. Ingest Question with Multiple Topics (DEO)
+```bash
+curl -X POST http://127.0.0.1:8000/api/questions/ingest/ \
+  -H "Authorization: Bearer <deo_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question_text": "What is the unit of electric current?",
+    "question_type": "MCQ",
+    "difficulty": "EASY",
+    "marks": 1,
+    "topic_ids": [1, 2],
+    "options": {"A": "Ampere", "B": "Volt", "C": "Ohm", "D": "Watt"},
+    "correct_answer": "A",
+    "submit": true
+  }'
+```
+
+#### 2. Validator Review Queue
+```bash
+curl "http://127.0.0.1:8000/api/questions/validation-queue/?status=SUBMITTED" \
+  -H "Authorization: Bearer <validator_token>"
+```
+
+#### 3. Validator Metadata Modification (Permitted Fields Only)
+```bash
+curl -X PATCH http://127.0.0.1:8000/api/questions/101/validator-metadata/ \
+  -H "Authorization: Bearer <validator_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "difficulty": "MEDIUM",
+    "topic_ids": [1, 3],
+    "marks": 2
+  }'
+```
+*Note: Modifying question content directly (`question_text`, `options`, `correct_answer`) via `/api/questions/<id>/` is strictly prohibited for validators and returns HTTP 403 Forbidden.*
+
+#### 4. Validator Action (Approve / Send for Correction / Reject)
+```bash
+# Approve
+curl -X POST http://127.0.0.1:8000/api/questions/101/validate/ \
+  -H "Authorization: Bearer <validator_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "APPROVE"}'
+
+# Send for correction (Comment mandatory >= 5 chars)
+curl -X POST http://127.0.0.1:8000/api/questions/101/validate/ \
+  -H "Authorization: Bearer <validator_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "SEND_FOR_CORRECTION",
+    "comment": "Please provide clearer distractors for Option C and D."
+  }'
+```
+
+#### 5. DEO Edit & Resubmit
+```bash
+curl -X POST http://127.0.0.1:8000/api/questions/101/resubmit/ \
+  -H "Authorization: Bearer <deo_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question_text": "What is the SI unit of electric current?",
+    "topic_ids": [1],
+    "options": {"A": "Ampere", "B": "Volt", "C": "Coulomb", "D": "Joule"},
+    "correct_answer": "A"
+  }'
+```
+
+#### 6. View Validation Audit History
+```bash
+curl http://127.0.0.1:8000/api/questions/101/validation-history/ \
+  -H "Authorization: Bearer <token>"
+```
+

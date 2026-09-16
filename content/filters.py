@@ -51,9 +51,19 @@ def filter_questions(queryset: "QuerySet", params: dict) -> "QuerySet":
     -------
     Filtered QuerySet (unevaluated).
     """
-    topic_id = params.get("topic_id")
-    if topic_id:
-        queryset = queryset.filter(topic_id=topic_id)
+    topic_ids = params.get("topic_ids")
+    if topic_ids:
+        if isinstance(topic_ids, str):
+            topic_ids = [int(tid.strip()) for tid in topic_ids.split(",") if tid.strip().isdigit()]
+        if isinstance(topic_ids, (list, tuple, set)):
+            queryset = queryset.filter(Q(topics__id__in=topic_ids) | Q(topic_id__in=topic_ids)).distinct()
+    elif params.get("topic_id"):
+        t_id = params.get("topic_id")
+        queryset = queryset.filter(Q(topics__id=t_id) | Q(topic_id=t_id)).distinct()
+
+    validation_status = params.get("validation_status")
+    if validation_status and validation_status.upper() != "ALL":
+        queryset = queryset.filter(validation_status=validation_status.upper())
 
     board = params.get("board")
     if board and board.upper() != "ALL":

@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { contentApi, type IngestQuestionPayload, type QuestionStats } from '../../api/content';
 import type { Book, Chapter, Question, Topic } from '../../types';
+import { useAuth } from '../../auth/AuthContext';
+import { DEOSubmissionsView } from '../../components/qbm/DEOSubmissionsView';
+import { ValidatorQueueView } from '../../components/qbm/ValidatorQueueView';
+import { ValidationStatusBadge } from '../../components/qbm/ValidationStatusBadge';
 import {
   Database,
   Plus,
@@ -13,14 +17,32 @@ import {
   Trash2,
   X,
   FileQuestion,
+  Inbox,
 } from 'lucide-react';
 import { SearchableSubjectSelect } from '../../components/ui/searchable-subject-select';
 import { Pagination } from '../../components/ui/pagination';
 
-export const QBMDashboard: React.FC = () => {
+export interface QBMDashboardProps {
+  initialTab?: 'explore' | 'ingest' | 'submissions' | 'validation';
+}
 
-  // Active view tab: 'explore' or 'ingest'
-  const [activeTab, setActiveTab] = useState<'explore' | 'ingest'>('explore');
+export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
+  const { hasCapability } = useAuth();
+  const isDEO = hasCapability('DATA_ENTRY_OPERATOR');
+  const isValidator = hasCapability('VALIDATOR');
+  const isQBM = hasCapability('INGEST_GLOBAL_QUESTIONS') || hasCapability('CREATE_SCHOOL');
+
+  const defaultTab = initialTab
+    ? initialTab
+    : isValidator && !isDEO && !isQBM
+    ? 'validation'
+    : isDEO && !isValidator && !isQBM
+    ? 'submissions'
+    : 'explore';
+
+  // Active view tab: 'explore', 'ingest', 'submissions', or 'validation'
+  const [activeTab, setActiveTab] = useState<'explore' | 'ingest' | 'submissions' | 'validation'>(defaultTab);
+  const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([]);
 
   // Question bank explorer state (Server-Side Paginated & Filtered)
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -184,6 +206,7 @@ export const QBMDashboard: React.FC = () => {
     if (isNewChapter || selectedChapterId === 'NEW' || !selectedChapterId) {
       setTopics([]);
       setSelectedTopicId('NEW');
+      setSelectedTopicIds([]);
       setIsNewTopic(true);
       return;
     }
@@ -193,15 +216,18 @@ export const QBMDashboard: React.FC = () => {
         setTopics(topList);
         if (topList.length > 0) {
           setSelectedTopicId(topList[0].id);
+          setSelectedTopicIds([topList[0].id]);
           setIsNewTopic(false);
         } else {
           setSelectedTopicId('NEW');
+          setSelectedTopicIds([]);
           setIsNewTopic(true);
         }
       })
       .catch(() => {
         setTopics([]);
         setSelectedTopicId('NEW');
+        setSelectedTopicIds([]);
         setIsNewTopic(true);
       });
   }, [selectedChapterId, isNewChapter]);
@@ -401,7 +427,8 @@ export const QBMDashboard: React.FC = () => {
       marks,
       difficulty,
       learner_level: learnerLevel,
-      bank_source: 'GLOBAL',
+      bank_source: isDEO ? 'ORGANIZATION' : 'GLOBAL',
+      submit: true,
       options: formattedOptions,
       correct_answer: correctAnswer.trim(),
       explanation: explanation.trim(),
@@ -419,9 +446,10 @@ export const QBMDashboard: React.FC = () => {
 
     if (!isNewBook && selectedBookId && selectedBookId !== 'NEW') {
       if (!isNewChapter && selectedChapterId && selectedChapterId !== 'NEW') {
-        if (!isNewTopic && selectedTopicId && selectedTopicId !== 'NEW') {
+        if (!isNewTopic && (selectedTopicId || selectedTopicIds.length > 0) && selectedTopicId !== 'NEW') {
           // 1. All existing
-          payload.topic = Number(selectedTopicId);
+          payload.topic = selectedTopicIds.length > 0 ? selectedTopicIds[0] : Number(selectedTopicId);
+          payload.topic_ids = selectedTopicIds.length > 0 ? selectedTopicIds : [Number(selectedTopicId)];
         } else {
           // 2. Existing Book & Chapter, but new Topic
           payload.topic = null;
@@ -594,31 +622,66 @@ export const QBMDashboard: React.FC = () => {
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-surface-muted border border-border rounded-pill self-start md:self-auto">
-          <button
-            type="button"
-            onClick={() => setActiveTab('explore')}
-            className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'explore'
-                ? 'bg-forest text-white shadow-xs'
-                : 'text-ink/70 hover:text-ink'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>Question Explorer ({stats?.total_questions ?? totalCount})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('ingest')}
-            className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'ingest'
-                ? 'bg-forest text-white shadow-xs'
-                : 'text-ink/70 hover:text-ink'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Ingest Question + Variants</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-surface-muted border border-border rounded-pill self-start md:self-auto">
+          {(isQBM || (!isDEO && !isValidator)) && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('explore')}
+              className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
+                activeTab === 'explore'
+                  ? 'bg-forest text-white shadow-xs'
+                  : 'text-ink/70 hover:text-ink'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Question Explorer ({stats?.total_questions ?? totalCount})</span>
+            </button>
+          )}
+
+          {(isQBM || isDEO || (!isDEO && !isValidator)) && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('ingest')}
+              className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
+                activeTab === 'ingest'
+                  ? 'bg-forest text-white shadow-xs'
+                  : 'text-ink/70 hover:text-ink'
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{isDEO ? 'Enter Question' : 'Ingest Question + Variants'}</span>
+            </button>
+          )}
+
+          {(isDEO || isQBM) && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('submissions')}
+              className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
+                activeTab === 'submissions'
+                  ? 'bg-forest text-white shadow-xs'
+                  : 'text-ink/70 hover:text-ink'
+              }`}
+            >
+              <FileQuestion className="w-3.5 h-3.5" />
+              <span>My Submissions</span>
+            </button>
+          )}
+
+          {(isValidator || isQBM) && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('validation')}
+              className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
+                activeTab === 'validation'
+                  ? 'bg-forest text-white shadow-xs'
+                  : 'text-ink/70 hover:text-ink'
+              }`}
+            >
+              <Inbox className="w-3.5 h-3.5" />
+              <span>Review Queue</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -769,6 +832,7 @@ export const QBMDashboard: React.FC = () => {
                       {/* Tags row */}
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5">
+                          <ValidationStatusBadge status={q.validation_status} revision={q.revision} />
                           <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-pill bg-forest/10 text-forest border border-forest/20">
                             {q.question_type_display || q.question_type}
                           </span>
@@ -1231,30 +1295,76 @@ export const QBMDashboard: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="mt-2.5">
+                  <div className="mt-2.5 space-y-2">
                     {!isNewTopic && topics.length > 0 ? (
-                      <select
-                        value={selectedTopicId}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '__NEW__') {
-                            setIsNewTopic(true);
-                            setSelectedTopicId('NEW');
-                          } else {
-                            setSelectedTopicId(Number(val));
-                          }
-                        }}
-                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                      >
-                        {topics.map((tp) => (
-                          <option key={tp.id} value={tp.id}>
-                            {tp.name}
+                      <>
+                        {/* Selected Topic Pills */}
+                        <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 bg-bg rounded-card border border-border">
+                          {selectedTopicIds.length === 0 && (
+                            <span className="text-[11px] text-ink/40 font-mono">No topics selected.</span>
+                          )}
+                          {selectedTopicIds.map((tId) => {
+                            const tObj = topics.find((tp) => tp.id === tId);
+                            const name = tObj ? tObj.name : `Topic #${tId}`;
+                            return (
+                              <span
+                                key={tId}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-pill text-[11px] bg-surface border border-border text-ink font-medium shadow-2xs"
+                              >
+                                <span>{name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = selectedTopicIds.filter((id) => id !== tId);
+                                    setSelectedTopicIds(next);
+                                    if (next.length > 0) setSelectedTopicId(next[0]);
+                                  }}
+                                  className="text-ink/40 hover:text-ink cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+
+                        {/* Add Topic Selector */}
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '__NEW__') {
+                              setIsNewTopic(true);
+                              setSelectedTopicId('NEW');
+                            } else if (val) {
+                              const numVal = Number(val);
+                              if (!selectedTopicIds.includes(numVal)) {
+                                const next = [...selectedTopicIds, numVal];
+                                setSelectedTopicIds(next);
+                                setSelectedTopicId(next[0]);
+                              }
+                            }
+                          }}
+                          className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
+                        >
+                          <option value="">+ Add Topic Tag...</option>
+                          {topics.map((tp) => (
+                            <option
+                              key={tp.id}
+                              value={tp.id}
+                              disabled={selectedTopicIds.includes(tp.id)}
+                            >
+                              {tp.name} {selectedTopicIds.includes(tp.id) ? '(Selected)' : ''}
+                            </option>
+                          ))}
+                          <option value="__NEW__" className="font-semibold text-forest">
+                            + Create New Topic...
                           </option>
-                        ))}
-                        <option value="__NEW__" className="font-semibold text-forest">
-                          + Add New Topic...
-                        </option>
-                      </select>
+                        </select>
+                        <p className="text-[10px] text-ink/50">
+                          Multi-topic tagging supported (PDF Section 9). Select multiple topics under this chapter.
+                        </p>
+                      </>
                     ) : (
                       <div className="space-y-1.5">
                         <input
@@ -1674,6 +1784,20 @@ export const QBMDashboard: React.FC = () => {
             </button>
           </div>
         </form>
+      )}
+
+      {/* ──────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 3: DEO MY SUBMISSIONS WORKSPACE (Task 8)                            */}
+      {/* ──────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'submissions' && (
+        <DEOSubmissionsView onNewQuestionClick={() => setActiveTab('ingest')} />
+      )}
+
+      {/* ──────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 4: VALIDATOR REVIEW QUEUE WORKSPACE (Task 8)                        */}
+      {/* ──────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'validation' && (
+        <ValidatorQueueView />
       )}
 
       {/* ──────────────────────────────────────────────────────────────────────── */}

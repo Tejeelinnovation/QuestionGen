@@ -20,6 +20,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
   const [maxStudents, setMaxStudents] = useState<number>(500);
   const [maxTeachers, setMaxTeachers] = useState<number>(50);
   const [questionBankEnabled, setQuestionBankEnabled] = useState<boolean>(false);
+  const [validationWorkflowEnabled, setValidationWorkflowEnabled] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
       setMaxStudents(school.max_students ?? 500);
       setMaxTeachers(school.max_teachers ?? 50);
       setQuestionBankEnabled(Boolean(school.question_bank_enabled));
+      setValidationWorkflowEnabled(Boolean(school.validation_workflow_enabled));
       setErrorMessage(null);
       setSuccessMessage(null);
     }
@@ -82,6 +84,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
         max_students: Number(maxStudents),
         max_teachers: Number(maxTeachers),
         question_bank_enabled: questionBankEnabled,
+        validation_workflow_enabled: validationWorkflowEnabled,
       });
 
       setSuccessMessage('Organization settings & quotas updated successfully!');
@@ -218,6 +221,29 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
                 id="edit-school-question-bank-enabled"
                 checked={questionBankEnabled}
                 onChange={(e) => setQuestionBankEnabled(e.target.checked)}
+                disabled={isSubmitting}
+                className="sr-only peer"
+              />
+              <div className="w-10 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-forest"></div>
+            </label>
+          </div>
+
+          {/* QBM Validation Workflow Toggle (Task 8) */}
+          <div className="bg-surface-muted/40 border border-border rounded-card p-3.5 flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <span className="text-xs font-heading font-semibold text-ink block">
+                Enable QBM Validation Workflow (DEO → Validator)
+              </span>
+              <span className="text-[11px] text-ink/65 block">
+                When enabled, all questions entered for this school must pass through a Data Entry Operator and Validator before becoming eligible for question generation.
+              </span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                id="edit-school-validation-workflow-enabled"
+                checked={validationWorkflowEnabled}
+                onChange={(e) => setValidationWorkflowEnabled(e.target.checked)}
                 disabled={isSubmitting}
                 className="sr-only peer"
               />

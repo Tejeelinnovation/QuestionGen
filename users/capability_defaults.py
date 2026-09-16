@@ -136,3 +136,57 @@ def grant_qbm_defaults(user: "User", granted_by: "User | None" = None) -> None:
     ]:
         _grant(user, cap, granted_by)
 
+
+def grant_deo_defaults(user: "User", granted_by: "User | None" = None) -> None:
+    """
+    Data Entry Operator (DEO) capability set.
+
+    Grants: DATA_ENTRY_OPERATOR.
+    GENERATE_SELECT_QUESTIONS is included if the school has question_bank_enabled.
+    """
+    from users.models import CapabilityName  # noqa: PLC0415
+
+    caps = [CapabilityName.DATA_ENTRY_OPERATOR]
+    if user.school and getattr(user.school, "question_bank_enabled", False):
+        caps.append(CapabilityName.GENERATE_SELECT_QUESTIONS)
+
+    for cap in caps:
+        _grant(user, cap, granted_by)
+
+
+def grant_validator_defaults(user: "User", granted_by: "User | None" = None) -> None:
+    """
+    Question Validator capability set.
+
+    Grants: VALIDATOR.
+    GENERATE_SELECT_QUESTIONS is included if the school has question_bank_enabled.
+    """
+    from users.models import CapabilityName  # noqa: PLC0415
+
+    caps = [CapabilityName.VALIDATOR]
+    if user.school and getattr(user.school, "question_bank_enabled", False):
+        caps.append(CapabilityName.GENERATE_SELECT_QUESTIONS)
+
+    for cap in caps:
+        _grant(user, cap, granted_by)
+
+
+def grant_deo_and_validator_defaults(user: "User", granted_by: "User | None" = None) -> None:
+    """
+    Dual-role DEO & Validator capability set for single-person assignment (PDF Section 5).
+
+    Grants: DATA_ENTRY_OPERATOR, VALIDATOR.
+    GENERATE_SELECT_QUESTIONS is included if the school has question_bank_enabled.
+    """
+    from users.models import CapabilityName  # noqa: PLC0415
+
+    caps = [
+        CapabilityName.DATA_ENTRY_OPERATOR,
+        CapabilityName.VALIDATOR,
+    ]
+    if user.school and getattr(user.school, "question_bank_enabled", False):
+        caps.append(CapabilityName.GENERATE_SELECT_QUESTIONS)
+
+    for cap in caps:
+        _grant(user, cap, granted_by)
+

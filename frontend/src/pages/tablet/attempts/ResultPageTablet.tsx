@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
+import { getStaggerDelay } from '../../../lib/motion';
 import type { StudentAttemptResult } from '../../../types';
 
 export const ResultPageTablet: React.FC = () => {
@@ -59,13 +60,10 @@ export const ResultPageTablet: React.FC = () => {
   }
 
   const isEvaluated = result.status === 'EVALUATED';
-  const isSubmitted = result.status === 'SUBMITTED';
   const scoreNum = Number(result.score) || 0;
   const maxScoreNum = Number(result.max_score) || 0;
   const percentage =
     maxScoreNum > 0 ? ((scoreNum / maxScoreNum) * 100).toFixed(1) : '0.0';
-
-  const pendingQuestionsCount = result.answers?.filter((a) => a.pending_manual_review).length || 0;
 
   return (
     <div className="pb-20 font-body space-y-6">

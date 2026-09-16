@@ -41,6 +41,12 @@ class School(models.Model):
         help_text="Whether Question Bank capability is enabled for this organization by Super Admin.",
     )
 
+    # Super Admin configurable validation workflow toggle (DEO -> Validator -> Approved Question Bank)
+    validation_workflow_enabled = models.BooleanField(
+        default=False,
+        help_text="Controls whether the school uses the DEO -> Validator validation workflow or direct question generation.",
+    )
+
     # Reserved for future school-level configuration (e.g. logo URL, timezone,
     # feature flags). Stored as JSON so schema changes don't require migrations.
     config = models.JSONField(

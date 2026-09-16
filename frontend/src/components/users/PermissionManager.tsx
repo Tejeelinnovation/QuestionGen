@@ -71,6 +71,18 @@ export const ALL_CAPABILITIES: CapabilityMeta[] = [
     description: 'Inspect graded scores and evaluated answer breakdowns.',
     category: 'Examination & Results',
   },
+  {
+    name: 'DATA_ENTRY_OPERATOR',
+    label: 'Data Entry Operator (QBM)',
+    description: 'Enter curriculum questions, options, and tags for validation.',
+    category: 'Curriculum & Papers',
+  },
+  {
+    name: 'VALIDATOR',
+    label: 'Question Validator (QBM)',
+    description: 'Review submitted questions, edit metadata, and approve or return for correction.',
+    category: 'Curriculum & Papers',
+  },
 ];
 
 export const getDefaultCapabilitiesForRole = (roleLabel: string): CapabilityName[] => {
@@ -81,6 +93,12 @@ export const getDefaultCapabilitiesForRole = (roleLabel: string): CapabilityName
       return ['CREATE_TEACHER', 'CREATE_STUDENT', 'VIEW_SCHOOL_WIDE_CONTROLS'];
     case 'Teacher':
       return ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST'];
+    case 'Data Entry Operator':
+      return ['DATA_ENTRY_OPERATOR', 'GENERATE_SELECT_QUESTIONS'];
+    case 'Validator':
+      return ['VALIDATOR', 'GENERATE_SELECT_QUESTIONS'];
+    case 'DEO & Validator':
+      return ['DATA_ENTRY_OPERATOR', 'VALIDATOR', 'GENERATE_SELECT_QUESTIONS'];
     case 'Student':
       return ['ATTEMPT_TEST', 'VIEW_OWN_RESULT'];
     default:
@@ -91,7 +109,10 @@ export const getDefaultCapabilitiesForRole = (roleLabel: string): CapabilityName
 const ALLOWED_CAPABILITIES_BY_ROLE: Record<string, CapabilityName[]> = {
   'Super Admin': ALL_CAPABILITIES.map((c) => c.name),
   'School Admin': ['CREATE_TEACHER', 'CREATE_STUDENT', 'VIEW_SCHOOL_WIDE_CONTROLS'],
-  'Teacher': ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST'],
+  'Teacher': ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST', 'DATA_ENTRY_OPERATOR', 'VALIDATOR'],
+  'Data Entry Operator': ['DATA_ENTRY_OPERATOR', 'GENERATE_SELECT_QUESTIONS', 'VALIDATOR'],
+  'Validator': ['VALIDATOR', 'GENERATE_SELECT_QUESTIONS', 'DATA_ENTRY_OPERATOR'],
+  'DEO & Validator': ['DATA_ENTRY_OPERATOR', 'VALIDATOR', 'GENERATE_SELECT_QUESTIONS'],
   'Student': ['ATTEMPT_TEST', 'VIEW_OWN_RESULT'],
 };
 

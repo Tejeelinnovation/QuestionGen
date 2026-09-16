@@ -5,11 +5,8 @@ import { papersApi, type SelectQuestionsConstraints } from '../../../api/papers'
 import type { Paper, Topic } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import {
-  Check,
-  ArrowRight,
   Sparkles,
   Clock,
-  Layers,
   Plus,
   Trash2,
   AlertCircle,
@@ -54,8 +51,8 @@ export const PaperConfigurePageMobile: React.FC = () => {
   const [paper, setPaper] = useState<Paper | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([]);
-  const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | ''>('');
-  const [learnerLevel, setLearnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | ''>('');
+  const [difficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | ''>('');
+  const [learnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | ''>('');
 
   // Rubric & parameters
   const [useDistributionRubric, setUseDistributionRubric] = useState<boolean>(true);

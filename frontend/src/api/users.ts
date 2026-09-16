@@ -21,7 +21,7 @@ export interface UserQueryParams {
 export interface CreateUserInput {
   username: string;
   password: string;
-  profile: 'school_admin' | 'teacher' | 'student' | 'qbm';
+  profile: 'school_admin' | 'teacher' | 'student' | 'qbm' | 'deo' | 'validator' | 'deo_validator';
   email: string;
   mobile_number: string;
   first_name?: string;
@@ -127,6 +127,11 @@ export const usersApi = {
   // Schools management endpoints
   getSchools: async (): Promise<School[]> => {
     const response = await apiClient.get<School[]>('/api/schools/');
+    return response.data;
+  },
+
+  getSchool: async (id: number): Promise<School> => {
+    const response = await apiClient.get<School>(`/api/schools/${id}/`);
     return response.data;
   },
 

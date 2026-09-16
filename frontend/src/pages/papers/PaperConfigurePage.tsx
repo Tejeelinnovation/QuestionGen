@@ -48,7 +48,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
   const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | ''>('');
   const [learnerLevel, setLearnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | ''>('');
   const [questionType, setQuestionType] = useState<'MCQ' | 'SHORT_ANSWER' | 'LONG_ANSWER' | ''>('');
-  const [marksPerQuestion, setMarksPerQuestion] = useState<string>('');
+  const [marksPerQuestion] = useState<string>('');
   const [totalMarks, setTotalMarks] = useState<string>('37');
   const [durationMinutes, setDurationMinutes] = useState<number>(60);
   const [quantity, setQuantity] = useState<string>('');

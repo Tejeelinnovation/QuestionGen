@@ -320,6 +320,22 @@ class CreateVersionSerializer(serializers.Serializer):
                 {"question_ids": f"Questions with IDs {missing_ids} do not exist or are inactive."}
             )
 
+        # Approved Question Bank Gate (Task 8 PDF Section 13 & 14)
+        request = self.context.get("request")
+        paper = self.context.get("paper")
+        school = getattr(paper, "school", None) if paper else getattr(getattr(request, "user", None), "school", None)
+        if school and getattr(school, "validation_workflow_enabled", False):
+            unapproved = [qid for qid in question_ids if questions_by_id[qid].validation_status != "APPROVED"]
+            if unapproved:
+                raise serializers.ValidationError(
+                    {
+                        "question_ids": (
+                            f"Questions with IDs {unapproved} cannot be included in paper generation "
+                            "because they have not been Approved by a Validator."
+                        )
+                    }
+                )
+
         # Calculate sum of marks
         total_sum = sum(float(questions_by_id[qid].marks) for qid in question_ids)
 

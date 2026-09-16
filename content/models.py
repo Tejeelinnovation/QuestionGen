@@ -65,6 +65,25 @@ class BankSource(models.TextChoices):
     TEACHER = "TEACHER", _("Teacher")
 
 
+class ValidationStatus(models.TextChoices):
+    DRAFT = "DRAFT", _("Draft")
+    SUBMITTED = "SUBMITTED", _("Submitted for Validation")
+    UNDER_VALIDATION = "UNDER_VALIDATION", _("Under Validation")
+    CORRECTION_REQUIRED = "CORRECTION_REQUIRED", _("Correction Required")
+    APPROVED = "APPROVED", _("Approved")
+    REJECTED = "REJECTED", _("Rejected")
+
+
+class ValidationAction(models.TextChoices):
+    SUBMIT = "SUBMIT", _("Submit for Validation")
+    START_VALIDATION = "START_VALIDATION", _("Start Validation")
+    METADATA_UPDATE = "METADATA_UPDATE", _("Update Metadata")
+    SEND_FOR_CORRECTION = "SEND_FOR_CORRECTION", _("Send for Correction")
+    RESUBMIT = "RESUBMIT", _("Resubmit for Validation")
+    APPROVE = "APPROVE", _("Approve Question")
+    REJECT = "REJECT", _("Reject Question")
+
+
 # ---------------------------------------------------------------------------
 # Book
 # ---------------------------------------------------------------------------
@@ -268,6 +287,23 @@ class Question(TimestampedModel):
         db_index=True,
         help_text="Inactive questions are excluded from paper-builder queries.",
     )
+    topics = models.ManyToManyField(
+        Topic,
+        related_name="questions_m2m",
+        blank=True,
+        help_text="Multiple topics associated with this question.",
+    )
+    validation_status = models.CharField(
+        max_length=30,
+        choices=ValidationStatus.choices,
+        default=ValidationStatus.DRAFT,
+        db_index=True,
+        help_text="DRAFT | SUBMITTED | UNDER_VALIDATION | CORRECTION_REQUIRED | APPROVED | REJECTED",
+    )
+    revision = models.PositiveIntegerField(
+        default=1,
+        help_text="Revision counter incremented each time question content is corrected and resubmitted.",
+    )
 
     class Meta:
         ordering = ["topic", "difficulty", "question_type"]
@@ -287,13 +323,70 @@ class Question(TimestampedModel):
                 fields=["bank_source", "school"],
                 name="question_tenant_idx",
             ),
+            models.Index(
+                fields=["validation_status", "school"],
+                name="question_val_status_idx",
+            ),
         ]
 
     def __str__(self) -> str:
         return (
-            f"[{self.bank_source}][{self.question_type}/{self.difficulty}] "
+            f"[{self.bank_source}][{self.validation_status}][{self.question_type}/{self.difficulty}] "
             f"{self.question_text[:60]}{'…' if len(self.question_text) > 60 else ''}"
         )
+
+
+# ---------------------------------------------------------------------------
+# QuestionValidationHistory
+# ---------------------------------------------------------------------------
+
+class QuestionValidationHistory(TimestampedModel):
+    """
+    Audit and history log for question validation cycles.
+    Tracks reviewer identity, action, comments, field diffs, revision, and timestamp.
+    """
+
+    question = models.ForeignKey(
+        Question,
+        on_delete=models.CASCADE,
+        related_name="validation_history",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="question_validations",
+        help_text="User who performed this validation action.",
+    )
+    action = models.CharField(
+        max_length=30,
+        choices=ValidationAction.choices,
+        db_index=True,
+    )
+    comment = models.TextField(
+        blank=True,
+        default="",
+        help_text="Validator or DEO comment. Mandatory for SEND_FOR_CORRECTION and REJECT.",
+    )
+    changed_fields = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Stores old and new values for metadata changes: topics, difficulty, marks, variant marks.",
+    )
+    revision = models.PositiveIntegerField(
+        default=1,
+        help_text="Question revision number at the time of this validation action.",
+    )
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Question Validation History"
+        verbose_name_plural = "Question Validation Histories"
+
+    def __str__(self) -> str:
+        actor_name = self.actor.username if self.actor else "System"
+        return f"Q#{self.question_id} [Rev {self.revision}] {self.action} by {actor_name}"
 
 
 # ---------------------------------------------------------------------------

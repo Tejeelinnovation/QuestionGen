@@ -43,7 +43,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
   const isSuperAdmin = hasCapability('CREATE_SCHOOL_ADMIN') || hasCapability('CREATE_SCHOOL');
   const isSchoolAdmin = hasCapability('VIEW_SCHOOL_WIDE_CONTROLS');
   const targetIsManageableBySchoolAdmin = userData
-    ? userData.role_label === 'Teacher' || userData.role_label === 'Student'
+    ? ['Teacher', 'Student', 'Data Entry Operator', 'Validator', 'DEO & Validator'].includes(userData.role_label)
     : true;
   const canManagePermissions = isSuperAdmin || (isSchoolAdmin && targetIsManageableBySchoolAdmin);
 

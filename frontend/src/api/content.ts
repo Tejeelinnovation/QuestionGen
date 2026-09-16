@@ -1,5 +1,14 @@
 import { apiClient } from './client';
-import type { Book, Chapter, PaginatedResponse, Question, QuestionVariant, Topic } from '../types';
+import type {
+  Book,
+  Chapter,
+  Difficulty,
+  PaginatedResponse,
+  Question,
+  QuestionValidationHistoryItem,
+  QuestionVariant,
+  Topic,
+} from '../types';
 
 export interface QuestionStats {
   total_questions: number;
@@ -10,6 +19,7 @@ export interface QuestionStats {
 
 export interface IngestQuestionPayload {
   topic?: number | null;
+  topic_ids?: number[];
   book_id?: number | null;
   chapter_id?: number | null;
   board?: string;
@@ -24,6 +34,7 @@ export interface IngestQuestionPayload {
   difficulty: string;
   learner_level?: string;
   bank_source?: string;
+  submit?: boolean;
   options?: Record<string, string> | any;
   correct_answer: string;
   explanation?: string;
@@ -97,5 +108,57 @@ export const contentApi = {
 
   deleteQuestion: async (id: number): Promise<void> => {
     await apiClient.delete(`/api/questions/${id}/`);
+  },
+
+  getValidationQueue: async (params?: {
+    status?: string;
+    board?: string;
+    difficulty?: string;
+    subject?: string;
+    page?: number;
+    search?: string;
+  }): Promise<PaginatedResponse<Question>> => {
+    const res = await apiClient.get<PaginatedResponse<Question>>('/api/questions/validation-queue/', { params });
+    return res.data;
+  },
+
+  getValidationHistory: async (questionId: number): Promise<QuestionValidationHistoryItem[]> => {
+    const res = await apiClient.get<QuestionValidationHistoryItem[]>(`/api/questions/${questionId}/validation-history/`);
+    return res.data;
+  },
+
+  validateQuestion: async (
+    questionId: number,
+    payload: { action: 'APPROVE' | 'SEND_FOR_CORRECTION' | 'REJECT'; comment?: string }
+  ): Promise<Question> => {
+    const res = await apiClient.post<Question>(`/api/questions/${questionId}/validate/`, payload);
+    return res.data;
+  },
+
+  updateValidatorMetadata: async (
+    questionId: number,
+    payload: {
+      topic_ids?: number[];
+      difficulty?: Difficulty;
+      marks?: string | number;
+      variant_marks?: Array<{ id: number; marks: string | number }>;
+    }
+  ): Promise<Question> => {
+    const res = await apiClient.patch<Question>(`/api/questions/${questionId}/validator-metadata/`, payload);
+    return res.data;
+  },
+
+  resubmitQuestion: async (
+    questionId: number,
+    payload: {
+      question_text?: string;
+      options?: any;
+      correct_answer?: string;
+      explanation?: string;
+      comment?: string;
+    }
+  ): Promise<Question> => {
+    const res = await apiClient.post<Question>(`/api/questions/${questionId}/resubmit/`, payload);
+    return res.data;
   },
 };

@@ -265,17 +265,24 @@ class PaperSelectQuestionsView(APIView):
         # Multi-source candidate pooling:
         # Include Global QBM questions + own school's private questions.
         # Strictly exclude other organizations' question banks.
-        target_school_id = paper.school_id or getattr(request.user, "school_id", None)
+        target_school = paper.school or getattr(request.user, "school", None)
+        target_school_id = target_school.id if target_school else None
         scope_filter = Q(bank_source="GLOBAL")
         if target_school_id:
             scope_filter |= Q(school_id=target_school_id)
 
         qs = Question.objects.select_related(
             "topic", "topic__chapter", "topic__chapter__book"
-        ).prefetch_related("variants").filter(
+        ).prefetch_related("variants", "topics").filter(
             scope_filter,
             is_active=True,
         )
+
+        # Gate 2 — Validation (Task 8 PDF Section 13 & 14):
+        # Where the school's validation workflow is enabled, candidate pool must be strictly APPROVED.
+        if target_school and getattr(target_school, "validation_workflow_enabled", False):
+            qs = qs.filter(validation_status="APPROVED")
+
 
         # Syllabus scoping
         chapter_ids = data.get("chapter_ids")
@@ -370,7 +377,7 @@ class PaperVersionListCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        serializer = CreateVersionSerializer(data=request.data)
+        serializer = CreateVersionSerializer(data=request.data, context={"request": request, "paper": paper})
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
 
@@ -532,6 +539,13 @@ class PaperVersionCloneView(APIView):
                     {"question_ids": f"Questions with IDs {missing} do not exist or are inactive."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if paper.school and getattr(paper.school, "validation_workflow_enabled", False):
+                unapproved = [qid for qid in explicit_qids if questions_by_id[qid].validation_status != "APPROVED"]
+                if unapproved:
+                    return Response(
+                        {"question_ids": f"Questions with IDs {unapproved} cannot be used because they are not yet Approved."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
             resolved_questions = [questions_by_id[qid] for qid in explicit_qids]
             constraints_used = source_version.constraints_used.copy()
         else:
@@ -543,6 +557,9 @@ class PaperVersionCloneView(APIView):
                 topic__chapter=paper.chapter,
                 is_active=True,
             )
+
+            if paper.school and getattr(paper.school, "validation_workflow_enabled", False):
+                candidate_qs = candidate_qs.filter(validation_status="APPROVED")
 
             topic_ids = constraints_used.get("topic_ids")
             if topic_ids:

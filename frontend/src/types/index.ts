@@ -9,7 +9,9 @@ export type CapabilityName =
   | 'ATTEMPT_TEST'
   | 'VIEW_OWN_RESULT'
   | 'VIEW_SCHOOL_WIDE_CONTROLS'
-  | 'INGEST_GLOBAL_QUESTIONS';
+  | 'INGEST_GLOBAL_QUESTIONS'
+  | 'DATA_ENTRY_OPERATOR'
+  | 'VALIDATOR';
 
 export type RoleLabel =
   | 'Super Admin'
@@ -17,8 +19,19 @@ export type RoleLabel =
   | 'Teacher'
   | 'Student'
   | 'Question Bank Manager'
+  | 'Data Entry Operator'
+  | 'Validator'
+  | 'DEO & Validator'
   | 'Custom'
   | string;
+
+export type ValidationStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'UNDER_VALIDATION'
+  | 'CORRECTION_REQUIRED'
+  | 'APPROVED'
+  | 'REJECTED';
 
 export type QuestionType =
   | 'MCQ'
@@ -158,6 +171,8 @@ export interface Question {
   id: number;
   topic: number;
   topic_name?: string;
+  topic_ids?: number[];
+  topics?: Topic[];
   chapter_title?: string;
   book_title?: string;
   book_board?: string;
@@ -173,6 +188,10 @@ export interface Question {
   bank_source_display?: string;
   school?: number | null;
   created_by?: number | null;
+  created_by_username?: string;
+  validation_status?: ValidationStatus;
+  revision?: number;
+  latest_comment?: string | null;
   options?: Record<string, string> | any;
   correct_answer?: string;
   explanation?: string;
@@ -182,6 +201,19 @@ export interface Question {
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface QuestionValidationHistoryItem {
+  id: number;
+  question: number;
+  actor_id: number;
+  actor_username: string;
+  actor_role: string;
+  action: 'SUBMIT' | 'START_VALIDATION' | 'METADATA_UPDATE' | 'SEND_FOR_CORRECTION' | 'RESUBMIT' | 'APPROVE' | 'REJECT';
+  comment: string;
+  changed_fields: Record<string, { old: any; new: any }>;
+  revision: number;
+  created_at: string;
 }
 
 export interface QuestionPreview {
@@ -476,6 +508,7 @@ export interface School {
   max_students?: number;
   max_teachers?: number;
   question_bank_enabled?: boolean;
+  validation_workflow_enabled?: boolean;
   student_count?: number;
   teacher_count?: number;
   created_at?: string;
@@ -496,6 +529,7 @@ export interface SchoolCreateInput {
   max_students?: number;
   max_teachers?: number;
   question_bank_enabled?: boolean;
+  validation_workflow_enabled?: boolean;
   config?: Record<string, any>;
   admin?: SchoolAdminCreateInput;
 }
@@ -505,6 +539,7 @@ export interface SchoolUpdateInput {
   max_students?: number;
   max_teachers?: number;
   question_bank_enabled?: boolean;
+  validation_workflow_enabled?: boolean;
   config?: Record<string, any>;
 }
 

@@ -429,20 +429,40 @@ frontend/src/
   - [x] Code isolation: Existing `papers/views.py` `select-questions/` endpoint preserved untouched with explanatory integration comment; existing test suites continue passing with 100% success.
   - [x] Comprehensive test suite in `generation/tests.py` (12 passing tests).
 
+- [x] **Task 8 — QBM -> DEO -> Validator -> Approved Question Bank Workflow**
+  - [x] School-level validation toggle: `School.validation_workflow_enabled` (Mode A: enabled, Mode B: direct paper generation without gating).
+  - [x] Data models: `Question.validation_status` (`DRAFT`, `SUBMITTED`, `UNDER_VALIDATION`, `CORRECTION_REQUIRED`, `APPROVED`, `REJECTED`), `Question.revision` integer counter, `Question.topics` (M2M relation), and `QuestionValidationHistory` audit log model (captures actor, action, comments, field diffs, revision).
+  - [x] Capability system: Added `DATA_ENTRY_OPERATOR` and `VALIDATOR` to `CapabilityName`; updated role computation supporting `"Data Entry Operator"`, `"Validator"`, and `"DEO & Validator"` dual-role.
+  - [x] Default capability mappings: `grant_deo_defaults`, `grant_validator_defaults`, `grant_deo_and_validator_defaults`.
+  - [x] State machine & validation endpoints:
+    - `POST /api/questions/<id>/validate/`: validator review actions (`APPROVE`, `SEND_FOR_CORRECTION`, `REJECT`), mandatory comments (>=5 chars) on correction/rejection.
+    - `PATCH /api/questions/<id>/validator-metadata/`: permitted validator metadata edits (topics, difficulty with variants synchronization, marks); direct content/options mutations strictly prohibited with HTTP 403.
+    - `POST /api/questions/<id>/resubmit/`: DEO edit and resubmission, increments revision counter and transitions status back to `SUBMITTED`.
+    - `GET /api/questions/validation-queue/`: filterable queue for validators.
+    - `GET /api/questions/<id>/validation-history/`: full chronological audit log.
+  - [x] Approved Question Bank Gate: `PaperSelectQuestionsView`, `PaperVersionCloneView`, and `SeededBankGenerationService` filter strictly for `validation_status=APPROVED` when school has validation enabled.
+  - [x] Automated test suite: `content/test_validation_workflow.py` (9 tests covering state machine, permission checks, audit logging, content mutation restrictions, resubmissions, and gate enforcement).
+  - [x] Frontend UI:
+    - Super Admin / School Admin: Validation workflow toggle on school creation/edit; DEO, Validator, and Dual-Role user onboarding.
+    - DEO Workspace: Ingestion with multi-topic selection; "My Submissions" tab with status badges, correction alert banners, and "Edit & Resubmit" modal.
+    - Validator Workspace: Review queue with filters; review modal allowing permitted metadata edits while keeping question content read-only; slide-in validation audit history drawer.
+  - [x] Demo Seeding: `seed_task8_demo` command seeding test users and questions across all workflow states.
+
 ---
 
 ## Verification Report
 
 | Checklist Item | Status | Verification Evidence & Notes |
 |----------------|--------|-------------------------------|
-| **Authentication** | **PASS** | Valid login (`teacher1`, `student1`, `schooladmin1`, `superadmin`) issues JWT and loads respective dashboard; invalid password returns HTTP 400 with user-facing error message; expired/invalid Bearer token returns HTTP 401 and cleanly redirects to `/login`. |
-| **Authorization** | **PASS** | Gated client-side by `RequireCapability` and server-side by DRF permissions: `student1` attempting to create a student returns HTTP 403; `teacher1` attempting to create a school admin returns HTTP 403; `schooladmin1` attempting cross-school or unauthorized admin creation returns HTTP 403. |
-| **Scope** | **PASS** | Scoped queries verified in UI and API: teachers only see students within their assigned school and papers they authored; students only see deliveries assigned to their student ID via `assigned_students` M2M filter. |
-| **Question Selection** | **PASS** | Applying combinations of filters (`chapter=1`, `difficulty=EASY`, `question_type=MCQ`, `learner_level=BEGINNER`) deterministically returns identical ordered subsets from the 42-question NCERT question bank. |
+| **Authentication** | **PASS** | Valid login (`teacher1`, `student1`, `schooladmin1`, `superadmin`, `deo1`, `validator1`, `dualuser1`) issues JWT and loads respective dashboard; invalid password returns HTTP 400 with user-facing error message; expired/invalid Bearer token returns HTTP 401 and cleanly redirects to `/login`. |
+| **Authorization** | **PASS** | Gated client-side by `RequireCapability` and server-side by DRF permissions: `student1` attempting to create a student returns HTTP 403; `teacher1` attempting to create a school admin returns HTTP 403; `schooladmin1` attempting cross-school or unauthorized admin creation returns HTTP 403. Validators attempting content modification return HTTP 403. |
+| **Scope** | **PASS** | Scoped queries verified in UI and API: teachers only see students within their assigned school and papers they authored; students only see deliveries assigned to their student ID via `assigned_students` M2M filter. DEO/Validator queues scoped to school questions. |
+| **Question Selection** | **PASS** | Applying combinations of filters (`chapter=1`, `difficulty=EASY`, `question_type=MCQ`, `learner_level=BEGINNER`) deterministically returns identical ordered subsets from the 42-question NCERT question bank. Approved Question Bank gate strictly blocks non-approved questions when validation is enabled. |
 | **Paper** | **PASS** | Version `total_marks` is computed immediately upon version creation by summing question snapshot marks and persists across page refreshes and browser reloads. |
 | **Versions** | **PASS** | Creating Version B by cloning Version A does not mutate Version A's stored snapshot, total marks, or lifecycle status; each version maintains an independent immutable record. |
 | **Online Test** | **PASS** | End-to-end flow verified via live browser subagent: Teacher delivers test -> Student sits and saves responses incrementally -> Student submits (MCQ auto-graded, descriptive set to pending) -> Teacher views roster (`/deliveries/:id/results`) -> Teacher grades descriptive questions (`/attempts/:id/grade`) -> Attempt transitions to `EVALUATED` -> Student result page (`/attempts/:id/result`) displays final evaluated score with no pending banner. |
 | **Print** | **PASS** | Print layout route (`/papers/:id/versions/:id/print`) renders clean exam header (title, instructions, version label, total marks) and question sequence with mark allocation; print preview trigger confirmed functional. |
+| **Validation Workflow (Task 8)** | **PASS** | 65 backend tests passed 100% (`content/test_validation_workflow.py` 9 tests, `papers/tests.py`, `users/tests.py`). Frontend production build passed cleanly (`tsc -b && vite build` built in 1.06s). End-to-end demo seeded with `deo1`, `validator1`, `dualuser1`, and `teacher_direct`. |
 | **Regression** | **N/A** | Repository git history reviewed: no legacy document-processing or external DTO layer preceded this project. |
 
 ---

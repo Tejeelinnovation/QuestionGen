@@ -28,15 +28,19 @@ from rest_framework.views import APIView
 from core.audit import log_action
 from core.pagination import StandardPageNumberPagination
 from .filters import filter_questions
-from .models import Book, Chapter, Question, QuestionVariant, Topic
+from .models import Book, Chapter, Question, QuestionVariant, Topic, QuestionValidationHistory
 from .serializers import (
     BookSerializer,
     ChapterSerializer,
     QuestionDetailSerializer,
     QuestionIngestSerializer,
     QuestionListSerializer,
+    QuestionResubmitSerializer,
+    QuestionValidationActionSerializer,
+    QuestionValidationHistorySerializer,
     QuestionVariantSerializer,
     TopicSerializer,
+    ValidatorMetadataSerializer,
 )
 
 
@@ -283,13 +287,36 @@ class QuestionDetailView(RetrieveUpdateDestroyAPIView):
 
         qs = Question.objects.select_related(
             "topic", "topic__chapter", "topic__chapter__book"
-        ).prefetch_related("variants")
+        ).prefetch_related("variants", "topics")
 
         if user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL")):
             return qs
         elif user.school_id is not None:
             return qs.filter(Q(bank_source="GLOBAL") | Q(school_id=user.school_id))
         return qs.filter(bank_source="GLOBAL")
+
+    def patch(self, request, *args, **kwargs):
+        user = request.user
+        is_super = user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+        is_deo = user.has_capability("DATA_ENTRY_OPERATOR")
+        is_validator = user.has_capability("VALIDATOR")
+
+        # Validator-only users cannot directly modify question text, options, answers, or explanation
+        if is_validator and not is_super and not is_deo:
+            forbidden_fields = {"question_text", "options", "correct_answer", "explanation"}
+            attempted = set(request.data.keys()).intersection(forbidden_fields)
+            if attempted:
+                return Response(
+                    {
+                        "detail": (
+                            f"Validators are strictly prohibited from directly modifying question content ({', '.join(attempted)}). "
+                            "Please document content issues in a comment and use 'Send for Correction/Review' or 'Reject'."
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        return super().patch(request, *args, **kwargs)
 
 
 class QuestionIngestView(APIView):
@@ -409,4 +436,320 @@ class QuestionVariantCreateView(APIView):
         )
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
+# Task 8: Validation Workflow Views
+# ---------------------------------------------------------------------------
+
+class QuestionValidateView(APIView):
+    """
+    POST /api/questions/<id>/validate/
+
+    Performs Validator review action on submitted questions:
+    - APPROVE: Transitions to APPROVED (comment optional). Question enters Approved Question Bank.
+    - SEND_FOR_CORRECTION: Transitions to CORRECTION_REQUIRED (comment mandatory). Returns to DEO.
+    - REJECT: Transitions to REJECTED (comment mandatory). Excluded from generation.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk=None):
+        user = request.user
+        question = Question.objects.filter(pk=pk).first()
+        if not question:
+            return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_super = user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+        is_validator = user.has_capability("VALIDATOR")
+        if not is_super and not is_validator:
+            return Response(
+                {"detail": "Only users with the 'VALIDATOR' capability can validate questions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Tenant isolation
+        if not is_super:
+            if question.bank_source != "GLOBAL" and question.school_id != user.school_id:
+                return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = QuestionValidationActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        action = serializer.validated_data["action"]
+        comment = serializer.validated_data.get("comment", "")
+
+        status_map = {
+            "APPROVE": "APPROVED",
+            "SEND_FOR_CORRECTION": "CORRECTION_REQUIRED",
+            "REJECT": "REJECTED",
+        }
+        question.validation_status = status_map[action]
+        question.save(update_fields=["validation_status", "updated_at"])
+
+        # Persist audit record
+        QuestionValidationHistory.objects.create(
+            question=question,
+            actor=user,
+            action=action,
+            comment=comment,
+            revision=question.revision,
+        )
+
+        log_action(
+            user,
+            f"question.{action.lower()}",
+            question,
+            metadata={
+                "question_id": question.id,
+                "action": action,
+                "comment": comment,
+                "revision": question.revision,
+                "validation_status": question.validation_status,
+            },
+        )
+
+        return Response(
+            QuestionDetailSerializer(question, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class QuestionValidatorMetadataView(APIView):
+    """
+    PATCH /api/questions/<id>/validator-metadata/
+
+    Allows Validator to directly modify permitted metadata:
+    - Topics: add, remove, change topic associations
+    - Difficulty: change difficulty (automatically synchronised across all variants)
+    - Marks: change marks on parent question
+    - Variant marks: change marks on individual variants
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk=None):
+        user = request.user
+        question = Question.objects.filter(pk=pk).first()
+        if not question:
+            return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_super = user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+        is_validator = user.has_capability("VALIDATOR")
+        if not is_super and not is_validator:
+            return Response(
+                {"detail": "Only users with the 'VALIDATOR' capability can edit question metadata."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Tenant isolation
+        if not is_super:
+            if question.bank_source != "GLOBAL" and question.school_id != user.school_id:
+                return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ValidatorMetadataSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        changed_fields = {}
+
+        # 1. Update topics
+        if "topic_ids" in data:
+            old_topics = list(question.topics.values_list("name", flat=True))
+            new_topics_qs = Topic.objects.filter(id__in=data["topic_ids"])
+            question.topics.set(new_topics_qs)
+            if data["topic_ids"] and question.topic_id not in data["topic_ids"]:
+                question.topic_id = data["topic_ids"][0]
+                question.save(update_fields=["topic"])
+            new_topics = list(new_topics_qs.values_list("name", flat=True))
+            if set(old_topics) != set(new_topics):
+                changed_fields["topics"] = {"old": old_topics, "new": new_topics}
+
+        # 2. Update difficulty (cascades to all variants)
+        if "difficulty" in data and data["difficulty"] != question.difficulty:
+            old_diff = question.difficulty
+            new_diff = data["difficulty"]
+            question.difficulty = new_diff
+            question.save(update_fields=["difficulty"])
+            # Cascade to variants
+            question.variants.all().update(difficulty=new_diff)
+            changed_fields["difficulty"] = {"old": old_diff, "new": new_diff}
+
+        # 3. Update parent marks
+        if "marks" in data and float(data["marks"]) != float(question.marks):
+            old_marks = float(question.marks)
+            new_marks = float(data["marks"])
+            question.marks = new_marks
+            question.save(update_fields=["marks"])
+            changed_fields["marks"] = {"old": old_marks, "new": new_marks}
+
+        # 4. Update variant marks
+        if "variant_marks" in data:
+            variant_diffs = []
+            for item in data["variant_marks"]:
+                var = question.variants.filter(id=item["id"]).first()
+                if var and float(var.marks) != float(item["marks"]):
+                    old_v_marks = float(var.marks)
+                    new_v_marks = float(item["marks"])
+                    var.marks = new_v_marks
+                    var.save(update_fields=["marks"])
+                    variant_diffs.append({"id": var.id, "old": old_v_marks, "new": new_v_marks})
+            if variant_diffs:
+                changed_fields["variant_marks"] = variant_diffs
+
+        if changed_fields:
+            QuestionValidationHistory.objects.create(
+                question=question,
+                actor=user,
+                action="METADATA_UPDATE",
+                comment="Validator updated metadata",
+                changed_fields=changed_fields,
+                revision=question.revision,
+            )
+            log_action(
+                user,
+                "question.metadata_updated",
+                question,
+                metadata={"question_id": question.id, "changed_fields": changed_fields},
+            )
+
+        return Response(
+            QuestionDetailSerializer(question, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class QuestionResubmitView(APIView):
+    """
+    POST /api/questions/<id>/resubmit/
+
+    Allows DEO / Question Author to modify question content and resubmit for validation
+    after receiving comments from a Validator:
+    - Increments revision counter (revision += 1)
+    - Transitions validation_status from CORRECTION_REQUIRED back to SUBMITTED
+    - Persists RESUBMIT audit record with optional resubmission notes
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk=None):
+        user = request.user
+        question = Question.objects.filter(pk=pk).first()
+        if not question:
+            return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        is_super = user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+        is_deo = user.has_capability("DATA_ENTRY_OPERATOR")
+        is_creator = question.created_by_id == user.id
+
+        if not (is_super or is_deo or is_creator):
+            return Response(
+                {"detail": "You do not have permission to resubmit this question."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = QuestionResubmitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        # Update question content fields
+        for field in ["question_text", "options", "correct_answer", "explanation"]:
+            if field in data:
+                setattr(question, field, data[field])
+
+        if "topic_ids" in data and data["topic_ids"]:
+            question.topics.set(data["topic_ids"])
+            if question.topic_id not in data["topic_ids"]:
+                question.topic_id = data["topic_ids"][0]
+
+        # Increment revision and transition back to SUBMITTED
+        question.revision += 1
+        question.validation_status = "SUBMITTED"
+        question.save()
+
+        comment = data.get("comment", "") or f"Resubmitted revision #{question.revision}"
+
+        QuestionValidationHistory.objects.create(
+            question=question,
+            actor=user,
+            action="RESUBMIT",
+            comment=comment,
+            revision=question.revision,
+        )
+
+        log_action(
+            user,
+            "question.resubmitted",
+            question,
+            metadata={
+                "question_id": question.id,
+                "revision": question.revision,
+                "comment": comment,
+            },
+        )
+
+        return Response(
+            QuestionDetailSerializer(question, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class ValidationQueueView(ListAPIView):
+    """
+    GET /api/questions/validation-queue/
+
+    Returns paginated queue of questions requiring validation:
+    - Default status filter: SUBMITTED, UNDER_VALIDATION, CORRECTION_REQUIRED
+    - Gated by VALIDATOR capability or Super Admin
+    - Tenant scoped to user's school (or Global QBM)
+    """
+
+    serializer_class = QuestionDetailSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = QuestionPagination
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return Question.objects.none()
+
+        is_super = user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+        is_validator = user.has_capability("VALIDATOR")
+
+        if not is_super and not is_validator:
+            return Question.objects.none()
+
+        qs = Question.objects.select_related(
+            "topic", "topic__chapter", "topic__chapter__book"
+        ).prefetch_related("variants", "topics").filter(is_active=True)
+
+        if not is_super:
+            if user.school_id:
+                qs = qs.filter(Q(bank_source="GLOBAL") | Q(school_id=user.school_id))
+            else:
+                qs = qs.filter(bank_source="GLOBAL")
+
+        status_param = self.request.query_params.get("status")
+        if status_param and status_param.upper() != "ALL":
+            qs = qs.filter(validation_status=status_param.upper())
+        else:
+            # Default queue shows active validation stages
+            qs = qs.filter(validation_status__in=["SUBMITTED", "UNDER_VALIDATION", "CORRECTION_REQUIRED"])
+
+        return filter_questions(qs, self.request.query_params)
+
+
+class ValidationHistoryView(ListAPIView):
+    """
+    GET /api/questions/<id>/validation-history/
+
+    Returns full audit history of validation cycles for a question.
+    """
+
+    serializer_class = QuestionValidationHistorySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        question_id = self.kwargs.get("pk")
+        return QuestionValidationHistory.objects.filter(question_id=question_id).select_related("actor").order_by("-created_at", "-id")
 

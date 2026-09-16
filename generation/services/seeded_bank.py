@@ -49,6 +49,14 @@ class SeededBankGenerationService(QuestionGenerationService):
             is_active=True,
         )
 
+        # Gate 2 — Validation (Task 8 PDF Section 13 & 14):
+        school = constraints.get("school")
+        validation_enabled = constraints.get("validation_workflow_enabled")
+        if validation_enabled is None and school:
+            validation_enabled = getattr(school, "validation_workflow_enabled", False)
+        if validation_enabled:
+            qs = qs.filter(validation_status="APPROVED")
+
         # Topic filtering (supports both topic_id and topic_ids)
         topic_ids = constraints.get("topic_ids")
         if topic_ids and isinstance(topic_ids, (list, tuple, set)):

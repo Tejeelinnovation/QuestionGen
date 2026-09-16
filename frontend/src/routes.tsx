@@ -69,8 +69,24 @@ export const routes: RouteObject[] = [
       {
         path: 'dashboard/qbm',
         element: (
-          <RequireCapability capability="INGEST_GLOBAL_QUESTIONS">
+          <RequireCapability anyOf={['INGEST_GLOBAL_QUESTIONS', 'DATA_ENTRY_OPERATOR', 'VALIDATOR']}>
             <QBMDashboard />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'qbm/validation-queue',
+        element: (
+          <RequireCapability capability="VALIDATOR">
+            <QBMDashboard initialTab="validation" />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'qbm/my-submissions',
+        element: (
+          <RequireCapability capability="DATA_ENTRY_OPERATOR">
+            <QBMDashboard initialTab="submissions" />
           </RequireCapability>
         ),
       },

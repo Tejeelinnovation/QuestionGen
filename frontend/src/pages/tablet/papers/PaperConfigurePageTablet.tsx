@@ -5,15 +5,12 @@ import { papersApi, type SelectQuestionsConstraints } from '../../../api/papers'
 import type { Paper, Topic } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import {
-  Check,
-  ArrowRight,
   Clock,
   Sparkles,
   Plus,
   Trash2,
   AlertCircle,
   CheckCircle2,
-  Layers,
 } from 'lucide-react';
 import { MOTION } from '../../../lib/motion';
 
@@ -52,8 +49,8 @@ export const PaperConfigurePageTablet: React.FC = () => {
   const [paper, setPaper] = useState<Paper | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([]);
-  const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | ''>('');
-  const [learnerLevel, setLearnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | ''>('');
+  const [difficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | ''>('');
+  const [learnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | ''>('');
 
   // Rubric breakdown state
   const [useDistributionRubric, setUseDistributionRubric] = useState<boolean>(true);

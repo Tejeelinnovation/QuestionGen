@@ -37,6 +37,8 @@ class CapabilityName(models.TextChoices):
     VIEW_OWN_RESULT = "VIEW_OWN_RESULT", _("View Own Result")
     VIEW_SCHOOL_WIDE_CONTROLS = "VIEW_SCHOOL_WIDE_CONTROLS", _("View School-Wide Controls")
     INGEST_GLOBAL_QUESTIONS = "INGEST_GLOBAL_QUESTIONS", _("Ingest Global Questions")
+    DATA_ENTRY_OPERATOR = "DATA_ENTRY_OPERATOR", _("Data Entry Operator (QBM)")
+    VALIDATOR = "VALIDATOR", _("Question Validator (QBM)")
 
 
 class Capability(models.Model):
@@ -192,11 +194,18 @@ class User(AbstractUser):
                 "teacher": "Teacher",
                 "student": "Student",
                 "qbm": "Question Bank Manager",
+                "deo": "Data Entry Operator",
+                "DEO": "Data Entry Operator",
+                "validator": "Validator",
+                "Validator": "Validator",
+                "deo_validator": "DEO & Validator",
+                "DEO & Validator": "DEO & Validator",
                 "Super Admin": "Super Admin",
                 "School Admin": "School Admin",
                 "Teacher": "Teacher",
                 "Student": "Student",
                 "Question Bank Manager": "Question Bank Manager",
+                "Data Entry Operator": "Data Entry Operator",
             }
             return role_map.get(self.role, self.role)
 
@@ -209,6 +218,12 @@ class User(AbstractUser):
             return "Super Admin"
         if CapabilityName.INGEST_GLOBAL_QUESTIONS in caps:
             return "Question Bank Manager"
+        if CapabilityName.DATA_ENTRY_OPERATOR in caps and CapabilityName.VALIDATOR in caps:
+            return "DEO & Validator"
+        if CapabilityName.VALIDATOR in caps:
+            return "Validator"
+        if CapabilityName.DATA_ENTRY_OPERATOR in caps:
+            return "Data Entry Operator"
         if CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS in caps and self.school_id:
             return "School Admin"
         if CapabilityName.CREATE_STUDENT in caps and self.school_id:

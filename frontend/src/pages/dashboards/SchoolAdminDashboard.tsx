@@ -24,7 +24,8 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import type { User, Delivery } from '../../types';
+import { useAuth } from '../../auth/AuthContext';
+import type { User, Delivery, School } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
 import {
   SkeletonFacultyRoster,
@@ -63,6 +64,9 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const { user: currentUser } = useAuth();
+  const [schoolData, setSchoolData] = useState<School | null>(null);
+  const [targetProfile, setTargetProfile] = useState<'teacher' | 'deo' | 'validator' | 'deo_validator'>('teacher');
   const [primarySubject, setPrimarySubject] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -100,6 +104,15 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
     fetchDeliveries();
   }, []);
 
+  useEffect(() => {
+    if (currentUser?.school) {
+      usersApi
+        .getSchool(currentUser.school)
+        .then(setSchoolData)
+        .catch(() => {});
+    }
+  }, [currentUser?.school]);
+
   const handleCreateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -127,15 +140,24 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
       const newUser = await usersApi.createUser({
         username: username.trim(),
         password: password.trim(),
-        profile: 'teacher',
+        profile: targetProfile,
         first_name: firstName.trim() || undefined,
         last_name: lastName.trim() || undefined,
         email: email.trim(),
         mobile_number: mobileNumber.startsWith('+91') ? mobileNumber : `+91${mobDigits.slice(-10)}`,
-        primary_subject: primarySubject.trim() || undefined,
+        primary_subject: targetProfile === 'teacher' ? (primarySubject.trim() || undefined) : undefined,
       });
 
-      setFormSuccess(`Teacher "${newUser.username}" created successfully.`);
+      const roleDisplay =
+        targetProfile === 'deo'
+          ? 'Data Entry Operator'
+          : targetProfile === 'validator'
+          ? 'Validator'
+          : targetProfile === 'deo_validator'
+          ? 'DEO & Validator'
+          : 'Teacher';
+
+      setFormSuccess(`${roleDisplay} "${newUser.username}" created successfully.`);
       setUsername('');
       setPassword('');
       setFirstName('');
@@ -148,14 +170,16 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
       const detail =
         err.response?.data?.detail ||
         JSON.stringify(err.response?.data) ||
-        'Failed to create teacher account.';
+        'Failed to create user account.';
       setFormError(detail);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const teachers = users.filter((u) => u.role_label === 'Teacher');
+  const teachers = users.filter((u) =>
+    ['Teacher', 'Data Entry Operator', 'Validator', 'DEO & Validator'].includes(u.role_label)
+  );
   const students = users.filter((u) => u.role_label === 'Student');
 
   const filteredStudents = students.filter((s) => {
@@ -452,6 +476,70 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
               )}
 
               <form onSubmit={handleCreateTeacher} className="space-y-4 font-body">
+                {/* Role Profile Selector (Task 8) */}
+                <div>
+                  <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                    Account Responsibility Profile *
+                  </label>
+                  {schoolData?.validation_workflow_enabled ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTargetProfile('teacher')}
+                        className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                          targetProfile === 'teacher'
+                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="block text-xs">Teacher</span>
+                        <span className="block text-[10px] text-ink/50 mt-0.5">Authoring & Exam Prep</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargetProfile('deo')}
+                        className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                          targetProfile === 'deo'
+                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="block text-xs">DEO</span>
+                        <span className="block text-[10px] text-ink/50 mt-0.5">Data Entry Operator</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargetProfile('validator')}
+                        className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                          targetProfile === 'validator'
+                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="block text-xs">Validator</span>
+                        <span className="block text-[10px] text-ink/50 mt-0.5">Review & Metadata</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargetProfile('deo_validator')}
+                        className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                          targetProfile === 'deo_validator'
+                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="block text-xs">Dual Role</span>
+                        <span className="block text-[10px] text-ink/50 mt-0.5">DEO & Validator</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-card bg-surface-muted/60 border border-border text-[11px] text-ink/70">
+                      <span className="font-semibold block text-ink mb-0.5">Standard Teacher Flow Active</span>
+                      Validation workflow disabled by Super Admin. Standard teacher question-generation flow active.
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1" htmlFor="t-username">
                     Username *

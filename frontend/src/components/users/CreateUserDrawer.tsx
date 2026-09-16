@@ -10,7 +10,7 @@ import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
 interface CreateUserDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  targetProfile: 'teacher' | 'student' | 'qbm';
+  targetProfile: 'teacher' | 'student' | 'qbm' | 'deo' | 'validator' | 'deo_validator';
   onUserCreated: (newUser: User) => void;
 }
 
@@ -85,6 +85,12 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
         return 'Enroll New Student';
       case 'qbm':
         return 'Create Question Bank Manager';
+      case 'deo':
+        return 'Create Data Entry Operator (DEO)';
+      case 'validator':
+        return 'Create Question Validator';
+      case 'deo_validator':
+        return 'Create DEO & Validator (Dual Role)';
       default:
         return 'Create Account';
     }
@@ -98,6 +104,12 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
         return 'Quickly enroll a candidate for assessments and test attempts.';
       case 'qbm':
         return 'Provision a platform Question Bank Manager authorized to curate and ingest central curriculum question banks.';
+      case 'deo':
+        return 'Enter curriculum questions, options, and tags for school question banks.';
+      case 'validator':
+        return 'Review submitted questions, edit metadata, and approve or return for correction.';
+      case 'deo_validator':
+        return 'Dual-role user holding both question entry and validation approval responsibilities.';
       default:
         return 'Create an institutional user account.';
     }
