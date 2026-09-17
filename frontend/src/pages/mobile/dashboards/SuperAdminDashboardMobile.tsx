@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { usersApi } from '../../../api/users';
 import { useAuth } from '../../../auth/AuthContext';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
@@ -7,7 +8,7 @@ import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../../components/schools/BulkImportModal';
-import { ShieldCheck, Search, Edit2, Building2, Loader2, X, Users as UsersIcon, FileSpreadsheet, ShieldAlert, UserPlus } from 'lucide-react';
+import { ShieldCheck, Search, Edit2, Building2, Loader2, X, Users as UsersIcon, FileSpreadsheet, ShieldAlert, UserPlus, Database } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster } from '../../../components/ui/skeleton';
@@ -126,6 +127,15 @@ export const SuperAdminDashboardMobile: React.FC = () => {
 
       {/* ── Action Triggers Bar ── */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <Link
+          to="/dashboard/qbm"
+          id="superadmin-mobile-qbm-engine-btn"
+          className="px-3.5 py-2 rounded-pill bg-[#0F766E] text-white text-xs font-heading font-semibold hover:bg-[#0F766E]/90 transition-all flex items-center gap-1.5 shrink-0 active:scale-95 shadow-xs cursor-pointer"
+        >
+          <Database className="w-3.5 h-3.5" />
+          <span>Question Bank (QBM) Engine</span>
+        </Link>
+
         <button
           type="button"
           id="superadmin-mobile-create-qbm-btn"
@@ -133,7 +143,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
           className="px-3.5 py-2 rounded-pill border border-border bg-surface text-ink text-xs font-heading font-semibold hover:bg-surface-muted transition-all flex items-center gap-1.5 shrink-0 active:scale-95 shadow-xs cursor-pointer"
         >
           <UserPlus className="w-3.5 h-3.5 text-forest" />
-          <span>Add Question Bank Manager</span>
+          <span>Add QBM Staff</span>
         </button>
 
         <button
@@ -143,7 +153,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
           className="px-3.5 py-2 rounded-pill bg-forest text-white text-xs font-heading font-semibold hover:bg-forest/90 transition-all flex items-center gap-1.5 shrink-0 active:scale-95 shadow-xs cursor-pointer"
         >
           <Building2 className="w-3.5 h-3.5" />
-          <span>School / Coaching Class & Admin</span>
+          <span>Add School / Coaching Class & Admin</span>
         </button>
       </div>
 
@@ -324,7 +334,17 @@ export const SuperAdminDashboardMobile: React.FC = () => {
 
             {/* Horizontal scrollable role filter chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-              {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student', 'Question Bank Manager'].map((role) => (
+              {[
+                'ALL',
+                'Super Admin',
+                'School Admin',
+                'Teacher',
+                'Student',
+                'Question Bank Manager',
+                'Data Entry Operator',
+                'Validator',
+                'DEO & Validator',
+              ].map((role) => (
                 <button
                   key={role}
                   onClick={() => {

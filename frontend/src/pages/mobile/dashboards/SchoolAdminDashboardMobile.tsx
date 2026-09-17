@@ -53,6 +53,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
   // Pagination states
   const [teacherPage, setTeacherPage] = useState(1);
   const teacherPageSize = 6;
+  const [facultyRoleFilter, setFacultyRoleFilter] = useState<string>('ALL');
   const [studentPage, setStudentPage] = useState(1);
   const studentPageSize = 8;
   const [deliveryPage, setDeliveryPage] = useState(1);
@@ -179,6 +180,11 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
   const teachers = users.filter((u) =>
     ['Teacher', 'Data Entry Operator', 'Validator', 'DEO & Validator'].includes(u.role_label)
   );
+
+  const filteredTeachers = teachers.filter((t) => {
+    if (facultyRoleFilter === 'ALL') return true;
+    return t.role_label === facultyRoleFilter;
+  });
   const students = users.filter((u) => u.role_label === 'Student');
 
   const filteredStudents = students.filter((s) => {
@@ -192,7 +198,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
     );
   });
 
-  const paginatedTeachers = teachers.slice(
+  const paginatedTeachers = filteredTeachers.slice(
     (teacherPage - 1) * teacherPageSize,
     teacherPage * teacherPageSize
   );
@@ -332,64 +338,62 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
               )}
 
               <form onSubmit={handleCreateTeacher} className="space-y-3 text-xs">
-                {/* Role Profile Selector (when validation workflow is enabled) */}
-                {schoolData?.validation_workflow_enabled && (
-                  <div className="space-y-1.5">
-                    <label className="font-heading font-semibold text-ink block">
-                      Account Responsibility Profile *
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTargetProfile('teacher')}
-                        className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
-                          targetProfile === 'teacher'
-                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
-                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
-                        }`}
-                      >
-                        <span className="block text-xs">Teacher</span>
-                        <span className="block text-[10px] text-ink/50 mt-0.5">Authoring & Exam Prep</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTargetProfile('deo')}
-                        className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
-                          targetProfile === 'deo'
-                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
-                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
-                        }`}
-                      >
-                        <span className="block text-xs">DEO</span>
-                        <span className="block text-[10px] text-ink/50 mt-0.5">Data Entry Operator</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTargetProfile('validator')}
-                        className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
-                          targetProfile === 'validator'
-                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
-                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
-                        }`}
-                      >
-                        <span className="block text-xs">Validator</span>
-                        <span className="block text-[10px] text-ink/50 mt-0.5">Review & Metadata</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTargetProfile('deo_validator')}
-                        className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
-                          targetProfile === 'deo_validator'
-                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
-                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
-                        }`}
-                      >
-                        <span className="block text-xs">Dual Role</span>
-                        <span className="block text-[10px] text-ink/50 mt-0.5">DEO & Validator</span>
-                      </button>
-                    </div>
+                {/* Role Profile Selector (Always available to school admin) */}
+                <div className="space-y-1.5">
+                  <label className="font-heading font-semibold text-ink block">
+                    Account Responsibility Profile *
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfile('teacher')}
+                      className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
+                        targetProfile === 'teacher'
+                          ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                          : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                      }`}
+                    >
+                      <span className="block text-xs">Teacher</span>
+                      <span className="block text-[10px] text-ink/50 mt-0.5">Authoring & Exam Prep</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfile('deo')}
+                      className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
+                        targetProfile === 'deo'
+                          ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                          : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                      }`}
+                    >
+                      <span className="block text-xs">DEO</span>
+                      <span className="block text-[10px] text-ink/50 mt-0.5">Data Entry Operator</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfile('validator')}
+                      className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
+                        targetProfile === 'validator'
+                          ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                          : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                      }`}
+                    >
+                      <span className="block text-xs">Validator</span>
+                      <span className="block text-[10px] text-ink/50 mt-0.5">Review & Metadata</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfile('deo_validator')}
+                      className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
+                        targetProfile === 'deo_validator'
+                          ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                          : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                      }`}
+                    >
+                      <span className="block text-xs">Dual Role</span>
+                      <span className="block text-[10px] text-ink/50 mt-0.5">DEO & Validator</span>
+                    </button>
                   </div>
-                )}
+                </div>
 
                 <div className="space-y-1">
                   <label className="font-heading font-semibold text-ink">Username *</label>
@@ -507,12 +511,39 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
             </div>
           )}
 
+          {/* Faculty Role Filter Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {[
+              { id: 'ALL', label: `All (${teachers.length})` },
+              { id: 'Teacher', label: `Teachers (${teachers.filter((t) => t.role_label === 'Teacher').length})` },
+              { id: 'Data Entry Operator', label: `DEO (${teachers.filter((t) => t.role_label === 'Data Entry Operator').length})` },
+              { id: 'Validator', label: `Validators (${teachers.filter((t) => t.role_label === 'Validator').length})` },
+              { id: 'DEO & Validator', label: `Dual Role (${teachers.filter((t) => t.role_label === 'DEO & Validator').length})` },
+            ].map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  setFacultyRoleFilter(f.id);
+                  setTeacherPage(1);
+                }}
+                className={`px-2.5 py-1 rounded-pill font-heading text-xs whitespace-nowrap transition-all cursor-pointer active:scale-95 ${
+                  facultyRoleFilter === f.id
+                    ? 'bg-ink text-white font-semibold'
+                    : 'bg-surface border border-border text-ink/70 hover:text-ink'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {/* Teacher list */}
           {isLoading ? (
             <SkeletonFacultyRoster count={4} />
-          ) : teachers.length === 0 ? (
+          ) : filteredTeachers.length === 0 ? (
             <div className="p-6 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
-              No teachers registered yet.
+              No faculty members found for this filter.
             </div>
           ) : (
             <div className="space-y-3">
@@ -567,7 +598,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
 
               <Pagination
                 currentPage={teacherPage}
-                totalCount={teachers.length}
+                totalCount={filteredTeachers.length}
                 pageSize={teacherPageSize}
                 onPageChange={setTeacherPage}
               />

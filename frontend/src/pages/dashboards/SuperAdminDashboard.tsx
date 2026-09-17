@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { usersApi } from '../../api/users';
 import { useAuth } from '../../auth/AuthContext';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
@@ -10,7 +11,7 @@ import { EditSchoolModal } from '../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../components/schools/BulkImportModal';
-import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, UserPlus, Users, ShieldAlert } from 'lucide-react';
+import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, UserPlus, Users, ShieldAlert, Database } from 'lucide-react';
 import type { User, School, UserStats } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonTable, Skeleton } from '../../components/ui/skeleton';
@@ -115,6 +116,14 @@ const SuperAdminDashboardDesktop: React.FC = () => {
 
         {/* Primary Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+          <Link
+            to="/dashboard/qbm"
+            id="superadmin-qbm-engine-btn"
+            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-[#0F766E] text-white hover:bg-[#0F766E]/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>Question Bank (QBM) Engine</span>
+          </Link>
           <button
             type="button"
             id="superadmin-create-qbm-btn"
@@ -122,7 +131,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
             className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <UserPlus className="w-3.5 h-3.5 text-forest" />
-            <span>Add Question Bank Manager</span>
+            <span>Add QBM Staff</span>
           </button>
           <button
             type="button"
@@ -420,7 +429,17 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
-                  {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student', 'Question Bank Manager'].map((role) => (
+                  {[
+                    'ALL',
+                    'Super Admin',
+                    'School Admin',
+                    'Teacher',
+                    'Student',
+                    'Question Bank Manager',
+                    'Data Entry Operator',
+                    'Validator',
+                    'DEO & Validator',
+                  ].map((role) => (
                     <button
                       key={role}
                       type="button"

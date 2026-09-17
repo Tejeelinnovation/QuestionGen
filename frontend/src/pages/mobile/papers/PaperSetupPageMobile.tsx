@@ -16,6 +16,17 @@ export const PaperSetupPageMobile: React.FC = () => {
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [chapterId, setChapterId] = useState<number | ''>('');
+  const [examMode, setExamMode] = useState<'single' | 'multi'>('single');
+  const availableSubjects = [
+    'Mathematics',
+    'Physics',
+    'Chemistry',
+    'Biology',
+    'Science',
+    'Social Science',
+    'English',
+  ];
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['Mathematics']);
 
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,10 +37,10 @@ export const PaperSetupPageMobile: React.FC = () => {
       setIsLoadingChapters(true);
       setErrorMessage(null);
       try {
-        const data = await contentApi.getChapters();
-        setChapters(data);
-        if (data.length > 0) {
-          setChapterId(data[0].id);
+        const chapData = await contentApi.getChapters();
+        setChapters(chapData);
+        if (chapData.length > 0) {
+          setChapterId(chapData[0].id);
         }
       } catch (err: any) {
         setErrorMessage(
@@ -43,6 +54,12 @@ export const PaperSetupPageMobile: React.FC = () => {
     loadChapters();
   }, []);
 
+  const handleSubjectToggle = (subj: string) => {
+    setSelectedSubjects((prev) =>
+      prev.includes(subj) ? prev.filter((s) => s !== subj) : [...prev, subj]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -51,8 +68,12 @@ export const PaperSetupPageMobile: React.FC = () => {
       setErrorMessage('Paper title is required.');
       return;
     }
-    if (!chapterId) {
+    if (examMode === 'single' && !chapterId) {
       setErrorMessage('Please select a curriculum chapter.');
+      return;
+    }
+    if (examMode === 'multi' && selectedSubjects.length === 0) {
+      setErrorMessage('Please select at least one subject for the combined test.');
       return;
     }
 
@@ -61,7 +82,10 @@ export const PaperSetupPageMobile: React.FC = () => {
       const paper = await papersApi.createPaper({
         title: title.trim(),
         instructions: instructions.trim(),
-        chapter: Number(chapterId),
+        chapter: examMode === 'single' ? Number(chapterId) : null,
+        subjects: examMode === 'multi' ? selectedSubjects : [],
+        duration_minutes: 60,
+        total_question_count: 0,
       });
 
       navigate(`/papers/${paper.id}/configure`);
@@ -119,30 +143,107 @@ export const PaperSetupPageMobile: React.FC = () => {
             />
           </div>
 
-          {/* Curriculum Chapter Select */}
+          {/* Blueprint Scope Mode: Single Chapter vs Multi-Subject */}
           <div className="space-y-1.5">
-            <label
-              htmlFor="mobile-paper-chapter"
-              className="block text-xs font-heading font-semibold text-ink"
-            >
-              Curriculum Chapter *
+            <label className="block text-xs font-heading font-semibold text-ink">
+              Blueprint Scope Mode *
             </label>
-            {isLoadingChapters ? (
-              <div className="text-xs text-ink/50 py-2">Loading chapters...</div>
-            ) : (
-              <CustomSelect
-                id="mobile-paper-chapter"
-                value={String(chapterId)}
-                onChange={(val) => setChapterId(Number(val))}
-                options={chapters.map((ch) => ({
-                  value: String(ch.id),
-                  label: `${ch.book_subject ? `${ch.book_subject}: ` : ''}${ch.title}`,
-                }))}
-                placeholder="Select a chapter..."
-                triggerClassName="min-h-[48px] py-3 text-xs sm:text-sm font-body bg-surface"
-              />
-            )}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setExamMode('single')}
+                className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                  examMode === 'single'
+                    ? 'border-forest bg-forest/5 text-ink ring-1 ring-forest'
+                    : 'border-border bg-bg text-ink/70 hover:bg-surface'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-heading font-semibold text-xs">
+                  <span className={`w-2 h-2 rounded-full ${examMode === 'single' ? 'bg-forest' : 'bg-ink/30'}`} />
+                  Single Chapter
+                </div>
+                <p className="text-[10px] text-ink/60 mt-0.5">
+                  Unit test or chapter focus
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExamMode('multi')}
+                className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                  examMode === 'multi'
+                    ? 'border-forest bg-forest/5 text-ink ring-1 ring-forest'
+                    : 'border-border bg-bg text-ink/70 hover:bg-surface'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-heading font-semibold text-xs">
+                  <span className={`w-2 h-2 rounded-full ${examMode === 'multi' ? 'bg-forest' : 'bg-ink/30'}`} />
+                  Multi-Subject
+                </div>
+                <p className="text-[10px] text-ink/60 mt-0.5">
+                  Combined or term mock exam
+                </p>
+              </button>
+            </div>
           </div>
+
+          {/* Chapter / Multi-Subject Choice */}
+          {examMode === 'single' ? (
+            <div className="space-y-1.5">
+              <label
+                htmlFor="mobile-paper-chapter"
+                className="block text-xs font-heading font-semibold text-ink"
+              >
+                Curriculum Chapter *
+              </label>
+              {isLoadingChapters ? (
+                <div className="text-xs text-ink/50 py-2">Loading chapters...</div>
+              ) : (
+                <CustomSelect
+                  id="mobile-paper-chapter"
+                  value={String(chapterId)}
+                  onChange={(val) => setChapterId(Number(val))}
+                  options={chapters.map((ch) => ({
+                    value: String(ch.id),
+                    label: `${ch.book_subject ? `${ch.book_subject}: ` : ''}${ch.title}`,
+                  }))}
+                  placeholder="Select a chapter..."
+                  triggerClassName="min-h-[48px] py-3 text-xs sm:text-sm font-body bg-surface"
+                />
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-heading font-semibold text-ink">
+                  Participating Subjects *
+                </label>
+                <span className="text-[11px] font-mono text-ink/40">
+                  {selectedSubjects.length} selected
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {availableSubjects.map((subj) => {
+                  const isSelected = selectedSubjects.includes(subj);
+                  return (
+                    <button
+                      key={subj}
+                      type="button"
+                      onClick={() => handleSubjectToggle(subj)}
+                      className={`px-2.5 py-1 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer border ${
+                        isSelected
+                          ? 'bg-forest text-white border-forest shadow-xs'
+                          : 'bg-bg text-ink/70 border-border hover:bg-surface hover:text-ink'
+                      }`}
+                    >
+                      {isSelected ? '✓ ' : '+ '}
+                      {subj}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Instructions */}
           <div className="space-y-1.5">

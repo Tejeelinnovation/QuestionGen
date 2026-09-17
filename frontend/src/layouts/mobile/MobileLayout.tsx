@@ -6,26 +6,39 @@ import {
   FilePlus,
   BookOpen,
   User as UserIcon,
-  ClipboardList,
+  Database,
 } from 'lucide-react';
 
 export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const { user, hasCapability } = useAuth();
+  const { user, hasCapability, dashboardPath } = useAuth();
   const location = useLocation();
 
-  // Mobile Bottom Tab Items tailored by capability (Teachers only for Create Paper)
-  const isTeacher =
-    user?.role_label === 'Teacher' && hasCapability('CREATE_PAPER');
-  const isStudent = hasCapability('ATTEMPT_TEST');
+  // Mobile Bottom Tab Items tailored by capability
+  const isSuperAdmin = hasCapability('CREATE_SCHOOL');
+  const isSchoolAdmin = hasCapability('VIEW_SCHOOL_WIDE_CONTROLS') && !isSuperAdmin;
+  const isTeacher = hasCapability('CREATE_PAPER') && !isSuperAdmin && !isSchoolAdmin;
+  const isStudent = hasCapability('ATTEMPT_TEST') && !isTeacher && !isSchoolAdmin && !isSuperAdmin;
+  const isQBM = (hasCapability('INGEST_GLOBAL_QUESTIONS') || hasCapability('DATA_ENTRY_OPERATOR') || hasCapability('VALIDATOR')) && !isSuperAdmin;
 
   const tabs = [
     {
       id: 'home',
       label: 'Home',
       icon: LayoutDashboard,
-      path: '/',
-      isActive: location.pathname === '/' || location.pathname.startsWith('/dashboard'),
+      path: dashboardPath || '/',
+      isActive: location.pathname === '/' || location.pathname === dashboardPath,
     },
+    ...(isSuperAdmin
+      ? [
+          {
+            id: 'qbm-bank',
+            label: 'Q-Bank',
+            icon: Database,
+            path: '/dashboard/qbm',
+            isActive: location.pathname.startsWith('/dashboard/qbm'),
+          },
+        ]
+      : []),
     ...(isTeacher
       ? [
           {
@@ -41,21 +54,21 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
       ? [
           {
             id: 'assessments',
-            label: 'Assessments',
+            label: 'Tests',
             icon: BookOpen,
             path: '/dashboard/student',
             isActive: location.pathname.startsWith('/dashboard/student') || location.pathname.includes('/attempt'),
           },
         ]
       : []),
-    ...(!isTeacher && !isStudent
+    ...(isQBM
       ? [
           {
-            id: 'directory',
-            label: 'Overview',
-            icon: ClipboardList,
-            path: '/',
-            isActive: location.pathname === '/',
+            id: 'qbm-repository',
+            label: 'Repository',
+            icon: Database,
+            path: '/dashboard/qbm',
+            isActive: location.pathname.startsWith('/dashboard/qbm') || location.pathname.startsWith('/qbm'),
           },
         ]
       : []),

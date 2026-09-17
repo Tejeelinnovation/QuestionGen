@@ -1,22 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import { useAuth } from '../../../auth/AuthContext';
 import type { PaperVersion, QuestionSnapshotItem } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
-import { Lock, Send, Printer, CheckCircle2 } from 'lucide-react';
+import { Lock, Send, Printer, CheckCircle2, Copy, Loader2 } from 'lucide-react';
 
 export const VersionDetailPageMobile: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);
+  const navigate = useNavigate();
   const { hasCapability } = useAuth();
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleCloneSame = async () => {
+    setIsCloning(true);
+    setErrorMessage(null);
+    try {
+      const cloned = await papersApi.cloneVersion(paperId, vId, {});
+      setSuccessMessage(`Created clone Version ${cloned.version_label}.`);
+      setIsCloning(false);
+      navigate(`/papers/${paperId}/versions/${cloned.id}`);
+    } catch (err: any) {
+      const detail =
+        err.response?.data?.detail ||
+        err.response?.data?.non_field_errors?.[0] ||
+        'Failed to clone version.';
+      setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      setIsCloning(false);
+    }
+  };
 
   const fetchVersion = async () => {
     setIsLoading(true);
@@ -156,6 +176,32 @@ export const VersionDetailPageMobile: React.FC = () => {
               <span>Print View</span>
             </Link>
           </div>
+        )}
+
+        {hasCapability('CREATE_PAPER') && (
+          <button
+            type="button"
+            id="mobile-clone-version-btn"
+            onClick={handleCloneSame}
+            disabled={actionLoading || isCloning}
+            className={`w-full py-3 px-4 rounded-pill text-xs font-heading font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px] shadow-xs active:scale-95 ${
+              isCloning
+                ? 'bg-ink text-white font-bold'
+                : 'border border-border bg-surface text-ink hover:bg-surface-muted hover:border-forest/50'
+            }`}
+          >
+            {isCloning ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-lime" />
+                <span>Cloning Version...</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5 text-forest" />
+                <span>Clone as Alternate Shift Version</span>
+              </>
+            )}
+          </button>
         )}
       </div>
 

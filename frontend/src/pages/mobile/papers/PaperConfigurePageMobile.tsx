@@ -250,7 +250,7 @@ export const PaperConfigurePageMobile: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 font-body pb-24">
+    <div className="space-y-4 font-body pb-40">
       <PaperWorkflowNavMobile currentStep="configure" backTo="/papers/create" />
 
       {/* Header */}
@@ -761,25 +761,27 @@ export const PaperConfigurePageMobile: React.FC = () => {
           )}
         </div>
 
-        {/* ── Mobile Proceed Action Bar ── */}
-        <div className="pt-3 pb-12">
-          <button
-            type="submit"
-            id="mobile-paper-proceed-btn"
-            disabled={isSubmitting}
-            className={`w-full py-3.5 px-4 rounded-pill bg-forest text-white font-heading font-bold text-sm hover:bg-forest/90 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-98 disabled:opacity-50 ${MOTION.touch.button.className}`}
-          >
-            {isSubmitting ? (
-              <span>Generating Candidate Questions...</span>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                <span>
-                  Generate Questions ({useDistributionRubric ? rubricTotalQuestions : totalMarks} Qs) &rarr;
-                </span>
-              </>
-            )}
-          </button>
+        {/* ── Docked Mobile Proceed Action Bar ── */}
+        <div className="fixed bottom-14 left-0 right-0 z-30 bg-surface/95 backdrop-blur-md border-t border-border px-4 py-2.5 shadow-float print:hidden">
+          <div className="max-w-lg mx-auto">
+            <button
+              type="submit"
+              id="mobile-paper-proceed-btn"
+              disabled={isSubmitting}
+              className={`w-full py-3 px-4 rounded-pill bg-forest text-white font-heading font-bold text-sm hover:bg-forest/90 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50 min-h-[48px] ${MOTION.touch.button.className}`}
+            >
+              {isSubmitting ? (
+                <span>Generating Candidate Questions...</span>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-lime" />
+                  <span>
+                    Generate Questions ({useDistributionRubric ? rubricTotalQuestions : totalMarks} Qs) &rarr;
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
     </div>

@@ -4,6 +4,7 @@ import { papersApi } from '../../../api/papers';
 import { useAuth } from '../../../auth/AuthContext';
 import type { PaperVersion } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
+import { Loader2, Copy } from 'lucide-react';
 
 export const VersionDetailPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -194,9 +195,23 @@ export const VersionDetailPageTablet: React.FC = () => {
                 onClick={handleCloneSame}
                 id="clone-version-btn"
                 disabled={isFinalizing || isCloning}
-                className="px-4 py-3 rounded-pill bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-heading font-medium min-h-[44px] cursor-pointer disabled:opacity-50"
+                className={`px-4 py-3 rounded-pill text-xs font-heading font-medium min-h-[44px] cursor-pointer flex items-center justify-center gap-2 border transition-all ${
+                  isCloning
+                    ? 'bg-[#06241b] text-white border-forest shadow-inner'
+                    : 'bg-white/10 hover:bg-white/20 text-white border-white/20 disabled:opacity-50'
+                }`}
               >
-                {isCloning ? 'Cloning...' : 'Clone as Alternate Shift'}
+                {isCloning ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-lime" />
+                    <span>Cloning...</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-white/70" />
+                    <span>Clone as Alternate Shift</span>
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -237,9 +252,23 @@ export const VersionDetailPageTablet: React.FC = () => {
                 onClick={handleCloneSame}
                 id="clone-version-btn"
                 disabled={isFinalizing || isCloning}
-                className="px-4 py-3 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-medium min-h-[44px] cursor-pointer disabled:opacity-50"
+                className={`px-4 py-3 rounded-pill text-xs font-heading font-medium min-h-[44px] cursor-pointer flex items-center justify-center gap-2 border transition-all ${
+                  isCloning
+                    ? 'bg-[#06241b] text-white border-forest shadow-inner'
+                    : 'border-border bg-bg text-ink disabled:opacity-50'
+                }`}
               >
-                {isCloning ? 'Cloning...' : 'Clone as Alternate Shift'}
+                {isCloning ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-lime" />
+                    <span>Cloning...</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-forest" />
+                    <span>Clone as Alternate Shift</span>
+                  </>
+                )}
               </button>
             )}
           </div>

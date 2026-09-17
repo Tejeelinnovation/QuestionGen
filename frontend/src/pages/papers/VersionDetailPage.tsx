@@ -8,6 +8,7 @@ import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { VersionDetailPageTablet } from '../tablet/papers/VersionDetailPageTablet';
 import { VersionDetailPageMobile } from '../mobile/papers/VersionDetailPageMobile';
+import { Loader2, Copy } from 'lucide-react';
 
 const VersionDetailPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -220,10 +221,24 @@ const VersionDetailPageDesktop: React.FC = () => {
                   onClick={handleCloneSame}
                   id="clone-version-btn"
                   disabled={isFinalizing || isCloning}
-                  className="px-4 py-2 text-xs font-heading font-medium rounded-pill bg-white/10 hover:bg-white/20 text-white border border-white/25 transition-colors cursor-pointer disabled:opacity-50"
+                  className={`px-4 py-2 text-xs font-heading font-medium rounded-pill border transition-all cursor-pointer flex items-center gap-2 ${
+                    isCloning
+                      ? 'bg-[#06241b] text-white border-forest shadow-inner'
+                      : 'bg-white/10 hover:bg-white/20 text-white border-white/25 disabled:opacity-50'
+                  }`}
                   title="Clone this version creating Version B/C with the same question pool"
                 >
-                  {isCloning ? 'Cloning...' : 'Clone as Alternate Shift Version'}
+                  {isCloning ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-lime" />
+                      <span>Cloning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-white/70" />
+                      <span>Clone as Alternate Shift Version</span>
+                    </>
+                  )}
                 </button>
               </div>
             )}
@@ -276,10 +291,24 @@ const VersionDetailPageDesktop: React.FC = () => {
                   onClick={handleCloneSame}
                   id="clone-version-btn"
                   disabled={isFinalizing || isCloning}
-                  className="px-4 py-2 text-xs font-heading font-medium rounded-pill border border-border bg-bg text-ink hover:bg-surface-muted transition-colors cursor-pointer disabled:opacity-50"
+                  className={`px-4 py-2 text-xs font-heading font-medium rounded-pill border transition-all cursor-pointer flex items-center gap-2 ${
+                    isCloning
+                      ? 'bg-[#06241b] text-white border-forest shadow-inner'
+                      : 'border-border bg-bg text-ink hover:bg-surface-muted disabled:opacity-50'
+                  }`}
                   title="Clone this version creating Version B/C with the same question pool"
                 >
-                  {isCloning ? 'Cloning...' : 'Clone as Alternate Shift Version'}
+                  {isCloning ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-lime" />
+                      <span>Cloning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-forest" />
+                      <span>Clone as Alternate Shift Version</span>
+                    </>
+                  )}
                 </button>
 
                 <Link
