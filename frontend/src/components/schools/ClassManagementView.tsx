@@ -3,6 +3,7 @@ import { classesApi } from '../../api/classes';
 import { usersApi } from '../../api/users';
 import type { ClassSection, ClassSubjectTeacher, User } from '../../types';
 import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
+import { CustomSelect } from '../ui/custom-select';
 import {
   GraduationCap,
   Plus,
@@ -857,36 +858,34 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
                   <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                     Standard (Class) *
                   </label>
-                  <select
-                    value={standard}
-                    onChange={(e) => setStandard(Number(e.target.value))}
+                  <CustomSelect
+                    value={String(standard)}
+                    onChange={(val) => setStandard(Number(val))}
                     disabled={modalSubmitting}
-                    className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
-                  >
-                    {STANDARDS.map((std) => (
-                      <option key={std} value={std}>
-                        Class {std}th
-                      </option>
-                    ))}
-                  </select>
+                    options={STANDARDS.map((std) => ({
+                      value: String(std),
+                      label: `Class ${std}th`,
+                    }))}
+                    placeholder="Select class..."
+                    className="w-full"
+                  />
                 </div>
 
                 <div className="space-y-1">
                   <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                     Division (Section) *
                   </label>
-                  <select
+                  <CustomSelect
                     value={section}
-                    onChange={(e) => setSection(e.target.value)}
+                    onChange={(val) => setSection(val)}
                     disabled={modalSubmitting}
-                    className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
-                  >
-                    {SECTIONS.map((sec) => (
-                      <option key={sec} value={sec}>
-                        Section {sec}
-                      </option>
-                    ))}
-                  </select>
+                    options={SECTIONS.map((sec) => ({
+                      value: sec,
+                      label: `Section ${sec}`,
+                    }))}
+                    placeholder="Select section..."
+                    className="w-full"
+                  />
                 </div>
               </div>
 
@@ -917,10 +916,10 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
                   <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                     Designated Class Teacher (Single Main Authority)
                   </label>
-                  <select
-                    value={classTeacherId}
-                    onChange={(e) => {
-                      const tId = e.target.value ? Number(e.target.value) : '';
+                  <CustomSelect
+                    value={classTeacherId ? String(classTeacherId) : ''}
+                    onChange={(val) => {
+                      const tId = val ? Number(val) : '';
                       setClassTeacherId(tId);
                       if (tId) {
                         const tObj = faculty.find((f) => f.id === tId);
@@ -930,18 +929,16 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
                       }
                     }}
                     disabled={modalSubmitting}
-                    className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
-                  >
-                    <option value="">-- Unassigned (Select Faculty) --</option>
-                    {faculty.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.first_name || f.last_name
-                          ? `${f.first_name || ''} ${f.last_name || ''}`.trim()
-                          : f.username}{' '}
-                        {f.primary_subject ? `(${f.primary_subject})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: '', label: '-- Unassigned (Select Faculty) --' },
+                      ...faculty.map((f) => ({
+                        value: String(f.id),
+                        label: `${f.first_name || f.last_name ? `${f.first_name || ''} ${f.last_name || ''}`.trim() : f.username}${f.primary_subject ? ` (${f.primary_subject})` : ''}`,
+                      })),
+                    ]}
+                    placeholder="-- Unassigned (Select Faculty) --"
+                    className="w-full"
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -1048,22 +1045,19 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
 
                   <div>
                     <label className="block text-[11px] text-ink/70 font-medium mb-1">Assigned Teacher</label>
-                    <select
-                      required
-                      value={newSubjectTeacherId}
-                      onChange={(e) => setNewSubjectTeacherId(Number(e.target.value))}
-                      className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
-                    >
-                      <option value="">Select Teacher...</option>
-                      {faculty.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.first_name || f.last_name
-                            ? `${f.first_name || ''} ${f.last_name || ''}`.trim()
-                            : f.username}{' '}
-                          {f.primary_subject ? `(${f.primary_subject})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <CustomSelect
+                      value={newSubjectTeacherId ? String(newSubjectTeacherId) : ''}
+                      onChange={(val) => setNewSubjectTeacherId(val ? Number(val) : '')}
+                      options={[
+                        { value: '', label: 'Select Teacher...' },
+                        ...faculty.map((f) => ({
+                          value: String(f.id),
+                          label: `${f.first_name || f.last_name ? `${f.first_name || ''} ${f.last_name || ''}`.trim() : f.username}${f.primary_subject ? ` (${f.primary_subject})` : ''}`,
+                        })),
+                      ]}
+                      placeholder="Select Teacher..."
+                      className="w-full"
+                    />
                   </div>
                 </div>
 

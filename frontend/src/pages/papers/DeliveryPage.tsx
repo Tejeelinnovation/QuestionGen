@@ -11,6 +11,7 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { DeliveryPageTablet } from '../tablet/papers/DeliveryPageTablet';
 import { DeliveryPageMobile } from '../mobile/papers/DeliveryPageMobile';
 import { GraduationCap, Users } from 'lucide-react';
+import { CustomSelect } from '../../components/ui/custom-select';
 
 const DeliveryPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -496,19 +497,20 @@ const DeliveryPageDesktop: React.FC = () => {
                     </div>
 
                     <div>
-                      <select
+                      <CustomSelect
                         value={classFilter}
-                        onChange={(e) => setClassFilter(e.target.value)}
-                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:bg-surface focus:border-grape focus:outline-none cursor-pointer"
-                      >
-                        <option value="ALL">All Classes & Divisions</option>
-                        {classes.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            Class {c.name}
-                          </option>
-                        ))}
-                        <option value="UNASSIGNED">Unassigned Candidates</option>
-                      </select>
+                        onChange={(val) => setClassFilter(val)}
+                        options={[
+                          { value: 'ALL', label: 'All Classes & Divisions' },
+                          ...classes.map((c) => ({
+                            value: String(c.id),
+                            label: `Class ${c.name}`,
+                          })),
+                          { value: 'UNASSIGNED', label: 'Unassigned Candidates' },
+                        ]}
+                        placeholder="Filter by class/division..."
+                        className="w-full"
+                      />
                     </div>
                   </div>
 

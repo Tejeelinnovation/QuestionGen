@@ -6,6 +6,7 @@ import { classesApi } from '../../../api/classes';
 import type { Delivery, PaperVersion, User, ClassSection } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { Send, Check, Search, CheckCircle2, GraduationCap, Users } from 'lucide-react';
+import { CustomSelect } from '../../../components/ui/custom-select';
 
 export const DeliveryPageMobile: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -349,19 +350,18 @@ export const DeliveryPageMobile: React.FC = () => {
                       <Search className="w-3.5 h-3.5 text-ink/40 absolute left-2.5 top-2.5" />
                     </div>
 
-                    <select
+                    <CustomSelect
                       value={classFilter}
-                      onChange={(e) => setClassFilter(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-card bg-surface-muted border border-border text-xs focus:border-forest focus:outline-none min-h-[36px] cursor-pointer"
-                    >
-                      <option value="ALL">All Divisions</option>
-                      {classes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          Class {c.name}
-                        </option>
-                      ))}
-                      <option value="UNASSIGNED">Unassigned</option>
-                    </select>
+                      onChange={(val) => setClassFilter(val)}
+                      options={[
+                        { value: 'ALL', label: 'All Divisions' },
+                        ...classes.map((c) => ({ value: String(c.id), label: `Class ${c.name}` })),
+                        { value: 'UNASSIGNED', label: 'Unassigned' },
+                      ]}
+                      placeholder="Filter division..."
+                      triggerClassName="min-h-[36px] bg-surface-muted py-1.5 px-2.5 text-xs"
+                      className="w-full"
+                    />
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-ink/60 pt-1">

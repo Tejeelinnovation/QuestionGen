@@ -6,6 +6,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { ArrowRight } from 'lucide-react';
+import { CustomSelect } from '../../../components/ui/custom-select';
 
 export const PaperSetupPageMobile: React.FC = () => {
   const navigate = useNavigate();
@@ -129,24 +130,17 @@ export const PaperSetupPageMobile: React.FC = () => {
             {isLoadingChapters ? (
               <div className="text-xs text-ink/50 py-2">Loading chapters...</div>
             ) : (
-              <div className="relative">
-                <select
-                  id="mobile-paper-chapter"
-                  value={chapterId}
-                  onChange={(e) => setChapterId(Number(e.target.value))}
-                  required
-                  className="w-full px-3.5 py-3 rounded-card bg-surface border border-border text-xs sm:text-sm font-body text-ink focus:border-forest focus:outline-none min-h-[48px] appearance-none cursor-pointer"
-                >
-                  {chapters.map((ch) => (
-                    <option key={ch.id} value={ch.id}>
-                      {ch.book_subject ? `${ch.book_subject}: ` : ''}{ch.title}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-ink/40 text-xs">
-                  ▼
-                </div>
-              </div>
+              <CustomSelect
+                id="mobile-paper-chapter"
+                value={String(chapterId)}
+                onChange={(val) => setChapterId(Number(val))}
+                options={chapters.map((ch) => ({
+                  value: String(ch.id),
+                  label: `${ch.book_subject ? `${ch.book_subject}: ` : ''}${ch.title}`,
+                }))}
+                placeholder="Select a chapter..."
+                triggerClassName="min-h-[48px] py-3 text-xs sm:text-sm font-body bg-surface"
+              />
             )}
           </div>
 

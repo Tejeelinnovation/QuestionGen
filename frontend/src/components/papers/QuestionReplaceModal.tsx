@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { contentApi } from '../../api/content';
 import type { Question, QuestionPreview } from '../../types';
+import { CustomSelect } from '../ui/custom-select';
 
 interface QuestionReplaceModalProps {
   isOpen: boolean;
@@ -156,18 +157,21 @@ export const QuestionReplaceModal: React.FC<QuestionReplaceModalProps> = ({
               <span className="font-medium text-ink/80">Same topic only</span>
             </label>
 
-            <div className="flex items-center gap-1.5">
-              <span className="text-ink/50 font-mono text-[11px]">Difficulty:</span>
-              <select
+            <div className="flex items-center gap-1.5 min-w-[150px]">
+              <span className="text-ink/50 font-mono text-[11px] whitespace-nowrap">Difficulty:</span>
+              <CustomSelect
                 value={selectedDifficulty}
-                onChange={(e) => setSelectedDifficulty(e.target.value)}
-                className="text-xs border border-border rounded-md px-2 py-1 bg-bg text-ink focus:outline-hidden focus:border-forest"
-              >
-                <option value="ALL">All Difficulties</option>
-                <option value="EASY">Easy</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HARD">Hard</option>
-              </select>
+                onChange={(val) => setSelectedDifficulty(val)}
+                options={[
+                  { value: 'ALL', label: 'All Difficulties' },
+                  { value: 'EASY', label: 'Easy' },
+                  { value: 'MEDIUM', label: 'Medium' },
+                  { value: 'HARD', label: 'Hard' },
+                ]}
+                placeholder="Difficulty..."
+                className="w-36"
+                triggerClassName="py-1 px-2.5 text-xs"
+              />
             </div>
           </div>
 

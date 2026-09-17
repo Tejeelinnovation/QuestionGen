@@ -7,6 +7,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { Delivery, PaperVersion, User, ClassSection } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { GraduationCap, Users } from 'lucide-react';
+import { CustomSelect } from '../../../components/ui/custom-select';
 
 export const DeliveryPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -453,19 +454,20 @@ export const DeliveryPageTablet: React.FC = () => {
                         placeholder="Search students..."
                         className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-grape focus:outline-none min-h-[40px]"
                       />
-                      <select
+                      <CustomSelect
                         value={classFilter}
-                        onChange={(e) => setClassFilter(e.target.value)}
-                        className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-grape focus:outline-none min-h-[40px] cursor-pointer"
-                      >
-                        <option value="ALL">All Divisions</option>
-                        {classes.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            Class {c.name}
-                          </option>
-                        ))}
-                        <option value="UNASSIGNED">Unassigned</option>
-                      </select>
+                        onChange={(val) => setClassFilter(val)}
+                        options={[
+                          { value: 'ALL', label: 'All Divisions' },
+                          ...classes.map((c) => ({
+                            value: String(c.id),
+                            label: `Class ${c.name}`,
+                          })),
+                          { value: 'UNASSIGNED', label: 'Unassigned' },
+                        ]}
+                        placeholder="Filter by Division..."
+                        className="w-full"
+                      />
                     </div>
 
                     <div className="flex justify-between items-center text-xs text-ink/60">

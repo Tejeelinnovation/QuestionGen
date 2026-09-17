@@ -12,6 +12,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { Pagination } from '../ui/pagination';
+import { CustomSelect } from '../ui/custom-select';
 
 export const ValidatorQueueView: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -159,56 +160,62 @@ export const ValidatorQueueView: React.FC = () => {
 
         {/* Status Filter */}
         <div>
-          <select
+          <CustomSelect
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
+            onChange={(val) => {
+              setStatusFilter(val);
               setCurrentPage(1);
             }}
-            className="w-full px-2.5 py-1.5 rounded-card bg-bg border border-border text-xs text-ink focus:border-forest focus:outline-none font-mono"
-          >
-            <option value="ALL">Queue: All In-Review</option>
-            <option value="SUBMITTED">Submitted (New / Resubmitted)</option>
-            <option value="UNDER_VALIDATION">Under Validation</option>
-            <option value="CORRECTION_REQUIRED">Needs Correction</option>
-            <option value="APPROVED">Approved (Question Bank)</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="ALL_STATUSES">All Statuses (Full Review History)</option>
-          </select>
+            options={[
+              { value: 'ALL', label: 'Queue: All In-Review' },
+              { value: 'SUBMITTED', label: 'Submitted (New / Resubmitted)' },
+              { value: 'UNDER_VALIDATION', label: 'Under Validation' },
+              { value: 'CORRECTION_REQUIRED', label: 'Needs Correction' },
+              { value: 'APPROVED', label: 'Approved (Question Bank)' },
+              { value: 'REJECTED', label: 'Rejected' },
+              { value: 'ALL_STATUSES', label: 'All Statuses (Full Review History)' },
+            ]}
+            placeholder="Select status..."
+            className="w-full"
+          />
         </div>
 
         {/* Difficulty Filter */}
         <div>
-          <select
+          <CustomSelect
             value={difficultyFilter}
-            onChange={(e) => {
-              setDifficultyFilter(e.target.value);
+            onChange={(val) => {
+              setDifficultyFilter(val);
               setCurrentPage(1);
             }}
-            className="w-full px-2.5 py-1.5 rounded-card bg-bg border border-border text-xs text-ink focus:border-forest focus:outline-none font-mono"
-          >
-            <option value="ALL">Difficulty: All</option>
-            <option value="EASY">Easy</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HARD">Hard</option>
-          </select>
+            options={[
+              { value: 'ALL', label: 'Difficulty: All' },
+              { value: 'EASY', label: 'Easy' },
+              { value: 'MEDIUM', label: 'Medium' },
+              { value: 'HARD', label: 'Hard' },
+            ]}
+            placeholder="Select difficulty..."
+            className="w-full"
+          />
         </div>
 
         {/* Board Filter */}
         <div>
-          <select
+          <CustomSelect
             value={boardFilter}
-            onChange={(e) => {
-              setBoardFilter(e.target.value);
+            onChange={(val) => {
+              setBoardFilter(val);
               setCurrentPage(1);
             }}
-            className="w-full px-2.5 py-1.5 rounded-card bg-bg border border-border text-xs text-ink focus:border-forest focus:outline-none font-mono"
-          >
-            <option value="ALL">Board: All</option>
-            <option value="CBSE">CBSE</option>
-            <option value="ICSE">ICSE</option>
-            <option value="STATE">State Board</option>
-          </select>
+            options={[
+              { value: 'ALL', label: 'Board: All' },
+              { value: 'CBSE', label: 'CBSE' },
+              { value: 'ICSE', label: 'ICSE' },
+              { value: 'STATE', label: 'State Board' },
+            ]}
+            placeholder="Select board..."
+            className="w-full"
+          />
         </div>
       </div>
 

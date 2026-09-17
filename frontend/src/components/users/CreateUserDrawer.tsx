@@ -7,6 +7,7 @@ import type { User, School, ClassSection } from '../../types';
 import { X, UserPlus, Check, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
 import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
+import { CustomSelect } from '../ui/custom-select';
 
 interface CreateUserDrawerProps {
   isOpen: boolean;
@@ -249,19 +250,18 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
                 Assigned Institution *
               </label>
               {schools.length > 0 ? (
-                <select
+                <CustomSelect
                   id="user-school-select"
-                  value={selectedSchoolId}
-                  onChange={(e) => setSelectedSchoolId(Number(e.target.value))}
+                  value={String(selectedSchoolId)}
+                  onChange={(val) => setSelectedSchoolId(Number(val))}
                   disabled={isSubmitting}
-                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2.5 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none font-medium cursor-pointer"
-                >
-                  {schools.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} (#{s.id})
-                    </option>
-                  ))}
-                </select>
+                  options={schools.map((s) => ({
+                    value: String(s.id),
+                    label: `${s.name} (#${s.id})`,
+                  }))}
+                  placeholder="Select an institution..."
+                  className="w-full"
+                />
               ) : (
                 <div className="text-xs text-ember/90 italic">
                   No schools found. Please create a school first.
@@ -390,20 +390,21 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
               <label htmlFor="u-class-section" className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink">
                 Class & Division Assignment
               </label>
-              <select
+              <CustomSelect
                 id="u-class-section"
-                value={selectedClassSection}
-                onChange={(e) => setSelectedClassSection(e.target.value ? Number(e.target.value) : '')}
+                value={String(selectedClassSection)}
+                onChange={(val) => setSelectedClassSection(val ? Number(val) : '')}
                 disabled={isSubmitting}
-                className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
-              >
-                <option value="">No class assigned (Unassigned)</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    Class {c.name} ({c.student_count} / {c.max_students} students enrolled)
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: '', label: 'No class assigned (Unassigned)' },
+                  ...classes.map((c) => ({
+                    value: String(c.id),
+                    label: `Class ${c.name} (${c.student_count} / ${c.max_students} students enrolled)`,
+                  })),
+                ]}
+                placeholder="Select class section..."
+                className="w-full"
+              />
               <p className="text-[10px] text-ink/50">
                 Enroll student directly into a division (Standards 8, 9, 10 up to Section J).
               </p>

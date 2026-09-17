@@ -21,6 +21,7 @@ import {
   History,
 } from 'lucide-react';
 import { SearchableSubjectSelect } from '../../components/ui/searchable-subject-select';
+import { CustomSelect } from '../../components/ui/custom-select';
 import { Pagination } from '../../components/ui/pagination';
 import { ValidationHistoryDrawer } from '../../components/qbm/ValidationHistoryDrawer';
 import { useToast } from '../../context/ToastContext';
@@ -120,6 +121,7 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
       question_text: string;
       correct_answer: string;
       explanation: string;
+      options?: Array<{ key: string; text: string }>;
     }>
   >([]);
 
@@ -135,6 +137,12 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
   const [quickVariantText, setQuickVariantText] = useState('');
   const [quickVariantAnswer, setQuickVariantAnswer] = useState('');
   const [quickVariantExplanation, setQuickVariantExplanation] = useState('');
+  const [quickVariantOptions, setQuickVariantOptions] = useState<Array<{ key: string; text: string }>>([
+    { key: 'A', text: '' },
+    { key: 'B', text: '' },
+    { key: 'C', text: '' },
+    { key: 'D', text: '' },
+  ]);
   const [isSubmittingQuickVariant, setIsSubmittingQuickVariant] = useState(false);
 
   // Load Boards on mount
@@ -337,14 +345,24 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
 
   // Add a variant template
   const addVariant = (presetMarks?: string, presetType?: string) => {
+    const type = presetType || 'SHORT_ANSWER';
     setVariants((prev) => [
       ...prev,
       {
-        variant_type: presetType || 'SHORT_ANSWER',
+        variant_type: type,
         marks: presetMarks || '2.00',
         question_text: '',
-        correct_answer: '',
+        correct_answer: type === 'MCQ' ? 'A' : '',
         explanation: '',
+        options:
+          type === 'MCQ'
+            ? [
+                { key: 'A', text: '' },
+                { key: 'B', text: '' },
+                { key: 'C', text: '' },
+                { key: 'D', text: '' },
+              ]
+            : undefined,
       },
     ]);
   };
@@ -353,11 +371,107 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
     setVariants((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const updateVariant = (idx: number, field: string, val: string) => {
+  const updateVariant = (idx: number, field: string, val: any) => {
     setVariants((prev) => {
       const copy = [...prev];
       (copy[idx] as any)[field] = val;
+      if (field === 'variant_type') {
+        if (val === 'MCQ') {
+          if (!copy[idx].options || copy[idx].options!.length === 0) {
+            copy[idx].options = [
+              { key: 'A', text: '' },
+              { key: 'B', text: '' },
+              { key: 'C', text: '' },
+              { key: 'D', text: '' },
+            ];
+          }
+          if (!copy[idx].correct_answer || copy[idx].correct_answer.length > 1) {
+            copy[idx].correct_answer = 'A';
+          }
+        }
+      }
       return copy;
+    });
+  };
+
+  const addVariantOption = (variantIdx: number) => {
+    setVariants((prev) => {
+      const copy = [...prev];
+      const curOpts = copy[variantIdx].options || [];
+      if (curOpts.length >= 6) return prev;
+      const nextKey = String.fromCharCode(65 + curOpts.length);
+      copy[variantIdx] = {
+        ...copy[variantIdx],
+        options: [...curOpts, { key: nextKey, text: '' }],
+      };
+      return copy;
+    });
+  };
+
+  const removeVariantOption = (variantIdx: number, optIdx: number) => {
+    setVariants((prev) => {
+      const copy = [...prev];
+      const curOpts = copy[variantIdx].options || [];
+      if (curOpts.length <= 2) return prev;
+      const filtered = curOpts.filter((_, i) => i !== optIdx);
+      const reindexed = filtered.map((item, i) => ({
+        key: String.fromCharCode(65 + i),
+        text: item.text,
+      }));
+      let ans = copy[variantIdx].correct_answer;
+      if (!reindexed.some((o) => o.key === ans)) {
+        ans = 'A';
+      }
+      copy[variantIdx] = {
+        ...copy[variantIdx],
+        options: reindexed,
+        correct_answer: ans,
+      };
+      return copy;
+    });
+  };
+
+  const updateVariantOption = (variantIdx: number, optIdx: number, text: string) => {
+    setVariants((prev) => {
+      const copy = [...prev];
+      const curOpts = copy[variantIdx].options || [];
+      const updatedOpts = [...curOpts];
+      updatedOpts[optIdx] = { ...updatedOpts[optIdx], text };
+      copy[variantIdx] = {
+        ...copy[variantIdx],
+        options: updatedOpts,
+      };
+      return copy;
+    });
+  };
+
+  // Quick Variant Option Helpers
+  const addQuickVariantOption = () => {
+    if (quickVariantOptions.length >= 6) return;
+    const nextKey = String.fromCharCode(65 + quickVariantOptions.length);
+    setQuickVariantOptions((prev) => [...prev, { key: nextKey, text: '' }]);
+  };
+
+  const removeQuickVariantOption = (optIdx: number) => {
+    if (quickVariantOptions.length <= 2) return;
+    setQuickVariantOptions((prev) => {
+      const filtered = prev.filter((_, i) => i !== optIdx);
+      const reindexed = filtered.map((item, i) => ({
+        key: String.fromCharCode(65 + i),
+        text: item.text,
+      }));
+      if (!reindexed.some((o) => o.key === quickVariantAnswer)) {
+        setQuickVariantAnswer('A');
+      }
+      return reindexed;
+    });
+  };
+
+  const updateQuickVariantOption = (optIdx: number, text: string) => {
+    setQuickVariantOptions((prev) => {
+      const updated = [...prev];
+      updated[optIdx] = { ...updated[optIdx], text };
+      return updated;
     });
   };
 
@@ -450,13 +564,25 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
       source_reference: sourceReference.trim(),
       variants: variants
         .filter((v) => v.question_text.trim())
-        .map((v) => ({
-          variant_type: v.variant_type,
-          marks: v.marks,
-          question_text: v.question_text.trim(),
-          correct_answer: v.correct_answer.trim(),
-          explanation: v.explanation.trim(),
-        })),
+        .map((v) => {
+          let variantOptions: Record<string, string> | undefined = undefined;
+          if (v.variant_type === 'MCQ' && v.options) {
+            variantOptions = {};
+            v.options.forEach((opt) => {
+              if (opt.text.trim()) {
+                variantOptions![opt.key] = opt.text.trim();
+              }
+            });
+          }
+          return {
+            variant_type: v.variant_type,
+            marks: v.marks,
+            question_text: v.question_text.trim(),
+            options: variantOptions,
+            correct_answer: v.correct_answer.trim(),
+            explanation: v.explanation.trim(),
+          };
+        }),
     };
 
     if (!isNewBook && selectedBookId && selectedBookId !== 'NEW') {
@@ -591,6 +717,16 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
       return;
     }
 
+    let quickOptionsMap: Record<string, string> | undefined = undefined;
+    if (quickVariantType === 'MCQ') {
+      quickOptionsMap = {};
+      quickVariantOptions.forEach((opt) => {
+        if (opt.text.trim()) {
+          quickOptionsMap![opt.key] = opt.text.trim();
+        }
+      });
+    }
+
     setIsSubmittingQuickVariant(true);
     try {
       await contentApi.addVariant(quickVariantModalQuestion.id, {
@@ -598,6 +734,7 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
         marks: quickVariantMarks,
         difficulty: quickVariantModalQuestion.difficulty, // Enforce matching parent difficulty
         question_text: quickVariantText.trim(),
+        options: quickOptionsMap,
         correct_answer: quickVariantAnswer.trim(),
         explanation: quickVariantExplanation.trim(),
       });
@@ -758,67 +895,68 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
 
             <div className="flex flex-wrap items-center gap-2">
               {/* Board selector */}
-              <select
+              <CustomSelect
                 id="qbm-filter-board"
                 value={filterBoard}
-                onChange={(e) => handleBoardChange(e.target.value)}
-                className="text-xs px-3 py-1.5 rounded-pill border border-border bg-bg text-ink cursor-pointer focus:border-forest focus:outline-none"
-              >
-                <option value="ALL">All Boards</option>
-                {boards.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => handleBoardChange(val)}
+                options={[{ value: 'ALL', label: 'All Boards' }, ...boards.map((b) => ({ value: b, label: b }))]}
+                triggerClassName="rounded-pill text-xs py-1.5 px-3 bg-bg"
+                className="w-auto min-w-[130px]"
+              />
 
               {/* Type filter */}
-              <select
+              <CustomSelect
                 id="qbm-filter-type"
                 value={filterType}
-                onChange={(e) => handleTypeChange(e.target.value)}
-                className="text-xs px-3 py-1.5 rounded-pill border border-border bg-bg text-ink cursor-pointer focus:border-forest focus:outline-none"
-              >
-                <option value="ALL">All Question Types</option>
-                <option value="MCQ">Multiple Choice (MCQ)</option>
-                <option value="MSQ">Multiple Select (MSQ)</option>
-                <option value="SHORT_ANSWER">Short Answer</option>
-                <option value="LONG_ANSWER">Long Answer</option>
-                <option value="FILL_IN_THE_BLANKS">Fill in Blanks</option>
-                <option value="ONE_WORD">One Word</option>
-                <option value="MATCH_THE_FOLLOWING">Match the Following</option>
-                <option value="DIAGRAM_BASED">Diagram Based</option>
-                <option value="COMPREHENSION_BASED">Comprehension Based</option>
-              </select>
+                onChange={(val) => handleTypeChange(val)}
+                options={[
+                  { value: 'ALL', label: 'All Question Types' },
+                  { value: 'MCQ', label: 'Multiple Choice (MCQ)' },
+                  { value: 'MSQ', label: 'Multiple Select (MSQ)' },
+                  { value: 'SHORT_ANSWER', label: 'Short Answer' },
+                  { value: 'LONG_ANSWER', label: 'Long Answer' },
+                  { value: 'FILL_IN_THE_BLANKS', label: 'Fill in Blanks' },
+                  { value: 'ONE_WORD', label: 'One Word' },
+                  { value: 'MATCH_THE_FOLLOWING', label: 'Match the Following' },
+                  { value: 'DIAGRAM_BASED', label: 'Diagram Based' },
+                  { value: 'COMPREHENSION_BASED', label: 'Comprehension Based' },
+                ]}
+                triggerClassName="rounded-pill text-xs py-1.5 px-3 bg-bg"
+                className="w-auto min-w-[160px]"
+              />
 
               {/* Difficulty filter */}
-              <select
+              <CustomSelect
                 id="qbm-filter-difficulty"
                 value={filterDifficulty}
-                onChange={(e) => handleDifficultyChange(e.target.value)}
-                className="text-xs px-3 py-1.5 rounded-pill border border-border bg-bg text-ink cursor-pointer focus:border-forest focus:outline-none"
-              >
-                <option value="ALL">All Difficulties</option>
-                <option value="EASY">Easy</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HARD">Hard</option>
-              </select>
+                onChange={(val) => handleDifficultyChange(val)}
+                options={[
+                  { value: 'ALL', label: 'All Difficulties' },
+                  { value: 'EASY', label: 'Easy' },
+                  { value: 'MEDIUM', label: 'Medium' },
+                  { value: 'HARD', label: 'Hard' },
+                ]}
+                triggerClassName="rounded-pill text-xs py-1.5 px-3 bg-bg"
+                className="w-auto min-w-[130px]"
+              />
 
               {/* Sort Order Selector */}
-              <select
+              <CustomSelect
                 id="qbm-sort-order"
                 value={sortBy}
-                onChange={(e) => handleSortChange(e.target.value)}
-                className="text-xs px-3 py-1.5 rounded-pill border border-border bg-bg text-ink cursor-pointer focus:border-forest focus:outline-none font-medium"
-              >
-                <option value="newest">Sort: Newest First</option>
-                <option value="oldest">Sort: Oldest First</option>
-                <option value="marks_desc">Sort: Marks (High → Low)</option>
-                <option value="marks_asc">Sort: Marks (Low → High)</option>
-                <option value="difficulty_asc">Sort: Difficulty (Easy → Hard)</option>
-                <option value="difficulty_desc">Sort: Difficulty (Hard → Easy)</option>
-                <option value="text_asc">Sort: Question Text (A–Z)</option>
-              </select>
+                onChange={(val) => handleSortChange(val)}
+                options={[
+                  { value: 'newest', label: 'Sort: Newest First' },
+                  { value: 'oldest', label: 'Sort: Oldest First' },
+                  { value: 'marks_desc', label: 'Sort: Marks (High → Low)' },
+                  { value: 'marks_asc', label: 'Sort: Marks (Low → High)' },
+                  { value: 'difficulty_asc', label: 'Sort: Difficulty (Easy → Hard)' },
+                  { value: 'difficulty_desc', label: 'Sort: Difficulty (Hard → Easy)' },
+                  { value: 'text_asc', label: 'Sort: Question Text (A–Z)' },
+                ]}
+                triggerClassName="rounded-pill text-xs py-1.5 px-3 bg-bg"
+                className="w-auto min-w-[160px]"
+              />
             </div>
           </div>
 
@@ -1059,10 +1197,9 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
 
                   <div className="mt-2.5">
                     {!isNewBoard ? (
-                      <select
+                      <CustomSelect
                         value={selectedBoard}
-                        onChange={(e) => {
-                          const val = e.target.value;
+                        onChange={(val) => {
                           if (val === '__NEW__') {
                             setIsNewBoard(true);
                             setSelectedBoard('');
@@ -1070,17 +1207,13 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                             setSelectedBoard(val);
                           }
                         }}
-                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                      >
-                        {boards.map((b) => (
-                          <option key={b} value={b}>
-                            {b}
-                          </option>
-                        ))}
-                        <option value="__NEW__" className="font-semibold text-forest">
-                          + Add New Board...
-                        </option>
-                      </select>
+                        options={[
+                          ...boards.map((b) => ({ value: b, label: b })),
+                          { value: '__NEW__', label: '+ Add New Board...', badge: 'NEW' },
+                        ]}
+                        placeholder="Select a board..."
+                        className="w-full"
+                      />
                     ) : (
                       <div className="space-y-1.5">
                         <input
@@ -1137,10 +1270,9 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
 
                   <div className="mt-2.5">
                     {!isNewBook && books.length > 0 ? (
-                      <select
-                        value={selectedBookId}
-                        onChange={(e) => {
-                          const val = e.target.value;
+                      <CustomSelect
+                        value={String(selectedBookId)}
+                        onChange={(val) => {
                           if (val === '__NEW__') {
                             setIsNewBook(true);
                             setSelectedBookId('NEW');
@@ -1148,17 +1280,13 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                             setSelectedBookId(Number(val));
                           }
                         }}
-                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                      >
-                        {books.map((bk) => (
-                          <option key={bk.id} value={bk.id}>
-                            {bk.title} ({bk.grade})
-                          </option>
-                        ))}
-                        <option value="__NEW__" className="font-semibold text-forest">
-                          + Add New Book...
-                        </option>
-                      </select>
+                        options={[
+                          ...books.map((bk) => ({ value: String(bk.id), label: `${bk.title} (${bk.grade})` })),
+                          { value: '__NEW__', label: '+ Add New Book...', badge: 'NEW' },
+                        ]}
+                        placeholder="Select a book..."
+                        className="w-full"
+                      />
                     ) : (
                       <div className="space-y-2">
                         {books.length === 0 && !isNewBoard && (
@@ -1178,19 +1306,17 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                         <div className="grid grid-cols-2 gap-1.5">
                           <div>
                             <label className="block text-[10px] font-semibold text-ink/70 mb-0.5">Grade *</label>
-                            <select
+                            <CustomSelect
                               value={newBookGrade}
-                              onChange={(e) => setNewBookGrade(e.target.value)}
-                              className="w-full rounded-card border border-border bg-bg px-2.5 py-1.5 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                            >
-                              {[
+                              onChange={setNewBookGrade}
+                              options={[
                                 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
                                 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
                                 'Class 11', 'Class 12'
-                              ].map((g) => (
-                                <option key={g} value={g}>{g}</option>
-                              ))}
-                            </select>
+                              ]}
+                              placeholder="Select grade..."
+                              className="w-full"
+                            />
                           </div>
                           <div>
                             <label className="block text-[10px] font-semibold text-ink/70 mb-0.5">Book Title</label>
@@ -1245,10 +1371,9 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
 
                   <div className="mt-2.5">
                     {!isNewChapter && chapters.length > 0 ? (
-                      <select
-                        value={selectedChapterId}
-                        onChange={(e) => {
-                          const val = e.target.value;
+                      <CustomSelect
+                        value={String(selectedChapterId)}
+                        onChange={(val) => {
                           if (val === '__NEW__') {
                             setIsNewChapter(true);
                             setSelectedChapterId('NEW');
@@ -1256,17 +1381,13 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                             setSelectedChapterId(Number(val));
                           }
                         }}
-                        className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                      >
-                        {chapters.map((ch) => (
-                          <option key={ch.id} value={ch.id}>
-                            Ch.{ch.chapter_order}: {ch.title}
-                          </option>
-                        ))}
-                        <option value="__NEW__" className="font-semibold text-forest">
-                          + Add New Chapter...
-                        </option>
-                      </select>
+                        options={[
+                          ...chapters.map((ch) => ({ value: String(ch.id), label: `Ch.${ch.chapter_order}: ${ch.title}` })),
+                          { value: '__NEW__', label: '+ Add New Chapter...', badge: 'NEW' },
+                        ]}
+                        placeholder="Select a chapter..."
+                        className="w-full"
+                      />
                     ) : (
                       <div className="space-y-1.5">
                         <input
@@ -1356,10 +1477,9 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                         </div>
 
                         {/* Add Topic Selector */}
-                        <select
+                        <CustomSelect
                           value=""
-                          onChange={(e) => {
-                            const val = e.target.value;
+                          onChange={(val) => {
                             if (val === '__NEW__') {
                               setIsNewTopic(true);
                               setSelectedTopicId('NEW');
@@ -1372,22 +1492,16 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                               }
                             }
                           }}
-                          className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                        >
-                          <option value="">+ Add Topic Tag...</option>
-                          {topics.map((tp) => (
-                            <option
-                              key={tp.id}
-                              value={tp.id}
-                              disabled={selectedTopicIds.includes(tp.id)}
-                            >
-                              {tp.name} {selectedTopicIds.includes(tp.id) ? '(Selected)' : ''}
-                            </option>
-                          ))}
-                          <option value="__NEW__" className="font-semibold text-forest">
-                            + Create New Topic...
-                          </option>
-                        </select>
+                          options={[
+                            ...topics.map((tp) => ({
+                              value: String(tp.id),
+                              label: `${tp.name}${selectedTopicIds.includes(tp.id) ? ' (Selected)' : ''}`,
+                            })),
+                            { value: '__NEW__', label: '+ Create New Topic...', badge: 'NEW' },
+                          ]}
+                          placeholder="+ Add Topic Tag..."
+                          className="w-full"
+                        />
                         <p className="text-[10px] text-ink/50">
                           Multi-topic tagging supported (PDF Section 9). Select multiple topics under this chapter.
                         </p>
@@ -1455,15 +1569,17 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                 <label className="block font-heading text-xs font-semibold text-ink">
                   Target Learner Level *
                 </label>
-                <select
+                <CustomSelect
                   value={learnerLevel}
-                  onChange={(e) => setLearnerLevel(e.target.value as any)}
-                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                >
-                  <option value="BEGINNER">Beginner (Foundational)</option>
-                  <option value="INTERMEDIATE">Intermediate (Competency)</option>
-                  <option value="ADVANCED">Advanced (HOTS)</option>
-                </select>
+                  onChange={(val) => setLearnerLevel(val as any)}
+                  options={[
+                    { value: 'BEGINNER', label: 'Beginner (Foundational)' },
+                    { value: 'INTERMEDIATE', label: 'Intermediate (Competency)' },
+                    { value: 'ADVANCED', label: 'Advanced (HOTS)' },
+                  ]}
+                  placeholder="Select learner level..."
+                  className="w-full"
+                />
               </div>
 
               {/* Base Marks */}
@@ -1500,21 +1616,23 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                 <label className="block font-heading text-xs font-semibold text-ink">
                   Question Format / Type *
                 </label>
-                <select
+                <CustomSelect
                   value={questionType}
-                  onChange={(e) => setQuestionType(e.target.value)}
-                  className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:border-forest focus:outline-none cursor-pointer"
-                >
-                  <option value="MCQ">Multiple Choice Question (Single Select)</option>
-                  <option value="MSQ">Multiple Select Question (MSQ)</option>
-                  <option value="SHORT_ANSWER">Short Answer (1-2 Marks)</option>
-                  <option value="LONG_ANSWER">Long Answer (3-5 Marks)</option>
-                  <option value="FILL_IN_THE_BLANKS">Fill in the Blanks</option>
-                  <option value="ONE_WORD">One Word Response</option>
-                  <option value="MATCH_THE_FOLLOWING">Match the Following</option>
-                  <option value="DIAGRAM_BASED">Diagram Based Question</option>
-                  <option value="COMPREHENSION_BASED">Case Study / Comprehension Based</option>
-                </select>
+                  onChange={(val) => setQuestionType(val)}
+                  options={[
+                    { value: 'MCQ', label: 'Multiple Choice Question (Single Select)' },
+                    { value: 'MSQ', label: 'Multiple Select Question (MSQ)' },
+                    { value: 'SHORT_ANSWER', label: 'Short Answer (1-2 Marks)' },
+                    { value: 'LONG_ANSWER', label: 'Long Answer (3-5 Marks)' },
+                    { value: 'FILL_IN_THE_BLANKS', label: 'Fill in the Blanks' },
+                    { value: 'ONE_WORD', label: 'One Word Response' },
+                    { value: 'MATCH_THE_FOLLOWING', label: 'Match the Following' },
+                    { value: 'DIAGRAM_BASED', label: 'Diagram Based Question' },
+                    { value: 'COMPREHENSION_BASED', label: 'Case Study / Comprehension Based' },
+                  ]}
+                  placeholder="Select question type..."
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -1601,17 +1719,16 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
               {questionType === 'MCQ' ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-ink/70">Correct Choice:</span>
-                  <select
+                  <CustomSelect
                     value={correctAnswer}
-                    onChange={(e) => setCorrectAnswer(e.target.value)}
-                    className="rounded-card border border-border bg-bg px-3 py-1.5 text-xs font-mono font-bold text-forest focus:border-forest focus:outline-none cursor-pointer"
-                  >
-                    {options.map((opt) => (
-                      <option key={opt.key} value={opt.key}>
-                        Option {opt.key}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setCorrectAnswer(val)}
+                    options={options.map((opt) => ({
+                      value: opt.key,
+                      label: `Option ${opt.key}${opt.text ? `: ${opt.text.substring(0, 24)}...` : ''}`,
+                    }))}
+                    placeholder="Select correct choice..."
+                    className="w-48"
+                  />
                 </div>
               ) : (
                 <textarea
@@ -1719,17 +1836,19 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label className="text-[11px] font-medium text-ink">Variant Format</label>
-                        <select
+                        <CustomSelect
                           value={v.variant_type}
-                          onChange={(e) => updateVariant(idx, 'variant_type', e.target.value)}
-                          className="w-full rounded-card border border-border bg-surface px-2.5 py-1.5 text-xs text-ink cursor-pointer focus:border-forest focus:outline-none"
-                        >
-                          <option value="SHORT_ANSWER">Short Answer</option>
-                          <option value="LONG_ANSWER">Long Answer</option>
-                          <option value="MCQ">Multiple Choice</option>
-                          <option value="FILL_IN_THE_BLANKS">Fill in the Blanks</option>
-                          <option value="ONE_WORD">One Word</option>
-                        </select>
+                          onChange={(val) => updateVariant(idx, 'variant_type', val)}
+                          options={[
+                            { value: 'SHORT_ANSWER', label: 'Short Answer' },
+                            { value: 'LONG_ANSWER', label: 'Long Answer' },
+                            { value: 'MCQ', label: 'Multiple Choice' },
+                            { value: 'FILL_IN_THE_BLANKS', label: 'Fill in the Blanks' },
+                            { value: 'ONE_WORD', label: 'One Word' },
+                          ]}
+                          placeholder="Select format..."
+                          className="w-full"
+                        />
                       </div>
 
                       <div className="space-y-1">
@@ -1756,17 +1875,77 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                       />
                     </div>
 
+                    {/* Dynamic Options Builder for MCQ Variant */}
+                    {v.variant_type === 'MCQ' && (
+                      <div className="bg-surface border border-border rounded-card p-3 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-heading font-semibold text-xs text-ink">
+                            Variant Answer Choices / Options
+                          </span>
+                          {(v.options?.length || 0) < 6 && (
+                            <button
+                              type="button"
+                              onClick={() => addVariantOption(idx)}
+                              className="text-[11px] font-heading font-semibold text-forest hover:underline cursor-pointer flex items-center gap-1"
+                            >
+                              <Plus className="w-3 h-3" /> Add Choice
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          {(v.options || []).map((opt, optIdx) => (
+                            <div key={opt.key} className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-card bg-surface-muted border border-border text-[11px] font-mono font-bold flex items-center justify-center text-ink shrink-0">
+                                {opt.key}
+                              </span>
+                              <input
+                                type="text"
+                                required
+                                placeholder={`Option ${opt.key} text`}
+                                value={opt.text}
+                                onChange={(e) => updateVariantOption(idx, optIdx, e.target.value)}
+                                className="flex-1 rounded-card border border-border bg-bg px-2.5 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                              />
+                              {(v.options?.length || 0) > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeVariantOption(idx, optIdx)}
+                                  className="p-1 text-ink/40 hover:text-ember cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label className="text-[11px] font-medium text-ink">Variant Answer *</label>
-                        <input
-                          type="text"
-                          required
-                          value={v.correct_answer}
-                          onChange={(e) => updateVariant(idx, 'correct_answer', e.target.value)}
-                          placeholder="Correct key or scoring note"
-                          className="w-full rounded-card border border-border bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
-                        />
+                        {v.variant_type === 'MCQ' ? (
+                          <CustomSelect
+                            value={v.correct_answer || 'A'}
+                            onChange={(val) => updateVariant(idx, 'correct_answer', val)}
+                            options={(v.options || []).map((opt) => ({
+                              value: opt.key,
+                              label: `Option ${opt.key}${opt.text ? `: ${opt.text.substring(0, 20)}...` : ''}`,
+                            }))}
+                            placeholder="Select correct choice..."
+                            className="w-full"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            required
+                            value={v.correct_answer}
+                            onChange={(e) => updateVariant(idx, 'correct_answer', e.target.value)}
+                            placeholder="Correct key or scoring note"
+                            className="w-full rounded-card border border-border bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                          />
+                        )}
                       </div>
 
                       <div className="space-y-1">
@@ -1964,6 +2143,16 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                         <span className="font-mono text-forest font-semibold">{v.marks} Marks</span>
                       </div>
                       <p className="text-xs text-ink font-medium">{v.question_text}</p>
+                      {v.options && Object.keys(v.options).length > 0 && (
+                        <div className="grid grid-cols-2 gap-1.5 py-1 text-[11px]">
+                          {Object.entries(v.options).map(([k, optVal]) => (
+                            <div key={k} className="flex items-center gap-1.5 bg-surface rounded px-2 py-1 border border-border/40">
+                              <span className="font-mono font-bold text-forest">{k}.</span>
+                              <span className="truncate text-ink">{optVal as string}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="text-[11px] text-ink/70 pt-1 border-t border-border/50">
                         <strong>Answer:</strong> {v.correct_answer}
                       </div>
@@ -2010,17 +2199,26 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-heading font-semibold text-ink">Format</label>
-                <select
+                <CustomSelect
                   value={quickVariantType}
-                  onChange={(e) => setQuickVariantType(e.target.value)}
-                  className="w-full rounded-card border border-border bg-bg px-3 py-1.5 text-xs text-ink cursor-pointer focus:border-forest focus:outline-none"
-                >
-                  <option value="SHORT_ANSWER">Short Answer</option>
-                  <option value="LONG_ANSWER">Long Answer</option>
-                  <option value="MCQ">Multiple Choice</option>
-                  <option value="FILL_IN_THE_BLANKS">Fill in the Blanks</option>
-                  <option value="ONE_WORD">One Word</option>
-                </select>
+                  onChange={(val) => {
+                    setQuickVariantType(val);
+                    if (val === 'MCQ') {
+                      if (!quickVariantAnswer || quickVariantAnswer.length > 1) {
+                        setQuickVariantAnswer('A');
+                      }
+                    }
+                  }}
+                  options={[
+                    { value: 'SHORT_ANSWER', label: 'Short Answer' },
+                    { value: 'LONG_ANSWER', label: 'Long Answer' },
+                    { value: 'MCQ', label: 'Multiple Choice' },
+                    { value: 'FILL_IN_THE_BLANKS', label: 'Fill in the Blanks' },
+                    { value: 'ONE_WORD', label: 'One Word' },
+                  ]}
+                  placeholder="Select format..."
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-1">
@@ -2047,16 +2245,76 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
               />
             </div>
 
+            {/* Dynamic Options Builder for Quick MCQ Variant */}
+            {quickVariantType === 'MCQ' && (
+              <div className="bg-bg border border-border rounded-card p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-heading font-semibold text-xs text-ink">
+                    Answer Choices / Options
+                  </span>
+                  {quickVariantOptions.length < 6 && (
+                    <button
+                      type="button"
+                      onClick={addQuickVariantOption}
+                      className="text-[11px] font-heading font-semibold text-forest hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Add Choice
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {quickVariantOptions.map((opt, optIdx) => (
+                    <div key={opt.key} className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-card bg-surface border border-border text-[11px] font-mono font-bold flex items-center justify-center text-ink shrink-0">
+                        {opt.key}
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        placeholder={`Option ${opt.key} text`}
+                        value={opt.text}
+                        onChange={(e) => updateQuickVariantOption(optIdx, e.target.value)}
+                        className="flex-1 rounded-card border border-border bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-forest focus:outline-none"
+                      />
+                      {quickVariantOptions.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => removeQuickVariantOption(optIdx)}
+                          className="p-1 text-ink/40 hover:text-ember cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1">
               <label className="text-xs font-heading font-semibold text-ink">Correct Answer *</label>
-              <input
-                type="text"
-                required
-                value={quickVariantAnswer}
-                onChange={(e) => setQuickVariantAnswer(e.target.value)}
-                placeholder="Correct answer or scoring criteria"
-                className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none"
-              />
+              {quickVariantType === 'MCQ' ? (
+                <CustomSelect
+                  value={quickVariantAnswer || 'A'}
+                  onChange={(val) => setQuickVariantAnswer(val)}
+                  options={quickVariantOptions.map((opt) => ({
+                    value: opt.key,
+                    label: `Option ${opt.key}${opt.text ? `: ${opt.text.substring(0, 24)}...` : ''}`,
+                  }))}
+                  placeholder="Select correct choice..."
+                  className="w-full"
+                />
+              ) : (
+                <input
+                  type="text"
+                  required
+                  value={quickVariantAnswer}
+                  onChange={(e) => setQuickVariantAnswer(e.target.value)}
+                  placeholder="Correct answer or scoring criteria"
+                  className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:border-forest focus:outline-none"
+                />
+              )}
             </div>
 
             <div className="space-y-1">

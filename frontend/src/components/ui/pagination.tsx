@@ -1,6 +1,7 @@
 import React from 'react';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { CustomSelect } from './custom-select';
 
 export interface PaginationProps {
   currentPage: number;
@@ -179,20 +180,19 @@ export const Pagination: React.FC<PaginationProps> = ({
         {onPageSizeChange && (
           <div className="flex items-center gap-1.5 text-xs text-ink/65 pl-2 border-l border-border">
             <span>Per page:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                onPageSizeChange(Number(e.target.value));
+            <CustomSelect
+              value={String(pageSize)}
+              onChange={(val) => {
+                onPageSizeChange(Number(val));
                 onPageChange(1);
               }}
-              className="px-2 py-1 rounded-sm border border-border bg-surface text-xs font-heading font-medium text-ink focus:outline-none focus:border-forest"
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+              options={pageSizeOptions.map((opt) => ({
+                value: String(opt),
+                label: String(opt),
+              }))}
+              className="w-16"
+              triggerClassName="py-0.5 px-2 text-xs"
+            />
           </div>
         )}
       </div>

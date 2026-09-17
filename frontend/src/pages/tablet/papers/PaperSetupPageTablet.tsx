@@ -5,6 +5,7 @@ import { papersApi } from '../../../api/papers';
 import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
+import { CustomSelect } from '../../../components/ui/custom-select';
 
 export const PaperSetupPageTablet: React.FC = () => {
   const navigate = useNavigate();
@@ -138,21 +139,17 @@ export const PaperSetupPageTablet: React.FC = () => {
               <label htmlFor="paper-chapter" className="block text-xs font-heading font-semibold text-ink uppercase mb-1">
                 Curriculum Chapter *
               </label>
-              <select
-                id="paper-chapter"
-                value={chapterId}
-                onChange={(e) => setChapterId(Number(e.target.value))}
+              <CustomSelect
+                value={chapterId ? String(chapterId) : ''}
+                onChange={(val) => setChapterId(val ? Number(val) : '')}
                 disabled={isSubmitting}
-                required
-                className="w-full rounded-card border border-border bg-bg px-4 py-3 text-sm text-ink focus:bg-surface focus:border-forest focus:outline-none min-h-[48px] cursor-pointer"
-              >
-                {chapters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.book_title ? `[${c.book_title}] ` : ''}
-                    {c.title} ({c.topic_count} Topics)
-                  </option>
-                ))}
-              </select>
+                options={chapters.map((c) => ({
+                  value: String(c.id),
+                  label: `${c.book_title ? `[${c.book_title}] ` : ''}${c.title} (${c.topic_count} Topics)`,
+                }))}
+                placeholder="Select curriculum chapter..."
+                className="w-full"
+              />
             </div>
 
             <div>

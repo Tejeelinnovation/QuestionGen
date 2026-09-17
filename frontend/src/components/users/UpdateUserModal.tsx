@@ -8,6 +8,7 @@ import type { User, CapabilityName, ClassSection } from '../../types';
 import { X, UserCheck, Shield, Check, AlertCircle, RefreshCw, BookOpen, GraduationCap } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
 import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
+import { CustomSelect } from '../ui/custom-select';
 
 interface UpdateUserModalProps {
   userId: number | null;
@@ -376,20 +377,21 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
                         <GraduationCap className="w-3.5 h-3.5 text-forest" />
                         <span>Assigned Class & Division</span>
                       </label>
-                      <select
+                      <CustomSelect
                         id="edit-class-section"
-                        value={classSectionId}
-                        onChange={(e) => setClassSectionId(e.target.value ? Number(e.target.value) : '')}
+                        value={String(classSectionId)}
+                        onChange={(val) => setClassSectionId(val ? Number(val) : '')}
                         disabled={isSaving}
-                        className="w-full rounded-card border border-border bg-bg px-3.5 py-2 text-xs text-ink focus:bg-surface focus:border-forest focus:outline-none cursor-pointer"
-                      >
-                        <option value="">Unassigned</option>
-                        {availableClasses.map((cls) => (
-                          <option key={cls.id} value={cls.id}>
-                            Class {cls.name} ({cls.student_count ?? 0}/{cls.max_students} students)
-                          </option>
-                        ))}
-                      </select>
+                        options={[
+                          { value: '', label: 'Unassigned' },
+                          ...availableClasses.map((cls) => ({
+                            value: String(cls.id),
+                            label: `Class ${cls.name} (${cls.student_count ?? 0}/${cls.max_students} students)`,
+                          })),
+                        ]}
+                        placeholder="Select class section..."
+                        className="w-full"
+                      />
                     </div>
                   )}
 
