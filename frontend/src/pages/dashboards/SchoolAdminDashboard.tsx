@@ -231,7 +231,7 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
           <p className="font-body text-ink/75 text-base max-w-2xl leading-relaxed">
             Directing{' '}
             <span className="font-heading font-bold text-ember text-lg underline decoration-ember/40 underline-offset-2">
-              {teachers.length} certified teachers
+              {teachers.length} faculty members
             </span>
             ,{' '}
             <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
@@ -388,8 +388,18 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
                       <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1.5 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="pill pill-ember text-[10px]">
-                              Teacher #{t.id}
+                            <span
+                              className={`pill text-[10px] ${
+                                t.role_label === 'Data Entry Operator'
+                                  ? 'pill-forest'
+                                  : t.role_label === 'Validator'
+                                  ? 'pill-grape'
+                                  : t.role_label === 'DEO & Validator'
+                                  ? 'pill-lime'
+                                  : 'pill-ember'
+                              }`}
+                            >
+                              {t.role_label || 'Teacher'} #{t.id}
                             </span>
                             <span className="font-mono text-xs text-ink/50">
                               @{t.username}
@@ -489,12 +499,12 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
               )}
 
               <form onSubmit={handleCreateTeacher} className="space-y-4 font-body">
-                {/* Role Profile Selector (Task 8) */}
-                <div>
-                  <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
-                    Account Responsibility Profile *
-                  </label>
-                  {schoolData?.validation_workflow_enabled ? (
+                {/* Role Profile Selector (Task 8 - only shown when validation workflow is enabled) */}
+                {schoolData?.validation_workflow_enabled && (
+                  <div>
+                    <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1.5">
+                      Account Responsibility Profile *
+                    </label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
@@ -545,13 +555,8 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
                         <span className="block text-[10px] text-ink/50 mt-0.5">DEO & Validator</span>
                       </button>
                     </div>
-                  ) : (
-                    <div className="p-3 rounded-card bg-surface-muted/60 border border-border text-[11px] text-ink/70">
-                      <span className="font-semibold block text-ink mb-0.5">Standard Teacher Flow Active</span>
-                      Validation workflow disabled by Super Admin. Standard teacher question-generation flow active.
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block font-heading text-xs font-semibold uppercase tracking-wider text-ink mb-1" htmlFor="t-username">

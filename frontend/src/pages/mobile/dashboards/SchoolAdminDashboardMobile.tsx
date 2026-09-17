@@ -448,7 +448,19 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                           {t.primary_subject}
                         </span>
                       )}
-                      <span className="pill pill-ember text-[10px] py-0.5">Faculty</span>
+                      <span
+                        className={`pill text-[10px] py-0.5 ${
+                          t.role_label === 'Data Entry Operator'
+                            ? 'pill-forest'
+                            : t.role_label === 'Validator'
+                            ? 'pill-grape'
+                            : t.role_label === 'DEO & Validator'
+                            ? 'pill-lime'
+                            : 'pill-ember'
+                        }`}
+                      >
+                        {t.role_label || 'Faculty'}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">

@@ -580,6 +580,21 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
             CapabilityName.CREATE_PAPER,
             CapabilityName.ASSIGN_TEST,
         ],
+        "Data Entry Operator": [
+            CapabilityName.DATA_ENTRY_OPERATOR,
+            CapabilityName.GENERATE_SELECT_QUESTIONS,
+            CapabilityName.VALIDATOR,
+        ],
+        "Validator": [
+            CapabilityName.VALIDATOR,
+            CapabilityName.GENERATE_SELECT_QUESTIONS,
+            CapabilityName.DATA_ENTRY_OPERATOR,
+        ],
+        "DEO & Validator": [
+            CapabilityName.DATA_ENTRY_OPERATOR,
+            CapabilityName.VALIDATOR,
+            CapabilityName.GENERATE_SELECT_QUESTIONS,
+        ],
         "Student": [
             CapabilityName.ATTEMPT_TEST,
             CapabilityName.VIEW_OWN_RESULT,
@@ -593,8 +608,8 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
     def _check_permission_management_allowed(self, request_user, target_user) -> Response | None:
         """
         Enforce caller hierarchy for modifying capabilities:
-        - Super Admin: can modify School Admin, Teacher, Student.
-        - School Admin: can modify Teacher and Student within their own school.
+        - Super Admin: can modify School Admin, Teacher, Student, DEO, Validator.
+        - School Admin: can modify Teacher, Student, DEO, and Validator within their own school.
         - Teacher and Student: cannot modify permissions for anyone.
         """
         is_super_admin = (
@@ -615,9 +630,15 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                     {"detail": "You can only manage permissions for users in your own school."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-            if target_user.role_label not in ("Teacher", "Student"):
+            if target_user.role_label not in (
+                "Teacher",
+                "Student",
+                "Data Entry Operator",
+                "Validator",
+                "DEO & Validator",
+            ):
                 return Response(
-                    {"detail": "School Admins can only manage permissions for Teachers and Students."},
+                    {"detail": "School Admins can only manage permissions for faculty, staff, and students in their school."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
             return None
@@ -635,8 +656,8 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
     def grant_permission(self, request, pk=None):
         """
         Grant a capability to a user, enforcing role scope boundaries:
-        - Super Admin can grant to School Admin (3 caps), Teacher (4 caps), Student (2 caps).
-        - School Admin can grant to Teacher (4 caps), Student (2 caps) within their school.
+        - Super Admin can grant to School Admin (3 caps), Teacher (6 caps), Student (2 caps), DEO/Validator.
+        - School Admin can grant to Teacher, Student, DEO, Validator within their school.
         - Out-of-scope capabilities are strictly rejected with 400 Bad Request.
         """
         target_user = self._get_scoped_user(request, pk)
@@ -664,6 +685,20 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # Validation workflow capability gating:
+        # Cannot grant DEO or Validator if organization does not have validation workflow enabled.
+        if cap_name in (CapabilityName.DATA_ENTRY_OPERATOR, CapabilityName.VALIDATOR):
+            if target_user.school and not getattr(target_user.school, "validation_workflow_enabled", False):
+                return Response(
+                    {
+                        "detail": (
+                            "Validation workflow is not enabled for this organization. "
+                            "Super Admin must enable validation workflow for the School / Coaching Class first."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Question Bank capability gating:
         # Teacher cannot be granted GENERATE_SELECT_QUESTIONS if organization does not have it enabled.

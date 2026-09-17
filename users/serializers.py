@@ -116,6 +116,9 @@ class UserSerializer(serializers.ModelSerializer):
     class_section_name = serializers.CharField(
         source="class_section.name", read_only=True, default=None
     )
+    school_validation_workflow_enabled = serializers.BooleanField(
+        source="school.validation_workflow_enabled", read_only=True, default=False
+    )
 
     class Meta:
         model = User
@@ -128,6 +131,7 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "school",
             "school_name",
+            "school_validation_workflow_enabled",
             "class_section",
             "class_section_name",
             "gr_number",

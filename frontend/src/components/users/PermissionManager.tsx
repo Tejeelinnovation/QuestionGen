@@ -109,7 +109,7 @@ export const getDefaultCapabilitiesForRole = (roleLabel: string): CapabilityName
 const ALLOWED_CAPABILITIES_BY_ROLE: Record<string, CapabilityName[]> = {
   'Super Admin': ALL_CAPABILITIES.map((c) => c.name),
   'School Admin': ['CREATE_TEACHER', 'CREATE_STUDENT', 'VIEW_SCHOOL_WIDE_CONTROLS'],
-  'Teacher': ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST', 'DATA_ENTRY_OPERATOR', 'VALIDATOR'],
+  'Teacher': ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST'],
   'Data Entry Operator': ['DATA_ENTRY_OPERATOR', 'GENERATE_SELECT_QUESTIONS', 'VALIDATOR'],
   'Validator': ['VALIDATOR', 'GENERATE_SELECT_QUESTIONS', 'DATA_ENTRY_OPERATOR'],
   'DEO & Validator': ['DATA_ENTRY_OPERATOR', 'VALIDATOR', 'GENERATE_SELECT_QUESTIONS'],
@@ -121,11 +121,15 @@ const ALLOWED_CAPABILITIES_BY_ROLE: Record<string, CapabilityName[]> = {
  * Enforces strict role scopes:
  * - Super Admin: all 10 caps allowed (0 locked)
  * - School Admin: 3 caps allowed (7 locked)
- * - Teacher: 4 caps allowed (6 locked)
+ * - Teacher: 4-6 caps allowed (depending on validation workflow)
  * - Student: 2 caps allowed (8 locked)
  * Also ensures School Admins cannot modify Super Admins or other School Admins.
  */
-const getLockedCapsForRole = (targetRole: string, editorRole?: string): CapabilityName[] => {
+const getLockedCapsForRole = (
+  targetRole: string,
+  editorRole?: string,
+  validationWorkflowEnabled?: boolean
+): CapabilityName[] => {
   // School Admins cannot modify Super Admin or School Admin capabilities
   if (editorRole === 'School Admin' && (targetRole === 'Super Admin' || targetRole === 'School Admin')) {
     return ALL_CAPABILITIES.map((c) => c.name);
@@ -135,10 +139,15 @@ const getLockedCapsForRole = (targetRole: string, editorRole?: string): Capabili
     return ALL_CAPABILITIES.map((c) => c.name);
   }
 
-  const allowed = ALLOWED_CAPABILITIES_BY_ROLE[targetRole];
-  if (!allowed) {
-    return ALL_CAPABILITIES.map((c) => c.name);
+  let allowed = ALLOWED_CAPABILITIES_BY_ROLE[targetRole] || [];
+
+  // If validation workflow is explicitly disabled for this school, hide DEO & Validator
+  if (validationWorkflowEnabled === false) {
+    allowed = allowed.filter(
+      (c) => c !== 'DATA_ENTRY_OPERATOR' && c !== 'VALIDATOR'
+    );
   }
+
   return ALL_CAPABILITIES.map((c) => c.name).filter((c) => !allowed.includes(c));
 };
 
@@ -160,8 +169,12 @@ export const PermissionManager: React.FC<PermissionManagerProps> = ({
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   const defaultCaps = getDefaultCapabilitiesForRole(user.role_label);
-  // Caps that are off-limits based on the target user's role and editor role
-  const lockedCaps = getLockedCapsForRole(user.role_label, editorRole);
+  // Caps that are off-limits based on the target user's role, editor role, and validation workflow status
+  const lockedCaps = getLockedCapsForRole(
+    user.role_label,
+    editorRole,
+    user.school_validation_workflow_enabled
+  );
 
   const handleToggle = async (capName: CapabilityName) => {
     const isCurrentlyGranted = grantedCaps.includes(capName);

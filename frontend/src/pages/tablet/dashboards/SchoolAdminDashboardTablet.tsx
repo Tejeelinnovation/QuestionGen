@@ -484,8 +484,18 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="pill pill-ember text-[10px]">
-                            Teacher #{t.id}
+                          <span
+                            className={`pill text-[10px] ${
+                              t.role_label === 'Data Entry Operator'
+                                ? 'pill-forest'
+                                : t.role_label === 'Validator'
+                                ? 'pill-grape'
+                                : t.role_label === 'DEO & Validator'
+                                ? 'pill-lime'
+                                : 'pill-ember'
+                            }`}
+                          >
+                            {t.role_label || 'Teacher'} #{t.id}
                           </span>
                           <span className="font-mono text-xs text-ink/60">
                             @{t.username}

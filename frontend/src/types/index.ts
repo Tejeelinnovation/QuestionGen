@@ -64,6 +64,7 @@ export interface User {
   role_label: RoleLabel;
   school: number | null;
   school_name?: string;
+  school_validation_workflow_enabled?: boolean;
   class_section?: number | null;
   class_section_name?: string | null;
   gr_number?: string;

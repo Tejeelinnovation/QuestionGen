@@ -627,8 +627,8 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
       {/* ── Page Header ── */}
-      <div className="border-b border-border pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-2">
+      <div className="border-b border-border pb-6 flex flex-col xl:flex-row xl:items-end justify-between gap-5">
+        <div className="space-y-2 max-w-xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-forest/10 border border-forest/20 text-xs font-semibold text-forest">
             <Sparkles className="w-3.5 h-3.5" />
             Central Question Bank Manager
@@ -636,25 +636,25 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
           <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
             Curriculum Ingestion Engine
           </h1>
-          <p className="font-body text-ink/75 text-sm max-w-2xl leading-relaxed">
+          <p className="font-body text-ink/75 text-sm leading-relaxed">
             Standardize and ingest board-certified questions, multi-tier difficulty rubrics, and variant
             architectures directly into the centralized platform question bank.
           </p>
         </div>
 
-        {/* View Switcher Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-surface-muted border border-border rounded-pill self-start md:self-auto">
+        {/* View Switcher Tabs: Balanced 2x2 on Mobile, Single Row on Desktop */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-1.5 p-1.5 bg-surface-muted border border-border rounded-xl sm:rounded-pill w-full sm:w-auto shrink-0 shadow-xs">
           {(isQBM || (!isDEO && !isValidator)) && (
             <button
               type="button"
               onClick={() => setActiveTab('explore')}
-              className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3.5 py-2 text-xs font-heading font-semibold rounded-lg sm:rounded-pill transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'explore'
                   ? 'bg-forest text-white shadow-xs'
-                  : 'text-ink/70 hover:text-ink'
+                  : 'text-ink/70 hover:text-ink hover:bg-surface/60'
               }`}
             >
-              <Database className="w-3.5 h-3.5" />
+              <Database className="w-3.5 h-3.5 shrink-0" />
               <span>Question Explorer ({stats?.total_questions ?? totalCount})</span>
             </button>
           )}
@@ -663,14 +663,14 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
             <button
               type="button"
               onClick={() => setActiveTab('ingest')}
-              className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3.5 py-2 text-xs font-heading font-semibold rounded-lg sm:rounded-pill transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'ingest'
                   ? 'bg-forest text-white shadow-xs'
-                  : 'text-ink/70 hover:text-ink'
+                  : 'text-ink/70 hover:text-ink hover:bg-surface/60'
               }`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{isDEO ? 'Enter Question' : 'Ingest Question + Variants'}</span>
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span>{isDEO ? 'Enter Question' : 'Ingest Question'}</span>
             </button>
           )}
 
@@ -678,13 +678,13 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
             <button
               type="button"
               onClick={() => setActiveTab('submissions')}
-              className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3.5 py-2 text-xs font-heading font-semibold rounded-lg sm:rounded-pill transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'submissions'
                   ? 'bg-forest text-white shadow-xs'
-                  : 'text-ink/70 hover:text-ink'
+                  : 'text-ink/70 hover:text-ink hover:bg-surface/60'
               }`}
             >
-              <FileQuestion className="w-3.5 h-3.5" />
+              <FileQuestion className="w-3.5 h-3.5 shrink-0" />
               <span>My Submissions</span>
             </button>
           )}
@@ -693,13 +693,13 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
             <button
               type="button"
               onClick={() => setActiveTab('validation')}
-              className={`px-4 py-2 text-xs font-heading font-semibold rounded-pill transition-all cursor-pointer flex items-center gap-2 ${
+              className={`px-3.5 py-2 text-xs font-heading font-semibold rounded-lg sm:rounded-pill transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'validation'
                   ? 'bg-forest text-white shadow-xs'
-                  : 'text-ink/70 hover:text-ink'
+                  : 'text-ink/70 hover:text-ink hover:bg-surface/60'
               }`}
             >
-              <Inbox className="w-3.5 h-3.5" />
+              <Inbox className="w-3.5 h-3.5 shrink-0" />
               <span>Review Queue</span>
             </button>
           )}

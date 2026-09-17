@@ -504,6 +504,60 @@ class RoleModificationAndQuestionBankTests(TestCase):
         self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
         self.assertTrue(teacher.has_capability(CapabilityName.GENERATE_SELECT_QUESTIONS))
 
+    def test_school_admin_can_manage_deo_and_validator_permissions(self):
+        from users.capability_defaults import grant_deo_and_validator_defaults
+
+        dual_user = User.objects.create_user(
+            username="dual_test_user",
+            email="dual@apex.local",
+            mobile_number="+919876543219",
+            role="DEO & Validator",
+            school=self.school,
+        )
+        self.school.validation_workflow_enabled = True
+        self.school.save()
+        grant_deo_and_validator_defaults(dual_user, granted_by=self.school_admin)
+
+        self.client.force_authenticate(user=self.school_admin)
+
+        # School Admin can revoke VALIDATOR from dual user
+        res = self.client.delete(
+            f"/api/users/{dual_user.id}/permissions/VALIDATOR/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(dual_user.has_capability(CapabilityName.VALIDATOR))
+
+        # School Admin can re-grant VALIDATOR to dual user
+        res2 = self.client.post(
+            f"/api/users/{dual_user.id}/permissions/",
+            {"capability_name": CapabilityName.VALIDATOR},
+            format="json",
+        )
+        self.assertEqual(res2.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(dual_user.has_capability(CapabilityName.VALIDATOR))
+
+    def test_granting_deo_to_teacher_is_rejected_out_of_scope(self):
+        teacher = User.objects.create_user(
+            username="candidate_teacher",
+            email="candidate@apex.local",
+            mobile_number="+919876543220",
+            role="Teacher",
+            school=self.school,
+        )
+        grant_teacher_defaults(teacher, granted_by=self.school_admin)
+
+        self.client.force_authenticate(user=self.school_admin)
+
+        # Granting DEO to a Teacher must be rejected as out of scope
+        res = self.client.post(
+            f"/api/users/{teacher.id}/permissions/",
+            {"capability_name": CapabilityName.DATA_ENTRY_OPERATOR},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("out of scope for role 'Teacher'", res.data["detail"])
+        self.assertFalse(teacher.has_capability(CapabilityName.DATA_ENTRY_OPERATOR))
+
 
 class ChangePasswordViewTests(TestCase):
     def setUp(self):
