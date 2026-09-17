@@ -51,7 +51,7 @@ export const PrintViewPageMobile: React.FC = () => {
           className="inline-flex items-center gap-1 text-xs font-heading font-semibold text-forest hover:underline"
         >
           <ChevronLeft className="w-4 h-4" />
-          <span>Back to Version Detail</span>
+          <span>Back</span>
         </Link>
         <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-3 text-xs font-medium">
           {errorMessage || 'Print data not available.'}

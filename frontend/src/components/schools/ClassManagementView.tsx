@@ -258,60 +258,60 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
     return (
       <div className="space-y-6 animate-fade-in">
         {/* Navigation & Action Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface border border-border rounded-card p-4 shadow-card">
-          <div className="flex items-center gap-3">
+        <div className="bg-surface border border-border rounded-card p-3.5 sm:p-4 shadow-card space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
             <button
               type="button"
               onClick={() => setSelectedClassDetail(null)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted text-xs font-heading font-semibold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted text-xs font-heading font-semibold transition-colors cursor-pointer shrink-0"
             >
-              <ArrowLeft className="w-4 h-4 text-forest" />
-              <span>Back to All Classes</span>
+              <ArrowLeft className="w-3.5 h-3.5 text-forest" />
+              <span>Back<span className="hidden sm:inline"> to All Classes</span></span>
             </button>
-            <div className="h-5 w-px bg-border hidden sm:block" />
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-heading font-bold text-lg text-ink">
-                  Class {cls.standard}-{cls.section}
-                </h2>
-                <span className="pill pill-forest text-[10px] font-mono">
-                  Standard {cls.standard}
-                </span>
-                <span className="pill text-[10px] font-mono bg-surface-muted text-ink/70 border border-border">
-                  Division {cls.section}
-                </span>
-              </div>
-              <p className="text-[11px] text-ink/60 font-mono">
-                Classroom Architecture, Faculty Assignments & Enrolled Student Roster
-              </p>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => openEditClassModal(cls)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer shrink-0"
+              >
+                <Edit2 className="w-3.5 h-3.5 text-forest" />
+                <span>Edit<span className="hidden sm:inline"> Class</span></span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openSubjectTeachersModal(cls)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer shrink-0"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-grape" />
+                <span>Subjects<span className="hidden sm:inline"> Manage</span></span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteClass(cls)}
+                className="p-1.5 rounded-pill text-ink/50 hover:text-ember hover:bg-ember/10 transition-colors cursor-pointer shrink-0"
+                title="Delete Class"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => openEditClassModal(cls)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5 text-forest" />
-              <span>Edit Class</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openSubjectTeachersModal(cls)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-grape" />
-              <span>Manage Subjects</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDeleteClass(cls)}
-              className="p-2 rounded-pill text-ink/50 hover:text-ember hover:bg-ember/10 transition-colors cursor-pointer"
-              title="Delete Class"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+          <div className="border-t border-border/50 pt-2.5 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-heading font-bold text-base sm:text-lg text-ink">
+                Class {cls.standard}-{cls.section}
+              </h2>
+              <span className="pill pill-forest text-[10px] font-mono shrink-0">
+                Standard {cls.standard}
+              </span>
+              <span className="pill text-[10px] font-mono bg-surface-muted text-ink/70 border border-border shrink-0">
+                Division {cls.section}
+              </span>
+            </div>
+            <p className="text-[11px] text-ink/60 font-mono">
+              Classroom Architecture, Faculty Assignments & Enrolled Student Roster
+            </p>
           </div>
         </div>
 
@@ -340,7 +340,7 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
             <div className="font-heading font-bold text-base text-ink mt-1 truncate">
               {cls.class_teacher_name || 'No Class Teacher Assigned'}
             </div>
-            <div className="text-[11px] text-ink/60 font-mono mt-0.5 flex items-center gap-2">
+            <div className="text-[11px] text-ink/60 font-mono mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <span>Subject: <strong className="text-forest">{cls.class_teacher_subject || 'General'}</strong></span>
               {cls.class_teacher_username && <span>• @{cls.class_teacher_username}</span>}
             </div>
@@ -363,7 +363,7 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
               style={{ width: `${fillPercent}%` }}
             />
           </div>
-          <div className="flex justify-between text-[10px] text-ink/50 font-mono">
+          <div className="flex flex-wrap justify-between gap-1 text-[10px] text-ink/50 font-mono">
             <span>0 students</span>
             <span>{seatsAvailable} seats remaining</span>
             <span>{maxCapacity} max capacity</span>

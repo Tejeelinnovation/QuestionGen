@@ -51,8 +51,9 @@ export const PaperConfigurePageMobile: React.FC = () => {
   const [paper, setPaper] = useState<Paper | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([]);
-  const [difficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | ''>('');
-  const [learnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | ''>('');
+  const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | ''>('');
+  const [questionType, setQuestionType] = useState<'MCQ' | 'SHORT_ANSWER' | 'LONG_ANSWER' | ''>('');
+  const [learnerLevel, setLearnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | ''>('');
 
   // Rubric & parameters
   const [useDistributionRubric, setUseDistributionRubric] = useState<boolean>(true);
@@ -195,6 +196,7 @@ export const PaperConfigurePageMobile: React.FC = () => {
         topic_ids: selectedTopicIds.length > 0 ? selectedTopicIds : undefined,
         difficulty: difficulty || undefined,
         learner_level: learnerLevel || undefined,
+        question_type: !useDistributionRubric ? (questionType || undefined) : undefined,
         total_marks: parsedTotalMarks,
         quantity: quantity ? Number(quantity) : (activeTiers.length > 0 ? rubricTotalQuestions : undefined),
         subjects: paper?.subjects?.length ? paper.subjects : undefined,
@@ -269,6 +271,190 @@ export const PaperConfigurePageMobile: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* ── SECTION: Taxonomy & Format Dimensions (Pill Filters) ── */}
+        <div className="bg-surface border border-border rounded-card p-4 shadow-card space-y-4">
+          <div className="border-b border-border/80 pb-3 flex items-center justify-between">
+            <div>
+              <h2 className="font-heading font-bold text-sm text-ink">
+                Taxonomy & Format Dimensions
+              </h2>
+              <p className="text-[11px] text-ink/60">
+                Click interactive pills to adjust question characteristics
+              </p>
+            </div>
+            <span className="font-mono text-[10px] text-ink/40 uppercase">Pill Filters</span>
+          </div>
+
+          {/* Hidden accessible selects for automation / test script compatibility */}
+          <select
+            id="filter-difficulty"
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value as any)}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+          >
+            <option value="">Any Difficulty</option>
+            <option value="EASY">EASY</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HARD">HARD</option>
+          </select>
+
+          <select
+            id="filter-type"
+            value={questionType}
+            onChange={(e) => setQuestionType(e.target.value as any)}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+          >
+            <option value="">Any Type</option>
+            <option value="MCQ">MCQ</option>
+            <option value="SHORT_ANSWER">SHORT_ANSWER</option>
+            <option value="LONG_ANSWER">LONG_ANSWER</option>
+          </select>
+
+          <select
+            id="filter-level"
+            value={learnerLevel}
+            onChange={(e) => setLearnerLevel(e.target.value as any)}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+          >
+            <option value="">Any Level</option>
+            <option value="BEGINNER">BEGINNER</option>
+            <option value="INTERMEDIATE">INTERMEDIATE</option>
+            <option value="ADVANCED">ADVANCED</option>
+          </select>
+
+          {/* Difficulty Pills */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-heading font-semibold uppercase tracking-wider text-ink/80">
+                Difficulty Level
+              </span>
+              <span className="font-mono text-[10px] text-ink/50">
+                {difficulty ? `Selected: ${difficulty}` : 'Any Difficulty'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { value: '', label: 'Any Difficulty', accent: 'muted' },
+                { value: 'EASY', label: 'Easy • Foundations', accent: 'forest' },
+                { value: 'MEDIUM', label: 'Medium • Standard', accent: 'ember' },
+                { value: 'HARD', label: 'Hard • Advanced Inquiry', accent: 'grape' },
+              ].map((item) => {
+                const isSelected = difficulty === item.value;
+                let activeClass = 'bg-ink text-white';
+                if (item.accent === 'forest') activeClass = 'bg-forest text-white border-forest';
+                if (item.accent === 'ember') activeClass = 'bg-ember text-white border-ember';
+                if (item.accent === 'grape') activeClass = 'bg-grape text-white border-grape';
+
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setDifficulty(item.value as any)}
+                    disabled={isSubmitting}
+                    className={`px-3 py-1.5 text-xs font-heading font-medium rounded-pill border transition-all cursor-pointer ${
+                      isSelected
+                        ? `${activeClass} shadow-xs font-semibold`
+                        : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Question Type Pills */}
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-heading font-semibold uppercase tracking-wider text-ink/80">
+                Question Format
+              </span>
+              <span className="font-mono text-[10px] text-ink/50">
+                {questionType ? `Selected: ${questionType}` : 'All Formats'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { value: '', label: 'All Question Types', accent: 'muted' },
+                { value: 'MCQ', label: 'Multiple Choice (MCQ)', accent: 'forest' },
+                { value: 'SHORT_ANSWER', label: 'Short Answer', accent: 'ember' },
+                { value: 'LONG_ANSWER', label: 'Long Answer / Descriptive', accent: 'grape' },
+              ].map((item) => {
+                const isSelected = questionType === item.value;
+                let activeClass = 'bg-ink text-white';
+                if (item.accent === 'forest') activeClass = 'bg-forest text-white border-forest';
+                if (item.accent === 'ember') activeClass = 'bg-ember text-white border-ember';
+                if (item.accent === 'grape') activeClass = 'bg-grape text-white border-grape';
+
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setQuestionType(item.value as any)}
+                    disabled={isSubmitting}
+                    className={`px-3 py-1.5 text-xs font-heading font-medium rounded-pill border transition-all cursor-pointer ${
+                      isSelected
+                        ? `${activeClass} shadow-xs font-semibold`
+                        : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Learner Cognitive Level */}
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-heading font-semibold uppercase tracking-wider text-ink/80">
+                Learner Cognitive Level
+              </span>
+              <span className="font-mono text-[10px] text-ink/50">
+                {learnerLevel ? `Selected: ${learnerLevel}` : 'Any Level'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { value: '', label: 'Any Learner Level', accent: 'muted' },
+                { value: 'BEGINNER', label: 'Beginner • Recall & Comprehension', accent: 'forest' },
+                { value: 'INTERMEDIATE', label: 'Intermediate • Application & Analysis', accent: 'ember' },
+                { value: 'ADVANCED', label: 'Advanced • Synthesis & Evaluation', accent: 'grape' },
+              ].map((item) => {
+                const isSelected = learnerLevel === item.value;
+                let activeClass = 'bg-ink text-white';
+                if (item.accent === 'forest') activeClass = 'bg-forest text-white border-forest';
+                if (item.accent === 'ember') activeClass = 'bg-ember text-white border-ember';
+                if (item.accent === 'grape') activeClass = 'bg-grape text-white border-grape';
+
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setLearnerLevel(item.value as any)}
+                    disabled={isSubmitting}
+                    className={`px-3 py-1.5 text-xs font-heading font-medium rounded-pill border transition-all cursor-pointer ${
+                      isSelected
+                        ? `${activeClass} shadow-xs font-semibold`
+                        : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {/* Mode Switcher */}
         <div className="flex items-center justify-between p-3 rounded-card bg-surface border border-border">
           <div className="space-y-0.5">
@@ -575,12 +761,13 @@ export const PaperConfigurePageMobile: React.FC = () => {
           )}
         </div>
 
-        {/* Floating / Sticky Mobile Bottom Action Bar */}
-        <div className="fixed bottom-0 left-0 right-0 p-3 bg-surface/95 backdrop-blur-md border-t border-border shadow-lg z-30">
+        {/* ── Mobile Proceed Action Bar ── */}
+        <div className="pt-3 pb-12">
           <button
             type="submit"
+            id="mobile-paper-proceed-btn"
             disabled={isSubmitting}
-            className={`w-full py-3 px-4 rounded-pill bg-forest text-white font-heading font-bold text-xs hover:bg-forest/90 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50 ${MOTION.touch.button.className}`}
+            className={`w-full py-3.5 px-4 rounded-pill bg-forest text-white font-heading font-bold text-sm hover:bg-forest/90 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-98 disabled:opacity-50 ${MOTION.touch.button.className}`}
           >
             {isSubmitting ? (
               <span>Generating Candidate Questions...</span>

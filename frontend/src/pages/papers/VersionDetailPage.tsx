@@ -19,7 +19,8 @@ const VersionDetailPageDesktop: React.FC = () => {
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -39,6 +40,8 @@ const VersionDetailPageDesktop: React.FC = () => {
   };
 
   useEffect(() => {
+    setIsFinalizing(false);
+    setIsCloning(false);
     if (paperId && vId) {
       fetchVersion();
     }
@@ -47,7 +50,7 @@ const VersionDetailPageDesktop: React.FC = () => {
   const handleFinalize = async () => {
     setErrorMessage(null);
     setSuccessMessage(null);
-    setActionLoading(true);
+    setIsFinalizing(true);
     try {
       const updated = await papersApi.finalizeVersion(paperId, vId);
       setVersion(updated);
@@ -64,17 +67,18 @@ const VersionDetailPageDesktop: React.FC = () => {
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
-      setActionLoading(false);
+      setIsFinalizing(false);
     }
   };
 
   const handleCloneSame = async () => {
     setErrorMessage(null);
     setSuccessMessage(null);
-    setActionLoading(true);
+    setIsCloning(true);
     try {
       const cloned = await papersApi.cloneVersion(paperId, vId, {});
       toast.success(`Created clone Version ${cloned.version_label}.`);
+      setIsCloning(false);
       navigate(`/papers/${paperId}/versions/${cloned.id}`);
     } catch (err: any) {
       const detail =
@@ -84,7 +88,7 @@ const VersionDetailPageDesktop: React.FC = () => {
       const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
       setErrorMessage(msg);
       toast.error(msg);
-      setActionLoading(false);
+      setIsCloning(false);
     }
   };
 
@@ -215,11 +219,11 @@ const VersionDetailPageDesktop: React.FC = () => {
                 <button
                   onClick={handleCloneSame}
                   id="clone-version-btn"
-                  disabled={actionLoading}
+                  disabled={isFinalizing || isCloning}
                   className="px-4 py-2 text-xs font-heading font-medium rounded-pill bg-white/10 hover:bg-white/20 text-white border border-white/25 transition-colors cursor-pointer disabled:opacity-50"
                   title="Clone this version creating Version B/C with the same question pool"
                 >
-                  {actionLoading ? 'Cloning...' : 'Clone as Alternate Shift Version'}
+                  {isCloning ? 'Cloning...' : 'Clone as Alternate Shift Version'}
                 </button>
               </div>
             )}
@@ -256,10 +260,10 @@ const VersionDetailPageDesktop: React.FC = () => {
                 <button
                   onClick={handleFinalize}
                   id="finalize-version-btn"
-                  disabled={actionLoading}
+                  disabled={isFinalizing || isCloning}
                   className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
                 >
-                  <span>{actionLoading ? 'Locking Snapshot...' : 'Finalize & Lock Version'}</span>
+                  <span>{isFinalizing ? 'Locking Snapshot...' : 'Finalize & Lock Version'}</span>
                   <span>🔒</span>
                 </button>
               )}
@@ -271,11 +275,11 @@ const VersionDetailPageDesktop: React.FC = () => {
                 <button
                   onClick={handleCloneSame}
                   id="clone-version-btn"
-                  disabled={actionLoading}
+                  disabled={isFinalizing || isCloning}
                   className="px-4 py-2 text-xs font-heading font-medium rounded-pill border border-border bg-bg text-ink hover:bg-surface-muted transition-colors cursor-pointer disabled:opacity-50"
                   title="Clone this version creating Version B/C with the same question pool"
                 >
-                  {actionLoading ? 'Cloning...' : 'Clone as Alternate Shift Version'}
+                  {isCloning ? 'Cloning...' : 'Clone as Alternate Shift Version'}
                 </button>
 
                 <Link

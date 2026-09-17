@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../../auth/AuthContext';
 import { usersApi } from '../../../api/users';
 import { papersApi } from '../../../api/papers';
-import type { User, Delivery } from '../../../types';
+import type { User, Delivery, School } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
@@ -35,6 +36,7 @@ import {
 type ActiveTab = 'teachers' | 'students' | 'classes' | 'deliveries';
 
 export const SchoolAdminDashboardMobile: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('teachers');
@@ -46,6 +48,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [bulkImportRole, setBulkImportRole] = useState<'student' | 'teacher'>('student');
   const [studentSearch, setStudentSearch] = useState('');
+  const [schoolData, setSchoolData] = useState<School | null>(null);
 
   // Pagination states
   const [teacherPage, setTeacherPage] = useState(1);
@@ -55,7 +58,8 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
   const [deliveryPage, setDeliveryPage] = useState(1);
   const deliveryPageSize = 5;
 
-  // Create Teacher form state
+  // Create Faculty form state
+  const [targetProfile, setTargetProfile] = useState<'teacher' | 'deo' | 'validator' | 'deo_validator'>('teacher');
   const [showAddForm, setShowAddForm] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -101,6 +105,15 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
     fetchDeliveries();
   }, []);
 
+  useEffect(() => {
+    if (currentUser?.school) {
+      usersApi
+        .getSchool(currentUser.school)
+        .then(setSchoolData)
+        .catch(() => {});
+    }
+  }, [currentUser?.school]);
+
   const handleCreateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -123,15 +136,24 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
       const newUser = await usersApi.createUser({
         username: username.trim(),
         password: password.trim(),
-        profile: 'teacher',
+        profile: targetProfile,
         first_name: firstName.trim() || undefined,
         last_name: lastName.trim() || undefined,
         email: email.trim(),
         mobile_number: `+91${cleanDigits}`,
-        primary_subject: primarySubject.trim() || undefined,
+        primary_subject: targetProfile === 'teacher' ? (primarySubject.trim() || undefined) : undefined,
       });
 
-      setFormSuccess(`Teacher "${newUser.username}" added successfully.`);
+      const roleDisplay =
+        targetProfile === 'deo'
+          ? 'Data Entry Operator'
+          : targetProfile === 'validator'
+          ? 'Validator'
+          : targetProfile === 'deo_validator'
+          ? 'DEO & Validator'
+          : 'Teacher';
+
+      setFormSuccess(`${roleDisplay} "${newUser.username}" added successfully.`);
       setUsername('');
       setPassword('');
       setFirstName('');
@@ -139,6 +161,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
       setEmail('');
       setMobileNumber('');
       setPrimarySubject('');
+      setTargetProfile('teacher');
       setShowAddForm(false);
       fetchUsers();
     } catch (err: any) {
@@ -146,14 +169,16 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
         err.response?.data?.detail ||
         err.response?.data?.username?.[0] ||
         err.response?.data?.password?.[0] ||
-        'Failed to create teacher account.';
+        'Failed to create account.';
       setFormError(detail);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const teachers = users.filter((u) => u.role_label === 'Teacher');
+  const teachers = users.filter((u) =>
+    ['Teacher', 'Data Entry Operator', 'Validator', 'DEO & Validator'].includes(u.role_label)
+  );
   const students = users.filter((u) => u.role_label === 'Student');
 
   const filteredStudents = students.filter((s) => {
@@ -285,7 +310,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
               className="flex items-center gap-1 px-3 py-1.5 rounded-pill bg-ember text-white font-heading font-semibold text-xs active:scale-95 transition-transform cursor-pointer"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>{showAddForm ? 'Close Form' : 'Add Teacher'}</span>
+              <span>{showAddForm ? 'Close Form' : (schoolData?.validation_workflow_enabled ? 'Add Faculty' : 'Add Teacher')}</span>
             </button>
           </div>
 
@@ -295,7 +320,7 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <h2 className="font-heading font-bold text-sm text-ink flex items-center gap-1.5">
                   <UserPlus className="w-4 h-4 text-ember" />
-                  New Faculty Instructor
+                  {schoolData?.validation_workflow_enabled ? 'New Faculty Account' : 'New Faculty Instructor'}
                 </h2>
                 <span className="pill pill-ember text-[10px]">Staff Role</span>
               </div>
@@ -307,6 +332,65 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
               )}
 
               <form onSubmit={handleCreateTeacher} className="space-y-3 text-xs">
+                {/* Role Profile Selector (when validation workflow is enabled) */}
+                {schoolData?.validation_workflow_enabled && (
+                  <div className="space-y-1.5">
+                    <label className="font-heading font-semibold text-ink block">
+                      Account Responsibility Profile *
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTargetProfile('teacher')}
+                        className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
+                          targetProfile === 'teacher'
+                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="block text-xs">Teacher</span>
+                        <span className="block text-[10px] text-ink/50 mt-0.5">Authoring & Exam Prep</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargetProfile('deo')}
+                        className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
+                          targetProfile === 'deo'
+                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="block text-xs">DEO</span>
+                        <span className="block text-[10px] text-ink/50 mt-0.5">Data Entry Operator</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargetProfile('validator')}
+                        className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
+                          targetProfile === 'validator'
+                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="block text-xs">Validator</span>
+                        <span className="block text-[10px] text-ink/50 mt-0.5">Review & Metadata</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargetProfile('deo_validator')}
+                        className={`p-2 rounded-card border text-left transition-all cursor-pointer ${
+                          targetProfile === 'deo_validator'
+                            ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                            : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                        }`}
+                      >
+                        <span className="block text-xs">Dual Role</span>
+                        <span className="block text-[10px] text-ink/50 mt-0.5">DEO & Validator</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1">
                   <label className="font-heading font-semibold text-ink">Username *</label>
                   <input
@@ -392,23 +476,25 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="font-heading font-semibold text-ink">Primary Teaching Subject</label>
-                  <input
-                    type="text"
-                    value={primarySubject}
-                    onChange={(e) => setPrimarySubject(e.target.value)}
-                    placeholder="e.g. Mathematics, Science"
-                    className="w-full px-3 py-2 rounded-card bg-surface border border-border text-xs focus:outline-none focus:border-forest"
-                  />
-                </div>
+                {targetProfile === 'teacher' && (
+                  <div className="space-y-1">
+                    <label className="font-heading font-semibold text-ink">Primary Teaching Subject</label>
+                    <input
+                      type="text"
+                      value={primarySubject}
+                      onChange={(e) => setPrimarySubject(e.target.value)}
+                      placeholder="e.g. Mathematics, Science"
+                      className="w-full px-3 py-2 rounded-card bg-surface border border-border text-xs focus:outline-none focus:border-forest"
+                    />
+                  </div>
+                )}
 
                 <button
                   type="submit"
                   disabled={isCreating}
                   className="w-full py-2.5 rounded-pill bg-ember text-white font-heading font-semibold text-xs active:scale-95 transition-all shadow-xs min-h-[44px] cursor-pointer disabled:opacity-50"
                 >
-                  {isCreating ? 'Saving Faculty...' : 'Confirm & Create Account'}
+                  {isCreating ? 'Creating Account...' : 'Confirm & Create Account'}
                 </button>
               </form>
             </div>
@@ -436,13 +522,13 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                   style={getStaggerDelay(idx, true)}
                   className={`p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2 ${MOTION.touch.card.className}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-heading font-bold text-sm text-ink">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <span className="font-heading font-bold text-sm text-ink truncate max-w-[160px]">
                       {t.first_name || t.last_name
                         ? `${t.first_name || ''} ${t.last_name || ''}`.trim()
                         : t.username}
                     </span>
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1 shrink-0">
                       {t.primary_subject && (
                         <span className="pill text-[9px] bg-grape/10 text-grape border border-grape/20 font-medium py-0.5">
                           {t.primary_subject}
@@ -570,11 +656,11 @@ export const SchoolAdminDashboardMobile: React.FC = () => {
                     style={getStaggerDelay(idx, true)}
                     className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-heading font-bold text-sm text-ink">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <span className="font-heading font-bold text-sm text-ink truncate max-w-[160px]">
                         {fullName || s.username}
                       </span>
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1 shrink-0">
                         {s.class_section_name && (
                           <span className="pill text-[9px] bg-forest/15 text-forest border border-forest/25 font-semibold py-0.5">
                             {s.class_section_name}

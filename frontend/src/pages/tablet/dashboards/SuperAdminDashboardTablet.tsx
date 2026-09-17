@@ -7,7 +7,7 @@ import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../../components/schools/BulkImportModal';
-import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, ShieldAlert, Users as UsersIcon } from 'lucide-react';
+import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, ShieldAlert, Users as UsersIcon, UserPlus } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster, Skeleton } from '../../../components/ui/skeleton';
@@ -32,7 +32,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
   // Modals state
   const [isCreateSchoolOpen, setIsCreateSchoolOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
-  const [createUserProfile, setCreateUserProfile] = useState<'teacher' | null>(null);
+  const [createUserProfile, setCreateUserProfile] = useState<'qbm' | 'teacher' | null>(null);
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [bulkImportSchool, setBulkImportSchool] = useState<School | null>(null);
 
@@ -137,6 +137,15 @@ export const SuperAdminDashboardTablet: React.FC = () => {
 
         {/* Primary Actions */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            id="superadmin-tablet-create-qbm-btn"
+            onClick={() => setCreateUserProfile('qbm')}
+            className="px-3 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-forest" />
+            <span>Add Question Bank Manager</span>
+          </button>
           <button
             type="button"
             onClick={() => setIsCreateSchoolOpen(true)}
@@ -372,7 +381,7 @@ export const SuperAdminDashboardTablet: React.FC = () => {
                 )}
               </div>
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
-                {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student'].map((role) => (
+                {['ALL', 'Super Admin', 'School Admin', 'Teacher', 'Student', 'Question Bank Manager'].map((role) => (
                   <button
                     key={role}
                     type="button"

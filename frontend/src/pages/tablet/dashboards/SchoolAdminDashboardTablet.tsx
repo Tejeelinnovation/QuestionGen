@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../../auth/AuthContext';
 import { usersApi } from '../../../api/users';
 import { papersApi } from '../../../api/papers';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
@@ -21,7 +22,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import type { User, Delivery } from '../../../types';
+import type { User, Delivery, School } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import {
   SkeletonFacultyRoster,
@@ -32,6 +33,7 @@ import {
 type ActiveTab = 'teachers' | 'students' | 'classes' | 'deliveries';
 
 export const SchoolAdminDashboardTablet: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('teachers');
@@ -43,6 +45,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [bulkImportRole, setBulkImportRole] = useState<'student' | 'teacher'>('student');
   const [studentSearch, setStudentSearch] = useState('');
+  const [schoolData, setSchoolData] = useState<School | null>(null);
 
   // Pagination states
   const [teacherPage, setTeacherPage] = useState(1);
@@ -52,7 +55,8 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
   const [deliveryPage, setDeliveryPage] = useState(1);
   const deliveryPageSize = 6;
 
-  // Create Teacher form state
+  // Create Faculty form state
+  const [targetProfile, setTargetProfile] = useState<'teacher' | 'deo' | 'validator' | 'deo_validator'>('teacher');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -97,6 +101,15 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
     fetchDeliveries();
   }, []);
 
+  useEffect(() => {
+    if (currentUser?.school) {
+      usersApi
+        .getSchool(currentUser.school)
+        .then(setSchoolData)
+        .catch(() => {});
+    }
+  }, [currentUser?.school]);
+
   const handleCreateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -124,15 +137,24 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
       const newUser = await usersApi.createUser({
         username: username.trim(),
         password: password.trim(),
-        profile: 'teacher',
+        profile: targetProfile,
         first_name: firstName.trim() || undefined,
         last_name: lastName.trim() || undefined,
         email: email.trim(),
         mobile_number: mobileNumber.startsWith('+91') ? mobileNumber : `+91${mobDigits.slice(-10)}`,
-        primary_subject: primarySubject.trim() || undefined,
+        primary_subject: targetProfile === 'teacher' ? (primarySubject.trim() || undefined) : undefined,
       });
 
-      setFormSuccess(`Teacher "${newUser.username}" created successfully.`);
+      const roleDisplay =
+        targetProfile === 'deo'
+          ? 'Data Entry Operator'
+          : targetProfile === 'validator'
+          ? 'Validator'
+          : targetProfile === 'deo_validator'
+          ? 'DEO & Validator'
+          : 'Teacher';
+
+      setFormSuccess(`${roleDisplay} "${newUser.username}" created successfully.`);
       setUsername('');
       setPassword('');
       setFirstName('');
@@ -140,19 +162,22 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
       setEmail('');
       setMobileNumber('');
       setPrimarySubject('');
+      setTargetProfile('teacher');
       fetchUsers();
     } catch (err: any) {
       const detail =
         err.response?.data?.detail ||
         JSON.stringify(err.response?.data) ||
-        'Failed to create teacher account.';
+        'Failed to create account.';
       setFormError(detail);
     } finally {
       setIsCreating(false);
     }
   };
 
-  const teachers = users.filter((u) => u.role_label === 'Teacher');
+  const teachers = users.filter((u) =>
+    ['Teacher', 'Data Entry Operator', 'Validator', 'DEO & Validator'].includes(u.role_label)
+  );
   const students = users.filter((u) => u.role_label === 'Student');
 
   const filteredStudents = students.filter((s) => {
@@ -292,7 +317,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
           <div className="p-5 rounded-card bg-surface border border-border shadow-card space-y-4">
             <h3 className="font-heading font-bold text-base text-ink flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-ember" />
-              <span>Register New Teacher</span>
+              <span>{schoolData?.validation_workflow_enabled ? 'Register New Faculty' : 'Register New Teacher'}</span>
             </h3>
 
             {formSuccess && (
@@ -308,6 +333,64 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
             )}
 
             <form onSubmit={handleCreateTeacher} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {schoolData?.validation_workflow_enabled && (
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label className="block text-[11px] font-heading font-semibold uppercase text-ink">
+                    Account Responsibility Profile *
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfile('teacher')}
+                      className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                        targetProfile === 'teacher'
+                          ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                          : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                      }`}
+                    >
+                      <span className="block text-xs">Teacher</span>
+                      <span className="block text-[10px] text-ink/50 mt-0.5">Authoring & Exam Prep</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfile('deo')}
+                      className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                        targetProfile === 'deo'
+                          ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                          : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                      }`}
+                    >
+                      <span className="block text-xs">DEO</span>
+                      <span className="block text-[10px] text-ink/50 mt-0.5">Data Entry Operator</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfile('validator')}
+                      className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                        targetProfile === 'validator'
+                          ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                          : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                      }`}
+                    >
+                      <span className="block text-xs">Validator</span>
+                      <span className="block text-[10px] text-ink/50 mt-0.5">Review & Metadata</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetProfile('deo_validator')}
+                      className={`p-2.5 rounded-card border text-left transition-all cursor-pointer ${
+                        targetProfile === 'deo_validator'
+                          ? 'border-forest bg-forest/5 text-forest font-semibold shadow-xs'
+                          : 'border-border bg-bg text-ink/80 hover:bg-surface-muted'
+                      }`}
+                    >
+                      <span className="block text-xs">Dual Role</span>
+                      <span className="block text-[10px] text-ink/50 mt-0.5">DEO & Validator</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-[11px] font-heading font-semibold uppercase text-ink mb-1" htmlFor="tab-t-username">
                   Username *
@@ -415,20 +498,22 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                 />
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-heading font-semibold uppercase text-ink mb-1" htmlFor="tab-t-subject">
-                  Primary Teaching Subject
-                </label>
-                <input
-                  id="tab-t-subject"
-                  type="text"
-                  value={primarySubject}
-                  onChange={(e) => setPrimarySubject(e.target.value)}
-                  disabled={isCreating}
-                  placeholder="e.g. Mathematics, Science, English"
-                  className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:outline-none focus:border-forest"
-                />
-              </div>
+              {targetProfile === 'teacher' && (
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-heading font-semibold uppercase text-ink mb-1" htmlFor="tab-t-subject">
+                    Primary Teaching Subject
+                  </label>
+                  <input
+                    id="tab-t-subject"
+                    type="text"
+                    value={primarySubject}
+                    onChange={(e) => setPrimarySubject(e.target.value)}
+                    disabled={isCreating}
+                    placeholder="e.g. Mathematics, Science, English"
+                    className="w-full rounded-card border border-border bg-bg px-3 py-2 text-xs text-ink focus:outline-none focus:border-forest"
+                  />
+                </div>
+              )}
 
               <div className="sm:col-span-2 pt-1">
                 <button
@@ -436,7 +521,7 @@ export const SchoolAdminDashboardTablet: React.FC = () => {
                   disabled={isCreating}
                   className="w-full py-2.5 px-4 rounded-pill bg-ember text-white text-xs font-heading font-semibold hover:bg-ember/90 transition-all min-h-[44px] cursor-pointer"
                 >
-                  {isCreating ? 'Provisioning...' : 'Provision Teacher Account →'}
+                  {isCreating ? 'Provisioning Account...' : 'Confirm & Create Account →'}
                 </button>
               </div>
             </form>

@@ -14,7 +14,8 @@ export const VersionDetailPageTablet: React.FC = () => {
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -34,6 +35,8 @@ export const VersionDetailPageTablet: React.FC = () => {
   };
 
   useEffect(() => {
+    setIsFinalizing(false);
+    setIsCloning(false);
     if (paperId && vId) {
       fetchVersion();
     }
@@ -42,7 +45,7 @@ export const VersionDetailPageTablet: React.FC = () => {
   const handleFinalize = async () => {
     setErrorMessage(null);
     setSuccessMessage(null);
-    setActionLoading(true);
+    setIsFinalizing(true);
     try {
       const updated = await papersApi.finalizeVersion(paperId, vId);
       setVersion(updated);
@@ -55,16 +58,17 @@ export const VersionDetailPageTablet: React.FC = () => {
         'Failed to finalize version.';
       setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
     } finally {
-      setActionLoading(false);
+      setIsFinalizing(false);
     }
   };
 
   const handleCloneSame = async () => {
     setErrorMessage(null);
     setSuccessMessage(null);
-    setActionLoading(true);
+    setIsCloning(true);
     try {
       const cloned = await papersApi.cloneVersion(paperId, vId, {});
+      setIsCloning(false);
       navigate(`/papers/${paperId}/versions/${cloned.id}`);
     } catch (err: any) {
       const detail =
@@ -72,7 +76,7 @@ export const VersionDetailPageTablet: React.FC = () => {
         JSON.stringify(err.response?.data) ||
         'Failed to clone version.';
       setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
-      setActionLoading(false);
+      setIsCloning(false);
     }
   };
 
@@ -189,10 +193,10 @@ export const VersionDetailPageTablet: React.FC = () => {
               <button
                 onClick={handleCloneSame}
                 id="clone-version-btn"
-                disabled={actionLoading}
-                className="px-4 py-3 rounded-pill bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-heading font-medium min-h-[44px] cursor-pointer"
+                disabled={isFinalizing || isCloning}
+                className="px-4 py-3 rounded-pill bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-heading font-medium min-h-[44px] cursor-pointer disabled:opacity-50"
               >
-                {actionLoading ? 'Cloning...' : 'Clone as Alternate Shift'}
+                {isCloning ? 'Cloning...' : 'Clone as Alternate Shift'}
               </button>
             )}
           </div>
@@ -220,10 +224,10 @@ export const VersionDetailPageTablet: React.FC = () => {
               <button
                 onClick={handleFinalize}
                 id="finalize-version-btn"
-                disabled={actionLoading}
+                disabled={isFinalizing || isCloning}
                 className="px-6 py-3 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 active:scale-95 transition-all shadow-sm min-h-[44px] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <span>{actionLoading ? 'Finalizing...' : 'Finalize & Lock Version'}</span>
+                <span>{isFinalizing ? 'Finalizing...' : 'Finalize & Lock Version'}</span>
                 <span>🔒</span>
               </button>
             )}
@@ -232,10 +236,10 @@ export const VersionDetailPageTablet: React.FC = () => {
               <button
                 onClick={handleCloneSame}
                 id="clone-version-btn"
-                disabled={actionLoading}
-                className="px-4 py-3 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-medium min-h-[44px] cursor-pointer"
+                disabled={isFinalizing || isCloning}
+                className="px-4 py-3 rounded-pill border border-border bg-bg text-ink text-xs font-heading font-medium min-h-[44px] cursor-pointer disabled:opacity-50"
               >
-                {actionLoading ? 'Cloning...' : 'Clone as Alternate Shift'}
+                {isCloning ? 'Cloning...' : 'Clone as Alternate Shift'}
               </button>
             )}
           </div>

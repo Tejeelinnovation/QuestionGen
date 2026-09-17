@@ -72,7 +72,7 @@ export const ResultsRosterPageMobile: React.FC = () => {
         className="inline-flex items-center gap-1 text-xs font-heading font-semibold text-forest hover:underline"
       >
         <ArrowLeft className="w-4 h-4" />
-        <span>Return to Dashboard</span>
+        <span>Back</span>
       </Link>
 
       {/* ── Headline Summary Block ── */}
