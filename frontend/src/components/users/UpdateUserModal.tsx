@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
 import { classesApi } from '../../api/classes';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { PermissionManager } from './PermissionManager';
 import type { User, CapabilityName, ClassSection } from '../../types';
 import { X, UserCheck, Shield, Check, AlertCircle, RefreshCw, BookOpen, GraduationCap } from 'lucide-react';
@@ -22,6 +23,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
   onUserUpdated,
 }) => {
   const { hasCapability, user: authUser } = useAuth();
+  const toast = useToast();
   const [userData, setUserData] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'permissions'>('details');
   const [isLoading, setIsLoading] = useState(false);
@@ -122,6 +124,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
 
       setUserData(updated);
       setSaveSuccess('User details updated successfully.');
+      toast.success('User details updated successfully.');
       onUserUpdated(updated);
     } catch (err: any) {
       const msg =
@@ -131,6 +134,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
         err.message ||
         'Failed to update user.';
       setSaveError(msg);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
@@ -141,6 +145,7 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
       const updated = { ...userData, capabilities: newCapabilities };
       setUserData(updated);
       onUserUpdated(updated);
+      toast.success('User permissions updated successfully.');
     }
   };
 
@@ -172,9 +177,21 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-ink/65">
-                {userData ? `@${userData.username} • ${userData.role_label}` : 'Loading profile...'}
-              </p>
+              <div className="text-xs text-ink/65 flex items-center gap-1.5 mt-0.5">
+                {userData ? (
+                  <>
+                    <span>@{userData.username}</span>
+                    {authUser && (authUser.id === userData.id || (authUser.username && userData.username && authUser.username.toLowerCase() === userData.username.toLowerCase())) && (
+                      <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold">
+                        You
+                      </span>
+                    )}
+                    <span>• {userData.role_label}</span>
+                  </>
+                ) : (
+                  <span>Loading profile...</span>
+                )}
+              </div>
             </div>
           </div>
 

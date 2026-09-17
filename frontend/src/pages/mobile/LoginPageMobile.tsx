@@ -214,11 +214,35 @@ export const LoginPageMobile: React.FC = () => {
             </button>
             <button
               type="button"
+              id="mobile-quick-deo"
+              onClick={() => handleQuickFill('deo1', 'password123')}
+              className="px-3 py-2.5 rounded-pill bg-[#E8632C]/15 border border-[#E8632C]/30 text-[#E8632C] font-heading font-semibold text-xs active:scale-95 transition-transform min-h-[44px] flex items-center justify-center cursor-pointer"
+            >
+              ⚡ DEO
+            </button>
+            <button
+              type="button"
+              id="mobile-quick-validator"
+              onClick={() => handleQuickFill('validator1', 'password123')}
+              className="px-3 py-2.5 rounded-pill bg-[#1F4D3A]/15 border border-[#1F4D3A]/30 text-[#1F4D3A] font-heading font-semibold text-xs active:scale-95 transition-transform min-h-[44px] flex items-center justify-center cursor-pointer"
+            >
+              ⚡ Validator
+            </button>
+            <button
+              type="button"
+              id="mobile-quick-dual"
+              onClick={() => handleQuickFill('dualuser1', 'password123')}
+              className="col-span-2 px-3 py-2.5 rounded-pill bg-indigo-50 border border-indigo-200 text-indigo-800 font-heading font-semibold text-xs active:scale-95 transition-transform min-h-[44px] flex items-center justify-center cursor-pointer"
+            >
+              ⚡ Dual Role (DEO + Validator)
+            </button>
+            <button
+              type="button"
               id="mobile-quick-qbm"
               onClick={() => handleQuickFill('qbm1', 'password123')}
               className="col-span-2 px-3 py-2.5 rounded-pill bg-[#0F766E] text-white font-heading font-semibold text-xs active:scale-95 transition-transform min-h-[44px] flex items-center justify-center cursor-pointer"
             >
-              ⚡ QBM
+              ⚡ QBM (Global)
             </button>
           </div>
         </div>

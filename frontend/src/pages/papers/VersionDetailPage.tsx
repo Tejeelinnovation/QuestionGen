@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { papersApi } from '../../api/papers';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import type { PaperVersion } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
@@ -14,6 +15,7 @@ const VersionDetailPageDesktop: React.FC = () => {
   const vId = Number(versionId);
   const navigate = useNavigate();
   const { hasCapability } = useAuth();
+  const toast = useToast();
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,14 +51,18 @@ const VersionDetailPageDesktop: React.FC = () => {
     try {
       const updated = await papersApi.finalizeVersion(paperId, vId);
       setVersion(updated);
-      setSuccessMessage(`Version ${updated.version_label} has been finalized and locked for delivery.`);
+      const msg = `Version ${updated.version_label} has been finalized and locked for delivery.`;
+      setSuccessMessage(msg);
+      toast.success(msg);
     } catch (err: any) {
       const detail =
         err.response?.data?.detail ||
         err.response?.data?.non_field_errors?.[0] ||
         (typeof err.response?.data === 'string' ? err.response.data : JSON.stringify(err.response?.data)) ||
         'Failed to finalize version.';
-      setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -68,13 +74,16 @@ const VersionDetailPageDesktop: React.FC = () => {
     setActionLoading(true);
     try {
       const cloned = await papersApi.cloneVersion(paperId, vId, {});
+      toast.success(`Created clone Version ${cloned.version_label}.`);
       navigate(`/papers/${paperId}/versions/${cloned.id}`);
     } catch (err: any) {
       const detail =
         err.response?.data?.detail ||
         JSON.stringify(err.response?.data) ||
         'Failed to clone version.';
-      setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      setErrorMessage(msg);
+      toast.error(msg);
       setActionLoading(false);
     }
   };

@@ -4,6 +4,7 @@ import { papersApi } from '../../api/papers';
 import type { QuestionPreview, Paper } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useToast } from '../../context/ToastContext';
 import { QuestionReviewPageTablet } from '../tablet/papers/QuestionReviewPageTablet';
 import { QuestionReviewPageMobile } from '../mobile/papers/QuestionReviewPageMobile';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
@@ -11,6 +12,7 @@ import { getStaggerDelay, MOTION } from '../../lib/motion';
 import { QuestionReplaceModal } from '../../components/papers/QuestionReplaceModal';
 
 const QuestionReviewPageDesktop: React.FC = () => {
+  const toast = useToast();
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const navigate = useNavigate();
@@ -159,6 +161,7 @@ const QuestionReviewPageDesktop: React.FC = () => {
         constraints_used: updatedConstraints,
       });
 
+      toast.success(`Exam Version ${newVersion.version_label} created successfully!`);
       sessionStorage.removeItem(`paper_${paperId}_review`);
       navigate(`/papers/${paperId}/versions/${newVersion.id}`);
     } catch (err: any) {
@@ -170,7 +173,9 @@ const QuestionReviewPageDesktop: React.FC = () => {
         err.response?.data?.detail ||
         (typeof err.response?.data === 'string' ? err.response.data : JSON.stringify(err.response?.data)) ||
         'Failed to save questions as a new version.';
-      setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }

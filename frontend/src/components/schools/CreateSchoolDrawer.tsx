@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usersApi } from '../../api/users';
+import { useToast } from '../../context/ToastContext';
 import type { School, SchoolCreateInput } from '../../types';
 import { X, Building2, UserPlus, Check, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { SearchableSelect } from '../ui/searchable-select';
@@ -17,6 +18,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
   onClose,
   onSchoolCreated,
 }) => {
+  const toast = useToast();
   // School Details
   const [name, setName] = useState('');
   const [board, setBoard] = useState('CBSE');
@@ -51,6 +53,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
     const trimmedName = name.trim();
     if (!trimmedName) {
       setErrorMsg('School / Coaching Class name is required.');
+      toast.warning('School / Coaching Class name is required.');
       return;
     }
 
@@ -112,6 +115,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
     setIsSubmitting(true);
     try {
       const created = await usersApi.createSchool(payload);
+      toast.success(`School "${created.name}" created successfully with admin @${uName}!`);
       onSchoolCreated(created);
       onClose();
       // Reset fields
@@ -151,6 +155,7 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
         }
       }
       setErrorMsg(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }

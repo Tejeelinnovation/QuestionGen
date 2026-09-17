@@ -25,6 +25,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import type { User, Delivery, School } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
 import {
@@ -36,6 +37,7 @@ import {
 type ActiveTab = 'teachers' | 'students' | 'classes' | 'deliveries';
 
 const SchoolAdminDashboardDesktop: React.FC = () => {
+  const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('teachers');
@@ -120,11 +122,13 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
 
     if (!username.trim() || !password.trim()) {
       setFormError('Username and password are required.');
+      toast.warning('Username and password are required.');
       return;
     }
 
     if (!email.trim()) {
       setFormError('Email address is compulsory.');
+      toast.warning('Email address is compulsory.');
       return;
     }
 
@@ -132,6 +136,7 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
     const isTenDigits = mobDigits.length === 10 || (mobDigits.length === 12 && mobDigits.startsWith('91'));
     if (!mobileNumber.trim() || !isTenDigits) {
       setFormError('A valid 10-digit Indian mobile number (+91) is compulsory.');
+      toast.warning('A valid 10-digit Indian mobile number (+91) is compulsory.');
       return;
     }
 
@@ -157,7 +162,9 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
           ? 'DEO & Validator'
           : 'Teacher';
 
-      setFormSuccess(`${roleDisplay} "${newUser.username}" created successfully.`);
+      const successMsg = `${roleDisplay} "${newUser.username}" created successfully.`;
+      setFormSuccess(successMsg);
+      toast.success(successMsg);
       setUsername('');
       setPassword('');
       setFirstName('');
@@ -172,6 +179,7 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
         JSON.stringify(err.response?.data) ||
         'Failed to create user account.';
       setFormError(detail);
+      toast.error(detail);
     } finally {
       setIsCreating(false);
     }
@@ -386,6 +394,11 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
                             <span className="font-mono text-xs text-ink/50">
                               @{t.username}
                             </span>
+                            {currentUser && (currentUser.id === t.id || (currentUser.username && t.username && currentUser.username.toLowerCase() === t.username.toLowerCase())) && (
+                              <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold">
+                                You
+                              </span>
+                            )}
                           </div>
 
                           <h3 className="font-heading font-bold text-lg text-ink group-hover:text-ember transition-colors">
@@ -785,9 +798,16 @@ const SchoolAdminDashboardDesktop: React.FC = () => {
                           <span className="pill pill-lime text-[10px]">
                             Student #{s.id}
                           </span>
-                          <span className="font-mono text-[11px] text-ink/50">
-                            @{s.username}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[11px] text-ink/50">
+                              @{s.username}
+                            </span>
+                            {currentUser && (currentUser.id === s.id || (currentUser.username && s.username && currentUser.username.toLowerCase() === s.username.toLowerCase())) && (
+                              <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold">
+                                You
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <h3 className="font-heading font-bold text-base text-ink">

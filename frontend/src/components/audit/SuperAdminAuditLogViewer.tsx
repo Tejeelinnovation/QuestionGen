@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auditApi, type AuditLogItem } from '../../api/audit';
+import { useAuth } from '../../auth/AuthContext';
 import {
   ShieldAlert,
   Search,
@@ -16,6 +17,7 @@ import {
 import { Pagination } from '../ui/pagination';
 
 export const SuperAdminAuditLogViewer: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -386,14 +388,31 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
                     {/* Actor */}
                     <td className="py-3 px-3 whitespace-nowrap">
                       {log.actor ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium text-ink">@{log.actor.username}</span>
-                          {(log.actor.role_label || log.actor.role) && (
-                            <span className="text-[10px] text-ink/40 font-mono">
-                              ({log.actor.role_label || log.actor.role})
-                            </span>
-                          )}
-                        </div>
+                        (() => {
+                          const isYou = Boolean(
+                            currentUser && (
+                              (log.actor.id && String(currentUser.id) === String(log.actor.id)) ||
+                              (log.actor.username && currentUser.username.toLowerCase() === log.actor.username.toLowerCase())
+                            )
+                          );
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <span className={`font-medium ${isYou ? 'text-forest font-semibold' : 'text-ink'}`}>
+                                @{log.actor.username}
+                              </span>
+                              {isYou && (
+                                <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold">
+                                  You
+                                </span>
+                              )}
+                              {(log.actor.role_label || log.actor.role) && (
+                                <span className="text-[10px] text-ink/40 font-mono">
+                                  ({log.actor.role_label || log.actor.role})
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()
                       ) : (
                         <span className="text-ink/40 font-mono italic">System Core</span>
                       )}
@@ -474,9 +493,19 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 p-3 rounded-card bg-surface-muted/40 border border-border text-xs font-mono">
                 <div>
                   <span className="text-ink/50 block text-[10px] uppercase">Actor Username</span>
-                  <span className="text-ink font-semibold">
-                    {selectedLog.actor ? `@${selectedLog.actor.username}` : 'System'}
-                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-ink font-semibold">
+                      {selectedLog.actor ? `@${selectedLog.actor.username}` : 'System'}
+                    </span>
+                    {currentUser && selectedLog.actor && (
+                      (selectedLog.actor.id && String(currentUser.id) === String(selectedLog.actor.id)) ||
+                      (selectedLog.actor.username && currentUser.username.toLowerCase() === selectedLog.actor.username.toLowerCase())
+                    ) && (
+                      <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold">
+                        You
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <span className="text-ink/50 block text-[10px] uppercase">Actor Role</span>

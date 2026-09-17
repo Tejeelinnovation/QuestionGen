@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
+import { useAuth } from '../../../auth/AuthContext';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
 import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
@@ -13,6 +14,7 @@ import { SkeletonRoleDeck, SkeletonRoster, Skeleton } from '../../../components/
 import { SuperAdminAuditLogViewer } from '../../../components/audit/SuperAdminAuditLogViewer';
 
 export const SuperAdminDashboardTablet: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'directory' | 'logs'>('directory');
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
@@ -412,10 +414,17 @@ export const SuperAdminDashboardTablet: React.FC = () => {
                       </div>
 
                       <div>
-                        <div className="font-heading font-bold text-sm text-ink truncate">
-                          {u.first_name || u.last_name
-                            ? `${u.first_name || ''} ${u.last_name || ''}`.trim()
-                            : u.username}
+                        <div className="flex items-center gap-1.5">
+                          <div className="font-heading font-bold text-sm text-ink truncate">
+                            {u.first_name || u.last_name
+                              ? `${u.first_name || ''} ${u.last_name || ''}`.trim()
+                              : u.username}
+                          </div>
+                          {currentUser && (currentUser.id === u.id || (currentUser.username && u.username && currentUser.username.toLowerCase() === u.username.toLowerCase())) && (
+                            <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold shrink-0">
+                              You
+                            </span>
+                          )}
                         </div>
                         <div className="font-mono text-[11px] text-ink/50 truncate">
                           @{u.username}

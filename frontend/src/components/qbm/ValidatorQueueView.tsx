@@ -81,6 +81,65 @@ export const ValidatorQueueView: React.FC = () => {
         </div>
       </div>
 
+      {/* Quick Status View Pills */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('ALL'); setCurrentPage(1); }}
+          className={`px-3 py-1 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            statusFilter === 'ALL'
+              ? 'bg-forest text-white shadow-xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink'
+          }`}
+        >
+          Active In-Review
+        </button>
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('CORRECTION_REQUIRED'); setCurrentPage(1); }}
+          className={`px-3 py-1 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            statusFilter === 'CORRECTION_REQUIRED'
+              ? 'bg-[#E8632C] text-white shadow-xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink'
+          }`}
+        >
+          Needs Correction
+        </button>
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('APPROVED'); setCurrentPage(1); }}
+          className={`px-3 py-1 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            statusFilter === 'APPROVED'
+              ? 'bg-[#1F4D3A] text-white shadow-xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink'
+          }`}
+        >
+          Approved Questions
+        </button>
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('REJECTED'); setCurrentPage(1); }}
+          className={`px-3 py-1 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            statusFilter === 'REJECTED'
+              ? 'bg-red-700 text-white shadow-xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink'
+          }`}
+        >
+          Rejected
+        </button>
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('ALL_STATUSES'); setCurrentPage(1); }}
+          className={`px-3 py-1 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer ${
+            statusFilter === 'ALL_STATUSES'
+              ? 'bg-ink text-white shadow-xs'
+              : 'bg-surface border border-border text-ink/70 hover:text-ink'
+          }`}
+        >
+          Full History
+        </button>
+      </div>
+
       {/* Filter Toolbar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 bg-surface border border-border rounded-card p-3 shadow-xs">
         {/* Search */}
@@ -108,10 +167,13 @@ export const ValidatorQueueView: React.FC = () => {
             }}
             className="w-full px-2.5 py-1.5 rounded-card bg-bg border border-border text-xs text-ink focus:border-forest focus:outline-none font-mono"
           >
-            <option value="ALL">Status: All In-Review</option>
+            <option value="ALL">Queue: All In-Review</option>
             <option value="SUBMITTED">Submitted (New / Resubmitted)</option>
             <option value="UNDER_VALIDATION">Under Validation</option>
             <option value="CORRECTION_REQUIRED">Needs Correction</option>
+            <option value="APPROVED">Approved (Question Bank)</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="ALL_STATUSES">All Statuses (Full Review History)</option>
           </select>
         </div>
 
@@ -232,11 +294,20 @@ export const ValidatorQueueView: React.FC = () => {
               )}
 
               {/* Footer Meta */}
-              <div className="flex items-center justify-between text-[11px] text-ink/50 font-mono pt-2 border-t border-border">
-                <span>
-                  Author: <strong className="text-ink/80">{q.created_by_username || 'DEO Staff'}</strong> • {q.book_title || 'General'}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink/60 font-mono pt-2 border-t border-border">
+                <span className="flex items-center gap-1.5 flex-wrap">
+                  <span>Author: <strong className="text-ink">{q.created_by_name || q.created_by_username || 'DEO'}</strong></span>
+                  {q.created_by_role && (
+                    <span className="px-1.5 py-0.2 rounded-pill bg-bg border border-border text-[9px] text-ink/70">
+                      {q.created_by_role}
+                    </span>
+                  )}
+                  <span>•</span>
+                  <span>School: <strong className="text-forest">{q.school_name || 'Global Curriculum'}</strong></span>
+                  <span>•</span>
+                  <span>{q.book_title || 'General'}</span>
                 </span>
-                <span>
+                <span className="shrink-0 text-ink/40">
                   Submitted {q.created_at ? new Date(q.created_at).toLocaleDateString() : ''}
                 </span>
               </div>

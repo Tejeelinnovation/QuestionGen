@@ -6,6 +6,7 @@ import { classesApi } from '../../api/classes';
 import type { Delivery, PaperVersion, User, ClassSection } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { DeliveryPageTablet } from '../tablet/papers/DeliveryPageTablet';
 import { DeliveryPageMobile } from '../mobile/papers/DeliveryPageMobile';
@@ -16,6 +17,7 @@ const DeliveryPageDesktop: React.FC = () => {
   const paperId = Number(id);
   const vId = Number(versionId);
   const { dashboardPath } = useAuth();
+  const toast = useToast();
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [students, setStudents] = useState<User[]>([]);
@@ -99,7 +101,9 @@ const DeliveryPageDesktop: React.FC = () => {
     setErrorMessage(null);
 
     if (mode === 'ONLINE' && selectedStudentIds.length === 0 && (!selectedClassId || assignmentType !== 'class')) {
-      setErrorMessage('Please assign at least one student or a valid class division for online test delivery.');
+      const warn = 'Please assign at least one student or a valid class division for online test delivery.';
+      setErrorMessage(warn);
+      toast.warning(warn);
       return;
     }
 
@@ -125,6 +129,7 @@ const DeliveryPageDesktop: React.FC = () => {
 
       const delivery = await papersApi.deliverVersion(paperId, vId, deliveryPayload);
       setCreatedDelivery(delivery);
+      toast.success(`Delivery #${delivery.id} created successfully for ${mode} exam.`);
     } catch (err: any) {
       const detail =
         err.response?.data?.student_ids?.[0] ||
@@ -134,6 +139,7 @@ const DeliveryPageDesktop: React.FC = () => {
         JSON.stringify(err.response?.data) ||
         'Failed to create test delivery.';
       setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }

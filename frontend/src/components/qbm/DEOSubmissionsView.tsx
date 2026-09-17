@@ -16,6 +16,7 @@ import {
   Search,
 } from 'lucide-react';
 import { Pagination } from '../ui/pagination';
+import { useToast } from '../../context/ToastContext';
 
 interface DEOSubmissionsViewProps {
   onNewQuestionClick?: () => void;
@@ -24,6 +25,7 @@ interface DEOSubmissionsViewProps {
 export const DEOSubmissionsView: React.FC<DEOSubmissionsViewProps> = ({
   onNewQuestionClick,
 }) => {
+  const toast = useToast();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,10 +127,13 @@ export const DEOSubmissionsView: React.FC<DEOSubmissionsViewProps> = ({
         comment: resubmitComment.trim() || undefined,
       });
 
+      toast.success(`Question #${resubmittingQuestion.id} successfully updated and resubmitted for validation!`);
       setResubmittingQuestion(null);
       fetchQuestions();
     } catch (err: any) {
-      setResubmitError(err.response?.data?.detail || 'Failed to resubmit question.');
+      const errText = err.response?.data?.detail || 'Failed to resubmit question.';
+      setResubmitError(errText);
+      toast.error(errText);
     } finally {
       setIsSubmittingResubmit(false);
     }

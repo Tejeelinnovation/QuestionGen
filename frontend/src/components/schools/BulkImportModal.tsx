@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { importApi } from '../../api/import';
+import { useToast } from '../../context/ToastContext';
 import type { ImportReport, SchoolCapacityInfo } from '../../types';
 import {
   FileSpreadsheet,
@@ -40,6 +41,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   schoolId,
   schoolName,
 }) => {
+  const toast = useToast();
   const effectiveDefaultRole = initialRole || defaultRole || 'student';
   const [activeRole, setActiveRole] = useState<'student' | 'teacher'>(effectiveDefaultRole);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -138,6 +140,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const handleUploadAndProcess = async () => {
     if (!selectedFile) {
       setError('Please select an Excel workbook to upload.');
+      toast.warning('Please select an Excel workbook to upload.');
       return;
     }
 
@@ -160,6 +163,14 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
         onSuccess?.();
       }
 
+      if (resultReport.summary.created_count > 0 && resultReport.summary.invalid_count === 0) {
+        toast.success(`Excel Import Complete: ${resultReport.summary.created_count} accounts imported successfully!`);
+      } else if (resultReport.summary.created_count > 0) {
+        toast.warning(`Imported ${resultReport.summary.created_count} accounts with ${resultReport.summary.invalid_count} errors.`);
+      } else {
+        toast.error(`Import finished with 0 accounts created and ${resultReport.summary.invalid_count} errors.`);
+      }
+
       // Default active report tab to the most relevant one
       if (resultReport.summary.created_count > 0) {
         setActiveReportTab('created');
@@ -171,11 +182,12 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
         setActiveReportTab('invalid');
       }
     } catch (err: any) {
-      setError(
+      const msg =
         err.response?.data?.detail ||
-          err.response?.data?.error ||
-          'Failed to process Excel workbook. Please check file format and try again.'
-      );
+        err.response?.data?.error ||
+        'Failed to process Excel workbook. Please check file format and try again.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setIsUploading(false);
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
 import { classesApi } from '../../api/classes';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import type { User, School, ClassSection } from '../../types';
 import { X, UserPlus, Check, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
@@ -21,6 +22,7 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
   onUserCreated,
 }) => {
   const { user: currentUser } = useAuth();
+  const toast = useToast();
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | ''>('');
   const [classes, setClasses] = useState<ClassSection[]>([]);
@@ -121,11 +123,13 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
 
     if (!username.trim() || !password.trim()) {
       setErrorMsg('Username and password are required.');
+      toast.warning('Username and password are required.');
       return;
     }
 
     if (!email.trim()) {
       setErrorMsg('Email address is compulsory.');
+      toast.warning('Email address is compulsory.');
       return;
     }
 
@@ -133,12 +137,14 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
     const isTenDigits = mobDigits.length === 10 || (mobDigits.length === 12 && mobDigits.startsWith('91'));
     if (!mobileNumber.trim() || !isTenDigits) {
       setErrorMsg('A valid 10-digit Indian mobile number (+91) is compulsory.');
+      toast.warning('A valid 10-digit Indian mobile number (+91) is compulsory.');
       return;
     }
 
     const schoolIdToUse = targetProfile === 'qbm' ? undefined : (currentUser?.school || (selectedSchoolId ? Number(selectedSchoolId) : undefined));
     if (targetProfile !== 'qbm' && !schoolIdToUse && !currentUser?.school) {
       setErrorMsg('Please select a school for this account.');
+      toast.warning('Please select a school for this account.');
       return;
     }
 
@@ -157,6 +163,7 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
         primary_subject: primarySubject.trim() || undefined,
       });
 
+      toast.success(`User @${createdUser.username} (${createdUser.role_label}) created successfully!`);
       onUserCreated(createdUser);
       onClose();
       // Reset
@@ -183,6 +190,7 @@ export const CreateUserDrawer: React.FC<CreateUserDrawerProps> = ({
         else detail = Object.values(data).flat().join(' ');
       }
       setErrorMsg(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }

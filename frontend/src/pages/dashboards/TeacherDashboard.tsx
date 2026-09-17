@@ -6,6 +6,7 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { TeacherDashboardTablet } from '../tablet/dashboards/TeacherDashboardTablet';
 import { TeacherDashboardMobile } from '../mobile/dashboards/TeacherDashboardMobile';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
 import { canEditUser } from '../../utils/userPermissions';
@@ -21,6 +22,7 @@ import { TeacherClassesSection } from '../../components/teachers/TeacherClassesS
 
 const TeacherDashboardDesktop: React.FC = () => {
   const { user: currentUser } = useAuth();
+  const toast = useToast();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [students, setStudents] = useState<User[]>([]);
@@ -93,13 +95,15 @@ const TeacherDashboardDesktop: React.FC = () => {
     try {
       await papersApi.deletePaper(paperToDelete.id);
       setPapers((prev) => prev.filter((p) => p.id !== paperToDelete.id));
-      setDeletePaperSuccess(`Paper "${paperToDelete.title}" (Paper #${paperToDelete.id}) was deleted successfully.`);
+      const successMsg = `Paper "${paperToDelete.title}" (Paper #${paperToDelete.id}) was deleted successfully.`;
+      setDeletePaperSuccess(successMsg);
+      toast.success(successMsg);
       setPaperToDelete(null);
       setTimeout(() => setDeletePaperSuccess(null), 4000);
     } catch (err: any) {
-      setDeletePaperError(
-        err.response?.data?.detail || 'Failed to delete paper. Please try again.'
-      );
+      const errMsg = err.response?.data?.detail || 'Failed to delete paper. Please try again.';
+      setDeletePaperError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsDeletingPaper(false);
     }

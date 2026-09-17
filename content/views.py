@@ -638,7 +638,11 @@ class QuestionResubmitView(APIView):
         if not question:
             return Response({"detail": "Question not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        is_super = user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+        is_super = (
+            user.is_superuser
+            or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+            or user.has_capability("INGEST_GLOBAL_QUESTIONS")
+        )
         is_deo = user.has_capability("DATA_ENTRY_OPERATOR")
         is_creator = question.created_by_id == user.id
 
@@ -730,8 +734,12 @@ class ValidationQueueView(ListAPIView):
                 qs = qs.filter(bank_source="GLOBAL")
 
         status_param = self.request.query_params.get("status")
-        if status_param and status_param.upper() != "ALL":
-            qs = qs.filter(validation_status=status_param.upper())
+        if status_param:
+            status_clean = status_param.strip().upper()
+            if status_clean in ("ALL", "ALL_STATUSES"):
+                pass  # Show all questions across all validation statuses
+            else:
+                qs = qs.filter(validation_status=status_clean)
         else:
             # Default queue shows active validation stages
             qs = qs.filter(validation_status__in=["SUBMITTED", "UNDER_VALIDATION", "CORRECTION_REQUIRED"])

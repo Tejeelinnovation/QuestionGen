@@ -133,6 +133,8 @@ def grant_qbm_defaults(user: "User", granted_by: "User | None" = None) -> None:
     for cap in [
         CapabilityName.INGEST_GLOBAL_QUESTIONS,
         CapabilityName.GENERATE_SELECT_QUESTIONS,
+        CapabilityName.DATA_ENTRY_OPERATOR,
+        CapabilityName.VALIDATOR,
     ]:
         _grant(user, cap, granted_by)
 

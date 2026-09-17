@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../../api/users';
+import { useAuth } from '../../../auth/AuthContext';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { CreateSchoolDrawer } from '../../../components/schools/CreateSchoolDrawer';
 import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
@@ -13,6 +14,7 @@ import { SkeletonRoleDeck, SkeletonRoster } from '../../../components/ui/skeleto
 import { SuperAdminAuditLogViewer } from '../../../components/audit/SuperAdminAuditLogViewer';
 
 export const SuperAdminDashboardMobile: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -371,7 +373,12 @@ export const SuperAdminDashboardMobile: React.FC = () => {
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-0.5">
                         <div className="font-heading font-bold text-sm text-ink flex items-center gap-1.5">
-                          {u.username}
+                          <span>{u.username}</span>
+                          {currentUser && (currentUser.id === u.id || (currentUser.username && u.username && currentUser.username.toLowerCase() === u.username.toLowerCase())) && (
+                            <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold">
+                              You
+                            </span>
+                          )}
                         </div>
                         {u.email && (
                           <div className="text-[11px] text-ink/60 font-mono">{u.email}</div>

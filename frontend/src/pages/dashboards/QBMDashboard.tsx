@@ -18,9 +18,12 @@ import {
   X,
   FileQuestion,
   Inbox,
+  History,
 } from 'lucide-react';
 import { SearchableSubjectSelect } from '../../components/ui/searchable-subject-select';
 import { Pagination } from '../../components/ui/pagination';
+import { ValidationHistoryDrawer } from '../../components/qbm/ValidationHistoryDrawer';
+import { useToast } from '../../context/ToastContext';
 
 export interface QBMDashboardProps {
   initialTab?: 'explore' | 'ingest' | 'submissions' | 'validation';
@@ -57,6 +60,8 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
   const [filterType, setFilterType] = useState('ALL');
   const [filterDifficulty, setFilterDifficulty] = useState('ALL');
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
+  const [historyQuestionId, setHistoryQuestionId] = useState<number | null>(null);
+  const toast = useToast();
 
   // Platform repository stats
   const [stats, setStats] = useState<QuestionStats | null>(null);
@@ -365,48 +370,58 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
     const effectiveBoard = isNewBoard ? newBoardName.trim() : selectedBoard;
     if (!effectiveBoard) {
       setIngestErrorMsg('Please specify or select an educational Board.');
+      toast.warning('Please specify or select an educational Board.');
       return;
     }
 
     if (isNewBook) {
       if (!newBookSubject.trim()) {
         setIngestErrorMsg('Please specify a Subject for the new book.');
+        toast.warning('Please specify a Subject for the new book.');
         return;
       }
       if (!newChapterTitle.trim()) {
         setIngestErrorMsg('Please enter a Chapter Title.');
+        toast.warning('Please enter a Chapter Title.');
         return;
       }
       if (!newTopicName.trim()) {
         setIngestErrorMsg('Please enter a Topic Name.');
+        toast.warning('Please enter a Topic Name.');
         return;
       }
     } else if (isNewChapter) {
       if (!newChapterTitle.trim()) {
         setIngestErrorMsg('Please enter a Chapter Title.');
+        toast.warning('Please enter a Chapter Title.');
         return;
       }
       if (!newTopicName.trim()) {
         setIngestErrorMsg('Please enter a Topic Name.');
+        toast.warning('Please enter a Topic Name.');
         return;
       }
     } else if (isNewTopic) {
       if (!newTopicName.trim()) {
         setIngestErrorMsg('Please enter a Topic Name.');
+        toast.warning('Please enter a Topic Name.');
         return;
       }
     } else if (!selectedTopicId || selectedTopicId === 'NEW') {
       setIngestErrorMsg('Please select an existing Topic or create a new one.');
+      toast.warning('Please select an existing Topic or create a new one.');
       return;
     }
 
     if (!questionText.trim()) {
       setIngestErrorMsg('Question text is required.');
+      toast.warning('Question text is required.');
       return;
     }
 
     if (!correctAnswer.trim()) {
       setIngestErrorMsg('Correct answer is required.');
+      toast.warning('Correct answer is required.');
       return;
     }
 
@@ -477,9 +492,11 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
     setIsSubmitting(true);
     try {
       const created = await contentApi.ingestQuestion(payload);
-      setIngestSuccessMsg(
-        `Question #${created.id} and ${created.variants?.length || variants.length} variant(s) successfully ingested into the Global Question Bank!`
-      );
+      const successText = `Question #${created.id} and ${created.variants?.length || variants.length} variant(s) successfully ingested into ${
+        created.school ? 'School Question Bank' : 'the Global Question Bank'
+      }!`;
+      setIngestSuccessMsg(successText);
+      toast.success(successText);
       // Reset question input fields
       setQuestionText('');
       setExplanation('');
@@ -552,12 +569,13 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
       loadQuestions();
       loadStats();
     } catch (err: any) {
-      setIngestErrorMsg(
+      const errText =
         err.response?.data?.detail ||
-          (err.response?.data && typeof err.response.data === 'object'
-            ? JSON.stringify(err.response.data)
-            : 'Failed to ingest question.')
-      );
+        (err.response?.data && typeof err.response.data === 'object'
+          ? JSON.stringify(err.response.data)
+          : 'Failed to ingest question.');
+      setIngestErrorMsg(errText);
+      toast.error(errText);
     } finally {
       setIsSubmitting(false);
     }
@@ -569,7 +587,7 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
     if (!quickVariantModalQuestion) return;
 
     if (!quickVariantText.trim() || !quickVariantAnswer.trim()) {
-      alert('Variant question text and answer are required.');
+      toast.warning('Variant question text and answer are required.');
       return;
     }
 
@@ -584,6 +602,8 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
         explanation: quickVariantExplanation.trim(),
       });
 
+      toast.success('Variant successfully appended to question!');
+
       // Reload question detail
       const refreshed = await contentApi.getQuestion(quickVariantModalQuestion.id);
       setSelectedQuestion(refreshed);
@@ -594,7 +614,8 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
       loadQuestions();
       loadStats();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to add variant.');
+      const errText = err.response?.data?.detail || 'Failed to add variant.';
+      toast.error(errText);
     } finally {
       setIsSubmittingQuickVariant(false);
     }
@@ -867,13 +888,19 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                     </div>
 
                     {/* Context footer */}
-                    <div className="border-t border-border mt-3 pt-2.5 flex items-center justify-between text-[11px] text-ink/60">
-                      <span className="truncate max-w-[200px]">
-                        {q.chapter_title ? `${q.chapter_title} • ` : ''}
-                        {q.topic_name || 'General Topic'}
-                      </span>
+                    <div className="border-t border-border mt-3 pt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink/60">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="truncate max-w-[180px]">
+                          {q.chapter_title ? `${q.chapter_title} • ` : ''}
+                          {q.topic_name || 'General Topic'}
+                        </span>
+                        <span className="text-ink/40">•</span>
+                        <span className="font-mono text-[10px] text-ink/70">
+                          By: <strong className="text-ink">{q.created_by_name || 'System'}</strong> ({q.school_name || 'Global'})
+                        </span>
+                      </div>
                       <span className="font-heading font-semibold text-forest group-hover:translate-x-0.5 transition-transform flex items-center gap-1 text-[11px]">
-                        View & Add Variants <ChevronRight className="w-3 h-3" />
+                        Details & Variants <ChevronRight className="w-3 h-3" />
                       </span>
                     </div>
                   </div>
@@ -1812,7 +1839,8 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
           <div className="relative z-10 w-full max-w-2xl bg-surface border border-border rounded-lg shadow-float max-h-[90vh] overflow-y-auto p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between border-b border-border pb-4">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <ValidationStatusBadge status={selectedQuestion.validation_status} revision={selectedQuestion.revision} />
                   <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded-pill bg-forest/10 text-forest border border-forest/20">
                     {selectedQuestion.question_type_display || selectedQuestion.question_type}
                   </span>
@@ -1823,9 +1851,22 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                     {selectedQuestion.difficulty}
                   </span>
                 </div>
-                <h3 className="font-heading font-bold text-base text-ink">
-                  Question #{selectedQuestion.id}
-                </h3>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h3 className="font-heading font-bold text-base text-ink">
+                    Question #{selectedQuestion.id}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryQuestionId(selectedQuestion.id)}
+                    className="px-2.5 py-0.5 rounded-pill bg-surface-muted border border-border text-xs font-mono text-ink/80 hover:text-ink hover:border-forest/50 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <History className="w-3.5 h-3.5 text-forest" />
+                    <span>Audit History</span>
+                  </button>
+                </div>
+                <p className="text-[11px] font-mono text-ink/60 mt-1">
+                  Author: <strong className="text-ink">{selectedQuestion.created_by_name || 'System'}</strong> {selectedQuestion.created_by_role ? `(${selectedQuestion.created_by_role})` : ''} • School: <strong className="text-forest">{selectedQuestion.school_name || 'Global Curriculum'}</strong>
+                </p>
               </div>
               <button
                 type="button"
@@ -2048,6 +2089,13 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
           </form>
         </div>
       )}
+
+      {/* Validation Audit History Timeline Drawer */}
+      <ValidationHistoryDrawer
+        questionId={historyQuestionId}
+        isOpen={historyQuestionId !== null}
+        onClose={() => setHistoryQuestionId(null)}
+      />
     </div>
   );
 };

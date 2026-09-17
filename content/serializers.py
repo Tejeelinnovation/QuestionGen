@@ -185,6 +185,9 @@ class QuestionListSerializer(serializers.ModelSerializer):
     variants_count = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
     latest_comment = serializers.SerializerMethodField()
+    school_name = serializers.CharField(source="school.name", read_only=True, default="Global Curriculum")
+    created_by_name = serializers.CharField(source="created_by.username", read_only=True, default="System")
+    created_by_role = serializers.CharField(source="created_by.role_label", read_only=True, default="Author")
 
     class Meta:
         model = Question
@@ -210,7 +213,10 @@ class QuestionListSerializer(serializers.ModelSerializer):
             "validation_status_display",
             "revision",
             "school",
+            "school_name",
             "created_by",
+            "created_by_name",
+            "created_by_role",
             "variants_count",
             "source_reference",
             "is_active",

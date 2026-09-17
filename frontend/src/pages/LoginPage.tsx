@@ -154,11 +154,35 @@ const LoginPageDesktop: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  id="quick-deo"
+                  onClick={() => handleQuickFill('deo1', 'password123')}
+                  className="pill bg-[#E8632C]/15 border border-[#E8632C]/30 text-[#E8632C] hover:bg-[#E8632C]/25 transition-all cursor-pointer text-xs font-semibold"
+                >
+                  ⚡ DEO
+                </button>
+                <button
+                  type="button"
+                  id="quick-validator"
+                  onClick={() => handleQuickFill('validator1', 'password123')}
+                  className="pill bg-[#1F4D3A]/15 border border-[#1F4D3A]/30 text-[#1F4D3A] hover:bg-[#1F4D3A]/25 transition-all cursor-pointer text-xs font-semibold"
+                >
+                  ⚡ Validator
+                </button>
+                <button
+                  type="button"
+                  id="quick-dual"
+                  onClick={() => handleQuickFill('dualuser1', 'password123')}
+                  className="pill bg-indigo-50 border border-indigo-200 text-indigo-800 hover:bg-indigo-100 transition-all cursor-pointer text-xs font-semibold"
+                >
+                  ⚡ Dual Role
+                </button>
+                <button
+                  type="button"
                   id="quick-qbm"
                   onClick={() => handleQuickFill('qbm1', 'password123')}
                   className="pill pill-teal hover:opacity-90 transition-opacity cursor-pointer text-xs"
                 >
-                  ⚡ QBM
+                  ⚡ QBM (Global)
                 </button>
               </div>
             </div>

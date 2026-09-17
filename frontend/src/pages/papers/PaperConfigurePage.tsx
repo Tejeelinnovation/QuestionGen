@@ -5,6 +5,7 @@ import { papersApi, type SelectQuestionsConstraints } from '../../api/papers';
 import type { Paper, Topic } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useToast } from '../../context/ToastContext';
 import { PaperConfigurePageTablet } from '../tablet/papers/PaperConfigurePageTablet';
 import { PaperConfigurePageMobile } from '../mobile/papers/PaperConfigurePageMobile';
 import { MOTION } from '../../lib/motion';
@@ -38,6 +39,7 @@ const AVAILABLE_QUESTION_FORMATS = [
 ];
 
 const PaperConfigurePageDesktop: React.FC = () => {
+  const toast = useToast();
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const navigate = useNavigate();
@@ -208,12 +210,14 @@ const PaperConfigurePageDesktop: React.FC = () => {
       const candidateQuestions = await papersApi.selectQuestions(paperId, constraints);
 
       if (candidateQuestions.length === 0) {
-        setErrorMessage(
-          'No questions found matching the specified constraints. Try broadening your criteria or rubric tier counts.'
-        );
+        const warningMsg = 'No questions found matching the specified constraints. Try broadening your criteria or rubric tier counts.';
+        setErrorMessage(warningMsg);
+        toast.warning(warningMsg);
         setIsSubmitting(false);
         return;
       }
+
+      toast.success(`Selected ${candidateQuestions.length} questions from question bank matching blueprint.`);
 
       const reviewPayload = {
         questions: candidateQuestions,
@@ -228,6 +232,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
         JSON.stringify(err.response?.data) ||
         'Failed to query candidate questions from the question bank.';
       setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }

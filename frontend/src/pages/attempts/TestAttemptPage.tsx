@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { attemptsApi } from '../../api/attempts';
+import { useToast } from '../../context/ToastContext';
 import type { AttemptQuestionItem, AttemptStartResponse } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { useExamProctoring } from '../../hooks/useExamProctoring';
@@ -17,6 +18,7 @@ const TestAttemptPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const deliveryId = Number(id);
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [attemptData, setAttemptData] = useState<AttemptStartResponse | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -194,16 +196,18 @@ const TestAttemptPageDesktop: React.FC = () => {
     setErrorMessage(null);
     try {
       const result = await attemptsApi.submitAttempt(attemptData.attempt_id);
+      toast.success('Exam submitted successfully! Generating result analysis...');
       navigate(`/attempts/${result.id}/result`);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (detail === 'Attempt has already been submitted.') {
+        toast.info('Attempt has already been submitted.');
         navigate(`/attempts/${attemptData.attempt_id}/result`);
         return;
       }
-      setErrorMessage(
-        detail || JSON.stringify(err.response?.data) || 'Failed to submit test attempt.'
-      );
+      const errDetail = detail || JSON.stringify(err.response?.data) || 'Failed to submit test attempt.';
+      setErrorMessage(errDetail);
+      toast.error(errDetail);
       setIsSubmitting(false);
       setShowConfirmModal(false);
     }

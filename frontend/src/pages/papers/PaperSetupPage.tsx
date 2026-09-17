@@ -6,6 +6,7 @@ import type { Chapter } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { PaperSetupPageTablet } from '../tablet/papers/PaperSetupPageTablet';
 import { PaperSetupPageMobile } from '../mobile/papers/PaperSetupPageMobile';
 import {
@@ -19,6 +20,7 @@ import {
 const PaperSetupPageDesktop: React.FC = () => {
   const navigate = useNavigate();
   const { user, dashboardPath } = useAuth();
+  const toast = useToast();
 
   useEffect(() => {
     if (user && user.role_label !== 'Teacher') {
@@ -81,14 +83,17 @@ const PaperSetupPageDesktop: React.FC = () => {
 
     if (!title.trim()) {
       setErrorMessage('Paper title is required.');
+      toast.warning('Paper title is required.');
       return;
     }
     if (examMode === 'single' && !chapterId) {
       setErrorMessage('Please select a chapter.');
+      toast.warning('Please select a chapter.');
       return;
     }
     if (examMode === 'multi' && selectedSubjects.length === 0) {
       setErrorMessage('Please select at least one subject for the combined test.');
+      toast.warning('Please select at least one subject for the combined test.');
       return;
     }
 
@@ -103,6 +108,7 @@ const PaperSetupPageDesktop: React.FC = () => {
         total_question_count: 0,
       });
 
+      toast.success(`Paper "${paper.title}" created successfully.`);
       navigate(`/papers/${paper.id}/configure`);
     } catch (err: any) {
       const detail =
@@ -112,6 +118,7 @@ const PaperSetupPageDesktop: React.FC = () => {
         JSON.stringify(err.response?.data) ||
         'Failed to create paper.';
       setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }

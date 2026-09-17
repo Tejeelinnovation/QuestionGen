@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../api/attempts';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import type { TeacherAttemptDetail, TeacherAttemptAnswerItem } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { GradeAttemptPageTablet } from '../tablet/attempts/GradeAttemptPageTablet';
@@ -19,6 +20,7 @@ const GradeAttemptPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const attemptId = Number(id);
   const { dashboardPath } = useAuth();
+  const toast = useToast();
 
   const [attempt, setAttempt] = useState<TeacherAttemptDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -180,20 +182,24 @@ const GradeAttemptPageDesktop: React.FC = () => {
         },
       }));
 
-      setSuccessBanner(`Grade saved for Question #${ans.question_id}.`);
+      const successMsg = `Grade saved for Question #${ans.question_id}: ${resp.marks_awarded} marks.`;
+      setSuccessBanner(successMsg);
+      toast.success(successMsg);
     } catch (err: any) {
       const errDetail =
         err.response?.data?.marks_awarded ||
         err.response?.data?.detail ||
         'Failed to save grade for this question.';
+      const msg = typeof errDetail === 'string' ? errDetail : JSON.stringify(errDetail);
       setGradingState((prev) => ({
         ...prev,
         [ans.question_id]: {
           ...prev[ans.question_id],
           isSaving: false,
-          error: typeof errDetail === 'string' ? errDetail : JSON.stringify(errDetail),
+          error: msg,
         },
       }));
+      toast.error(msg);
     }
   };
 

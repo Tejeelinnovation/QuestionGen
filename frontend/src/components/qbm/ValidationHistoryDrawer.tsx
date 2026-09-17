@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { contentApi } from '../../api/content';
+import { useAuth } from '../../auth/AuthContext';
 import type { QuestionValidationHistoryItem } from '../../types';
 import { X, Clock, CheckCircle2, AlertTriangle, XCircle, Edit3, Send, History } from 'lucide-react';
 
@@ -14,6 +15,7 @@ export const ValidationHistoryDrawer: React.FC<ValidationHistoryDrawerProps> = (
   isOpen,
   onClose,
 }) => {
+  const { user } = useAuth();
   const [history, setHistory] = useState<QuestionValidationHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -164,11 +166,22 @@ export const ValidationHistoryDrawer: React.FC<ValidationHistoryDrawerProps> = (
                       </div>
 
                       <div className="flex items-center justify-between text-[11px] text-ink/60 font-mono">
-                        <span>
-                          {item.actor_username || 'System'}{' '}
-                          {item.actor_role ? `(${item.actor_role})` : ''}
+                        <span className="flex items-center gap-1.5 flex-wrap">
+                          {user && (user.username === item.actor_username || user.id === item.actor_id) ? (
+                            <>
+                              <span className="font-semibold text-ink">You</span>
+                              <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold">
+                                {item.actor_role || 'Current User'}
+                              </span>
+                            </>
+                          ) : (
+                            <span>
+                              {item.actor_username || 'System'}{' '}
+                              {item.actor_role ? `(${item.actor_role})` : ''}
+                            </span>
+                          )}
                         </span>
-                        <span>{new Date(item.created_at).toLocaleString()}</span>
+                        <span className="shrink-0">{new Date(item.created_at).toLocaleString()}</span>
                       </div>
 
                       {item.comment && (

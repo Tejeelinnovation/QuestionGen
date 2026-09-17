@@ -187,8 +187,11 @@ export interface Question {
   bank_source?: BankSource;
   bank_source_display?: string;
   school?: number | null;
+  school_name?: string;
   created_by?: number | null;
   created_by_username?: string;
+  created_by_name?: string;
+  created_by_role?: string;
   validation_status?: ValidationStatus;
   revision?: number;
   latest_comment?: string | null;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, Users, GraduationCap, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { usersApi } from '../../api/users';
+import { useToast } from '../../context/ToastContext';
 import type { School } from '../../types';
 
 interface EditSchoolModalProps {
@@ -16,6 +17,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
   onClose,
   onSchoolUpdated,
 }) => {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [maxStudents, setMaxStudents] = useState<number>(500);
   const [maxTeachers, setMaxTeachers] = useState<number>(50);
@@ -88,6 +90,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
       });
 
       setSuccessMessage('Organization settings & quotas updated successfully!');
+      toast.success('Organization settings & quotas updated successfully!');
       setTimeout(() => {
         onSchoolUpdated();
         onClose();
@@ -101,6 +104,7 @@ export const EditSchoolModal: React.FC<EditSchoolModalProps> = ({
       else if (data?.max_teachers) msg = data.max_teachers.join(' ');
       else if (data?.name) msg = data.name.join(' ');
       setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

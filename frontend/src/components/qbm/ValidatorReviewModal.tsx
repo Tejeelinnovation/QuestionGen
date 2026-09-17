@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Sparkles,
 } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 
 interface ValidatorReviewModalProps {
   question: Question | null;
@@ -29,6 +30,7 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
   onClose,
   onUpdated,
 }) => {
+  const toast = useToast();
   // Metadata edit states
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
   const [marks, setMarks] = useState<string>('1.00');
@@ -92,12 +94,15 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
       });
 
       setFeedbackMessage({ type: 'success', text: 'Question metadata updated and logged to audit trail.' });
+      toast.success('Question metadata updated and logged to audit trail.');
       onUpdated(updated);
     } catch (err: any) {
+      const errText = err.response?.data?.detail || 'Failed to update question metadata.';
       setFeedbackMessage({
         type: 'error',
-        text: err.response?.data?.detail || 'Failed to update question metadata.',
+        text: errText,
       });
+      toast.error(errText);
     } finally {
       setIsSavingMetadata(false);
     }
@@ -107,10 +112,12 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
     if (!activeAction) return;
 
     if ((activeAction === 'SEND_FOR_CORRECTION' || activeAction === 'REJECT') && actionComment.trim().length < 5) {
+      const errText = 'A constructive comment with at least 5 characters is mandatory for this action.';
       setFeedbackMessage({
         type: 'error',
-        text: 'A constructive comment with at least 5 characters is mandatory for this action.',
+        text: errText,
       });
+      toast.warning(errText);
       return;
     }
 
@@ -123,15 +130,25 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
         comment: actionComment.trim() || undefined,
       });
 
+      if (activeAction === 'APPROVE') {
+        toast.success(`Question #${question.id} successfully approved and added to Question Bank!`);
+      } else if (activeAction === 'SEND_FOR_CORRECTION') {
+        toast.warning(`Question #${question.id} returned to DEO for corrections.`);
+      } else if (activeAction === 'REJECT') {
+        toast.error(`Question #${question.id} has been rejected.`);
+      }
+
       setActiveAction(null);
       setActionComment('');
       onUpdated(updated);
       onClose();
     } catch (err: any) {
+      const errText = err.response?.data?.detail || 'Failed to execute validation action.';
       setFeedbackMessage({
         type: 'error',
-        text: err.response?.data?.detail || 'Failed to execute validation action.',
+        text: errText,
       });
+      toast.error(errText);
     } finally {
       setIsPerformingAction(false);
     }
@@ -144,42 +161,43 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-ink/40 backdrop-blur-xs animate-fade-in overflow-y-auto">
-      <div className="bg-surface border border-border rounded-card max-w-4xl w-full shadow-float my-8 flex flex-col max-h-[92vh] animate-scale-up overflow-hidden">
-        {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-surface-muted/30">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-card bg-forest/10 border border-forest/20 flex items-center justify-center text-forest">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-heading font-bold text-base text-ink">Validator Review</h3>
-                <ValidationStatusBadge status={question.validation_status} revision={question.revision} />
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-ink/40 backdrop-blur-xs animate-fade-in overflow-y-auto">
+        <div className="bg-surface border border-border rounded-card max-w-4xl w-full shadow-float my-8 flex flex-col max-h-[92vh] animate-scale-up overflow-hidden">
+          {/* Modal Header */}
+          <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-surface-muted/30">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-card bg-forest/10 border border-forest/20 flex items-center justify-center text-forest">
+                <Layers className="w-5 h-5" />
               </div>
-              <p className="text-[11px] font-mono text-ink/50">
-                Question #{question.id} • {question.book_title || 'Central Bank'} • {question.chapter_title || 'General'}
-              </p>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-heading font-bold text-base text-ink">Validator Review</h3>
+                  <ValidationStatusBadge status={question.validation_status} revision={question.revision} />
+                </div>
+                <p className="text-[11px] font-mono text-ink/60 mt-0.5">
+                  Author: <strong className="text-ink">{question.created_by_name || question.created_by_username || 'DEO Staff'}</strong> {question.created_by_role ? `(${question.created_by_role})` : ''} • School: <strong className="text-forest">{question.school_name || 'Global Platform'}</strong> • {question.book_title || 'General'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsHistoryOpen(true)}
+                className="px-2.5 py-1 text-xs font-mono font-medium rounded-pill border border-border bg-bg hover:bg-surface-muted text-ink/80 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Audit History</span>
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-sm text-ink/40 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsHistoryOpen(true)}
-              className="px-2.5 py-1 text-xs font-mono font-medium rounded-pill border border-border bg-bg hover:bg-surface-muted text-ink/80 transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <History className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Audit History</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-sm text-ink/40 hover:text-ink hover:bg-surface-muted transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
 
         {/* Feedback Alert */}
         {feedbackMessage && (
@@ -579,6 +597,7 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
       />
-    </div>
+      </div>
+    </>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usersApi } from '../../api/users';
+import { useAuth } from '../../auth/AuthContext';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { SuperAdminDashboardTablet } from '../tablet/dashboards/SuperAdminDashboardTablet';
 import { SuperAdminDashboardMobile } from '../mobile/dashboards/SuperAdminDashboardMobile';
@@ -16,6 +17,7 @@ import { SkeletonRoleDeck, SkeletonTable, Skeleton } from '../../components/ui/s
 import { SuperAdminAuditLogViewer } from '../../components/audit/SuperAdminAuditLogViewer';
 
 const SuperAdminDashboardDesktop: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'directory' | 'logs'>('directory');
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
@@ -451,21 +453,35 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
-                    {users.map((u) => (
-                      <tr key={u.id} className="hover:bg-bg/60 transition-colors">
-                        <td className="py-3 px-3 font-mono text-ink/70">#{u.id}</td>
-                        <td className="py-3 px-3">
-                          <div className="font-heading font-semibold text-ink text-sm">
-                            {u.first_name || u.last_name
-                              ? `${u.first_name || ''} ${u.last_name || ''}`.trim()
-                              : u.username}
-                          </div>
-                          <div className="text-[11px] text-ink/60 font-mono flex items-center gap-1.5 flex-wrap">
-                            <span>@{u.username}</span>
-                            {u.email && <span>• {u.email}</span>}
-                            {u.mobile_number && <span className="text-forest font-medium">• {u.mobile_number}</span>}
-                          </div>
-                        </td>
+                    {users.map((u) => {
+                      const isCurrentUser = Boolean(
+                        currentUser && (
+                          currentUser.id === u.id ||
+                          (currentUser.username && u.username && currentUser.username.toLowerCase() === u.username.toLowerCase())
+                        )
+                      );
+                      return (
+                        <tr key={u.id} className={`hover:bg-bg/60 transition-colors ${isCurrentUser ? 'bg-forest/5' : ''}`}>
+                          <td className="py-3 px-3 font-mono text-ink/70">#{u.id}</td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2">
+                              <div className="font-heading font-semibold text-ink text-sm">
+                                {u.first_name || u.last_name
+                                  ? `${u.first_name || ''} ${u.last_name || ''}`.trim()
+                                  : u.username}
+                              </div>
+                              {isCurrentUser && (
+                                <span className="px-1.5 py-0.2 rounded-pill bg-forest/15 border border-forest/30 text-forest text-[9px] font-bold">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-ink/60 font-mono flex items-center gap-1.5 flex-wrap">
+                              <span className={isCurrentUser ? 'text-forest font-semibold' : ''}>@{u.username}</span>
+                              {u.email && <span>• {u.email}</span>}
+                              {u.mobile_number && <span className="text-forest font-medium">• {u.mobile_number}</span>}
+                            </div>
+                          </td>
                         <td className="py-3 px-3">
                           <span
                             className={`pill ${
@@ -501,7 +517,8 @@ const SuperAdminDashboardDesktop: React.FC = () => {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
                     {users.length === 0 && (
                       <tr>
                         <td colSpan={6} className="py-12 text-center">
