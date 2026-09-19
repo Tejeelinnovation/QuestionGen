@@ -19,8 +19,8 @@ var/
 sdist/
 develop-eggs/
 .installed.cfg
-lib/
-lib64/
+/lib/
+/lib64/
 MANIFEST
 
 # Virtual environments
