@@ -1,7 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { contentApi, type IngestQuestionPayload, type QuestionStats } from '../../api/content';
-import type { Book, Chapter, Question, Topic } from '../../types';
-import { useAuth } from '../../auth/AuthContext';
+import React from 'react';
 import { DEOSubmissionsView } from '../../components/qbm/DEOSubmissionsView';
 import { ValidatorQueueView } from '../../components/qbm/ValidatorQueueView';
 import { ValidationStatusBadge } from '../../components/qbm/ValidationStatusBadge';
@@ -23,759 +20,78 @@ import {
 import { SearchableSubjectSelect } from '../../components/ui/searchable-subject-select';
 import { CustomSelect } from '../../components/ui/custom-select';
 import { Pagination } from '../../components/ui/pagination';
+import { SkeletonQuestionGrid, SkeletonMetricCards } from '../../components/ui/skeleton';
+import { getStaggerDelay, CARD_MOTION } from '../../lib/motion';
 import { ValidationHistoryDrawer } from '../../components/qbm/ValidationHistoryDrawer';
-import { useToast } from '../../context/ToastContext';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useQBMDashboard } from '../../hooks/useQBMDashboard';
+import { QBMDashboardMobile } from '../mobile/dashboards/QBMDashboardMobile';
+import { QBMDashboardTablet } from '../tablet/dashboards/QBMDashboardTablet';
 
 export interface QBMDashboardProps {
   initialTab?: 'explore' | 'ingest' | 'submissions' | 'validation';
 }
 
-export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
-  const { hasCapability } = useAuth();
-  const isDEO = hasCapability('DATA_ENTRY_OPERATOR');
-  const isValidator = hasCapability('VALIDATOR');
-  const isQBM = hasCapability('INGEST_GLOBAL_QUESTIONS') || hasCapability('CREATE_SCHOOL');
+const QBMDashboardDesktop: React.FC<QBMDashboardProps> = ({ initialTab }) => {
+  const {
+    isDEO, isValidator, isQBM,
+    activeTab, setActiveTab,
+    questions, totalCount, currentPage, setCurrentPage, pageSize, setPageSize,
+    isLoadingQuestions, searchTerm, setSearchTerm,
+    filterBoard, filterType, filterDifficulty, sortBy,
+    selectedQuestion, setSelectedQuestion, historyQuestionId, setHistoryQuestionId, stats,
+    handleBoardChange, handleTypeChange, handleDifficultyChange, handleSortChange,
+    boards, books, chapters, topics,
+    selectedBoard, setSelectedBoard, isNewBoard, setIsNewBoard, newBoardName, setNewBoardName,
+    selectedBookId, setSelectedBookId, isNewBook, setIsNewBook, newBookTitle, setNewBookTitle, newBookSubject, setNewBookSubject, newBookGrade, setNewBookGrade,
+    selectedChapterId, setSelectedChapterId, isNewChapter, setIsNewChapter, newChapterTitle, setNewChapterTitle,
+    selectedTopicId, setSelectedTopicId, selectedTopicIds, setSelectedTopicIds, isNewTopic, setIsNewTopic, newTopicName, setNewTopicName,
+    difficulty, setDifficulty, learnerLevel, setLearnerLevel, questionType, setQuestionType,
+    marks, setMarks, questionText, setQuestionText, sourceReference, setSourceReference, explanation, setExplanation,
+    options, correctAnswer, setCorrectAnswer, handleOptionChange, addOption, removeOption,
+    variants, addVariant, removeVariant, updateVariant, addVariantOption, removeVariantOption, updateVariantOption,
+    isSubmitting, ingestSuccessMsg, setIngestSuccessMsg, ingestErrorMsg, handleIngestSubmit,
+    quickVariantModalQuestion, setQuickVariantModalQuestion,
+    quickVariantType, setQuickVariantType, quickVariantMarks, setQuickVariantMarks,
+    quickVariantText, setQuickVariantText, quickVariantAnswer, setQuickVariantAnswer,
+    quickVariantExplanation, setQuickVariantExplanation,
+    quickVariantOptions, isSubmittingQuickVariant,
+    addQuickVariantOption, removeQuickVariantOption, updateQuickVariantOption, handleQuickVariantSubmit,
+  } = useQBMDashboard(initialTab);
 
-  const defaultTab = initialTab
-    ? initialTab
-    : isValidator && !isDEO && !isQBM
-    ? 'validation'
-    : isDEO && !isValidator && !isQBM
-    ? 'submissions'
-    : 'explore';
-
-  // Active view tab: 'explore', 'ingest', 'submissions', or 'validation'
-  const [activeTab, setActiveTab] = useState<'explore' | 'ingest' | 'submissions' | 'validation'>(defaultTab);
-  const [selectedTopicIds, setSelectedTopicIds] = useState<number[]>([]);
-
-  // Question bank explorer state (Server-Side Paginated & Filtered)
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [sortBy, setSortBy] = useState('newest');
-  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [filterBoard, setFilterBoard] = useState('ALL');
-  const [filterType, setFilterType] = useState('ALL');
-  const [filterDifficulty, setFilterDifficulty] = useState('ALL');
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
-  const [historyQuestionId, setHistoryQuestionId] = useState<number | null>(null);
-  const toast = useToast();
-
-  // Platform repository stats
-  const [stats, setStats] = useState<QuestionStats | null>(null);
-
-  // Ingestion workflow hierarchy state
-  const [boards, setBoards] = useState<string[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [topics, setTopics] = useState<Topic[]>([]);
-
-  // 1. Board
-  const [selectedBoard, setSelectedBoard] = useState('CBSE');
-  const [isNewBoard, setIsNewBoard] = useState(false);
-  const [newBoardName, setNewBoardName] = useState('');
-
-  // 2. Book
-  const [selectedBookId, setSelectedBookId] = useState<number | '' | 'NEW'>('');
-  const [isNewBook, setIsNewBook] = useState(false);
-  const [newBookTitle, setNewBookTitle] = useState('');
-  const [newBookSubject, setNewBookSubject] = useState('');
-  const [newBookGrade, setNewBookGrade] = useState('Class 10');
-
-  // 3. Chapter
-  const [selectedChapterId, setSelectedChapterId] = useState<number | '' | 'NEW'>('');
-  const [isNewChapter, setIsNewChapter] = useState(false);
-  const [newChapterTitle, setNewChapterTitle] = useState('');
-
-  // 4. Topic
-  const [selectedTopicId, setSelectedTopicId] = useState<number | '' | 'NEW'>('');
-  const [isNewTopic, setIsNewTopic] = useState(false);
-  const [newTopicName, setNewTopicName] = useState('');
-
-  // Step 2 & 3: Question properties
-  const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
-  const [learnerLevel, setLearnerLevel] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'>('INTERMEDIATE');
-  const [questionType, setQuestionType] = useState<string>('MCQ');
-  const [marks, setMarks] = useState<string>('1.00');
-  const [questionText, setQuestionText] = useState('');
-  const [sourceReference, setSourceReference] = useState('');
-  const [explanation, setExplanation] = useState('');
-
-  // MCQ Options
-  const [options, setOptions] = useState<{ key: string; text: string }[]>([
-    { key: 'A', text: '' },
-    { key: 'B', text: '' },
-    { key: 'C', text: '' },
-    { key: 'D', text: '' },
-  ]);
-  const [correctAnswer, setCorrectAnswer] = useState('A');
-
-  // Step 4: Variants
-  const [variants, setVariants] = useState<
-    Array<{
-      variant_type: string;
-      marks: string;
-      question_text: string;
-      correct_answer: string;
-      explanation: string;
-      options?: Array<{ key: string; text: string }>;
-    }>
-  >([]);
-
-  // Submission state
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [ingestSuccessMsg, setIngestSuccessMsg] = useState<string | null>(null);
-  const [ingestErrorMsg, setIngestErrorMsg] = useState<string | null>(null);
-
-  // Quick variant modal state on existing question
-  const [quickVariantModalQuestion, setQuickVariantModalQuestion] = useState<Question | null>(null);
-  const [quickVariantType, setQuickVariantType] = useState('SHORT_ANSWER');
-  const [quickVariantMarks, setQuickVariantMarks] = useState('2.00');
-  const [quickVariantText, setQuickVariantText] = useState('');
-  const [quickVariantAnswer, setQuickVariantAnswer] = useState('');
-  const [quickVariantExplanation, setQuickVariantExplanation] = useState('');
-  const [quickVariantOptions, setQuickVariantOptions] = useState<Array<{ key: string; text: string }>>([
-    { key: 'A', text: '' },
-    { key: 'B', text: '' },
-    { key: 'C', text: '' },
-    { key: 'D', text: '' },
-  ]);
-  const [isSubmittingQuickVariant, setIsSubmittingQuickVariant] = useState(false);
-
-  // Load Boards on mount
-  useEffect(() => {
-    contentApi
-      .getBoards()
-      .then((b) => {
-        setBoards(b);
-        if (b.length > 0 && !b.includes(selectedBoard)) {
-          setSelectedBoard(b[0]);
-        }
-      })
-      .catch(() => setBoards(['CBSE', 'ICSE', 'State Board']));
-  }, []);
-
-  // Load Books when selectedBoard or isNewBoard changes
-  useEffect(() => {
-    if (isNewBoard) {
-      setBooks([]);
-      setSelectedBookId('NEW');
-      setIsNewBook(true);
-      return;
-    }
-    if (selectedBoard) {
-      contentApi
-        .getBooks(selectedBoard)
-        .then((bks) => {
-          setBooks(bks);
-          if (bks.length > 0) {
-            setSelectedBookId(bks[0].id);
-            setIsNewBook(false);
-          } else {
-            setSelectedBookId('NEW');
-            setIsNewBook(true);
-          }
-        })
-        .catch(() => {
-          setBooks([]);
-          setSelectedBookId('NEW');
-          setIsNewBook(true);
-        });
-    }
-  }, [selectedBoard, isNewBoard]);
-
-  // Load Chapters when selectedBookId or isNewBook changes
-  useEffect(() => {
-    if (isNewBook || selectedBookId === 'NEW' || !selectedBookId) {
-      setChapters([]);
-      setSelectedChapterId('NEW');
-      setIsNewChapter(true);
-      return;
-    }
-    contentApi
-      .getChapters(Number(selectedBookId))
-      .then((chaps) => {
-        setChapters(chaps);
-        if (chaps.length > 0) {
-          setSelectedChapterId(chaps[0].id);
-          setIsNewChapter(false);
-        } else {
-          setSelectedChapterId('NEW');
-          setIsNewChapter(true);
-        }
-      })
-      .catch(() => {
-        setChapters([]);
-        setSelectedChapterId('NEW');
-        setIsNewChapter(true);
-      });
-  }, [selectedBookId, isNewBook]);
-
-  // Load Topics when selectedChapterId or isNewChapter changes
-  useEffect(() => {
-    if (isNewChapter || selectedChapterId === 'NEW' || !selectedChapterId) {
-      setTopics([]);
-      setSelectedTopicId('NEW');
-      setSelectedTopicIds([]);
-      setIsNewTopic(true);
-      return;
-    }
-    contentApi
-      .getTopics(Number(selectedChapterId))
-      .then((topList) => {
-        setTopics(topList);
-        if (topList.length > 0) {
-          setSelectedTopicId(topList[0].id);
-          setSelectedTopicIds([topList[0].id]);
-          setIsNewTopic(false);
-        } else {
-          setSelectedTopicId('NEW');
-          setSelectedTopicIds([]);
-          setIsNewTopic(true);
-        }
-      })
-      .catch(() => {
-        setTopics([]);
-        setSelectedTopicId('NEW');
-        setSelectedTopicIds([]);
-        setIsNewTopic(true);
-      });
-  }, [selectedChapterId, isNewChapter]);
-
-  // Load Platform Repository Stats
-  const loadStats = () => {
-    contentApi
-      .getQuestionStats()
-      .then((data) => setStats(data))
-      .catch((err) => console.error('Failed to load question stats:', err));
-  };
-
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  // Debounce search input to avoid thrashing backend
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // Load Questions for Explorer with server-side pagination, search, filter, and sorting
-  const loadQuestions = () => {
-    setIsLoadingQuestions(true);
-    const params: Record<string, any> = {
-      page: currentPage,
-      page_size: pageSize,
-    };
-    if (filterBoard !== 'ALL') params.board = filterBoard;
-    if (filterType !== 'ALL') params.question_type = filterType;
-    if (filterDifficulty !== 'ALL') params.difficulty = filterDifficulty;
-    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
-    if (sortBy) params.ordering = sortBy;
-
-    contentApi
-      .getQuestions(params)
-      .then((data) => {
-        setQuestions(data.results || []);
-        setTotalCount(data.count || 0);
-      })
-      .catch((err) => {
-        console.error('Failed to load questions:', err);
-      })
-      .finally(() => {
-        setIsLoadingQuestions(false);
-      });
-  };
-
-  useEffect(() => {
-    loadQuestions();
-  }, [currentPage, pageSize, debouncedSearch, filterBoard, filterType, filterDifficulty, sortBy]);
-
-  // Handler helpers that reset pagination to page 1
-  const handleBoardChange = (b: string) => {
-    setFilterBoard(b);
-    setCurrentPage(1);
-  };
-  const handleTypeChange = (t: string) => {
-    setFilterType(t);
-    setCurrentPage(1);
-  };
-  const handleDifficultyChange = (d: string) => {
-    setFilterDifficulty(d);
-    setCurrentPage(1);
-  };
-  const handleSortChange = (s: string) => {
-    setSortBy(s);
-    setCurrentPage(1);
-  };
-
-  // Handle Option change
-  const handleOptionChange = (idx: number, text: string) => {
-    setOptions((prev) => {
-      const next = [...prev];
-      next[idx].text = text;
-      return next;
-    });
-  };
-
-  // Add Option row
-  const addOption = () => {
-    if (options.length >= 6) return;
-    const nextKey = String.fromCharCode(65 + options.length);
-    setOptions((prev) => [...prev, { key: nextKey, text: '' }]);
-  };
-
-  // Remove Option row
-  const removeOption = (idx: number) => {
-    if (options.length <= 2) return;
-    setOptions((prev) => {
-      const filtered = prev.filter((_, i) => i !== idx);
-      return filtered.map((item, i) => ({
-        key: String.fromCharCode(65 + i),
-        text: item.text,
-      }));
-    });
-  };
-
-  // Add a variant template
-  const addVariant = (presetMarks?: string, presetType?: string) => {
-    const type = presetType || 'SHORT_ANSWER';
-    setVariants((prev) => [
-      ...prev,
-      {
-        variant_type: type,
-        marks: presetMarks || '2.00',
-        question_text: '',
-        correct_answer: type === 'MCQ' ? 'A' : '',
-        explanation: '',
-        options:
-          type === 'MCQ'
-            ? [
-                { key: 'A', text: '' },
-                { key: 'B', text: '' },
-                { key: 'C', text: '' },
-                { key: 'D', text: '' },
-              ]
-            : undefined,
-      },
-    ]);
-  };
-
-  const removeVariant = (idx: number) => {
-    setVariants((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const updateVariant = (idx: number, field: string, val: any) => {
-    setVariants((prev) => {
-      const copy = [...prev];
-      (copy[idx] as any)[field] = val;
-      if (field === 'variant_type') {
-        if (val === 'MCQ') {
-          if (!copy[idx].options || copy[idx].options!.length === 0) {
-            copy[idx].options = [
-              { key: 'A', text: '' },
-              { key: 'B', text: '' },
-              { key: 'C', text: '' },
-              { key: 'D', text: '' },
-            ];
-          }
-          if (!copy[idx].correct_answer || copy[idx].correct_answer.length > 1) {
-            copy[idx].correct_answer = 'A';
-          }
-        }
-      }
-      return copy;
-    });
-  };
-
-  const addVariantOption = (variantIdx: number) => {
-    setVariants((prev) => {
-      const copy = [...prev];
-      const curOpts = copy[variantIdx].options || [];
-      if (curOpts.length >= 6) return prev;
-      const nextKey = String.fromCharCode(65 + curOpts.length);
-      copy[variantIdx] = {
-        ...copy[variantIdx],
-        options: [...curOpts, { key: nextKey, text: '' }],
-      };
-      return copy;
-    });
-  };
-
-  const removeVariantOption = (variantIdx: number, optIdx: number) => {
-    setVariants((prev) => {
-      const copy = [...prev];
-      const curOpts = copy[variantIdx].options || [];
-      if (curOpts.length <= 2) return prev;
-      const filtered = curOpts.filter((_, i) => i !== optIdx);
-      const reindexed = filtered.map((item, i) => ({
-        key: String.fromCharCode(65 + i),
-        text: item.text,
-      }));
-      let ans = copy[variantIdx].correct_answer;
-      if (!reindexed.some((o) => o.key === ans)) {
-        ans = 'A';
-      }
-      copy[variantIdx] = {
-        ...copy[variantIdx],
-        options: reindexed,
-        correct_answer: ans,
-      };
-      return copy;
-    });
-  };
-
-  const updateVariantOption = (variantIdx: number, optIdx: number, text: string) => {
-    setVariants((prev) => {
-      const copy = [...prev];
-      const curOpts = copy[variantIdx].options || [];
-      const updatedOpts = [...curOpts];
-      updatedOpts[optIdx] = { ...updatedOpts[optIdx], text };
-      copy[variantIdx] = {
-        ...copy[variantIdx],
-        options: updatedOpts,
-      };
-      return copy;
-    });
-  };
-
-  // Quick Variant Option Helpers
-  const addQuickVariantOption = () => {
-    if (quickVariantOptions.length >= 6) return;
-    const nextKey = String.fromCharCode(65 + quickVariantOptions.length);
-    setQuickVariantOptions((prev) => [...prev, { key: nextKey, text: '' }]);
-  };
-
-  const removeQuickVariantOption = (optIdx: number) => {
-    if (quickVariantOptions.length <= 2) return;
-    setQuickVariantOptions((prev) => {
-      const filtered = prev.filter((_, i) => i !== optIdx);
-      const reindexed = filtered.map((item, i) => ({
-        key: String.fromCharCode(65 + i),
-        text: item.text,
-      }));
-      if (!reindexed.some((o) => o.key === quickVariantAnswer)) {
-        setQuickVariantAnswer('A');
-      }
-      return reindexed;
-    });
-  };
-
-  const updateQuickVariantOption = (optIdx: number, text: string) => {
-    setQuickVariantOptions((prev) => {
-      const updated = [...prev];
-      updated[optIdx] = { ...updated[optIdx], text };
-      return updated;
-    });
-  };
-
-  // Ingest Form Submit
-  const handleIngestSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIngestSuccessMsg(null);
-    setIngestErrorMsg(null);
-
-    const effectiveBoard = isNewBoard ? newBoardName.trim() : selectedBoard;
-    if (!effectiveBoard) {
-      setIngestErrorMsg('Please specify or select an educational Board.');
-      toast.warning('Please specify or select an educational Board.');
-      return;
-    }
-
-    if (isNewBook) {
-      if (!newBookSubject.trim()) {
-        setIngestErrorMsg('Please specify a Subject for the new book.');
-        toast.warning('Please specify a Subject for the new book.');
-        return;
-      }
-      if (!newChapterTitle.trim()) {
-        setIngestErrorMsg('Please enter a Chapter Title.');
-        toast.warning('Please enter a Chapter Title.');
-        return;
-      }
-      if (!newTopicName.trim()) {
-        setIngestErrorMsg('Please enter a Topic Name.');
-        toast.warning('Please enter a Topic Name.');
-        return;
-      }
-    } else if (isNewChapter) {
-      if (!newChapterTitle.trim()) {
-        setIngestErrorMsg('Please enter a Chapter Title.');
-        toast.warning('Please enter a Chapter Title.');
-        return;
-      }
-      if (!newTopicName.trim()) {
-        setIngestErrorMsg('Please enter a Topic Name.');
-        toast.warning('Please enter a Topic Name.');
-        return;
-      }
-    } else if (isNewTopic) {
-      if (!newTopicName.trim()) {
-        setIngestErrorMsg('Please enter a Topic Name.');
-        toast.warning('Please enter a Topic Name.');
-        return;
-      }
-    } else if (!selectedTopicId || selectedTopicId === 'NEW') {
-      setIngestErrorMsg('Please select an existing Topic or create a new one.');
-      toast.warning('Please select an existing Topic or create a new one.');
-      return;
-    }
-
-    if (!questionText.trim()) {
-      setIngestErrorMsg('Question text is required.');
-      toast.warning('Question text is required.');
-      return;
-    }
-
-    if (!correctAnswer.trim()) {
-      setIngestErrorMsg('Correct answer is required.');
-      toast.warning('Correct answer is required.');
-      return;
-    }
-
-    // Format options map if MCQ/MSQ
-    let formattedOptions: Record<string, string> | null = null;
-    if (['MCQ', 'MSQ', 'MATCH_THE_FOLLOWING'].includes(questionType)) {
-      formattedOptions = {};
-      options.forEach((opt) => {
-        if (opt.text.trim()) {
-          formattedOptions![opt.key] = opt.text.trim();
-        }
-      });
-    }
-
-    const payload: IngestQuestionPayload = {
-      question_text: questionText.trim(),
-      question_type: questionType,
-      marks,
-      difficulty,
-      learner_level: learnerLevel,
-      bank_source: isDEO ? 'ORGANIZATION' : 'GLOBAL',
-      submit: true,
-      options: formattedOptions,
-      correct_answer: correctAnswer.trim(),
-      explanation: explanation.trim(),
-      source_reference: sourceReference.trim(),
-      variants: variants
-        .filter((v) => v.question_text.trim())
-        .map((v) => {
-          let variantOptions: Record<string, string> | undefined = undefined;
-          if (v.variant_type === 'MCQ' && v.options) {
-            variantOptions = {};
-            v.options.forEach((opt) => {
-              if (opt.text.trim()) {
-                variantOptions![opt.key] = opt.text.trim();
-              }
-            });
-          }
-          return {
-            variant_type: v.variant_type,
-            marks: v.marks,
-            question_text: v.question_text.trim(),
-            options: variantOptions,
-            correct_answer: v.correct_answer.trim(),
-            explanation: v.explanation.trim(),
-          };
-        }),
-    };
-
-    if (!isNewBook && selectedBookId && selectedBookId !== 'NEW') {
-      if (!isNewChapter && selectedChapterId && selectedChapterId !== 'NEW') {
-        if (!isNewTopic && (selectedTopicId || selectedTopicIds.length > 0) && selectedTopicId !== 'NEW') {
-          // 1. All existing
-          payload.topic = selectedTopicIds.length > 0 ? selectedTopicIds[0] : Number(selectedTopicId);
-          payload.topic_ids = selectedTopicIds.length > 0 ? selectedTopicIds : [Number(selectedTopicId)];
-        } else {
-          // 2. Existing Book & Chapter, but new Topic
-          payload.topic = null;
-          payload.chapter_id = Number(selectedChapterId);
-          payload.topic_name = newTopicName.trim();
-        }
-      } else {
-        // 3. Existing Book, but new Chapter & new Topic
-        payload.topic = null;
-        payload.book_id = Number(selectedBookId);
-        payload.chapter_title = newChapterTitle.trim();
-        payload.topic_name = newTopicName.trim();
-      }
-    } else {
-      // 4. New Book (and optionally new Board), new Chapter, new Topic
-      payload.topic = null;
-      payload.board = effectiveBoard;
-      payload.book_title = newBookTitle.trim() || `${newBookSubject.trim()} (${newBookGrade.trim()})`;
-      payload.subject = newBookSubject.trim();
-      payload.grade = newBookGrade.trim();
-      payload.chapter_title = newChapterTitle.trim();
-      payload.topic_name = newTopicName.trim();
-    }
-
-    setIsSubmitting(true);
-    try {
-      const created = await contentApi.ingestQuestion(payload);
-      const successText = `Question #${created.id} and ${created.variants?.length || variants.length} variant(s) successfully ingested into ${
-        created.school ? 'School Question Bank' : 'the Global Question Bank'
-      }!`;
-      setIngestSuccessMsg(successText);
-      toast.success(successText);
-      // Reset question input fields
-      setQuestionText('');
-      setExplanation('');
-      setSourceReference('');
-      setVariants([]);
-
-      // Refresh Boards
-      const updatedBoards = await contentApi.getBoards().catch(() => boards);
-      setBoards(updatedBoards);
-
-      // If new board was added, switch to it as selectedBoard
-      if (isNewBoard) {
-        setIsNewBoard(false);
-        setSelectedBoard(effectiveBoard);
-      }
-
-      // Refresh Books for this board
-      const updatedBooks = await contentApi.getBooks(effectiveBoard).catch(() => []);
-      setBooks(updatedBooks);
-
-      if (isNewBook) {
-        const targetBookTitle = (newBookTitle.trim() || `${newBookSubject.trim()} (${newBookGrade.trim()})`).toLowerCase();
-        const createdBook = updatedBooks.find((b) => b.title.toLowerCase() === targetBookTitle) || updatedBooks[updatedBooks.length - 1];
-        if (createdBook) {
-          setSelectedBookId(createdBook.id);
-          setIsNewBook(false);
-          const chaps = await contentApi.getChapters(createdBook.id).catch(() => []);
-          setChapters(chaps);
-          const createdChap = chaps.find((c) => c.title.toLowerCase() === newChapterTitle.trim().toLowerCase()) || chaps[chaps.length - 1];
-          if (createdChap) {
-            setSelectedChapterId(createdChap.id);
-            setIsNewChapter(false);
-            const tops = await contentApi.getTopics(createdChap.id).catch(() => []);
-            setTopics(tops);
-            if (created.topic) {
-              setSelectedTopicId(created.topic);
-            } else if (tops.length > 0) {
-              setSelectedTopicId(tops[tops.length - 1].id);
-            }
-            setIsNewTopic(false);
-          }
-        }
-      } else if (isNewChapter && selectedBookId && selectedBookId !== 'NEW') {
-        const chaps = await contentApi.getChapters(Number(selectedBookId)).catch(() => []);
-        setChapters(chaps);
-        const createdChap = chaps.find((c) => c.title.toLowerCase() === newChapterTitle.trim().toLowerCase()) || chaps[chaps.length - 1];
-        if (createdChap) {
-          setSelectedChapterId(createdChap.id);
-          setIsNewChapter(false);
-          const tops = await contentApi.getTopics(createdChap.id).catch(() => []);
-          setTopics(tops);
-          if (created.topic) {
-            setSelectedTopicId(created.topic);
-          } else if (tops.length > 0) {
-            setSelectedTopicId(tops[tops.length - 1].id);
-          }
-          setIsNewTopic(false);
-        }
-      } else if (isNewTopic && selectedChapterId && selectedChapterId !== 'NEW') {
-        const tops = await contentApi.getTopics(Number(selectedChapterId)).catch(() => []);
-        setTopics(tops);
-        if (created.topic) {
-          setSelectedTopicId(created.topic);
-        } else if (tops.length > 0) {
-          setSelectedTopicId(tops[tops.length - 1].id);
-        }
-        setIsNewTopic(false);
-      }
-
-      loadQuestions();
-      loadStats();
-    } catch (err: any) {
-      const errText =
-        err.response?.data?.detail ||
-        (err.response?.data && typeof err.response.data === 'object'
-          ? JSON.stringify(err.response.data)
-          : 'Failed to ingest question.');
-      setIngestErrorMsg(errText);
-      toast.error(errText);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Submit quick variant on existing question
-  const handleQuickVariantSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickVariantModalQuestion) return;
-
-    if (!quickVariantText.trim() || !quickVariantAnswer.trim()) {
-      toast.warning('Variant question text and answer are required.');
-      return;
-    }
-
-    let quickOptionsMap: Record<string, string> | undefined = undefined;
-    if (quickVariantType === 'MCQ') {
-      quickOptionsMap = {};
-      quickVariantOptions.forEach((opt) => {
-        if (opt.text.trim()) {
-          quickOptionsMap![opt.key] = opt.text.trim();
-        }
-      });
-    }
-
-    setIsSubmittingQuickVariant(true);
-    try {
-      await contentApi.addVariant(quickVariantModalQuestion.id, {
-        variant_type: quickVariantType as any,
-        marks: quickVariantMarks,
-        difficulty: quickVariantModalQuestion.difficulty, // Enforce matching parent difficulty
-        question_text: quickVariantText.trim(),
-        options: quickOptionsMap,
-        correct_answer: quickVariantAnswer.trim(),
-        explanation: quickVariantExplanation.trim(),
-      });
-
-      toast.success('Variant successfully appended to question!');
-
-      // Reload question detail
-      const refreshed = await contentApi.getQuestion(quickVariantModalQuestion.id);
-      setSelectedQuestion(refreshed);
-      setQuickVariantModalQuestion(null);
-      setQuickVariantText('');
-      setQuickVariantAnswer('');
-      setQuickVariantExplanation('');
-      loadQuestions();
-      loadStats();
-    } catch (err: any) {
-      const errText = err.response?.data?.detail || 'Failed to add variant.';
-      toast.error(errText);
-    } finally {
-      setIsSubmittingQuickVariant(false);
-    }
-  };
 
   // Display questions on current page (server-side filtered, sorted, and paginated)
   const displayQuestions = questions;
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() || filterBoard !== 'ALL' || filterType !== 'ALL' || filterDifficulty !== 'ALL'
+  );
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
       {/* ── Page Header ── */}
       <div className="border-b border-border pb-6 flex flex-col xl:flex-row xl:items-end justify-between gap-5">
         <div className="space-y-2 max-w-xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-forest/10 border border-forest/20 text-xs font-semibold text-forest">
-            <Sparkles className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+            <span className="w-2 h-2 rounded-full bg-forest" />
             Central Question Bank Manager
           </div>
           <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
             Curriculum Ingestion Engine
           </h1>
-          <p className="font-body text-ink/75 text-sm leading-relaxed">
-            Standardize and ingest board-certified questions, multi-tier difficulty rubrics, and variant
-            architectures directly into the centralized platform question bank.
+          <p className="font-body text-ink/75 text-base max-w-2xl leading-relaxed">
+            Standardizing{' '}
+            <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
+              {stats?.total_questions ?? totalCount} questions
+            </span>{' '}
+            and{' '}
+            <span className="font-heading font-bold text-ember text-lg underline decoration-ember/40 underline-offset-2">
+              {stats?.with_variants ?? 0} variants
+            </span>{' '}
+            across{' '}
+            <span className="font-heading font-bold text-grape text-lg underline decoration-grape/40 underline-offset-2">
+              {stats?.boards_count ?? (boards.length || 3)} curriculum boards
+            </span>{' '}
+            with multi-tier difficulty calibration.
           </p>
         </div>
 
@@ -844,36 +160,40 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
       </div>
 
       {/* ── Metric Highlights ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-surface border border-border rounded-card p-4 shadow-card">
-          <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Global Repository</span>
-          <div className="font-heading font-bold text-2xl text-ink mt-1">
-            {stats?.total_questions ?? totalCount}
+      {!stats ? (
+        <SkeletonMetricCards count={4} />
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+            <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Global Repository</span>
+            <div className="font-heading font-bold text-2xl text-ink mt-1">
+              {stats.total_questions ?? totalCount}
+            </div>
+            <p className="text-[11px] text-forest font-medium mt-0.5">Platform Available</p>
           </div>
-          <p className="text-[11px] text-forest font-medium mt-0.5">Platform Available</p>
-        </div>
-        <div className="bg-surface border border-border rounded-card p-4 shadow-card">
-          <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">With Variants</span>
-          <div className="font-heading font-bold text-2xl text-forest mt-1">
-            {stats?.with_variants ?? 0}
+          <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+            <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">With Variants</span>
+            <div className="font-heading font-bold text-2xl text-forest mt-1">
+              {stats.with_variants ?? 0}
+            </div>
+            <p className="text-[11px] text-ink/60 mt-0.5">Difficulty Locked</p>
           </div>
-          <p className="text-[11px] text-ink/60 mt-0.5">Difficulty Locked</p>
-        </div>
-        <div className="bg-surface border border-border rounded-card p-4 shadow-card">
-          <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Curriculum Boards</span>
-          <div className="font-heading font-bold text-2xl text-ink mt-1">
-            {stats?.boards_count ?? (boards.length || 3)}
+          <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+            <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Curriculum Boards</span>
+            <div className="font-heading font-bold text-2xl text-ink mt-1">
+              {stats.boards_count ?? (boards.length || 3)}
+            </div>
+            <p className="text-[11px] text-ink/60 mt-0.5">CBSE, ICSE & State</p>
           </div>
-          <p className="text-[11px] text-ink/60 mt-0.5">CBSE, ICSE & State</p>
-        </div>
-        <div className="bg-surface border border-border rounded-card p-4 shadow-card">
-          <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Active Chapters</span>
-          <div className="font-heading font-bold text-2xl text-ink mt-1">
-            {stats?.active_chapters ?? (chapters.length || 1)}
+          <div className="bg-surface border border-border rounded-card p-4 shadow-card">
+            <span className="text-[11px] font-mono text-ink/60 uppercase tracking-wider">Active Chapters</span>
+            <div className="font-heading font-bold text-2xl text-ink mt-1">
+              {stats.active_chapters ?? (chapters.length || 1)}
+            </div>
+            <p className="text-[11px] text-ink/60 mt-0.5">Structured Topics</p>
           </div>
-          <p className="text-[11px] text-ink/60 mt-0.5">Structured Topics</p>
         </div>
-      </div>
+      )}
 
       {/* ──────────────────────────────────────────────────────────────────────── */}
       {/* TAB 1: QUESTION EXPLORER                                                 */}
@@ -881,26 +201,36 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
       {activeTab === 'explore' && (
         <div className="space-y-6">
           {/* Filter Toolbar */}
-          <div className="bg-surface border border-border rounded-card p-4 shadow-card flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Filter by question, topic, chapter, book..."
-                className="w-full pl-9 pr-4 py-2 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest"
-              />
-            </div>
+          <div className="space-y-3">
+            <div className="bg-surface border border-border rounded-card p-3 shadow-card flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-4 h-4 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Filter by question, topic, chapter, book..."
+                  className="w-full pl-9 pr-8 py-2 rounded-pill border border-border bg-bg text-xs font-body text-ink focus:outline-none focus:border-forest"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink cursor-pointer p-0.5"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
 
-            <div className="flex flex-wrap items-center gap-2">
               {/* Board selector */}
               <CustomSelect
                 id="qbm-filter-board"
                 value={filterBoard}
                 onChange={(val) => handleBoardChange(val)}
                 options={[{ value: 'ALL', label: 'All Boards' }, ...boards.map((b) => ({ value: b, label: b }))]}
-                triggerClassName="rounded-pill text-xs py-1.5 px-3 bg-bg"
+                triggerClassName="rounded-pill text-xs py-2 px-3 bg-bg"
                 className="w-auto min-w-[130px]"
               />
 
@@ -921,7 +251,7 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                   { value: 'DIAGRAM_BASED', label: 'Diagram Based' },
                   { value: 'COMPREHENSION_BASED', label: 'Comprehension Based' },
                 ]}
-                triggerClassName="rounded-pill text-xs py-1.5 px-3 bg-bg"
+                triggerClassName="rounded-pill text-xs py-2 px-3 bg-bg"
                 className="w-auto min-w-[160px]"
               />
 
@@ -936,7 +266,7 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                   { value: 'MEDIUM', label: 'Medium' },
                   { value: 'HARD', label: 'Hard' },
                 ]}
-                triggerClassName="rounded-pill text-xs py-1.5 px-3 bg-bg"
+                triggerClassName="rounded-pill text-xs py-2 px-3 bg-bg"
                 className="w-auto min-w-[130px]"
               />
 
@@ -954,17 +284,61 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
                   { value: 'difficulty_desc', label: 'Sort: Difficulty (Hard → Easy)' },
                   { value: 'text_asc', label: 'Sort: Question Text (A–Z)' },
                 ]}
-                triggerClassName="rounded-pill text-xs py-1.5 px-3 bg-bg"
+                triggerClassName="rounded-pill text-xs py-2 px-3 bg-bg"
                 className="w-auto min-w-[160px]"
               />
             </div>
+
+            {/* Active Filters Bar */}
+            {hasActiveFilters && (
+              <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
+                <span className="text-ink/60 font-medium">Active filters:</span>
+                {searchTerm.trim() && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill bg-surface border border-border text-ink font-medium shadow-2xs">
+                    Search: "{searchTerm}"
+                    <button type="button" onClick={() => setSearchTerm('')} className="hover:text-ember cursor-pointer"><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {filterBoard !== 'ALL' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill bg-forest/10 border border-forest/20 text-forest font-medium shadow-2xs">
+                    Board: {filterBoard}
+                    <button type="button" onClick={() => handleBoardChange('ALL')} className="hover:text-ember cursor-pointer"><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {filterType !== 'ALL' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill bg-forest/10 border border-forest/20 text-forest font-medium shadow-2xs">
+                    Type: {filterType}
+                    <button type="button" onClick={() => handleTypeChange('ALL')} className="hover:text-ember cursor-pointer"><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {filterDifficulty !== 'ALL' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill bg-amber-50 border border-amber-200 text-amber-800 font-medium shadow-2xs">
+                    Diff: {filterDifficulty}
+                    <button type="button" onClick={() => handleDifficultyChange('ALL')} className="hover:text-ember cursor-pointer"><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    handleBoardChange('ALL');
+                    handleTypeChange('ALL');
+                    handleDifficultyChange('ALL');
+                  }}
+                  className="text-xs font-semibold text-forest hover:underline cursor-pointer ml-1"
+                >
+                  Reset all filters
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Question Cards Grid */}
           {isLoadingQuestions ? (
-            <div className="p-12 text-center text-xs text-ink/60">Loading questions repository...</div>
+            <SkeletonQuestionGrid count={6} />
           ) : displayQuestions.length === 0 ? (
-            <div className="bg-surface border border-border rounded-card p-12 text-center space-y-3 shadow-card">
+            <div className="bg-surface border-2 border-dashed border-border rounded-lg p-12 text-center space-y-3 shadow-card">
+              <span className="pill pill-forest text-xs">Repository Ready</span>
               <FileQuestion className="w-10 h-10 text-ink/30 mx-auto" />
               <h3 className="font-heading font-semibold text-ink text-sm">No Questions Found</h3>
               <p className="text-xs text-ink/60 max-w-sm mx-auto">
@@ -981,11 +355,12 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
           ) : (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {displayQuestions.map((q) => (
+                {displayQuestions.map((q, idx) => (
                   <div
                     key={q.id}
+                    style={getStaggerDelay(idx)}
                     onClick={() => setSelectedQuestion(q)}
-                    className="bg-surface border border-border hover:border-forest/50 transition-all rounded-card p-4 shadow-card flex flex-col justify-between cursor-pointer group"
+                    className={`bg-surface border border-border hover:border-forest/50 transition-all rounded-card p-4 shadow-card flex flex-col justify-between cursor-pointer group ${CARD_MOTION.interactive}`}
                   >
                     <div className="space-y-2.5">
                       {/* Tags row */}
@@ -2356,4 +1731,11 @@ export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
       />
     </div>
   );
+};
+
+export const QBMDashboard: React.FC<QBMDashboardProps> = ({ initialTab }) => {
+  const breakpoint = useBreakpoint();
+  if (breakpoint === 'mobile') return <QBMDashboardMobile key="mobile" initialTab={initialTab} />;
+  if (breakpoint === 'tablet') return <QBMDashboardTablet key="tablet" initialTab={initialTab} />;
+  return <QBMDashboardDesktop key="desktop" initialTab={initialTab} />;
 };

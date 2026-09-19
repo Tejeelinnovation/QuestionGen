@@ -3,6 +3,7 @@ import { contentApi } from '../../api/content';
 import { useAuth } from '../../auth/AuthContext';
 import type { QuestionValidationHistoryItem } from '../../types';
 import { X, Clock, CheckCircle2, AlertTriangle, XCircle, Edit3, Send, History } from 'lucide-react';
+import { SkeletonAuditTimeline } from '../ui/skeleton';
 
 interface ValidationHistoryDrawerProps {
   questionId: number | null;
@@ -124,9 +125,7 @@ export const ValidationHistoryDrawer: React.FC<ValidationHistoryDrawerProps> = (
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
           {isLoading && (
-            <div className="py-12 text-center text-xs text-ink/50 font-mono">
-              Loading audit timeline...
-            </div>
+            <SkeletonAuditTimeline count={3} />
           )}
 
           {errorMessage && (

@@ -10,9 +10,12 @@ import {
   Search,
   History,
   Layers,
+  X,
 } from 'lucide-react';
 import { Pagination } from '../ui/pagination';
 import { CustomSelect } from '../ui/custom-select';
+import { SkeletonSubmissionsList } from '../ui/skeleton';
+import { getStaggerDelay, CARD_MOTION } from '../../lib/motion';
 
 export const ValidatorQueueView: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -154,8 +157,21 @@ export const ValidatorQueueView: React.FC = () => {
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full pl-8 pr-3 py-1.5 rounded-card bg-bg border border-border text-xs text-ink focus:border-forest focus:outline-none"
+            className="w-full pl-8 pr-8 py-1.5 rounded-card bg-bg border border-border text-xs text-ink focus:border-forest focus:outline-none"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink cursor-pointer p-0.5"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Status Filter */}
@@ -221,11 +237,10 @@ export const ValidatorQueueView: React.FC = () => {
 
       {/* Queue Content: Card List / Table */}
       {isLoading ? (
-        <div className="py-16 text-center text-xs font-mono text-ink/50">
-          Loading review queue...
-        </div>
+        <SkeletonSubmissionsList count={4} />
       ) : questions.length === 0 ? (
-        <div className="py-16 text-center border border-dashed border-border rounded-card bg-surface p-8">
+        <div className="py-16 text-center border-2 border-dashed border-border rounded-lg bg-surface p-8 space-y-2 shadow-card">
+          <span className="pill pill-forest text-xs">Queue Clear</span>
           <CheckCircle2 className="w-8 h-8 text-forest/40 mx-auto mb-2" />
           <p className="text-sm font-heading font-semibold text-ink">Validation Queue is Clear!</p>
           <p className="text-xs text-ink/60 mt-1">
@@ -234,10 +249,11 @@ export const ValidatorQueueView: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {questions.map((q) => (
+          {questions.map((q, idx) => (
             <div
               key={q.id}
-              className="bg-surface border border-border rounded-card p-4 sm:p-5 shadow-xs hover:border-border-strong transition-all space-y-3"
+              style={getStaggerDelay(idx)}
+              className={`bg-surface border border-border rounded-card p-4 sm:p-5 shadow-xs hover:border-border-strong transition-all space-y-3 ${CARD_MOTION.interactive}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">

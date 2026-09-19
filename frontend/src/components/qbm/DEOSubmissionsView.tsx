@@ -16,6 +16,8 @@ import {
   Search,
 } from 'lucide-react';
 import { Pagination } from '../ui/pagination';
+import { SkeletonSubmissionsList } from '../ui/skeleton';
+import { getStaggerDelay, CARD_MOTION } from '../../lib/motion';
 import { useToast } from '../../context/ToastContext';
 
 interface DEOSubmissionsViewProps {
@@ -243,33 +245,46 @@ export const DEOSubmissionsView: React.FC<DEOSubmissionsViewProps> = ({
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="w-full pl-8 pr-3 py-1.5 rounded-pill bg-surface border border-border text-xs text-ink focus:border-forest focus:outline-none"
+            className="w-full pl-8 pr-8 py-1.5 rounded-pill bg-surface border border-border text-xs text-ink focus:border-forest focus:outline-none"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink cursor-pointer p-0.5"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Questions Listing */}
       {isLoading ? (
-        <div className="py-16 text-center text-xs font-mono text-ink/50">
-          Loading submissions...
-        </div>
+        <SkeletonSubmissionsList count={4} />
       ) : questions.length === 0 ? (
-        <div className="py-16 text-center border border-dashed border-border rounded-card bg-surface p-8">
-          <Layers className="w-8 h-8 text-ink/30 mx-auto mb-2" />
+        <div className="py-16 text-center border-2 border-dashed border-border rounded-lg bg-surface p-8 space-y-2 shadow-card">
+          <span className="pill pill-forest text-xs">Submissions Ready</span>
+          <Layers className="w-8 h-8 text-ink/30 mx-auto" />
           <p className="text-sm font-heading font-semibold text-ink">No questions found in this view</p>
-          <p className="text-xs text-ink/60 mt-1">
+          <p className="text-xs text-ink/60 max-w-sm mx-auto">
             Questions you submit will appear here with their live review status.
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {questions.map((q) => {
+          {questions.map((q, idx) => {
             const needsCorrection = q.validation_status === 'CORRECTION_REQUIRED';
 
             return (
               <div
                 key={q.id}
-                className={`bg-surface border rounded-card shadow-xs transition-all overflow-hidden ${
+                style={getStaggerDelay(idx)}
+                className={`bg-surface border rounded-card shadow-xs transition-all overflow-hidden ${CARD_MOTION.interactive} ${
                   needsCorrection
                     ? 'border-ember/40 ring-1 ring-ember/20'
                     : 'border-border hover:border-border-strong'
