@@ -80,6 +80,16 @@ Returns: `'mobile' | 'tablet' | 'desktop'`
 
 Implementation: ResizeObserver on document.documentElement + window resize event.
 
+### Hook: useExamCountdown()
+
+Location: `frontend/src/hooks/useExamCountdown.ts`
+Counts down to the `available_until` deadline of a Delivery. Automatically disables answer inputs and triggers a submit prompt when time expires.
+
+### Hook: useExamProctoring()
+
+Location: `frontend/src/hooks/useExamProctoring.ts`
+Detects tab-switch (Page Visibility API) and window focus-loss events during a live exam sitting. Used exclusively on `TestAttemptPage` and its mobile/tablet counterparts — NOT on any other screen.
+
 ### Layout Folder Structure
 
 ```

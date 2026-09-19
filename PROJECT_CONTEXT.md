@@ -63,24 +63,56 @@ question-generation-system/       ← repo root
 │
 ├── frontend/                     ← React + TypeScript frontend shell
 │   ├── src/
-│   │   ├── api/                  ← Axios instance & domain endpoints (auth, users, papers, deliveries, attempts)
+│   │   ├── api/                  ← Axios instance & domain endpoints (auth, users, papers, deliveries, attempts, content, audit, classes, import)
 │   │   ├── auth/                 ← AuthContext, useAuth, RequireCapability
-│   │   ├── layouts/              ← AppLayout with minimal navbar and logout
-│   │   ├── pages/                ← LoginPage
-│   │   │   ├── dashboards/       ← SuperAdmin, SchoolAdmin, Teacher, Student dashboards
+│   │   ├── components/           ← Reusable UI components by domain
+│   │   │   ├── ui/               ← shadcn/ui base + bento-grid, animated-card
+│   │   │   ├── attempts/         ← ConfirmSubmitModal
+│   │   │   ├── audit/            ← SuperAdminAuditLogViewer
+│   │   │   ├── papers/           ← PrintablePaperSheet, QuestionReplaceModal
+│   │   │   ├── profile/          ← EditProfileModal, ChangePasswordModal
+│   │   │   ├── qbm/              ← DEOSubmissionsView, ValidationHistoryDrawer, ValidatorQueueView, ValidatorReviewModal, ValidationStatusBadge
+│   │   │   ├── schools/          ← BulkImportModal, ClassManagementView, CreateSchoolDrawer, EditSchoolModal
+│   │   │   ├── teachers/         ← TeacherClassesSection
+│   │   │   └── users/            ← CreateUserDrawer, UpdateUserModal, PermissionManager
+│   │   ├── context/              ← ToastContext
+│   │   ├── hooks/
+│   │   │   ├── useBreakpoint.ts  ← Returns 'mobile' | 'tablet' | 'desktop'
+│   │   │   ├── useExamCountdown.ts ← Countdown timer hook for online tests
+│   │   │   └── useExamProctoring.ts ← Tab-switch / focus-loss detection during exams
+│   │   ├── layouts/
+│   │   │   ├── AppLayout.tsx     ← Root layout, selects responsive sub-layout
+│   │   │   ├── desktop/DesktopLayout.tsx
+│   │   │   ├── tablet/TabletLayout.tsx
+│   │   │   └── mobile/MobileLayout.tsx
+│   │   ├── lib/
+│   │   │   ├── motion.ts         ← Single source of truth for motion tokens & physics
+│   │   │   └── utils.ts          ← cn() helper (clsx + tailwind-merge)
+│   │   ├── pages/
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── auth/             ← ResetPasswordPage
+│   │   │   ├── profile/          ← ProfilePage, ProfilePageDesktop, ProfilePageTablet, ProfilePageMobile
+│   │   │   ├── dashboards/       ← SuperAdmin, SchoolAdmin, Teacher, Student, QBM dashboards
 │   │   │   ├── papers/           ← PaperSetup, PaperConfigure, QuestionReview, VersionDetail, Delivery, PrintView, PaperDetail
-│   │   │   └── attempts/         ← TestAttemptPage, ResultPage
+│   │   │   ├── attempts/         ← TestAttemptPage, ResultPage, ResultsRosterPage, GradeAttemptPage
+│   │   │   ├── mobile/           ← Full mobile-responsive counterparts of all pages above
+│   │   │   └── tablet/           ← Full tablet-responsive counterparts of all pages above
 │   │   ├── types/                ← TypeScript interfaces matching backend serializers
+│   │   ├── utils/                ← Shared utility functions
+│   │   ├── constants/            ← App-wide constants
 │   │   ├── routes.tsx            ← Central routes & capability-based index redirect
 │   │   ├── App.tsx
-│   │   └── index.css             ← Tailwind CSS utility entrypoint
+│   │   └── index.css             ← Tailwind v4 @theme design tokens + global styles
 │   ├── package.json
 │   ├── vite.config.ts
+│   ├── vercel.json               ← SPA rewrite rule (all paths → index.html)
 │   └── tsconfig.json
 │
 ├── .env                          ← Local secrets (NOT committed)
 ├── .env.example                  ← Template with all required variables
 ├── .gitignore
+├── local_data.json               ← Local DB dump (NOT committed — in .gitignore)
+├── neon_data.json                ← Neon cloud DB dump (NOT committed — in .gitignore)
 ├── manage.py
 ├── requirements.txt
 ├── README.md
@@ -165,7 +197,7 @@ Architectural boundary and contracts for Question Generation.
 
 ## Capability System
 
-### The 10 Fixed Capabilities (do not add without documenting here)
+### The 12 Fixed Capabilities (do not add without documenting here)
 
 | Capability Name | Default Holders | Description |
 |----------------|-----------------|-------------|
@@ -179,15 +211,20 @@ Architectural boundary and contracts for Question Generation.
 | `ATTEMPT_TEST` | Student | Can sit and submit a test |
 | `VIEW_OWN_RESULT` | Student | Can view their own test results |
 | `VIEW_SCHOOL_WIDE_CONTROLS` | School Admin | Can view/manage across their school |
+| `DATA_ENTRY_OPERATOR` | DEO user (Task 8) | Can ingest questions into the question bank for validation |
+| `VALIDATOR` | Validator user (Task 8) | Can review, approve, reject, or request correction on submitted questions |
 
 ### Default Capability Profiles (in `users/capability_defaults.py`)
 
 | Function | Grants |
 |----------|--------|
-| `grant_super_admin_defaults(user)` | ALL 10 capabilities |
+| `grant_super_admin_defaults(user)` | ALL 12 capabilities |
 | `grant_school_admin_defaults(user, granted_by)` | CREATE_TEACHER, CREATE_STUDENT, VIEW_SCHOOL_WIDE_CONTROLS |
 | `grant_teacher_defaults(user, granted_by)` | CREATE_STUDENT, GENERATE_SELECT_QUESTIONS, CREATE_PAPER, ASSIGN_TEST |
 | `grant_student_defaults(user, granted_by)` | ATTEMPT_TEST, VIEW_OWN_RESULT |
+| `grant_deo_defaults(user, granted_by)` | DATA_ENTRY_OPERATOR |
+| `grant_validator_defaults(user, granted_by)` | VALIDATOR |
+| `grant_deo_and_validator_defaults(user, granted_by)` | DATA_ENTRY_OPERATOR, VALIDATOR |
 
 These are convenience functions. The underlying system supports arbitrary custom grants.
 
@@ -282,27 +319,20 @@ Computed from granted capabilities — display only, never used for authz:
 
 ---
 
-## Frontend Architecture (P1 Shell)
+## Frontend Architecture
+
+> For the full responsive layout system, design tokens, motion system, and component inventory, see **`DESIGN_SYSTEM.md`**.
 
 ### Core Principles
-- **Capability-Gated UI**: The frontend **NEVER** branches routing or action permissions on `role_label`. UI logic strictly invokes `hasCapability("CAPABILITY_NAME")` (e.g. `CREATE_PAPER`, `ATTEMPT_TEST`), mirroring the backend DRF authorization architecture. `role_label` is treated strictly as display-only metadata.
-- **Minimal & Near-Unstyled**: Semantic HTML elements with basic flex/grid layouts via Tailwind CSS utility classes. No custom themes or heavy component libraries, ensuring clean future UI redesigns.
-- **Unified API Client**: All HTTP requests flow through a configured Axios instance (`src/api/client.ts`) with request interceptors (attaching `Authorization: Bearer <token>`) and response interceptors (handling 401 refresh queuing via `/api/auth/token/refresh/`).
-- **Session Security**: In compliance with web application security recommendations, JWT tokens are maintained in React state with `sessionStorage` fallback (avoiding persistent `localStorage` XSS vulnerabilities while surviving in-tab page refreshes).
+- **Capability-Gated UI**: The frontend **NEVER** branches routing or action permissions on `role_label`. UI logic strictly invokes `hasCapability("CAPABILITY_NAME")`, mirroring backend DRF authorization. `role_label` is display-only.
+- **Unified API Client**: All HTTP requests flow through `src/api/client.ts` (Axios) with JWT Bearer injection and automatic 401 token refresh queuing.
+- **Session Security**: JWT tokens stored in `sessionStorage` (not `localStorage`) — survives page refresh, clears on tab close.
 
-### Folder Structure
-```
-frontend/src/
-  ├── api/          — Axios instance, refresh interceptor, API functions by domain (auth, users, papers, deliveries, attempts)
-  ├── auth/         — AuthContext, useAuth hook, RequireCapability guard component
-  ├── layouts/      — AppLayout (header with user display, role_label, and logout button)
-  ├── pages/        — LoginPage, PaperBuilderPlaceholder, AttemptPlaceholder
-  │   └── dashboards/ — SuperAdmin, SchoolAdmin, Teacher, Student dashboards
-  ├── routes.tsx    — Route tree with capability gates & dynamic index redirect
-  ├── types/        — TypeScript interfaces matching backend models and serializers
-  ├── App.tsx       — Root component with AuthProvider and RouterProvider
-  └── index.css     — Tailwind CSS utility entrypoint
-```
+### Additional Hooks (not in DESIGN_SYSTEM.md)
+| Hook | Location | Purpose |
+|------|----------|---------|
+| `useExamCountdown` | `hooks/useExamCountdown.ts` | Countdown timer tied to `available_until` deadline; disables inputs on expiry |
+| `useExamProctoring` | `hooks/useExamProctoring.ts` | Detects tab-switch and window focus-loss events during live exam sessions |
 
 ---
 
@@ -467,8 +497,18 @@ frontend/src/
 
 ---
 
-## Not Yet Built
+## Deployment Status
 
-- [ ] **Deployment** (Docker, CI/CD, production PostgreSQL, static files with WhiteNoise or S3)
+- [/] **Frontend — Vercel** (React/Vite SPA)
+  - `frontend/vercel.json` created with SPA rewrite rule
+  - Vercel project settings: Root Directory = `frontend`, Framework = Vite
+  - Required Vercel env var: `VITE_API_BASE_URL` = Django backend production URL
+
+- [ ] **Backend — Not yet deployed**
+  - Django backend needs a host (Railway, Render, VPS, etc.)
+  - Production settings in `question_generation_system/settings/prod.py`
+  - Email SMTP credentials needed (see `.env.example` — `EMAIL_HOST_*` vars)
+  - Static files: WhiteNoise or S3 (not yet configured)
+  - Docker / CI/CD: not yet set up
 
 
