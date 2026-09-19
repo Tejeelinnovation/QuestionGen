@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ArrowRight, Lock, User as UserIcon, Sparkles, Eye, EyeOff } from 'lucide-react';
 
@@ -171,6 +171,16 @@ export const LoginPageMobile: React.FC = () => {
                 </>
               )}
             </button>
+
+            {/* Forgot Password */}
+            <div className="text-center pt-1">
+              <Link
+                to="/reset-password"
+                className="text-xs font-heading font-semibold text-forest hover:underline"
+              >
+                Forgot your password?
+              </Link>
+            </div>
           </form>
         </div>
 

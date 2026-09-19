@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 
@@ -230,6 +230,16 @@ export const LoginPageTablet: React.FC = () => {
               >
                 {isSubmitting ? 'Authenticating...' : 'Sign In to Tablet Workspace →'}
               </button>
+
+              {/* Forgot Password */}
+              <div className="text-center pt-1">
+                <Link
+                  to="/reset-password"
+                  className="text-xs font-heading font-semibold text-forest hover:underline"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
             </form>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useBreakpoint } from '../hooks/useBreakpoint';
@@ -236,12 +236,12 @@ const LoginPageDesktop: React.FC = () => {
                     >
                       Password
                     </label>
-                    <a
-                      href="/reset-password"
+                    <Link
+                      to="/reset-password"
                       className="text-[11px] font-heading font-medium text-forest hover:underline"
                     >
                       Forgot password?
-                    </a>
+                    </Link>
                   </div>
                   <div className="relative">
                     <input

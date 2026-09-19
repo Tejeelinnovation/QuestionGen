@@ -13,7 +13,7 @@ export const ResetPasswordPage: React.FC = () => {
   const hasTokens = Boolean(uidFromQuery && tokenFromQuery);
 
   // Request Reset Link State (Unauthenticated / Forgot Password)
-  const [requestEmail, setRequestEmail] = useState('');
+  const [requestIdentifier, setRequestIdentifier] = useState('');
   const [isRequesting, setIsRequesting] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -32,21 +32,21 @@ export const ResetPasswordPage: React.FC = () => {
     e.preventDefault();
     setRequestError(null);
 
-    const trimmedEmail = requestEmail.trim();
-    if (!trimmedEmail) {
-      setRequestError('Please enter your email address.');
+    const trimmed = requestIdentifier.trim();
+    if (!trimmed) {
+      setRequestError('Please enter your email address or username.');
       return;
     }
 
     setIsRequesting(true);
     try {
-      await authApi.requestPasswordReset(trimmedEmail);
+      await authApi.requestPasswordReset(trimmed);
       setRequestSuccess(true);
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||
-        err?.response?.data?.email?.[0] ||
-        'Unable to send reset email. Please verify your email and try again.';
+        err?.response?.data?.identifier?.[0] ||
+        'Unable to send reset email. Please verify your details and try again.';
       setRequestError(msg);
     } finally {
       setIsRequesting(false);
@@ -104,7 +104,7 @@ export const ResetPasswordPage: React.FC = () => {
     setSearchParams({});
     setConfirmError(null);
     setRequestSuccess(false);
-    setRequestEmail('');
+    setRequestIdentifier('');
   };
 
   return (
@@ -121,7 +121,7 @@ export const ResetPasswordPage: React.FC = () => {
           <p className="text-xs text-ink/65 max-w-xs mx-auto">
             {hasTokens
               ? 'Choose a strong new password for your account.'
-              : "Enter your registered email address and we'll send you a secure link to reset your password."}
+              : "Enter your email address or username and we'll send a secure reset link to your registered email."}
           </p>
         </div>
 
@@ -134,9 +134,9 @@ export const ResetPasswordPage: React.FC = () => {
                   <Check className="w-4 h-4" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-semibold text-forest">Password Reset Email Dispatched</p>
+                  <p className="text-xs font-semibold text-forest">Password Reset Email Sent</p>
                   <p className="text-[11px] text-ink/75 leading-relaxed">
-                    If an active account exists for <span className="font-semibold text-ink">{requestEmail}</span>, a secure password reset link has been sent to your inbox.
+                    A secure password reset link has been sent to the email address registered with your account.
                   </p>
                   <p className="text-[10px] text-ink/50 pt-1">
                     Please check your spam or junk folder if the email does not appear within a few minutes.
@@ -160,17 +160,17 @@ export const ResetPasswordPage: React.FC = () => {
                 )}
 
                 <div className="space-y-1.5">
-                  <label htmlFor="reset-email" className="block text-xs font-heading font-semibold text-ink">
-                    Email Address
+                  <label htmlFor="reset-identifier" className="block text-xs font-heading font-semibold text-ink">
+                    Email Address or Username
                   </label>
                   <div className="relative">
                     <input
-                      id="reset-email"
-                      type="email"
+                      id="reset-identifier"
+                      type="text"
                       required
-                      value={requestEmail}
-                      onChange={(e) => setRequestEmail(e.target.value)}
-                      placeholder="e.g. user@school.edu"
+                      value={requestIdentifier}
+                      onChange={(e) => setRequestIdentifier(e.target.value)}
+                      placeholder="e.g. teacher1 or user@school.edu"
                       className="w-full pl-9 pr-3 py-2.5 text-xs rounded-card border border-border bg-surface text-ink placeholder:text-ink/30 focus:border-forest focus:outline-none"
                     />
                     <Mail className="w-4 h-4 text-ink/40 absolute left-3 top-3" />

@@ -214,41 +214,58 @@ class PasswordResetRequestView(APIView):
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data["email"].strip().lower()
+        identifier = serializer.validated_data["identifier"].strip()
 
-        user = User.objects.filter(email__iexact=email, is_active=True).first()
-        if user:
-            token = default_token_generator.make_token(user)
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
-            reset_url = f"{frontend_url}/reset-password?uid={uid}&token={token}"
-            log_action(user, "user.password_reset_requested", user)
+        # Detect whether the identifier is an email address or a username
+        if "@" in identifier:
+            user = User.objects.filter(email__iexact=identifier, is_active=True).first()
+            if not user:
+                return Response(
+                    {"detail": "No active account found with this email address."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            user = User.objects.filter(username__iexact=identifier, is_active=True).first()
+            if not user:
+                return Response(
+                    {"detail": "No active account found with this username."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            subject = "Reset Your Password - Question Generation System"
-            message = (
-                f"Hello {user.get_full_name() or user.username},\n\n"
-                "We received a request to reset the password for your account.\n\n"
-                f"Click the link below to set a new password:\n{reset_url}\n\n"
-                "If you did not request a password reset, please ignore this email. Your password will remain unchanged.\n"
-                "This link is valid for 24 hours.\n\n"
-                "Best regards,\nQuestion Generation System Team"
+        # User found — generate token and send reset email
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        reset_url = f"{frontend_url}/reset-password?uid={uid}&token={token}"
+        log_action(user, "user.password_reset_requested", user)
+
+        subject = "Reset Your Password - Question Generation System"
+        message = (
+            f"Hello {user.get_full_name() or user.username},\n\n"
+            "We received a request to reset the password for your account.\n\n"
+            f"Click the link below to set a new password:\n{reset_url}\n\n"
+            "If you did not request a password reset, please ignore this email. Your password will remain unchanged.\n"
+            "This link is valid for 24 hours.\n\n"
+            "Best regards,\nQuestion Generation System Team"
+        )
+
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception as exc:
+            logger.error("Failed to send password reset email to %s: %s", user.email, exc)
+            return Response(
+                {"detail": "Failed to send the reset email. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-            try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    fail_silently=False,
-                )
-            except Exception as exc:
-                logger.error("Failed to send password reset email to %s: %s", user.email, exc)
-
         return Response(
-            {
-                "detail": "If an active account exists with this email address, password reset instructions have been dispatched to your email.",
-            },
+            {"detail": "Password reset instructions have been sent to your registered email address."},
             status=status.HTTP_200_OK,
         )
 

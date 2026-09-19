@@ -60,7 +60,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
+    identifier = serializers.CharField(required=True, max_length=254)
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
