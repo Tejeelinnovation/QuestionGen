@@ -6,10 +6,12 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { CustomSelect } from '../../../components/ui/custom-select';
+import { useToast } from '../../../context/ToastContext';
 
 export const PaperSetupPageTablet: React.FC = () => {
   const navigate = useNavigate();
   const { user, dashboardPath } = useAuth();
+  const toast = useToast();
 
   useEffect(() => {
     if (user && user.role_label !== 'Teacher') {
@@ -24,12 +26,10 @@ export const PaperSetupPageTablet: React.FC = () => {
 
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadChapters = async () => {
       setIsLoadingChapters(true);
-      setErrorMessage(null);
       try {
         const data = await contentApi.getChapters();
         setChapters(data);
@@ -37,7 +37,7 @@ export const PaperSetupPageTablet: React.FC = () => {
           setChapterId(data[0].id);
         }
       } catch (err: any) {
-        setErrorMessage(
+        toast.error(
           err.response?.data?.detail || 'Failed to load curriculum chapters from server.'
         );
       } finally {
@@ -50,14 +50,13 @@ export const PaperSetupPageTablet: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
 
     if (!title.trim()) {
-      setErrorMessage('Paper title is required.');
+      toast.warning('Paper title is required.');
       return;
     }
     if (!chapterId) {
-      setErrorMessage('Please select a chapter.');
+      toast.warning('Please select a chapter.');
       return;
     }
 
@@ -69,6 +68,7 @@ export const PaperSetupPageTablet: React.FC = () => {
         chapter: Number(chapterId),
       });
 
+      toast.success(`Paper "${paper.title}" created successfully.`);
       navigate(`/papers/${paper.id}/configure`);
     } catch (err: any) {
       const detail =
@@ -77,7 +77,7 @@ export const PaperSetupPageTablet: React.FC = () => {
         err.response?.data?.title?.[0] ||
         JSON.stringify(err.response?.data) ||
         'Failed to create paper.';
-      setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }
@@ -106,12 +106,6 @@ export const PaperSetupPageTablet: React.FC = () => {
       {isLoadingChapters && (
         <div className="bg-surface border border-border rounded-card p-6 text-sm text-ink/60 text-center">
           Loading curriculum syllabus chapters...
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
-          {errorMessage}
         </div>
       )}
 

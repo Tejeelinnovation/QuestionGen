@@ -37,7 +37,6 @@ const PaperSetupPageDesktop: React.FC = () => {
 
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const availableSubjects = [
     'Mathematics',
@@ -52,7 +51,6 @@ const PaperSetupPageDesktop: React.FC = () => {
   useEffect(() => {
     const loadChapters = async () => {
       setIsLoadingChapters(true);
-      setErrorMessage(null);
       try {
         const data = await contentApi.getChapters();
         setChapters(data);
@@ -60,7 +58,7 @@ const PaperSetupPageDesktop: React.FC = () => {
           setChapterId(data[0].id);
         }
       } catch (err: any) {
-        setErrorMessage(
+        toast.error(
           err.response?.data?.detail || 'Failed to load curriculum chapters from server.'
         );
       } finally {
@@ -79,20 +77,16 @@ const PaperSetupPageDesktop: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
 
     if (!title.trim()) {
-      setErrorMessage('Paper title is required.');
       toast.warning('Paper title is required.');
       return;
     }
     if (examMode === 'single' && !chapterId) {
-      setErrorMessage('Please select a chapter.');
       toast.warning('Please select a chapter.');
       return;
     }
     if (examMode === 'multi' && selectedSubjects.length === 0) {
-      setErrorMessage('Please select at least one subject for the combined test.');
       toast.warning('Please select at least one subject for the combined test.');
       return;
     }
@@ -117,7 +111,6 @@ const PaperSetupPageDesktop: React.FC = () => {
         err.response?.data?.title?.[0] ||
         JSON.stringify(err.response?.data) ||
         'Failed to create paper.';
-      setErrorMessage(detail);
       toast.error(detail);
     } finally {
       setIsSubmitting(false);
@@ -151,16 +144,6 @@ const PaperSetupPageDesktop: React.FC = () => {
           {isLoadingChapters && (
             <div className="bg-surface border border-border rounded-card p-6 text-sm text-ink/60">
               Retrieving curriculum syllabus and chapters...
-            </div>
-          )}
-
-          {errorMessage && (
-            <div
-              id="setup-error-banner"
-              className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium flex items-start gap-2"
-            >
-              <span className="font-bold text-sm">!</span>
-              <span>{errorMessage}</span>
             </div>
           )}
 

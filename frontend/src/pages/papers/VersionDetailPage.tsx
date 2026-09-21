@@ -144,17 +144,6 @@ const VersionDetailPageDesktop: React.FC = () => {
         versionLabel={version.version_label}
       />
 
-      {/* Error & Success Banners */}
-      {errorMessage && (
-        <div
-          id="version-error-banner"
-          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium flex items-start gap-2"
-        >
-          <span className="font-bold text-sm">!</span>
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
       {successMessage && (
         <div
           id="version-success-banner"

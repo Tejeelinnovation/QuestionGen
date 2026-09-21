@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import type { QuestionPreview, Paper } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
+import { useToast } from '../../../context/ToastContext';
 import { ChevronUp, ChevronDown, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 import { QuestionReplaceModal } from '../../../components/papers/QuestionReplaceModal';
 
@@ -11,12 +12,12 @@ export const QuestionReviewPageMobile: React.FC = () => {
   const paperId = Number(id);
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
 
   const [paper, setPaper] = useState<Paper | null>(null);
   const [questions, setQuestions] = useState<QuestionPreview[]>([]);
   const [constraints, setConstraints] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [replacingQuestion, setReplacingQuestion] = useState<{ question: QuestionPreview; index: number } | null>(null);
 
   useEffect(() => {
@@ -133,12 +134,11 @@ export const QuestionReviewPageMobile: React.FC = () => {
 
   const handleSaveVersion = async () => {
     if (questions.length === 0) {
-      setErrorMessage('Please select at least one question before creating a version.');
+      toast.warning('Please select at least one question before creating a version.');
       return;
     }
 
     setIsSaving(true);
-    setErrorMessage(null);
     try {
       const updatedConstraints = {
         ...constraints,
@@ -152,6 +152,7 @@ export const QuestionReviewPageMobile: React.FC = () => {
         constraints_used: updatedConstraints,
       });
 
+      toast.success(`Exam Version ${newVersion.version_label} created successfully!`);
       sessionStorage.removeItem(`paper_${paperId}_review`);
       navigate(`/papers/${paperId}/versions/${newVersion.id}`);
     } catch (err: any) {
@@ -159,7 +160,7 @@ export const QuestionReviewPageMobile: React.FC = () => {
         err.response?.data?.detail ||
         err.response?.data?.non_field_errors?.[0] ||
         'Failed to save paper version.';
-      setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setIsSaving(false);
     }
@@ -189,12 +190,6 @@ export const QuestionReviewPageMobile: React.FC = () => {
           Verify questions, adjust order, or remove unwanted items before generating version.
         </p>
       </div>
-
-      {errorMessage && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-3 text-xs font-medium">
-          {errorMessage}
-        </div>
-      )}
 
       {constraints.total_marks !== undefined &&
         constraints.total_marks !== null &&
