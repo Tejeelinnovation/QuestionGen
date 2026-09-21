@@ -717,3 +717,4 @@ curl http://127.0.0.1:8000/api/questions/101/validation-history/ \
   -H "Authorization: Bearer <token>"
 ```
 
+Just checking that i can push into both repo at once so old repo also keeps updated with new changes.
