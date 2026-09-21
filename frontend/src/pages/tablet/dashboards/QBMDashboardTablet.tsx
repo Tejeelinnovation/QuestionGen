@@ -29,7 +29,7 @@ export const QBMDashboardTablet: React.FC<QBMDashboardProps> = ({ initialTab }) 
     selectedBookId, setSelectedBookId, isNewBook, setIsNewBook, newBookTitle, setNewBookTitle,
     newBookSubject, setNewBookSubject, newBookGrade, setNewBookGrade,
     selectedChapterId, setSelectedChapterId, isNewChapter, setIsNewChapter, newChapterTitle, setNewChapterTitle,
-    selectedTopicId, setSelectedTopicId, selectedTopicIds, setSelectedTopicIds,
+    setSelectedTopicId, selectedTopicIds, setSelectedTopicIds,
     isNewTopic, setIsNewTopic, newTopicName, setNewTopicName,
     difficulty, setDifficulty, learnerLevel, setLearnerLevel, questionType, setQuestionType,
     marks, setMarks, questionText, setQuestionText, sourceReference, setSourceReference,
