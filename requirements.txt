@@ -24,3 +24,7 @@ django-cors-headers==4.7.0
 # Excel file generation and processing
 openpyxl==3.1.5
 
+# Production WSGI server & static files for Render
+gunicorn==23.0.0
+whitenoise==6.9.0
+
