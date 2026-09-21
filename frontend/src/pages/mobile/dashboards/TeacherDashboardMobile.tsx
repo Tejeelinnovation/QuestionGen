@@ -19,7 +19,6 @@ import {
   Trash2,
   Lock,
   AlertCircle,
-  CheckCircle2,
   X,
 } from 'lucide-react';
 import {
@@ -28,24 +27,24 @@ import {
   SkeletonCompactList,
 } from '../../../components/ui/skeleton';
 import { TeacherClassesSection } from '../../../components/teachers/TeacherClassesSection';
+import { useToast } from '../../../context/ToastContext';
 
 export const TeacherDashboardMobile: React.FC = () => {
   const { user: currentUser } = useAuth();
+  const toast = useToast();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [students, setStudents] = useState<User[]>([]);
   const [isLoadingPapers, setIsLoadingPapers] = useState<boolean>(true);
   const [isLoadingDeliveries, setIsLoadingDeliveries] = useState<boolean>(true);
   const [isLoadingStudents, setIsLoadingStudents] = useState<boolean>(true);
-  const [papersError, setPapersError] = useState<string | null>(null);
-  const [deliveriesError, setDeliveriesError] = useState<string | null>(null);
+
   const [studentsError, setStudentsError] = useState<string | null>(null);
 
   // Paper deletion states
   const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
   const [isDeletingPaper, setIsDeletingPaper] = useState<boolean>(false);
   const [deletePaperError, setDeletePaperError] = useState<string | null>(null);
-  const [deletePaperSuccess, setDeletePaperSuccess] = useState<string | null>(null);
 
   // Modal / Drawer state
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -68,12 +67,11 @@ export const TeacherDashboardMobile: React.FC = () => {
   useEffect(() => {
     const fetchPapers = async () => {
       setIsLoadingPapers(true);
-      setPapersError(null);
       try {
         const data = await papersApi.getPapers();
         setPapers(data);
       } catch (err: any) {
-        setPapersError(err.response?.data?.detail || 'Failed to load question papers.');
+        console.error('Failed to load papers:', err);
       } finally {
         setIsLoadingPapers(false);
       }
@@ -81,12 +79,11 @@ export const TeacherDashboardMobile: React.FC = () => {
 
     const fetchDeliveries = async () => {
       setIsLoadingDeliveries(true);
-      setDeliveriesError(null);
       try {
         const data = await papersApi.getDeliveries();
         setDeliveries(data);
       } catch (err: any) {
-        setDeliveriesError(err.response?.data?.detail || 'Failed to load deliveries.');
+        console.error('Failed to load deliveries:', err);
       } finally {
         setIsLoadingDeliveries(false);
       }
@@ -104,13 +101,12 @@ export const TeacherDashboardMobile: React.FC = () => {
     try {
       await papersApi.deletePaper(paperToDelete.id);
       setPapers((prev) => prev.filter((p) => p.id !== paperToDelete.id));
-      setDeletePaperSuccess(`Paper "${paperToDelete.title}" was deleted successfully.`);
+      toast.success(`Paper "${paperToDelete.title}" was deleted successfully.`);
       setPaperToDelete(null);
-      setTimeout(() => setDeletePaperSuccess(null), 4000);
     } catch (err: any) {
-      setDeletePaperError(
-        err.response?.data?.detail || 'Failed to delete paper. Please try again.'
-      );
+      const msg = err.response?.data?.detail || 'Failed to delete paper. Please try again.';
+      setDeletePaperError(msg);
+      toast.error(msg);
     } finally {
       setIsDeletingPaper(false);
     }
@@ -131,12 +127,6 @@ export const TeacherDashboardMobile: React.FC = () => {
           Design curriculum papers, configure Bloom's taxonomy, and review submissions.
         </p>
       </div>
-
-      {(papersError || deliveriesError) && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-3 text-xs font-medium">
-          {papersError || deliveriesError}
-        </div>
-      )}
 
       {/* ── Single Prominent Condensed Headline Stat Block ── */}
       <div className="p-4 rounded-card bg-surface border border-border shadow-card space-y-3">
@@ -182,21 +172,7 @@ export const TeacherDashboardMobile: React.FC = () => {
           <span className="text-[11px]">Blueprints & Question Banks</span>
         </div>
 
-        {deletePaperSuccess && (
-          <div className="p-3 rounded-card bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center justify-between gap-2 animate-fade-in">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{deletePaperSuccess}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDeletePaperSuccess(null)}
-              className="text-emerald-800 hover:text-emerald-950 font-semibold cursor-pointer p-1 active:scale-95"
-            >
-              ✕
-            </button>
-          </div>
-        )}
+
 
         {isLoadingPapers ? (
           <SkeletonPaperGrid count={2} />
