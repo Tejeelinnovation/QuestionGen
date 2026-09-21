@@ -4,8 +4,9 @@ import { contentApi } from '../../api/content';
 import { papersApi, type SelectQuestionsConstraints } from '../../api/papers';
 import type { Paper, Topic } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { useToast } from '../../context/ToastContext';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { extractApiErrorMessage } from '../../utils/errorUtils';
 import { PaperConfigurePageTablet } from '../tablet/papers/PaperConfigurePageTablet';
 import { PaperConfigurePageMobile } from '../mobile/papers/PaperConfigurePageMobile';
 import { MOTION } from '../../lib/motion';
@@ -223,11 +224,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
 
       navigate(`/papers/${paperId}/review`, { state: reviewPayload });
     } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        JSON.stringify(err.response?.data) ||
-        'Failed to query candidate questions from the question bank.';
-      toast.error(detail);
+      toast.error(extractApiErrorMessage(err, 'Failed to query candidate questions from the question bank.'));
     } finally {
       setIsSubmitting(false);
     }

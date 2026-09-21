@@ -5,6 +5,7 @@ import { papersApi, type SelectQuestionsConstraints } from '../../../api/papers'
 import type { Paper, Topic } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { useToast } from '../../../context/ToastContext';
+import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import {
   Sparkles,
   Clock,
@@ -227,11 +228,7 @@ export const PaperConfigurePageMobile: React.FC = () => {
 
       navigate(`/papers/${paperId}/review`, { state: reviewPayload });
     } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        err.response?.data?.non_field_errors?.[0] ||
-        'Failed to select candidate questions. Check criteria and try again.';
-      toast.error(detail);
+      toast.error(extractApiErrorMessage(err, 'Failed to select candidate questions. Check criteria and try again.'));
     } finally {
       setIsSubmitting(false);
     }

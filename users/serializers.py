@@ -60,7 +60,15 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):
-    identifier = serializers.CharField(required=True, max_length=254)
+    identifier = serializers.CharField(required=False, max_length=254)
+    email = serializers.CharField(required=False, max_length=254)
+
+    def validate(self, attrs):
+        ident = attrs.get("identifier") or attrs.get("email")
+        if not ident:
+            raise serializers.ValidationError({"identifier": "Identifier or email is required."})
+        attrs["identifier"] = ident
+        return attrs
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):

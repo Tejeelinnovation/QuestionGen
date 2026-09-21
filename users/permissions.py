@@ -144,9 +144,12 @@ class ScopedUserQuerysetMixin:
         if user.has_capability("VIEW_SCHOOL_WIDE_CONTROLS"):
             return base_qs.filter(school=user.school)
 
-        # Teacher — only students they created.
+        # Teacher — students in their school, or users they created.
         if user.has_capability("CREATE_STUDENT"):
-            return base_qs.filter(created_by=user)
+            from django.db.models import Q  # noqa: PLC0415
+            return base_qs.filter(school=user.school).filter(
+                Q(created_by=user) | Q(role="Student")
+            )
 
         # Default — own record only.
         return base_qs.filter(pk=user.pk)

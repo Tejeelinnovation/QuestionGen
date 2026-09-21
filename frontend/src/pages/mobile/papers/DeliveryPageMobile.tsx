@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import { usersApi } from '../../../api/users';
 import { classesApi } from '../../../api/classes';
 import type { Delivery, PaperVersion, User, ClassSection } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { useToast } from '../../../context/ToastContext';
+import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import { Send, Check, Search, CheckCircle2, GraduationCap, Users } from 'lucide-react';
 import { CustomSelect } from '../../../components/ui/custom-select';
 
 export const DeliveryPageMobile: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
+  const [searchParams] = useSearchParams();
+  const preselectedClassId = Number(searchParams.get('class_id') || searchParams.get('class_section_id'));
   const paperId = Number(id);
   const vId = Number(versionId);
   const toast = useToast();
@@ -45,17 +48,17 @@ export const DeliveryPageMobile: React.FC = () => {
         setClasses(classList);
 
         if (classList.length > 0) {
-          const firstClassId = classList[0].id;
-          setSelectedClassId(firstClassId);
-          const enrolled = studentList.filter((s) => s.class_section === firstClassId).map((s) => s.id);
+          const activeClassId = (preselectedClassId && classList.some((c) => c.id === preselectedClassId))
+            ? preselectedClassId
+            : classList[0].id;
+          setSelectedClassId(activeClassId);
+          const enrolled = studentList.filter((s) => s.class_section === activeClassId).map((s) => s.id);
           setSelectedStudentIds(enrolled);
         } else {
           setAssignmentType('individual');
         }
       } catch (err: any) {
-        toast.error(
-          err.response?.data?.detail || 'Failed to load paper version, students or classes list.'
-        );
+        toast.error(extractApiErrorMessage(err, 'Failed to load paper version, students or classes list.'));
       } finally {
         setIsLoading(false);
       }
@@ -128,11 +131,7 @@ export const DeliveryPageMobile: React.FC = () => {
       setCreatedDelivery(delivery);
       toast.success(`Delivery #${delivery.id} created successfully for ${mode} exam.`);
     } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        err.response?.data?.non_field_errors?.[0] ||
-        'Failed to schedule delivery.';
-      toast.error(detail);
+      toast.error(extractApiErrorMessage(err, 'Failed to schedule delivery.'));
     } finally {
       setIsSubmitting(false);
     }
