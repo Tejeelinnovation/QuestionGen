@@ -92,7 +92,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
   return (
     <div className="space-y-10">
       {/* ── Top Typographic Headline with embedded stats & primary create triggers ── */}
-      <div className="border-b border-border pb-6 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div className="border-b border-border pb-6 space-y-4">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
             <span className="w-2 h-2 rounded-full bg-forest" />
@@ -101,7 +101,7 @@ const SuperAdminDashboardDesktop: React.FC = () => {
           <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
             Super Admin Directory
           </h1>
-          <p className="font-body text-ink/75 text-base max-w-2xl leading-relaxed">
+          <p className="font-body text-ink/75 text-base max-w-3xl leading-relaxed">
             Overseeing{' '}
             <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
               {totalSystemAccounts} active system accounts
@@ -114,8 +114,8 @@ const SuperAdminDashboardDesktop: React.FC = () => {
           </p>
         </div>
 
-        {/* Primary Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+        {/* Primary Action Buttons - Left aligned in a neat row */}
+        <div className="flex flex-wrap items-center gap-2.5 pt-1">
           <Link
             to="/dashboard/qbm"
             id="superadmin-qbm-engine-btn"
@@ -126,21 +126,21 @@ const SuperAdminDashboardDesktop: React.FC = () => {
           </Link>
           <button
             type="button"
-            id="superadmin-create-qbm-btn"
-            onClick={() => setCreateUserProfile('qbm')}
-            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-forest" />
-            <span>Add QBM Staff</span>
-          </button>
-          <button
-            type="button"
             id="superadmin-create-school-btn"
             onClick={() => setIsCreateSchoolOpen(true)}
             className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Building2 className="w-3.5 h-3.5" />
             <span>Add School / Coaching Class & Admin</span>
+          </button>
+          <button
+            type="button"
+            id="superadmin-create-qbm-btn"
+            onClick={() => setCreateUserProfile('qbm')}
+            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-forest" />
+            <span>Add QBM Staff</span>
           </button>
         </div>
       </div>
