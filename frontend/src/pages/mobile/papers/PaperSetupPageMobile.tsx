@@ -6,6 +6,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { useToast } from '../../../context/ToastContext';
+import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import { ArrowRight } from 'lucide-react';
 import { CustomSelect } from '../../../components/ui/custom-select';
 
@@ -90,12 +91,7 @@ export const PaperSetupPageMobile: React.FC = () => {
       toast.success(`Paper "${paper.title}" created successfully.`);
       navigate(`/papers/${paper.id}/configure`);
     } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        err.response?.data?.chapter?.[0] ||
-        err.response?.data?.title?.[0] ||
-        'Failed to create question paper.';
-      toast.error(detail);
+      toast.error(extractApiErrorMessage(err, 'Failed to create question paper.'));
     } finally {
       setIsSubmitting(false);
     }

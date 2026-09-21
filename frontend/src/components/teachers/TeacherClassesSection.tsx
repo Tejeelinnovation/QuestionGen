@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { classesApi } from '../../api/classes';
 import type { ClassSection, SubjectAssignment, User } from '../../types';
 import {
@@ -14,6 +13,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { MOTION } from '../../lib/motion';
+import { AssignPaperModal } from './AssignPaperModal';
 
 interface TeacherClassesSectionProps {
   compact?: boolean;
@@ -35,6 +35,13 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
   const [isRosterLoading, setIsRosterLoading] = useState<boolean>(false);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [rosterSearch, setRosterSearch] = useState<string>('');
+
+  // Assign paper modal state
+  const [assignClassTarget, setAssignClassTarget] = useState<{
+    id: number;
+    name: string;
+    subject?: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchAssignments = async () => {
@@ -270,12 +277,19 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
                       <Users className="w-3.5 h-3.5" />
                       <span>View Class Roster ({sec.student_count})</span>
                     </button>
-                    <Link
-                      to="/papers/new"
-                      className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-surface border border-border text-ink hover:border-forest hover:text-forest transition-colors text-center"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAssignClassTarget({
+                          id: sec.id,
+                          name: sec.name,
+                          subject: sec.class_teacher_subject,
+                        })
+                      }
+                      className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-surface border border-border text-ink hover:border-forest hover:text-forest transition-colors text-center cursor-pointer"
                     >
-                      + Create Exam for Class
-                    </Link>
+                      + Assign Paper to Class
+                    </button>
                   </div>
                 </div>
               </div>
@@ -365,13 +379,20 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
                         <span>View Roster</span>
                       </button>
 
-                      <Link
-                        to="/papers/new"
-                        className="text-[11px] font-heading font-semibold text-ink/70 hover:text-grape flex items-center gap-0.5"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAssignClassTarget({
+                            id: sa.class_section_id,
+                            name: sa.class_name,
+                            subject: sa.subject,
+                          })
+                        }
+                        className="text-[11px] font-heading font-semibold text-ink/70 hover:text-grape flex items-center gap-0.5 cursor-pointer"
                       >
                         <span>Assign Paper</span>
                         <ChevronRight className="w-3 h-3" />
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -509,6 +530,14 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── 4. Assign Paper Choice Modal (Create New vs Existing Finalized) ── */}
+      {assignClassTarget && (
+        <AssignPaperModal
+          targetClass={assignClassTarget}
+          onClose={() => setAssignClassTarget(null)}
+        />
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import { papersApi, type SelectQuestionsConstraints } from '../../../api/papers'
 import type { Paper, Topic } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { useToast } from '../../../context/ToastContext';
+import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import {
   Clock,
   Sparkles,
@@ -225,11 +226,7 @@ export const PaperConfigurePageTablet: React.FC = () => {
 
       navigate(`/papers/${paperId}/review`, { state: reviewPayload });
     } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        err.response?.data?.non_field_errors?.[0] ||
-        'Failed to query candidate questions from the question bank.';
-      toast.error(detail);
+      toast.error(extractApiErrorMessage(err, 'Failed to query candidate questions from the question bank.'));
     } finally {
       setIsSubmitting(false);
     }
