@@ -22,7 +22,6 @@ const QuestionReviewPageDesktop: React.FC = () => {
   const [questions, setQuestions] = useState<QuestionPreview[]>([]);
   const [constraints, setConstraints] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [replacingQuestion, setReplacingQuestion] = useState<{ question: QuestionPreview; index: number } | null>(null);
 
   useEffect(() => {
@@ -146,7 +145,6 @@ const QuestionReviewPageDesktop: React.FC = () => {
   );
 
   const handleSaveAsVersion = async () => {
-    setErrorMessage(null);
     setIsSaving(true);
     try {
       const updatedConstraints = {
@@ -174,7 +172,6 @@ const QuestionReviewPageDesktop: React.FC = () => {
         (typeof err.response?.data === 'string' ? err.response.data : JSON.stringify(err.response?.data)) ||
         'Failed to save questions as a new version.';
       const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
-      setErrorMessage(msg);
       toast.error(msg);
     } finally {
       setIsSaving(false);
@@ -213,16 +210,6 @@ const QuestionReviewPageDesktop: React.FC = () => {
           ← Reconfigure Filters
         </Link>
       </div>
-
-      {errorMessage && (
-        <div
-          id="review-error-banner"
-          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium flex items-start gap-2"
-        >
-          <span className="font-bold text-sm">!</span>
-          <span>{errorMessage}</span>
-        </div>
-      )}
 
       {constraints.total_marks !== undefined &&
         constraints.total_marks !== null &&

@@ -66,21 +66,21 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             <div
               key={toast.id}
               role="status"
-              className={`pointer-events-auto flex items-start gap-3 p-3.5 sm:p-4 rounded-card border shadow-float backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-top-4 w-full ${
+              className={`pointer-events-auto flex items-start gap-3 p-3.5 sm:p-4 rounded-card border shadow-lg backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-top-4 w-full ${
                 isSuccess
-                  ? 'bg-[#1F4D3A] text-white border-[#1F4D3A]/80 shadow-[#1F4D3A]/20'
+                  ? 'bg-[#F0FDF4] text-[#166534] border-[#BBF7D0] shadow-green-900/5'
                   : isError
-                  ? 'bg-red-700 text-white border-red-800 shadow-red-700/20'
+                  ? 'bg-[#FFF5F5] text-[#991B1B] border-[#FECACA] shadow-red-900/5'
                   : isWarning
-                  ? 'bg-[#E8632C] text-white border-[#E8632C]/80 shadow-[#E8632C]/20'
-                  : 'bg-ink text-white border-ink/80 shadow-ink/20'
+                  ? 'bg-[#FFFBEB] text-[#92400E] border-[#FDE68A] shadow-amber-900/5'
+                  : 'bg-[#F0F9FF] text-[#075985] border-[#BAE6FD] shadow-blue-900/5'
               }`}
             >
               <div className="shrink-0 mt-0.5">
-                {isSuccess && <CheckCircle2 className="w-5 h-5 text-lime" />}
-                {isError && <AlertCircle className="w-5 h-5 text-red-200" />}
-                {isWarning && <AlertTriangle className="w-5 h-5 text-yellow-200" />}
-                {!isSuccess && !isError && !isWarning && <Info className="w-5 h-5 text-blue-200" />}
+                {isSuccess && <CheckCircle2 className="w-5 h-5 text-[#16A34A]" />}
+                {isError && <AlertCircle className="w-5 h-5 text-[#DC2626]" />}
+                {isWarning && <AlertTriangle className="w-5 h-5 text-[#D97706]" />}
+                {!isSuccess && !isError && !isWarning && <Info className="w-5 h-5 text-[#0284C7]" />}
               </div>
 
               <div className="flex-1 text-xs sm:text-sm font-medium leading-snug">
@@ -90,7 +90,15 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               <button
                 type="button"
                 onClick={() => removeToast(toast.id)}
-                className="shrink-0 p-1 rounded-sm text-white/70 hover:text-white hover:bg-white/15 transition-colors cursor-pointer -mr-1 -mt-1"
+                className={`shrink-0 p-1 rounded-sm transition-colors cursor-pointer -mr-1 -mt-1 ${
+                  isSuccess
+                    ? 'text-[#166534]/60 hover:text-[#166534] hover:bg-green-100/60'
+                    : isError
+                    ? 'text-[#991B1B]/60 hover:text-[#991B1B] hover:bg-red-100/60'
+                    : isWarning
+                    ? 'text-[#92400E]/60 hover:text-[#92400E] hover:bg-amber-100/60'
+                    : 'text-[#075985]/60 hover:text-[#075985] hover:bg-blue-100/60'
+                }`}
                 title="Dismiss notification"
               >
                 <X className="w-4 h-4" />

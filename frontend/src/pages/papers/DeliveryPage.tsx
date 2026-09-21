@@ -34,13 +34,11 @@ const DeliveryPageDesktop: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdDelivery, setCreatedDelivery] = useState<Delivery | null>(null);
 
   useEffect(() => {
     const loadVersionAndStudents = async () => {
       setIsLoading(true);
-      setErrorMessage(null);
       try {
         const [vData, studentList, classList] = await Promise.all([
           papersApi.getPaperVersion(paperId, vId),
@@ -60,7 +58,7 @@ const DeliveryPageDesktop: React.FC = () => {
           setAssignmentType('individual');
         }
       } catch (err: any) {
-        setErrorMessage(
+        toast.error(
           err.response?.data?.detail || 'Failed to load paper version, students or classes list.'
         );
       } finally {
@@ -99,11 +97,9 @@ const DeliveryPageDesktop: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
 
     if (mode === 'ONLINE' && selectedStudentIds.length === 0 && (!selectedClassId || assignmentType !== 'class')) {
       const warn = 'Please assign at least one student or a valid class division for online test delivery.';
-      setErrorMessage(warn);
       toast.warning(warn);
       return;
     }
@@ -139,7 +135,6 @@ const DeliveryPageDesktop: React.FC = () => {
         err.response?.data?.detail ||
         JSON.stringify(err.response?.data) ||
         'Failed to create test delivery.';
-      setErrorMessage(detail);
       toast.error(detail);
     } finally {
       setIsSubmitting(false);
@@ -208,16 +203,6 @@ const DeliveryPageDesktop: React.FC = () => {
           ← Version Snapshot
         </Link>
       </div>
-
-      {errorMessage && (
-        <div
-          id="delivery-error-banner"
-          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium flex items-start gap-2"
-        >
-          <span className="font-bold text-sm">!</span>
-          <span>{errorMessage}</span>
-        </div>
-      )}
 
       {/* ── SUCCESS STATE BANNER ── */}
       {createdDelivery && (

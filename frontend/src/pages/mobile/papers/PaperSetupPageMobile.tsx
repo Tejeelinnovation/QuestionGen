@@ -5,12 +5,14 @@ import { papersApi } from '../../../api/papers';
 import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
+import { useToast } from '../../../context/ToastContext';
 import { ArrowRight } from 'lucide-react';
 import { CustomSelect } from '../../../components/ui/custom-select';
 
 export const PaperSetupPageMobile: React.FC = () => {
   const navigate = useNavigate();
   const { dashboardPath } = useAuth();
+  const toast = useToast();
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [title, setTitle] = useState('');
@@ -30,12 +32,10 @@ export const PaperSetupPageMobile: React.FC = () => {
 
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadChapters = async () => {
       setIsLoadingChapters(true);
-      setErrorMessage(null);
       try {
         const chapData = await contentApi.getChapters();
         setChapters(chapData);
@@ -43,7 +43,7 @@ export const PaperSetupPageMobile: React.FC = () => {
           setChapterId(chapData[0].id);
         }
       } catch (err: any) {
-        setErrorMessage(
+        toast.error(
           err.response?.data?.detail || 'Failed to load curriculum chapters.'
         );
       } finally {
@@ -62,18 +62,17 @@ export const PaperSetupPageMobile: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
 
     if (!title.trim()) {
-      setErrorMessage('Paper title is required.');
+      toast.warning('Paper title is required.');
       return;
     }
     if (examMode === 'single' && !chapterId) {
-      setErrorMessage('Please select a curriculum chapter.');
+      toast.warning('Please select a curriculum chapter.');
       return;
     }
     if (examMode === 'multi' && selectedSubjects.length === 0) {
-      setErrorMessage('Please select at least one subject for the combined test.');
+      toast.warning('Please select at least one subject for the combined test.');
       return;
     }
 
@@ -88,6 +87,7 @@ export const PaperSetupPageMobile: React.FC = () => {
         total_question_count: 0,
       });
 
+      toast.success(`Paper "${paper.title}" created successfully.`);
       navigate(`/papers/${paper.id}/configure`);
     } catch (err: any) {
       const detail =
@@ -95,7 +95,7 @@ export const PaperSetupPageMobile: React.FC = () => {
         err.response?.data?.chapter?.[0] ||
         err.response?.data?.title?.[0] ||
         'Failed to create question paper.';
-      setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }
@@ -114,12 +114,6 @@ export const PaperSetupPageMobile: React.FC = () => {
           Establish the examination title, curriculum chapter, and student instructions.
         </p>
       </div>
-
-      {errorMessage && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-3 text-xs font-medium">
-          {errorMessage}
-        </div>
-      )}
 
       {/* Setup Form */}
       <form onSubmit={handleSubmit} className="space-y-4">

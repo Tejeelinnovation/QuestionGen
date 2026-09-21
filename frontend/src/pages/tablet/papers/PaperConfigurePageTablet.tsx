@@ -4,6 +4,7 @@ import { contentApi } from '../../../api/content';
 import { papersApi, type SelectQuestionsConstraints } from '../../../api/papers';
 import type { Paper, Topic } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
+import { useToast } from '../../../context/ToastContext';
 import {
   Clock,
   Sparkles,
@@ -45,6 +46,7 @@ export const PaperConfigurePageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [paper, setPaper] = useState<Paper | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -62,12 +64,10 @@ export const PaperConfigurePageTablet: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPaperAndTopics = async () => {
       setIsLoading(true);
-      setErrorMessage(null);
       try {
         const paperData = await papersApi.getPaper(paperId);
         setPaper(paperData);
@@ -87,9 +87,8 @@ export const PaperConfigurePageTablet: React.FC = () => {
           setQuantity(String(paperData.total_question_count));
         }
       } catch (err: any) {
-        setErrorMessage(
-          err.response?.data?.detail || 'Failed to load paper details and curriculum topics.'
-        );
+        const msg = err.response?.data?.detail || 'Failed to load paper details and curriculum topics.';
+        toast.error(msg);
       } finally {
         setIsLoading(false);
       }
@@ -164,18 +163,17 @@ export const PaperConfigurePageTablet: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
 
     const parsedTotalMarks = Number(totalMarks);
     if (!totalMarks || isNaN(parsedTotalMarks) || parsedTotalMarks <= 0) {
-      setErrorMessage('Total marks is compulsory. Please specify the grand total marks for this examination.');
+      toast.warning('Total marks is compulsory. Please specify the grand total marks for this examination.');
       return;
     }
 
     if (useDistributionRubric) {
       const activeTiers = markTiers.filter((t) => t.count > 0);
       if (activeTiers.length > 0 && rubricTotalMarks !== parsedTotalMarks) {
-        setErrorMessage(
+        toast.warning(
           `Rubric question distribution totals ${rubricTotalMarks} marks, which does not match compulsory Total Marks (${parsedTotalMarks}). Please balance your question counts or auto-adjust Total Marks.`
         );
         return;
@@ -210,12 +208,14 @@ export const PaperConfigurePageTablet: React.FC = () => {
       const candidateQuestions = await papersApi.selectQuestions(paperId, constraints);
 
       if (candidateQuestions.length === 0) {
-        setErrorMessage(
+        toast.warning(
           'No questions found matching the specified constraints. Try broadening your criteria or rubric tier counts.'
         );
         setIsSubmitting(false);
         return;
       }
+
+      toast.success(`Selected ${candidateQuestions.length} questions from question bank matching blueprint.`);
 
       const reviewPayload = {
         questions: candidateQuestions,
@@ -229,7 +229,7 @@ export const PaperConfigurePageTablet: React.FC = () => {
         err.response?.data?.detail ||
         err.response?.data?.non_field_errors?.[0] ||
         'Failed to query candidate questions from the question bank.';
-      setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }
@@ -286,13 +286,6 @@ export const PaperConfigurePageTablet: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {errorMessage && (
-        <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── SECTION: Taxonomy & Format Dimensions (Pill Filters) ── */}

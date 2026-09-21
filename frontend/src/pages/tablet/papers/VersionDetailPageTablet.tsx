@@ -5,6 +5,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { PaperVersion } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { Loader2, Copy } from 'lucide-react';
+import { useToast } from '../../../context/ToastContext';
 
 export const VersionDetailPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -12,6 +13,7 @@ export const VersionDetailPageTablet: React.FC = () => {
   const vId = Number(versionId);
   const navigate = useNavigate();
   const { hasCapability } = useAuth();
+  const toast = useToast();
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,14 +52,18 @@ export const VersionDetailPageTablet: React.FC = () => {
     try {
       const updated = await papersApi.finalizeVersion(paperId, vId);
       setVersion(updated);
-      setSuccessMessage(`Version ${updated.version_label} has been finalized and locked for delivery.`);
+      const msg = `Version ${updated.version_label} has been finalized and locked for delivery.`;
+      setSuccessMessage(msg);
+      toast.success(msg);
     } catch (err: any) {
       const detail =
         err.response?.data?.detail ||
         err.response?.data?.non_field_errors?.[0] ||
         (typeof err.response?.data === 'string' ? err.response.data : JSON.stringify(err.response?.data)) ||
         'Failed to finalize version.';
-      setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setIsFinalizing(false);
     }
@@ -69,6 +75,7 @@ export const VersionDetailPageTablet: React.FC = () => {
     setIsCloning(true);
     try {
       const cloned = await papersApi.cloneVersion(paperId, vId, {});
+      toast.success(`Created clone Version ${cloned.version_label}.`);
       setIsCloning(false);
       navigate(`/papers/${paperId}/versions/${cloned.id}`);
     } catch (err: any) {
@@ -76,7 +83,9 @@ export const VersionDetailPageTablet: React.FC = () => {
         err.response?.data?.detail ||
         JSON.stringify(err.response?.data) ||
         'Failed to clone version.';
-      setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      setErrorMessage(msg);
+      toast.error(msg);
       setIsCloning(false);
     }
   };
@@ -130,15 +139,6 @@ export const VersionDetailPageTablet: React.FC = () => {
         versionId={vId}
         versionLabel={version.version_label}
       />
-
-      {errorMessage && (
-        <div
-          id="version-error-banner"
-          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium"
-        >
-          {errorMessage}
-        </div>
-      )}
 
       {successMessage && (
         <div

@@ -15,9 +15,11 @@ import {
   SkeletonCompactList,
 } from '../../../components/ui/skeleton';
 import { TeacherClassesSection } from '../../../components/teachers/TeacherClassesSection';
+import { useToast } from '../../../context/ToastContext';
 
 export const TeacherDashboardTablet: React.FC = () => {
   const { user: currentUser } = useAuth();
+  const toast = useToast();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [students, setStudents] = useState<User[]>([]);
@@ -90,13 +92,12 @@ export const TeacherDashboardTablet: React.FC = () => {
     try {
       await papersApi.deletePaper(paperToDelete.id);
       setPapers((prev) => prev.filter((p) => p.id !== paperToDelete.id));
-      setDeletePaperSuccess(`Paper "${paperToDelete.title}" was deleted successfully.`);
+      toast.success(`Paper "${paperToDelete.title}" was deleted successfully.`);
       setPaperToDelete(null);
-      setTimeout(() => setDeletePaperSuccess(null), 4000);
     } catch (err: any) {
-      setDeletePaperError(
-        err.response?.data?.detail || 'Failed to delete paper. Please try again.'
-      );
+      const msg = err.response?.data?.detail || 'Failed to delete paper. Please try again.';
+      setDeletePaperError(msg);
+      toast.error(msg);
     } finally {
       setIsDeletingPaper(false);
     }
@@ -175,13 +176,7 @@ export const TeacherDashboardTablet: React.FC = () => {
           <SkeletonPaperGrid count={2} />
         )}
 
-        {papersError && (
-          <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
-            {papersError}
-          </div>
-        )}
-
-        {!isLoadingPapers && !papersError && papers.length === 0 && (
+        {!isLoadingPapers && papers.length === 0 && (
           <div className="bg-surface border-2 border-dashed border-border rounded-card p-8 text-center space-y-3">
             <span className="pill pill-forest text-xs">Repository Ready</span>
             <h3 className="font-heading font-bold text-base text-ink">No Question Papers Created Yet</h3>

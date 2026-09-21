@@ -61,12 +61,10 @@ const PaperConfigurePageDesktop: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPaperAndTopics = async () => {
       setIsLoading(true);
-      setErrorMessage(null);
       try {
         const paperData = await papersApi.getPaper(paperId);
         setPaper(paperData);
@@ -86,7 +84,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
           setQuantity(String(paperData.total_question_count));
         }
       } catch (err: any) {
-        setErrorMessage(
+        toast.error(
           err.response?.data?.detail || 'Failed to load paper details and curriculum topics.'
         );
       } finally {
@@ -163,18 +161,17 @@ const PaperConfigurePageDesktop: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
 
     const parsedTotalMarks = Number(totalMarks);
     if (!totalMarks || isNaN(parsedTotalMarks) || parsedTotalMarks <= 0) {
-      setErrorMessage('Total marks is compulsory. Please specify the grand total marks for this examination.');
+      toast.warning('Total marks is compulsory. Please specify the grand total marks for this examination.');
       return;
     }
 
     if (useDistributionRubric) {
       const activeTiers = markTiers.filter((t) => t.count > 0);
       if (activeTiers.length > 0 && rubricTotalMarks !== parsedTotalMarks) {
-        setErrorMessage(
+        toast.warning(
           `Rubric question distribution totals ${rubricTotalMarks} marks, which does not match compulsory Total Marks (${parsedTotalMarks}). Please balance your question counts or auto-adjust Total Marks.`
         );
         return;
@@ -211,7 +208,6 @@ const PaperConfigurePageDesktop: React.FC = () => {
 
       if (candidateQuestions.length === 0) {
         const warningMsg = 'No questions found matching the specified constraints. Try broadening your criteria or rubric tier counts.';
-        setErrorMessage(warningMsg);
         toast.warning(warningMsg);
         setIsSubmitting(false);
         return;
@@ -231,7 +227,6 @@ const PaperConfigurePageDesktop: React.FC = () => {
         err.response?.data?.detail ||
         JSON.stringify(err.response?.data) ||
         'Failed to query candidate questions from the question bank.';
-      setErrorMessage(detail);
       toast.error(detail);
     } finally {
       setIsSubmitting(false);
@@ -296,16 +291,6 @@ const PaperConfigurePageDesktop: React.FC = () => {
           </Link>
         </div>
       </div>
-
-      {errorMessage && (
-        <div
-          id="configure-error-banner"
-          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium flex items-start gap-2"
-        >
-          <span className="font-bold text-sm">!</span>
-          <span>{errorMessage}</span>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* ── SECTION 1: Interactive Filter Pills (Ref: 02_englishconnect_pills.jpg) ── */}

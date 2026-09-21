@@ -8,12 +8,14 @@ import type { Delivery, PaperVersion, User, ClassSection } from '../../../types'
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { GraduationCap, Users } from 'lucide-react';
 import { CustomSelect } from '../../../components/ui/custom-select';
+import { useToast } from '../../../context/ToastContext';
 
 export const DeliveryPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
   const vId = Number(versionId);
   const { dashboardPath } = useAuth();
+  const toast = useToast();
 
   const [version, setVersion] = useState<PaperVersion | null>(null);
   const [students, setStudents] = useState<User[]>([]);
@@ -29,13 +31,11 @@ export const DeliveryPageTablet: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdDelivery, setCreatedDelivery] = useState<Delivery | null>(null);
 
   useEffect(() => {
     const loadVersionAndStudents = async () => {
       setIsLoading(true);
-      setErrorMessage(null);
       try {
         const [vData, studentList, classList] = await Promise.all([
           papersApi.getPaperVersion(paperId, vId),
@@ -55,7 +55,7 @@ export const DeliveryPageTablet: React.FC = () => {
           setAssignmentType('individual');
         }
       } catch (err: any) {
-        setErrorMessage(
+        toast.error(
           err.response?.data?.detail || 'Failed to load paper version, students or classes list.'
         );
       } finally {
@@ -94,10 +94,9 @@ export const DeliveryPageTablet: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
 
     if (mode === 'ONLINE' && selectedStudentIds.length === 0 && (!selectedClassId || assignmentType !== 'class')) {
-      setErrorMessage('Please assign at least one student or a valid class division for online test delivery.');
+      toast.warning('Please assign at least one student or a valid class division for online test delivery.');
       return;
     }
 
@@ -123,6 +122,7 @@ export const DeliveryPageTablet: React.FC = () => {
 
       const delivery = await papersApi.deliverVersion(paperId, vId, deliveryPayload);
       setCreatedDelivery(delivery);
+      toast.success(`Delivery #${delivery.id} created successfully for ${mode} exam.`);
     } catch (err: any) {
       const detail =
         err.response?.data?.student_ids?.[0] ||
@@ -131,7 +131,7 @@ export const DeliveryPageTablet: React.FC = () => {
         err.response?.data?.detail ||
         JSON.stringify(err.response?.data) ||
         'Failed to create test delivery.';
-      setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setIsSubmitting(false);
     }
@@ -189,15 +189,6 @@ export const DeliveryPageTablet: React.FC = () => {
           Configure delivery mode and assign candidates via tablet touch.
         </p>
       </div>
-
-      {errorMessage && (
-        <div
-          id="delivery-error-banner"
-          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium"
-        >
-          {errorMessage}
-        </div>
-      )}
 
       {/* Success State */}
       {createdDelivery && (

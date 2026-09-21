@@ -4,18 +4,19 @@ import { papersApi } from '../../../api/papers';
 import type { QuestionPreview, Paper } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { QuestionReplaceModal } from '../../../components/papers/QuestionReplaceModal';
+import { useToast } from '../../../context/ToastContext';
 
 export const QuestionReviewPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const paperId = Number(id);
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
 
   const [paper, setPaper] = useState<Paper | null>(null);
   const [questions, setQuestions] = useState<QuestionPreview[]>([]);
   const [constraints, setConstraints] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [replacingQuestion, setReplacingQuestion] = useState<{ question: QuestionPreview; index: number } | null>(null);
 
   useEffect(() => {
@@ -136,7 +137,11 @@ export const QuestionReviewPageTablet: React.FC = () => {
   );
 
   const handleSaveAsVersion = async () => {
-    setErrorMessage(null);
+    if (questions.length === 0) {
+      toast.warning('Please select at least one question before creating a version.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const updatedConstraints = {
@@ -151,6 +156,7 @@ export const QuestionReviewPageTablet: React.FC = () => {
         constraints_used: updatedConstraints,
       });
 
+      toast.success(`Exam Version ${newVersion.version_label} created successfully!`);
       sessionStorage.removeItem(`paper_${paperId}_review`);
       navigate(`/papers/${paperId}/versions/${newVersion.id}`);
     } catch (err: any) {
@@ -162,7 +168,8 @@ export const QuestionReviewPageTablet: React.FC = () => {
         err.response?.data?.detail ||
         (typeof err.response?.data === 'string' ? err.response.data : JSON.stringify(err.response?.data)) ||
         'Failed to save questions as a new version.';
-      setErrorMessage(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
@@ -178,14 +185,14 @@ export const QuestionReviewPageTablet: React.FC = () => {
       />
 
       {/* Header section */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-4">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-surface border border-border text-[11px] font-semibold text-forest">
-            <span className="w-1.5 h-1.5 rounded-full bg-forest" />
-            Stage 03 • Curation
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+            <span className="w-2 h-2 rounded-full bg-forest" />
+            Stage 03 • Candidate Review
           </div>
           <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight">
-            Review Candidate Pool
+            Curate Examination
           </h1>
           <p className="text-ink/70 text-xs max-w-xl">
             Reorder presentation order, remove questions, and lock into an immutable version snapshot.
@@ -199,15 +206,6 @@ export const QuestionReviewPageTablet: React.FC = () => {
           ← Filters
         </Link>
       </div>
-
-      {errorMessage && (
-        <div
-          id="review-error-banner"
-          className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium"
-        >
-          {errorMessage}
-        </div>
-      )}
 
       {constraints.total_marks !== undefined &&
         constraints.total_marks !== null &&
