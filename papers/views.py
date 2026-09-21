@@ -683,7 +683,16 @@ class PaperVersionDeliverView(APIView):
                 if request.user.has_capability("VIEW_SCHOOL_WIDE_CONTROLS"):
                     valid_students = students_qs.filter(school=request.user.school)
                 else:
-                    valid_students = students_qs.filter(created_by=request.user)
+                    target_class = data.get("target_class")
+                    from schools.models import ClassSection, ClassSubjectTeacher  # noqa: PLC0415
+
+                    teacher_classes = ClassSection.objects.filter(
+                        Q(class_teacher=request.user) | Q(subject_teachers__teacher=request.user)
+                    )
+                    valid_scope = Q(created_by=request.user) | Q(class_section__in=teacher_classes)
+                    if target_class and target_class.school_id == request.user.school_id:
+                        valid_scope |= Q(class_section=target_class)
+                    valid_students = students_qs.filter(school=request.user.school).filter(valid_scope)
 
                 valid_ids = set(valid_students.values_list("id", flat=True))
                 out_of_scope_ids = [sid for sid in student_ids if sid not in valid_ids]

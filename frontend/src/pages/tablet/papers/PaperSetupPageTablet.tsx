@@ -7,6 +7,7 @@ import type { Chapter } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { CustomSelect } from '../../../components/ui/custom-select';
 import { useToast } from '../../../context/ToastContext';
+import { extractApiErrorMessage } from '../../../utils/errorUtils';
 
 export const PaperSetupPageTablet: React.FC = () => {
   const navigate = useNavigate();
@@ -71,13 +72,7 @@ export const PaperSetupPageTablet: React.FC = () => {
       toast.success(`Paper "${paper.title}" created successfully.`);
       navigate(`/papers/${paper.id}/configure`);
     } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        err.response?.data?.chapter?.[0] ||
-        err.response?.data?.title?.[0] ||
-        JSON.stringify(err.response?.data) ||
-        'Failed to create paper.';
-      toast.error(detail);
+      toast.error(extractApiErrorMessage(err, 'Failed to create paper.'));
     } finally {
       setIsSubmitting(false);
     }

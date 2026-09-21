@@ -7,6 +7,7 @@ import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { extractApiErrorMessage } from '../../utils/errorUtils';
 import { PaperSetupPageTablet } from '../tablet/papers/PaperSetupPageTablet';
 import { PaperSetupPageMobile } from '../mobile/papers/PaperSetupPageMobile';
 import {
@@ -105,13 +106,7 @@ const PaperSetupPageDesktop: React.FC = () => {
       toast.success(`Paper "${paper.title}" created successfully.`);
       navigate(`/papers/${paper.id}/configure`);
     } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        err.response?.data?.chapter?.[0] ||
-        err.response?.data?.title?.[0] ||
-        JSON.stringify(err.response?.data) ||
-        'Failed to create paper.';
-      toast.error(detail);
+      toast.error(extractApiErrorMessage(err, 'Failed to create paper.'));
     } finally {
       setIsSubmitting(false);
     }

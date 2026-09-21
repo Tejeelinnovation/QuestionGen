@@ -5,6 +5,7 @@ import type { QuestionPreview, Paper } from '../../types';
 import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { useToast } from '../../context/ToastContext';
+import { extractApiErrorMessage } from '../../utils/errorUtils';
 import { QuestionReviewPageTablet } from '../tablet/papers/QuestionReviewPageTablet';
 import { QuestionReviewPageMobile } from '../mobile/papers/QuestionReviewPageMobile';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
@@ -163,16 +164,7 @@ const QuestionReviewPageDesktop: React.FC = () => {
       sessionStorage.removeItem(`paper_${paperId}_review`);
       navigate(`/papers/${paperId}/versions/${newVersion.id}`);
     } catch (err: any) {
-      const detail =
-        err.response?.data?.question_ids?.[0] ||
-        err.response?.data?.question_ids ||
-        err.response?.data?.total_marks?.[0] ||
-        err.response?.data?.total_marks ||
-        err.response?.data?.detail ||
-        (typeof err.response?.data === 'string' ? err.response.data : JSON.stringify(err.response?.data)) ||
-        'Failed to save questions as a new version.';
-      const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
-      toast.error(msg);
+      toast.error(extractApiErrorMessage(err, 'Failed to save questions as a new version.'));
     } finally {
       setIsSaving(false);
     }

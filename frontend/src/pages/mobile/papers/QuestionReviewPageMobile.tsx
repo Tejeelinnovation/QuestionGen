@@ -4,6 +4,7 @@ import { papersApi } from '../../../api/papers';
 import type { QuestionPreview, Paper } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { useToast } from '../../../context/ToastContext';
+import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import { ChevronUp, ChevronDown, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
 import { QuestionReplaceModal } from '../../../components/papers/QuestionReplaceModal';
 
@@ -156,11 +157,7 @@ export const QuestionReviewPageMobile: React.FC = () => {
       sessionStorage.removeItem(`paper_${paperId}_review`);
       navigate(`/papers/${paperId}/versions/${newVersion.id}`);
     } catch (err: any) {
-      const detail =
-        err.response?.data?.detail ||
-        err.response?.data?.non_field_errors?.[0] ||
-        'Failed to save paper version.';
-      toast.error(detail);
+      toast.error(extractApiErrorMessage(err, 'Failed to save paper version.'));
     } finally {
       setIsSaving(false);
     }
