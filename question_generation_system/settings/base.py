@@ -124,12 +124,25 @@ import sys
 DATABASES = {
     "default": env.db("DATABASE_URL")
 }
+# Reuse persistent database connections to cut SSL handshake latency under load
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 
 if "test" in sys.argv:
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": ":memory:",
     }
+
+# ---------------------------------------------------------------------------
+# Caching configuration
+# ---------------------------------------------------------------------------
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "qgs-cache-locmem",
+        "TIMEOUT": env.int("CACHE_TIMEOUT", default=300),
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Password validation
