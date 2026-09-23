@@ -19,7 +19,7 @@ export const ProctoringWarningModal: React.FC<ProctoringWarningModalProps> = ({
   const isSevere = totalWarnings >= 3;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-sm animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-ink/75 backdrop-blur-sm animate-in fade-in duration-150">
       <div
         className="bg-surface border-2 border-ember/60 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-scale-in text-ink"
         role="alertdialog"

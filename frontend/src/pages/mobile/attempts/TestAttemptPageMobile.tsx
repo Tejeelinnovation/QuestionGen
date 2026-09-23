@@ -8,6 +8,7 @@ import {
   Send,
   Shield,
   Clock,
+  Maximize2,
 } from 'lucide-react';
 import { useExamProctoring } from '../../../hooks/useExamProctoring';
 import { useExamCountdown } from '../../../hooks/useExamCountdown';
@@ -29,6 +30,7 @@ export const TestAttemptPageMobile: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   const handleAutoSubmitOnMaxWarnings = useCallback(async () => {
@@ -43,15 +45,18 @@ export const TestAttemptPageMobile: React.FC = () => {
     }
   }, [attemptData, isSubmitting, navigate]);
 
-  // Anti-cheating exam proctoring hook
+  // Anti-cheating exam proctoring hook with mandatory fullscreen enforcement
   const {
     warningCount,
     activeWarning,
     dismissWarning,
+    isFullscreen,
+    requestFullscreen,
   } = useExamProctoring({
     attemptId: attemptData?.attempt_id,
     initialWarningCount: attemptData?.warning_count ?? 0,
     isActive: Boolean(attemptData && !isSubmitting && !isExpired),
+    hasStarted: hasEnteredFullscreen,
     maxWarnings: 5,
     onMaxWarningsReached: handleAutoSubmitOnMaxWarnings,
   });
@@ -262,57 +267,111 @@ export const TestAttemptPageMobile: React.FC = () => {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* ── Top Focus Status Header ── */}
-      <div className="p-3.5 rounded-card bg-surface border border-border shadow-xs flex items-center justify-between gap-2">
-        <div className="space-y-0.5">
-          <span className="font-heading font-bold text-xs text-ink block truncate max-w-[170px]">
+      {/* ── MANDATORY SECURE FULLSCREEN GATE & MONITORING LOCK (MOBILE) ── */}
+      {!isFullscreen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-bg/95 backdrop-blur-md animate-in fade-in">
+          <div className="max-w-md w-full bg-surface border border-forest/30 rounded-2xl p-6 shadow-2xl text-center space-y-5">
+            <div className="w-14 h-14 rounded-full bg-forest/10 border border-forest/20 flex items-center justify-center mx-auto text-forest">
+              <Maximize2 className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="font-heading font-bold text-lg text-ink">
+                {hasEnteredFullscreen ? 'Assessment Locked: Full Screen Required' : 'Full-Screen Assessment Mode Required'}
+              </h2>
+              <p className="text-xs text-ink/70 leading-relaxed">
+                {hasEnteredFullscreen
+                  ? 'You exited full-screen mode, switched apps, or accessed system panels. To maintain test integrity, questions are hidden until you return to full screen.'
+                  : 'This examination is proctored with active anti-cheating controls. You must enter and remain in full-screen mode before accessing questions.'}
+              </p>
+            </div>
+
+            <div className="rounded-card bg-surface-muted/60 border border-border p-3 text-left text-[11px] font-mono text-ink/75 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-forest shrink-0" />
+                <span>Switching apps & notification shade recorded</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-forest shrink-0" />
+                <span>Back navigation & browsing tabs blocked</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-ember shrink-0" />
+                <span>Exceeding 5 warnings will auto-submit exam</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await requestFullscreen();
+                setHasEnteredFullscreen(true);
+              }}
+              className="w-full py-3.5 px-5 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 min-h-[48px]"
+            >
+              <Maximize2 className="w-4 h-4" />
+              <span>{hasEnteredFullscreen ? 'Return to Full Screen to Continue' : 'Enter Full Screen & Begin Assessment'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Top Focus Status Header (2-Tier Zero-Overflow Layout) ── */}
+      <div className="p-3 rounded-card bg-surface border border-border shadow-xs space-y-2">
+        {/* Tier 1: Title on left, countdown and proctoring shield on right */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-heading font-bold text-xs text-ink truncate flex-1" title={attemptData.paper_title}>
             {attemptData.paper_title || 'Assessment'}
           </span>
-          <div className="text-[11px] font-mono text-ink/60">
-            Question <span className="font-bold text-forest">{currentIndex + 1}</span> of {totalQuestions}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              className={`pill text-[10px] py-0.5 px-2 font-mono font-bold flex items-center gap-1 ${
+                isUrgent
+                  ? 'bg-ember/15 text-ember border border-ember/30 animate-pulse'
+                  : 'bg-forest/10 text-forest border border-forest/20'
+              }`}
+              title="Time Remaining"
+            >
+              <Clock className={`w-3 h-3 ${isUrgent ? 'text-ember' : 'text-forest'}`} />
+              <span>{formattedTime}</span>
+            </span>
+
+            <span
+              className={`pill text-[10px] py-0.5 px-2 flex items-center gap-1 ${
+                warningCount > 0
+                  ? 'bg-ember/15 text-ember border border-ember/30 font-bold'
+                  : 'bg-forest/10 text-forest border border-forest/20'
+              }`}
+              title={warningCount > 0 ? `${warningCount} Warning(s) Logged` : 'Proctoring Active'}
+            >
+              <Shield className="w-3 h-3" />
+              <span>{warningCount > 0 ? `${warningCount}W` : 'Prot'}</span>
+            </span>
           </div>
         </div>
 
-        {/* Countdown, Auto-Save, Proctoring & Marks Pills */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span
-            className={`pill text-[10px] py-0.5 px-2 font-mono font-bold flex items-center gap-1 ${
-              isUrgent
-                ? 'bg-ember/15 text-ember border border-ember/30 animate-pulse'
-                : 'bg-forest/10 text-forest border border-forest/20'
-            }`}
-            title="Time Remaining"
-          >
-            <Clock className={`w-3 h-3 ${isUrgent ? 'text-ember' : 'text-forest'}`} />
-            <span>{formattedTime}</span>
-          </span>
+        {/* Tier 2: Question progress on left, auto-save and marks on right */}
+        <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/50 text-[11px]">
+          <div className="font-mono text-ink/70">
+            Question <span className="font-bold text-forest">{currentIndex + 1}</span> of {totalQuestions}
+          </div>
 
-          <span
-            className={`pill text-[10px] py-0.5 px-2 flex items-center gap-1 ${
-              warningCount > 0
-                ? 'bg-ember/15 text-ember border border-ember/30'
-                : 'bg-forest/10 text-forest border border-forest/20'
-            }`}
-          >
-            <Shield className="w-3 h-3" />
-            <span>{warningCount > 0 ? `${warningCount}W` : 'Prot'}</span>
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              className={`pill text-[10px] py-0.5 px-2 ${
+                currentStatus === 'saving'
+                  ? 'pill-ember animate-pulse'
+                  : currentStatus === 'saved'
+                  ? 'pill-forest'
+                  : 'pill-muted'
+              }`}
+            >
+              {currentStatus === 'saving' ? 'Saving...' : currentStatus === 'saved' ? '✓ Saved' : 'Draft'}
+            </span>
 
-          <span
-            className={`pill text-[10px] py-0.5 px-2 ${
-              currentStatus === 'saving'
-                ? 'pill-ember animate-pulse'
-                : currentStatus === 'saved'
-                ? 'pill-forest'
-                : 'pill-muted'
-            }`}
-          >
-            {currentStatus === 'saving' ? 'Saving...' : currentStatus === 'saved' ? '✓ Saved' : 'Draft'}
-          </span>
-
-          <span className="pill pill-muted text-[10px] py-0.5 px-2">
-            {currentQ.marks || 1} mark{(currentQ.marks || 1) === 1 ? '' : 's'}
-          </span>
+            <span className="pill pill-muted text-[10px] py-0.5 px-2 font-mono font-medium">
+              {currentQ.marks || 1} mark{(currentQ.marks || 1) === 1 ? '' : 's'}
+            </span>
+          </div>
         </div>
       </div>
 
