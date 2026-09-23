@@ -32,6 +32,8 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
       : []),
   ];
 
+  const isAttemptMode = /^\/deliveries\/\d+\/attempt(\/|$)/.test(location.pathname);
+
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col font-body selection:bg-lime selection:text-ink">
       {/* ── Tablet Header Bar (Touch-Optimized, Sticky) ── */}
@@ -39,57 +41,82 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
         <div className="px-6 h-16 flex items-center justify-between">
           {/* Hamburger Trigger & Brand */}
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              id="tablet-sidebar-toggle"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open Navigation Menu"
-              className="w-11 h-11 flex items-center justify-center rounded-card border border-border bg-surface-muted text-ink hover:bg-surface active:scale-95 transition-all cursor-pointer"
-            >
-              <span className="text-xl leading-none">☰</span>
-            </button>
+            {!isAttemptMode ? (
+              <>
+                <button
+                  type="button"
+                  id="tablet-sidebar-toggle"
+                  onClick={() => setSidebarOpen(true)}
+                  aria-label="Open Navigation Menu"
+                  className="w-11 h-11 flex items-center justify-center rounded-card border border-border bg-surface-muted text-ink hover:bg-surface active:scale-95 transition-all cursor-pointer"
+                >
+                  <span className="text-xl leading-none">☰</span>
+                </button>
 
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <span className="w-3.5 h-3.5 rounded-full bg-forest group-hover:scale-125 transition-transform" />
-              <span className="font-heading font-bold text-lg tracking-tight text-ink">
-                Question Generation <span className="text-forest font-mono text-sm font-normal">/tablet</span>
-              </span>
-            </Link>
+                <Link to="/" className="flex items-center gap-2.5 group">
+                  <span className="w-3.5 h-3.5 rounded-full bg-forest group-hover:scale-125 transition-transform" />
+                  <span className="font-heading font-bold text-lg tracking-tight text-ink">
+                    Question Generation <span className="text-forest font-mono text-sm font-normal">/tablet</span>
+                  </span>
+                </Link>
+              </>
+            ) : (
+              <div className="flex items-center gap-2.5 select-none">
+                <span className="w-3.5 h-3.5 rounded-full bg-forest animate-pulse" />
+                <span className="font-heading font-bold text-lg tracking-tight text-ink">
+                  Question Generation <span className="text-forest font-mono text-xs font-semibold bg-forest/10 px-2 py-0.5 rounded border border-forest/20">EXAM MODE</span>
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Single Profile Nav Entry Point (Replaces navbar clutter) */}
+          {/* Single Profile Nav Entry Point (Locked to static indicator during exam) */}
           <div className="flex items-center gap-3">
             {user && (
-              <Link
-                to="/profile"
-                id="tablet-profile-btn"
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-pill border transition-all ${
-                  location.pathname === '/profile'
-                    ? 'bg-ink text-white border-ink'
-                    : 'bg-surface border-border text-ink hover:bg-surface-muted'
-                }`}
-                aria-label="Profile Settings"
-              >
+              isAttemptMode ? (
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-heading font-bold shrink-0 ${
-                    location.pathname === '/profile'
-                      ? 'bg-lime text-ink'
-                      : 'bg-forest text-white'
-                  }`}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-pill border border-border bg-surface-muted text-ink select-none cursor-default"
+                  title={`Candidate: ${user.username}`}
                 >
-                  {user.username.charAt(0).toUpperCase()}
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-heading font-bold shrink-0 bg-forest text-white">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="font-heading font-semibold text-xs max-w-[100px] truncate">
+                    {user.username}
+                  </span>
                 </div>
-                <span className="font-heading font-semibold text-xs max-w-[100px] truncate">
-                  {user.username}
-                </span>
-              </Link>
+              ) : (
+                <Link
+                  to="/profile"
+                  id="tablet-profile-btn"
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-pill border transition-all ${
+                    location.pathname === '/profile'
+                      ? 'bg-ink text-white border-ink'
+                      : 'bg-surface border-border text-ink hover:bg-surface-muted'
+                  }`}
+                  aria-label="Profile Settings"
+                >
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-heading font-bold shrink-0 ${
+                      location.pathname === '/profile'
+                        ? 'bg-lime text-ink'
+                        : 'bg-forest text-white'
+                    }`}
+                  >
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="font-heading font-semibold text-xs max-w-[100px] truncate">
+                    {user.username}
+                  </span>
+                </Link>
+              )
             )}
           </div>
         </div>
       </header>
 
-      {/* ── Slide-Out Collapsible Sidebar Drawer (Touch-First) ── */}
-      {sidebarOpen && (
+      {/* ── Slide-Out Collapsible Sidebar Drawer (Disabled during active attempt) ── */}
+      {!isAttemptMode && sidebarOpen && (
         <div
           className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-xs transition-opacity duration-300"
           onClick={() => setSidebarOpen(false)}
@@ -97,11 +124,12 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
         />
       )}
 
-      <aside
-        className={`fixed top-0 left-0 bottom-0 z-50 w-72 bg-surface border-r border-border shadow-float transform transition-transform duration-300 ease-out flex flex-col justify-between print:hidden ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
+      {!isAttemptMode && (
+        <aside
+          className={`fixed top-0 left-0 bottom-0 z-50 w-72 bg-surface border-r border-border shadow-float transform transition-transform duration-300 ease-out flex flex-col justify-between print:hidden ${
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
         <div className="p-6 space-y-6">
           {/* Drawer Header */}
           <div className="flex items-center justify-between border-b border-border pb-4">
@@ -196,6 +224,7 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
           </Link>
         </div>
       </aside>
+      )}
 
       {/* ── Main Content Container ── */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8">

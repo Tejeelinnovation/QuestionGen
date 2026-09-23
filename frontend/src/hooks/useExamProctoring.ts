@@ -40,20 +40,52 @@ export const useExamProctoring = ({
     }
   }, [initialWarningCount, maxWarnings, onMaxWarningsReached]);
 
-  // Maintain real-time fullscreen state
+  // Maintain real-time fullscreen state with vendor prefix support
   useEffect(() => {
     const handleFsChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      const isFs = Boolean(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFs);
     };
+
     document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    document.addEventListener('mozfullscreenchange', handleFsChange);
+    document.addEventListener('MSFullscreenChange', handleFsChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+      document.removeEventListener('mozfullscreenchange', handleFsChange);
+      document.removeEventListener('MSFullscreenChange', handleFsChange);
+    };
   }, []);
 
-  // Request fullscreen
+  // Request fullscreen with cross-browser support
   const requestFullscreen = useCallback(async () => {
     try {
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        await document.documentElement.requestFullscreen();
+      const docEl = document.documentElement as any;
+      const isFs = Boolean(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+
+      if (!isFs) {
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+          await docEl.mozRequestFullScreen();
+        } else if (docEl.msRequestFullscreen) {
+          await docEl.msRequestFullscreen();
+        }
         setIsFullscreen(true);
       }
     } catch (err) {
@@ -134,9 +166,14 @@ export const useExamProctoring = ({
 
     // 3. Fullscreen state change
     const handleFullscreenChange = () => {
-      const isNowFs = Boolean(document.fullscreenElement);
+      const isNowFs = Boolean(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
       setIsFullscreen(isNowFs);
-      if (!isNowFs) {
+      if (!isNowFs && hasStarted) {
         triggerWarning(
           'FULLSCREEN_EXIT',
           'Student exited secure full-screen assessment view.'
@@ -176,24 +213,45 @@ export const useExamProctoring = ({
       triggerWarning('CLIPBOARD_ACTION', 'Direct copy/paste action blocked.');
     };
 
+    // 7. Prevent back-button navigation during active exam
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+      if (hasStarted) {
+        triggerWarning(
+          'BACK_NAVIGATION_ATTEMPT',
+          'Back button navigation is disabled during proctored assessment.'
+        );
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('contextmenu', handleContextMenu);
-    window.addEventListener('copy', handleCopyPaste);
-    window.addEventListener('paste', handleCopyPaste);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('copy', handleCopyPaste);
+    document.addEventListener('paste', handleCopyPaste);
+    window.addEventListener('popstate', handlePopState);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('contextmenu', handleContextMenu);
       window.removeEventListener('copy', handleCopyPaste);
       window.removeEventListener('paste', handleCopyPaste);
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, [isActive, attemptId, triggerWarning]);
+  }, [isActive, hasStarted, attemptId, triggerWarning]);
 
   return {
     warningCount,
