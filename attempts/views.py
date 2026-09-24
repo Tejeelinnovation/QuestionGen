@@ -14,7 +14,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.core.cache import cache
 from django.db import transaction
+from django.db.models.signals import m2m_changed, post_save
+from django.dispatch import receiver
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -59,12 +62,26 @@ class AttemptStartResumeView(APIView):
     permission_classes = [IsAuthenticated, CanAttemptTest]
 
     def get(self, request, pk):
-        delivery = Delivery.objects.select_related(
-            "paper_version", "paper_version__paper"
-        ).filter(pk=pk).first()
+        cache_key = f"delivery_start_meta_{pk}"
+        delivery_meta = cache.get(cache_key)
 
-        if not delivery:
-            return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+        if delivery_meta is None:
+            delivery = Delivery.objects.select_related(
+                "paper_version", "paper_version__paper"
+            ).filter(pk=pk).first()
+
+            if not delivery:
+                return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            assigned_student_ids = set(delivery.assigned_students.values_list("id", flat=True))
+            delivery_meta = {
+                "delivery": delivery,
+                "assigned_student_ids": assigned_student_ids,
+            }
+            cache.set(cache_key, delivery_meta, timeout=120)
+        else:
+            delivery = delivery_meta["delivery"]
+            assigned_student_ids = delivery_meta["assigned_student_ids"]
 
         if delivery.mode != DeliveryMode.ONLINE:
             return Response(
@@ -78,8 +95,8 @@ class AttemptStartResumeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check assigned students
-        if not delivery.assigned_students.filter(id=request.user.id).exists():
+        # Check assigned students via in-memory set (0 queries)
+        if request.user.id not in assigned_student_ids:
             return Response(
                 {"detail": "You are not assigned to this test."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -98,8 +115,13 @@ class AttemptStartResumeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Existing attempt check
-        attempt = Attempt.objects.filter(delivery=delivery, student=request.user).first()
+        # Existing attempt check with relations prefetched for fast serialization
+        attempt = (
+            Attempt.objects.select_related("delivery__paper_version__paper")
+            .prefetch_related("answers")
+            .filter(delivery=delivery, student=request.user)
+            .first()
+        )
         if attempt:
             if attempt.status in [AttemptStatus.SUBMITTED, AttemptStatus.EVALUATED]:
                 return Response(
@@ -155,6 +177,7 @@ class AttemptStartResumeView(APIView):
                 for q in snapshot_questions
             ]
             Answer.objects.bulk_create(answers_to_create)
+            attempt._prefetched_objects_cache = {"answers": answers_to_create}
 
             log_action(
                 user=request.user,
@@ -169,6 +192,17 @@ class AttemptStartResumeView(APIView):
 
         serializer = AttemptStartResponseSerializer(attempt)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@receiver(post_save, sender=Delivery)
+def _invalidate_delivery_cache(sender, instance, **kwargs):
+    cache.delete(f"delivery_start_meta_{instance.pk}")
+
+
+@receiver(m2m_changed)
+def _invalidate_delivery_students_cache(sender, instance, **kwargs):
+    if isinstance(instance, Delivery):
+        cache.delete(f"delivery_start_meta_{instance.pk}")
 
 
 # ---------------------------------------------------------------------------

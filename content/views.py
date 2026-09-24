@@ -18,7 +18,12 @@ POST   /api/questions/<id>/variants/          → QuestionVariantCreateView
 
 from __future__ import annotations
 
+import hashlib
+
+from django.core.cache import cache
 from django.db.models import Q
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -92,8 +97,16 @@ class QuestionStatsView(APIView):
         if not user.is_authenticated:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
+        is_admin = bool(
+            user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL"))
+        )
+        cache_key = f"content_qstats_{user.school_id or 'global'}_{is_admin}"
+        data = cache.get(cache_key)
+        if data is not None:
+            return Response(data)
+
         qs = Question.objects.filter(is_active=True)
-        if user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL")):
+        if is_admin:
             pass
         elif user.school_id is not None:
             qs = qs.filter(Q(bank_source="GLOBAL") | Q(school_id=user.school_id))
@@ -105,12 +118,14 @@ class QuestionStatsView(APIView):
         boards_count = Book.objects.filter(is_active=True).values("board").distinct().count() or len(INDIAN_BOARDS)
         active_chapters = Chapter.objects.filter(topics__questions__in=qs).distinct().count() or Chapter.objects.count()
 
-        return Response({
+        data = {
             "total_questions": total_questions,
             "with_variants": with_variants,
             "boards_count": boards_count,
             "active_chapters": active_chapters,
-        })
+        }
+        cache.set(cache_key, data, timeout=120)
+        return Response(data)
 
 
 INDIAN_BOARDS = [
@@ -155,15 +170,19 @@ class BoardListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        db_boards = list(
-            Book.objects.filter(is_active=True)
-            .values_list("board", flat=True)
-            .distinct()
-        )
-        combined = list(INDIAN_BOARDS)
-        for b in db_boards:
-            if b and b not in combined:
-                combined.append(b)
+        cache_key = "content_board_list"
+        combined = cache.get(cache_key)
+        if combined is None:
+            db_boards = list(
+                Book.objects.filter(is_active=True)
+                .values_list("board", flat=True)
+                .distinct()
+            )
+            combined = list(INDIAN_BOARDS)
+            for b in db_boards:
+                if b and b not in combined:
+                    combined.append(b)
+            cache.set(cache_key, combined, timeout=600)
         return Response(combined)
 
 
@@ -176,6 +195,17 @@ class BookListView(ListAPIView):
 
     serializer_class = BookSerializer
     permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        board = request.query_params.get("board", "")
+        board_hash = hashlib.md5(board.encode("utf-8")).hexdigest()
+        cache_key = f"content_books_board_{board_hash}"
+        data = cache.get(cache_key)
+        if data is None:
+            response = super().list(request, *args, **kwargs)
+            data = response.data
+            cache.set(cache_key, data, timeout=600)
+        return Response(data)
 
     def get_queryset(self):
         qs = Book.objects.filter(is_active=True).prefetch_related("chapters")
@@ -194,6 +224,16 @@ class ChapterListView(ListAPIView):
 
     serializer_class = ChapterSerializer
     permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        book_id = request.query_params.get("book_id", "")
+        cache_key = f"content_chapters_book_{book_id}"
+        data = cache.get(cache_key)
+        if data is None:
+            response = super().list(request, *args, **kwargs)
+            data = response.data
+            cache.set(cache_key, data, timeout=600)
+        return Response(data)
 
     def get_queryset(self):
         qs = (
@@ -218,6 +258,16 @@ class TopicListView(ListAPIView):
     serializer_class = TopicSerializer
     permission_classes = [IsAuthenticated]
 
+    def list(self, request, *args, **kwargs):
+        chapter_id = request.query_params.get("chapter_id", "")
+        cache_key = f"content_topics_chapter_{chapter_id}"
+        data = cache.get(cache_key)
+        if data is None:
+            response = super().list(request, *args, **kwargs)
+            data = response.data
+            cache.set(cache_key, data, timeout=600)
+        return Response(data)
+
     def get_queryset(self):
         qs = Topic.objects.select_related(
             "chapter", "chapter__book"
@@ -227,6 +277,35 @@ class TopicListView(ListAPIView):
         if chapter_id:
             qs = qs.filter(chapter_id=chapter_id)
         return qs
+
+
+@receiver([post_save, post_delete], sender=Book)
+def _invalidate_book_cache(sender, instance, **kwargs):
+    cache.delete("content_board_list")
+    board_hash = hashlib.md5((instance.board or "").encode("utf-8")).hexdigest()
+    empty_hash = hashlib.md5(b"").hexdigest()
+    cache.delete(f"content_books_board_{board_hash}")
+    cache.delete(f"content_books_board_{empty_hash}")
+
+
+@receiver([post_save, post_delete], sender=Chapter)
+def _invalidate_chapter_cache(sender, instance, **kwargs):
+    cache.delete(f"content_chapters_book_{instance.book_id}")
+    cache.delete("content_chapters_book_")
+
+
+@receiver([post_save, post_delete], sender=Topic)
+def _invalidate_topic_cache(sender, instance, **kwargs):
+    cache.delete(f"content_topics_chapter_{instance.chapter_id}")
+    cache.delete("content_topics_chapter_")
+
+
+@receiver([post_save, post_delete], sender=Question)
+def _invalidate_question_stats_cache(sender, instance, **kwargs):
+    if instance.school_id:
+        cache.delete(f"content_qstats_{instance.school_id}_False")
+    cache.delete("content_qstats_global_True")
+    cache.delete("content_qstats_global_False")
 
 
 class QuestionListView(ListAPIView):
