@@ -43,6 +43,8 @@ media/
 staticfiles/
 *_data.json
 db_backup.json
+backup_*.json
+*.sql
 
 # Environment variables — NEVER commit secrets
 .env
