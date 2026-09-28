@@ -57,12 +57,6 @@ const LoginPageDesktop: React.FC = () => {
     }
   };
 
-  // Quick-fill demo account helper
-  const handleQuickFill = (user: string, pass: string) => {
-    setUsername(user);
-    setPassword(pass);
-    setErrorMessage(null);
-  };
 
   return (
     <div className="min-h-screen bg-bg text-ink flex flex-col justify-between selection:bg-lime selection:text-ink">
@@ -118,74 +112,6 @@ const LoginPageDesktop: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick-fill demo account pills */}
-            <div className="pt-4 border-t border-border/80">
-              <span className="block text-xs font-mono uppercase tracking-wider text-ink/60 mb-2.5">
-                Quick Demo Access (Select Role):
-              </span>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('superadmin', 'password123')}
-                  className="pill pill-forest hover:opacity-90 transition-opacity cursor-pointer text-xs"
-                >
-                  ⚡ Super Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('schooladmin1', 'password123')}
-                  className="pill pill-ember hover:opacity-90 transition-opacity cursor-pointer text-xs"
-                >
-                  ⚡ School Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('teacher1', 'password123')}
-                  className="pill pill-grape hover:opacity-90 transition-opacity cursor-pointer text-xs"
-                >
-                  ⚡ Teacher
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickFill('student1', 'password123')}
-                  className="pill pill-lime hover:opacity-90 transition-opacity cursor-pointer text-xs"
-                >
-                  ⚡ Student
-                </button>
-                <button
-                  type="button"
-                  id="quick-deo"
-                  onClick={() => handleQuickFill('deo1', 'password123')}
-                  className="pill bg-[#E8632C]/15 border border-[#E8632C]/30 text-[#E8632C] hover:bg-[#E8632C]/25 transition-all cursor-pointer text-xs font-semibold"
-                >
-                  ⚡ DEO
-                </button>
-                <button
-                  type="button"
-                  id="quick-validator"
-                  onClick={() => handleQuickFill('validator1', 'password123')}
-                  className="pill bg-[#1F4D3A]/15 border border-[#1F4D3A]/30 text-[#1F4D3A] hover:bg-[#1F4D3A]/25 transition-all cursor-pointer text-xs font-semibold"
-                >
-                  ⚡ Validator
-                </button>
-                <button
-                  type="button"
-                  id="quick-dual"
-                  onClick={() => handleQuickFill('dualuser1', 'password123')}
-                  className="pill bg-indigo-50 border border-indigo-200 text-indigo-800 hover:bg-indigo-100 transition-all cursor-pointer text-xs font-semibold"
-                >
-                  ⚡ Dual Role
-                </button>
-                <button
-                  type="button"
-                  id="quick-qbm"
-                  onClick={() => handleQuickFill('qbm1', 'password123')}
-                  className="pill pill-teal hover:opacity-90 transition-opacity cursor-pointer text-xs"
-                >
-                  ⚡ QBM (Global)
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Right Column: High-craft Login Card */}
