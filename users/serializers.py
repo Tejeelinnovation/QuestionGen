@@ -140,6 +140,8 @@ class UserSerializer(serializers.ModelSerializer):
     school_validation_workflow_enabled = serializers.BooleanField(
         source="school.validation_workflow_enabled", read_only=True, default=False
     )
+    school_board = serializers.SerializerMethodField()
+    school_curriculum = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -152,6 +154,8 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "school",
             "school_name",
+            "school_board",
+            "school_curriculum",
             "school_validation_workflow_enabled",
             "class_section",
             "class_section_name",
@@ -167,6 +171,16 @@ class UserSerializer(serializers.ModelSerializer):
             "date_joined",
         ]
         read_only_fields = fields
+
+    def get_school_board(self, obj) -> str:
+        if obj.school and isinstance(obj.school.config, dict):
+            return obj.school.config.get("board", "") or ""
+        return ""
+
+    def get_school_curriculum(self, obj) -> str:
+        if obj.school and isinstance(obj.school.config, dict):
+            return obj.school.config.get("curriculum", "") or ""
+        return ""
 
     def get_capabilities(self, obj):
         caps = obj.user_capabilities.select_related("capability").all()

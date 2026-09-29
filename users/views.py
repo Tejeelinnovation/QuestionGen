@@ -154,7 +154,7 @@ class MeView(APIView):
             )
 
         allowed_fields = {"first_name", "last_name"}
-        if user.role in ["TEACHER", "HOD"]:
+        if user.role in ["TEACHER", "HOD", "Teacher"]:
             allowed_fields.add("primary_subject")
 
         updated_keys = []
@@ -164,6 +164,36 @@ class MeView(APIView):
                 updated_keys.append(key)
 
         user.save()
+
+        # Allow School Admin to update their School's Education Board and Default Curriculum
+        is_school_admin = (
+            user.role in ["School Admin", "school_admin"]
+            or user.role_label == "School Admin"
+            or (hasattr(user, "school") and user.school and user.has_capability("VIEW_SCHOOL_WIDE_CONTROLS"))
+        )
+        if (is_school_admin or user.is_superuser) and user.school:
+            updated_school = False
+            current_config = dict(user.school.config or {})
+            if "school_board" in request.data or "board" in request.data:
+                new_board = request.data.get("school_board", request.data.get("board", ""))
+                current_config["board"] = (new_board or "").strip()
+                updated_school = True
+                updated_keys.append("school_board")
+            if "school_curriculum" in request.data or "curriculum" in request.data:
+                new_curriculum = request.data.get("school_curriculum", request.data.get("curriculum", ""))
+                current_config["curriculum"] = (new_curriculum or "").strip()
+                updated_school = True
+                updated_keys.append("school_curriculum")
+            if updated_school:
+                user.school.config = current_config
+                user.school.save(update_fields=["config"])
+                log_action(
+                    user,
+                    "school.config_updated",
+                    user.school,
+                    metadata={"board": current_config.get("board"), "curriculum": current_config.get("curriculum")},
+                )
+
         log_action(user, "user.profile_updated", user, metadata={"updated_fields": updated_keys})
         serializer = UserSerializer(user, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)

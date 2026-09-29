@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ALL_CAPABILITIES } from '../../components/users/PermissionManager';
-import { LogOut, User, Building, Mail, ShieldCheck, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound } from 'lucide-react';
+import { LogOut, User, Building, Mail, ShieldCheck, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound, Layers } from 'lucide-react';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
 import { EditProfileModal } from '../../components/profile/EditProfileModal';
 import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
@@ -141,10 +141,30 @@ export const ProfilePageMobile: React.FC = () => {
             </div>
           )}
           {user?.school_name && (
-            <div className="flex items-center gap-2">
-              <Building className="w-3.5 h-3.5 text-ink/40 shrink-0" />
-              <span className="truncate">{user.school_name}</span>
-            </div>
+            <>
+              <div className="flex items-center gap-2">
+                <Building className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                <span className="truncate">{user.school_name}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                  <span>Board: <strong className="text-ink">{user.school_board || 'None'}</strong></span>
+                </div>
+                {user.role_label === 'School Admin' && (
+                  <span className="text-[9px] font-mono text-primary bg-primary/10 px-1 rounded">Editable</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                  <span>Curriculum: <strong className="text-ink">{user.school_curriculum || 'None'}</strong></span>
+                </div>
+                {user.role_label === 'School Admin' && (
+                  <span className="text-[9px] font-mono text-primary bg-primary/10 px-1 rounded">Editable</span>
+                )}
+              </div>
+            </>
           )}
           {user?.created_by_username && (
             <div className="flex items-center gap-2 text-[11px]">

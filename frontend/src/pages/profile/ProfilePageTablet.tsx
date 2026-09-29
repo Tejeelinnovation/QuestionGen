@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ALL_CAPABILITIES } from '../../components/users/PermissionManager';
-import { LogOut, User, Building, ShieldCheck, Mail, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound } from 'lucide-react';
+import { LogOut, User, Building, ShieldCheck, Mail, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound, Layers } from 'lucide-react';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
 import { EditProfileModal } from '../../components/profile/EditProfileModal';
 import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
@@ -146,6 +146,18 @@ export const ProfilePageTablet: React.FC = () => {
             <Building className="w-3.5 h-3.5 text-ink/40" />
             <span className="truncate">{user?.school_name || 'Global Scope'}</span>
           </div>
+          {user?.school_name && (
+            <>
+              <div className="col-span-1 flex items-center gap-2 text-ink/80">
+                <BookOpen className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                <span className="text-xs truncate">Board: <strong className="text-ink">{user.school_board || 'None'}</strong></span>
+              </div>
+              <div className="col-span-1 flex items-center gap-2 text-ink/80">
+                <Layers className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                <span className="text-xs truncate">Curriculum: <strong className="text-ink">{user.school_curriculum || 'None'}</strong></span>
+              </div>
+            </>
+          )}
           {user?.created_by_username && (
             <div className="col-span-2 flex items-center gap-2 text-ink/70">
               <User className="w-3.5 h-3.5 text-ink/40" />

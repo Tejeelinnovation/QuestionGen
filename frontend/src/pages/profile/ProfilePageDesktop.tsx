@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ALL_CAPABILITIES } from '../../components/users/PermissionManager';
-import { LogOut, User, Building, Calendar, ShieldCheck, Mail, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound } from 'lucide-react';
+import { LogOut, User, Building, Calendar, ShieldCheck, Mail, AlertTriangle, Phone, BookOpen, GraduationCap, Hash, Lock, Edit3, KeyRound, Layers } from 'lucide-react';
 import { getStaggerDelay, MOTION, CARD_MOTION } from '../../lib/motion';
 import { EditProfileModal } from '../../components/profile/EditProfileModal';
 import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
@@ -203,6 +203,52 @@ export const ProfilePageDesktop: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {user?.school_name && (
+                <>
+                  <div className="flex items-center gap-3 py-1">
+                    <BookOpen className="w-4 h-4 text-ink/40 shrink-0" />
+                    <div className="flex-1 truncate">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-ink/60 block text-[10px] uppercase font-mono">Education Board</span>
+                        {user?.role_label === 'School Admin' ? (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-primary bg-primary/10 px-1 rounded">
+                            Configurable
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded" title="Governed by School Administration">
+                            <Lock className="w-2.5 h-2.5" /> Locked
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-ink font-medium">
+                        {user.school_board || <span className="italic text-ink/40">Not configured (Optional)</span>}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 py-1">
+                    <Layers className="w-4 h-4 text-ink/40 shrink-0" />
+                    <div className="flex-1 truncate">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-ink/60 block text-[10px] uppercase font-mono">Default Curriculum</span>
+                        {user?.role_label === 'School Admin' ? (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-primary bg-primary/10 px-1 rounded">
+                            Configurable
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-ink/40 bg-surface-muted px-1 rounded" title="Governed by School Administration">
+                            <Lock className="w-2.5 h-2.5" /> Locked
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-ink font-medium">
+                        {user.school_curriculum || <span className="italic text-ink/40">Not configured (Optional)</span>}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {user?.created_by_username && (
                 <div className="flex items-center gap-3 py-1">

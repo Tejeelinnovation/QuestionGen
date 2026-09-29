@@ -157,11 +157,27 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         <span className={`truncate font-body ${!value ? 'text-ink/40' : 'text-ink font-medium'}`}>
           {value ? displayLabel : placeholder}
         </span>
-        <ChevronDown
-          className={`w-4 h-4 shrink-0 text-ink/50 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-forest' : ''
-          }`}
-        />
+        <div className="flex items-center gap-1 shrink-0">
+          {!required && value && !disabled && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange('');
+              }}
+              className="p-0.5 rounded-full hover:bg-surface-muted text-ink/40 hover:text-ink transition-colors cursor-pointer"
+              title="Clear selection"
+            >
+              <X className="w-3.5 h-3.5" />
+            </span>
+          )}
+          <ChevronDown
+            className={`w-4 h-4 text-ink/50 transition-transform duration-200 ${
+              isOpen ? 'rotate-180 text-forest' : ''
+            }`}
+          />
+        </div>
       </button>
 
       {/* Dropdown Popover */}
@@ -207,6 +223,18 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             role="listbox"
             className="overflow-y-auto flex-1 divide-y divide-border/40 py-1"
           >
+            {!required && !searchQuery.trim() && (
+              <div className="p-1 border-b border-border/40">
+                <button
+                  type="button"
+                  onClick={() => handleSelect('')}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md text-xs text-ink/50 hover:bg-surface-muted hover:text-ink flex items-center justify-between transition-colors cursor-pointer italic"
+                >
+                  <span>None (Clear selection)</span>
+                  {!value && <Check className="w-3.5 h-3.5 text-forest" />}
+                </button>
+              </div>
+            )}
             {filteredOptions.length === 0 ? (
               <div className="p-4 text-center space-y-2">
                 <p className="text-xs text-ink/60">
