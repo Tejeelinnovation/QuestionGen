@@ -28,7 +28,15 @@ export const authApi = {
     return response.data;
   },
 
-  updateProfile: async (data: { first_name?: string; last_name?: string; primary_subject?: string }): Promise<User> => {
+  updateProfile: async (data: {
+    first_name?: string;
+    last_name?: string;
+    primary_subject?: string;
+    board?: string;
+    curriculum?: string;
+    school_board?: string;
+    school_curriculum?: string;
+  }): Promise<User> => {
     const response = await apiClient.patch<User>('/api/auth/me/', data);
     return response.data;
   },

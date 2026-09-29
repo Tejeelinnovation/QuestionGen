@@ -21,8 +21,8 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
   const toast = useToast();
   // School Details
   const [name, setName] = useState('');
-  const [board, setBoard] = useState('CBSE');
-  const [curriculum, setCurriculum] = useState('NCERT');
+  const [board, setBoard] = useState('');
+  const [curriculum, setCurriculum] = useState('');
   const [maxStudents, setMaxStudents] = useState<number>(500);
   const [maxTeachers, setMaxTeachers] = useState<number>(50);
   const [questionBankEnabled, setQuestionBankEnabled] = useState<boolean>(false);
@@ -67,10 +67,14 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
       }
     } else {
       configPayload = {
-        board: board.trim(),
-        curriculum: curriculum.trim(),
         timezone: timezone.trim() || 'Asia/Kolkata',
       };
+      if (board.trim()) {
+        configPayload.board = board.trim();
+      }
+      if (curriculum.trim()) {
+        configPayload.curriculum = curriculum.trim();
+      }
     }
 
     // Validate mandatory Administrator fields
@@ -120,8 +124,8 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
       onClose();
       // Reset fields
       setName('');
-      setBoard('CBSE');
-      setCurriculum('NCERT');
+      setBoard('');
+      setCurriculum('');
       setMaxStudents(500);
       setMaxTeachers(50);
       setQuestionBankEnabled(false);
@@ -232,28 +236,28 @@ export const CreateSchoolDrawer: React.FC<CreateSchoolDrawerProps> = ({
               />
             </div>
 
-            {/* Academic & Curriculum Configuration */}
+            {/* Academic & Curriculum Configuration (Optional) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
               <SearchableSelect
                 id="school-board"
-                label="Education Board"
+                label="Education Board (Optional)"
                 value={board}
                 onChange={setBoard}
                 options={INDIAN_BOARDS}
-                placeholder="Select Indian board..."
+                placeholder="Select Indian board (Optional)..."
                 disabled={isSubmitting}
-                required
+                required={false}
               />
 
               <SearchableSelect
                 id="school-curriculum"
-                label="Default Curriculum"
+                label="Default Curriculum (Optional)"
                 value={curriculum}
                 onChange={setCurriculum}
                 options={INDIAN_CURRICULA}
-                placeholder="Select curriculum..."
+                placeholder="Select curriculum (Optional)..."
                 disabled={isSubmitting}
-                required
+                required={false}
               />
             </div>
 

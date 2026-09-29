@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { authApi } from '../../api/auth';
-import { X, Check, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Check, Lock, AlertCircle, Loader2, Building } from 'lucide-react';
+import { SearchableSelect } from '../ui/searchable-select';
+import { INDIAN_BOARDS, INDIAN_CURRICULA } from '../../constants/educationData';
 import { MOTION } from '../../lib/motion';
 
 interface EditProfileModalProps {
@@ -19,6 +21,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [firstName, setFirstName] = useState(user?.first_name || '');
   const [lastName, setLastName] = useState(user?.last_name || '');
   const [primarySubject, setPrimarySubject] = useState(user?.primary_subject || '');
+  const isSchoolAdmin = user?.role_label === 'School Admin';
+  const [board, setBoard] = useState(user?.school_board || '');
+  const [curriculum, setCurriculum] = useState(user?.school_curriculum || '');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -38,6 +43,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         ...(isTeacher ? { primary_subject: primarySubject.trim() } : {}),
+        ...(isSchoolAdmin ? { board: board.trim(), curriculum: curriculum.trim() } : {}),
       });
       await refreshUser();
       setSuccessMsg('Profile updated successfully.');
@@ -126,6 +132,43 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 placeholder="e.g. Mathematics, Science"
                 className="w-full px-3 py-2 text-xs rounded-card border border-border bg-surface text-ink focus:border-forest focus:outline-hidden"
               />
+            </div>
+          )}
+
+          {/* School Admin: Education Board & Default Curriculum */}
+          {isSchoolAdmin && (
+            <div className="space-y-3 pt-2 border-t border-border/60">
+              <div className="flex items-center gap-2">
+                <Building className="w-3.5 h-3.5 text-forest" />
+                <span className="text-xs font-heading font-semibold text-ink">
+                  Institutional Academic Standards ({user?.school_name || 'School'})
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchableSelect
+                  id="profile-school-board"
+                  label="Education Board (Optional)"
+                  value={board}
+                  onChange={setBoard}
+                  options={INDIAN_BOARDS}
+                  placeholder="Select Education Board..."
+                  disabled={isSaving}
+                  required={false}
+                />
+                <SearchableSelect
+                  id="profile-school-curriculum"
+                  label="Default Curriculum (Optional)"
+                  value={curriculum}
+                  onChange={setCurriculum}
+                  options={INDIAN_CURRICULA}
+                  placeholder="Select Default Curriculum..."
+                  disabled={isSaving}
+                  required={false}
+                />
+              </div>
+              <p className="text-[10px] text-ink/55 italic">
+                Set or update your school's education board and curriculum. Teachers will inherit these defaults.
+              </p>
             </div>
           )}
 
