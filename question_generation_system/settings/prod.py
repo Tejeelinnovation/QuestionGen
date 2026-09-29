@@ -10,6 +10,9 @@ Usage:
 
 from .base import *  # noqa: F401, F403
 
+# Production Frontend URL
+FRONTEND_URL = env("FRONTEND_URL", default="https://question-gen-alpha.vercel.app")
+
 # ---------------------------------------------------------------------------
 # Security hardening
 # ---------------------------------------------------------------------------

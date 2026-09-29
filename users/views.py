@@ -326,7 +326,15 @@ class PasswordResetRequestView(APIView):
         # User found — generate token and send reset email
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
-        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
+        # Determine frontend URL dynamically from the client's Origin/Referer header
+        origin = request.headers.get("Origin") or request.headers.get("Referer")
+        if origin and "http" in origin:
+            from urllib.parse import urlparse
+            parsed = urlparse(origin)
+            frontend_url = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+        else:
+            frontend_url = getattr(settings, "FRONTEND_URL", "https://question-gen-alpha.vercel.app").rstrip("/")
+
         reset_url = f"{frontend_url}/reset-password?uid={uid}&token={token}"
         log_action(user, "user.password_reset_requested", user)
 
