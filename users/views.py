@@ -232,6 +232,67 @@ class ChangePasswordView(APIView):
         )
 
 
+def dispatch_system_email(subject: str, message: str, recipient_email: str) -> bool:
+    """
+    Sends email via the Vercel HTTPS Bridge to bypass cloud SMTP restrictions (like Render's
+    firewall on ports 25, 465, 587), falling back to standard Django send_mail.
+    """
+    import json
+    import urllib.request
+    import urllib.error
+
+    frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
+    bridge_candidates = []
+    if frontend_url and "localhost" not in frontend_url:
+        bridge_candidates.append(f"{frontend_url}/api/send-email")
+    if "https://question-gen-alpha.vercel.app/api/send-email" not in bridge_candidates:
+        bridge_candidates.append("https://question-gen-alpha.vercel.app/api/send-email")
+
+    email_user = getattr(settings, "EMAIL_HOST_USER", "") or "queraai78789@gmail.com"
+    email_pass = getattr(settings, "EMAIL_HOST_PASSWORD", "") or "gehx gwoo ltgp lwsx"
+
+    for bridge_url in bridge_candidates:
+        try:
+            payload = json.dumps({
+                "to": recipient_email,
+                "subject": subject,
+                "message": message,
+                "user": email_user,
+                "pass": email_pass,
+            }).encode("utf-8")
+
+            req = urllib.request.Request(
+                bridge_url,
+                data=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "Django-QuestionGen"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                resp_data = json.loads(resp.read().decode("utf-8"))
+                if resp.status == 200 and resp_data.get("success"):
+                    logger.info("Email successfully sent via Vercel Bridge (%s) to %s", bridge_url, recipient_email)
+                    return True
+                else:
+                    logger.warning("Vercel Bridge (%s) returned unexpected response: %s", bridge_url, resp_data)
+        except Exception as bridge_err:
+            logger.warning("Could not reach Vercel Bridge (%s): %s", bridge_url, bridge_err)
+
+    # Fallback to local Django send_mail (works for local development or direct SMTP)
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", email_user),
+            recipient_list=[recipient_email],
+            fail_silently=False,
+        )
+        logger.info("Email successfully sent via Django send_mail fallback to %s", recipient_email)
+        return True
+    except Exception as exc:
+        logger.error("Failed standard send_mail fallback for %s: %s", recipient_email, exc)
+        return False
+
+
 class PasswordResetRequestView(APIView):
     """
     POST /api/auth/password-reset/request/
@@ -279,16 +340,12 @@ class PasswordResetRequestView(APIView):
             "Best regards,\nQuestion Generation System Team"
         )
 
-        try:
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
-        except Exception as exc:
-            logger.error("Failed to send password reset email to %s: %s", user.email, exc)
+        sent = dispatch_system_email(
+            subject=subject,
+            message=message,
+            recipient_email=user.email,
+        )
+        if not sent:
             return Response(
                 {"detail": "Failed to send the reset email. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
