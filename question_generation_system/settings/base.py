@@ -71,6 +71,8 @@ LOCAL_APPS = [
     "attempts",
     # Question Generation Service boundary & interfaces.
     "generation",
+    # Document Ingestion & Training Dataset Collection Engine
+    "content_ingestion",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -174,6 +176,9 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -182,6 +187,15 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
+# ---------------------------------------------------------------------------
+# Document Ingestion & Extractor configuration
+# ---------------------------------------------------------------------------
+DOCUMENT_EXTRACTOR_BACKEND = env("DOCUMENT_EXTRACTOR_BACKEND", default="auto")
+GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
+GEMINI_MODEL_NAME = env("GEMINI_MODEL_NAME", default="gemini-2.0-flash")
+GOOGLE_DRIVE_FOLDER_ID = env("GOOGLE_DRIVE_FOLDER_ID", default="")
+GOOGLE_DRIVE_CREDENTIALS_FILE = env("GOOGLE_DRIVE_CREDENTIALS_FILE", default="")
 
 # ---------------------------------------------------------------------------
 # Default primary key type

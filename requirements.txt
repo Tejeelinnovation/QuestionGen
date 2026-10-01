@@ -28,3 +28,7 @@ openpyxl==3.1.5
 gunicorn==23.0.0
 whitenoise==6.9.0
 
+# PDF parsing and document processing (ultra-lightweight C-extension)
+pymupdf==1.28.2
+requests==2.32.5
+

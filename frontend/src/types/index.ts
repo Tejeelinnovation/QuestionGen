@@ -11,7 +11,8 @@ export type CapabilityName =
   | 'VIEW_SCHOOL_WIDE_CONTROLS'
   | 'INGEST_GLOBAL_QUESTIONS'
   | 'DATA_ENTRY_OPERATOR'
-  | 'VALIDATOR';
+  | 'VALIDATOR'
+  | 'UPLOAD_STUDY_MATERIAL';
 
 export type RoleLabel =
   | 'Super Admin'

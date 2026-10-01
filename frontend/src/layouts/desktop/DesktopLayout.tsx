@@ -9,11 +9,17 @@ export const DesktopLayout: React.FC<{ children?: React.ReactNode }> = ({ childr
   // Determine active navigation links based on user capabilities (Teachers only for Create Paper)
   const canCreatePaper =
     user?.role_label === 'Teacher' && hasCapability('CREATE_PAPER');
+  const canUploadMaterial =
+    hasCapability('UPLOAD_STUDY_MATERIAL') || hasCapability('CREATE_SCHOOL');
+  const isSuperAdmin = hasCapability('CREATE_SCHOOL');
 
   const navItems = [
     { label: 'Dashboard', path: '/' },
     ...(canCreatePaper
       ? [{ label: '+ Create Paper', path: '/papers/new' }]
+      : []),
+    ...(canUploadMaterial
+      ? [{ label: isSuperAdmin ? 'Dataset Ingestion' : 'Upload Material', path: '/dataset-ingestion' }]
       : []),
   ];
 

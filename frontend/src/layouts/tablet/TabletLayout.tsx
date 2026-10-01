@@ -24,11 +24,17 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
 
   const canCreatePaper =
     user?.role_label === 'Teacher' && hasCapability('CREATE_PAPER');
+  const canUploadMaterial =
+    hasCapability('UPLOAD_STUDY_MATERIAL') || hasCapability('CREATE_SCHOOL');
+  const isSuperAdmin = hasCapability('CREATE_SCHOOL');
 
   const navItems = [
     { label: 'Dashboard', path: '/' },
     ...(canCreatePaper
       ? [{ label: '+ Create Paper', path: '/papers/new' }]
+      : []),
+    ...(canUploadMaterial
+      ? [{ label: isSuperAdmin ? 'Dataset Ingestion' : 'Upload Material', path: '/dataset-ingestion' }]
       : []),
   ];
 

@@ -39,6 +39,7 @@ class CapabilityName(models.TextChoices):
     INGEST_GLOBAL_QUESTIONS = "INGEST_GLOBAL_QUESTIONS", _("Ingest Global Questions")
     DATA_ENTRY_OPERATOR = "DATA_ENTRY_OPERATOR", _("Data Entry Operator (QBM)")
     VALIDATOR = "VALIDATOR", _("Question Validator (QBM)")
+    UPLOAD_STUDY_MATERIAL = "UPLOAD_STUDY_MATERIAL", _("Upload Study Material")
 
 
 class Capability(models.Model):
