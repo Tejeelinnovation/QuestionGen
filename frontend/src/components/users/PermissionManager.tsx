@@ -83,6 +83,12 @@ export const ALL_CAPABILITIES: CapabilityMeta[] = [
     description: 'Review submitted questions, edit metadata, and approve or return for correction.',
     category: 'Curriculum & Papers',
   },
+  {
+    name: 'UPLOAD_STUDY_MATERIAL',
+    label: 'Upload Study Material',
+    description: 'Submit textbooks, notes, and past papers to the AI dataset ingestion pipeline.',
+    category: 'Curriculum & Papers',
+  },
 ];
 
 export const getDefaultCapabilitiesForRole = (roleLabel: string): CapabilityName[] => {
@@ -108,12 +114,12 @@ export const getDefaultCapabilitiesForRole = (roleLabel: string): CapabilityName
 
 const ALLOWED_CAPABILITIES_BY_ROLE: Record<string, CapabilityName[]> = {
   'Super Admin': ALL_CAPABILITIES.map((c) => c.name),
-  'School Admin': ['CREATE_TEACHER', 'CREATE_STUDENT', 'VIEW_SCHOOL_WIDE_CONTROLS'],
-  'Teacher': ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST'],
-  'Data Entry Operator': ['DATA_ENTRY_OPERATOR', 'GENERATE_SELECT_QUESTIONS', 'VALIDATOR'],
-  'Validator': ['VALIDATOR', 'GENERATE_SELECT_QUESTIONS', 'DATA_ENTRY_OPERATOR'],
-  'DEO & Validator': ['DATA_ENTRY_OPERATOR', 'VALIDATOR', 'GENERATE_SELECT_QUESTIONS'],
-  'Student': ['ATTEMPT_TEST', 'VIEW_OWN_RESULT'],
+  'School Admin': ['CREATE_TEACHER', 'CREATE_STUDENT', 'VIEW_SCHOOL_WIDE_CONTROLS', 'UPLOAD_STUDY_MATERIAL'],
+  'Teacher': ['CREATE_STUDENT', 'GENERATE_SELECT_QUESTIONS', 'CREATE_PAPER', 'ASSIGN_TEST', 'UPLOAD_STUDY_MATERIAL'],
+  'Data Entry Operator': ['DATA_ENTRY_OPERATOR', 'GENERATE_SELECT_QUESTIONS', 'VALIDATOR', 'UPLOAD_STUDY_MATERIAL'],
+  'Validator': ['VALIDATOR', 'GENERATE_SELECT_QUESTIONS', 'DATA_ENTRY_OPERATOR', 'UPLOAD_STUDY_MATERIAL'],
+  'DEO & Validator': ['DATA_ENTRY_OPERATOR', 'VALIDATOR', 'GENERATE_SELECT_QUESTIONS', 'UPLOAD_STUDY_MATERIAL'],
+  'Student': ['ATTEMPT_TEST', 'VIEW_OWN_RESULT', 'UPLOAD_STUDY_MATERIAL'],
 };
 
 /**

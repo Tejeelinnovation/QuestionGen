@@ -361,6 +361,20 @@ class CreateUserSerializer(serializers.ModelSerializer):
         }
         dispatch[profile](user, granted_by=granted_by)
 
+        # Inherit school-level bulk study material upload permission if enabled
+        if user.school:
+            bulk_policy = user.school.config.get("study_material_bulk_policy", {})
+            role_key = (
+                "teachers" if profile == "teacher"
+                else "students" if profile == "student"
+                else "school_admins" if profile == "school_admin"
+                else None
+            )
+            if role_key and bulk_policy.get(role_key, {}).get("enabled"):
+                from users.capability_defaults import _grant
+                from users.models import CapabilityName
+                _grant(user, CapabilityName.UPLOAD_STUDY_MATERIAL, granted_by)
+
         return user
 
 

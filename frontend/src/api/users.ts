@@ -144,4 +144,38 @@ export const usersApi = {
     const response = await apiClient.patch<School>(`/api/schools/${id}/`, data);
     return response.data;
   },
+
+  getSchoolUploadPolicy: async (schoolId: number): Promise<SchoolUploadPolicyResponse> => {
+    const response = await apiClient.get<SchoolUploadPolicyResponse>(`/api/schools/${schoolId}/upload-policy/`);
+    return response.data;
+  },
+
+  setSchoolUploadPolicy: async (
+    schoolId: number,
+    data: {
+      role_group: 'teachers' | 'students' | 'school_admins';
+      enabled: boolean;
+      preserve_prior_grants?: boolean;
+    }
+  ): Promise<SchoolUploadPolicyResponse> => {
+    const response = await apiClient.post<SchoolUploadPolicyResponse>(
+      `/api/schools/${schoolId}/upload-policy/`,
+      data
+    );
+    return response.data;
+  },
 };
+
+export interface RoleUploadPolicyInfo {
+  enabled: boolean;
+  total_count: number;
+  active_with_permission: number;
+  prior_users: { id: number; username: string; name: string }[];
+}
+
+export interface SchoolUploadPolicyResponse {
+  teachers: RoleUploadPolicyInfo;
+  students: RoleUploadPolicyInfo;
+  school_admins: RoleUploadPolicyInfo;
+}
+

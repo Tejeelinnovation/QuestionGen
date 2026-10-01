@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { MOTION } from '../../lib/motion';
 import { AssignPaperModal } from './AssignPaperModal';
+import { SkeletonCompactList } from '../ui/skeleton';
 
 interface TeacherClassesSectionProps {
   compact?: boolean;
@@ -453,10 +454,7 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
             {/* Modal Body: Student List */}
             <div className="p-5 overflow-y-auto space-y-3 flex-1">
               {isRosterLoading ? (
-                <div className="py-12 text-center text-xs text-ink/50 space-y-2">
-                  <div className="w-6 h-6 border-2 border-grape border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p>Loading class enrolled students...</p>
-                </div>
+                <SkeletonCompactList count={4} />
               ) : rosterError ? (
                 <div className="p-4 rounded-card bg-ember/10 border border-ember/30 text-ember text-xs">
                   {rosterError}

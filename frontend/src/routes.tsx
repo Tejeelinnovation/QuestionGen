@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, type RouteObject } from 'react-router-dom';
+import { Navigate, Link, type RouteObject } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { SuperAdminDashboard } from './pages/dashboards/SuperAdminDashboard';
@@ -218,9 +218,26 @@ export const routes: RouteObject[] = [
       {
         path: '*',
         element: (
-          <div className="p-6">
-            <h2 className="text-xl font-bold">404 - Page Not Found</h2>
-            <p className="mt-2">The requested page does not exist.</p>
+          <div className="min-h-[70vh] flex items-center justify-center p-6 text-center font-body animate-fade-in">
+            <div className="max-w-md w-full bg-surface border border-border rounded-2xl shadow-float p-8 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-forest/10 border border-forest/20 text-forest flex items-center justify-center mx-auto">
+                <span className="font-heading font-black text-lg">404</span>
+              </div>
+              <div className="space-y-1">
+                <h2 className="font-heading font-bold text-lg text-ink">Page Not Found</h2>
+                <p className="text-xs text-ink/60">
+                  The page you are looking for doesn't exist or may have been moved.
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link
+                  to="/"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 transition-all shadow-xs cursor-pointer active:scale-95"
+                >
+                  Return to Dashboard
+                </Link>
+              </div>
+            </div>
           </div>
         ),
       },

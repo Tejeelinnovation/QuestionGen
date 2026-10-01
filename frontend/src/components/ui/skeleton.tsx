@@ -470,4 +470,183 @@ export const SkeletonAuditTimeline: React.FC<{ count?: number }> = ({ count = 3 
   );
 };
 
+/**
+ * Skeleton for Dataset Ingestion Jobs (Desktop, Tablet, Mobile)
+ */
+export const SkeletonIngestionList: React.FC<{ count?: number }> = ({ count = 4 }) => {
+  const breakpoint = useBreakpoint();
+
+  if (breakpoint === 'mobile') {
+    return (
+      <div className="space-y-3" aria-hidden="true">
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className="p-4 rounded-xl bg-surface border border-border shadow-xs space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <Skeleton className="h-4 w-40" radius="sm" />
+                <Skeleton className="h-3 w-28" radius="sm" />
+              </div>
+              <Skeleton className="h-5 w-16" radius="pill" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <Skeleton className="h-3 w-20" radius="sm" />
+                <Skeleton className="h-3 w-10" radius="sm" />
+              </div>
+              <Skeleton className="h-2 w-full" radius="pill" />
+            </div>
+            <div className="pt-2 border-t border-border/60 flex items-center justify-between">
+              <Skeleton className="h-3 w-24" radius="sm" />
+              <Skeleton className="h-7 w-20" radius="pill" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Tablet & Desktop (Table / card list)
+  return (
+    <div className="w-full divide-y divide-border/60" aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Skeleton className="w-9 h-9 shrink-0" radius="card" />
+            <div className="space-y-1.5 min-w-0 flex-1">
+              <Skeleton className="h-4 w-48" radius="sm" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-3 w-24" radius="sm" />
+                <Skeleton className="h-3 w-16" radius="pill" />
+                <Skeleton className="h-3 w-20" radius="sm" />
+              </div>
+            </div>
+          </div>
+          <div className="w-36 space-y-1.5 hidden sm:block">
+            <div className="flex justify-between">
+              <Skeleton className="h-3 w-14" radius="sm" />
+              <Skeleton className="h-3 w-8" radius="sm" />
+            </div>
+            <Skeleton className="h-2 w-full" radius="pill" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-7 w-20" radius="pill" />
+            <Skeleton className="h-7 w-16" radius="pill" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Skeleton for Class Sections & Divisions Grid
+ */
+export const SkeletonClassSections: React.FC<{ count?: number }> = ({ count = 4 }) => {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="p-4 rounded-xl bg-surface border border-border shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-7 h-7" radius="card" />
+              <Skeleton className="h-5 w-24" radius="sm" />
+            </div>
+            <Skeleton className="h-4 w-12" radius="pill" />
+          </div>
+          <div className="space-y-2 pt-1 border-t border-border/50">
+            <Skeleton className="h-3.5 w-3/4" radius="sm" />
+            <Skeleton className="h-3 w-1/2" radius="sm" />
+          </div>
+          <div className="pt-2 border-t border-border/50 flex justify-end gap-2">
+            <Skeleton className="h-6 w-16" radius="pill" />
+            <Skeleton className="h-6 w-16" radius="pill" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Skeleton for Study Material Bulk Policy cards inside Modal
+ */
+export const SkeletonPolicyCards: React.FC = () => {
+  return (
+    <div className="space-y-3" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="p-3.5 rounded-xl border border-border bg-surface space-y-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 flex-1">
+              <Skeleton className="w-7 h-7" radius="card" />
+              <div className="space-y-1.5 flex-1">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-28" radius="sm" />
+                  <Skeleton className="h-4 w-20" radius="pill" />
+                </div>
+                <Skeleton className="h-3 w-3/4" radius="sm" />
+              </div>
+            </div>
+            <Skeleton className="w-10 h-5" radius="pill" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Skeleton for Audit Log Viewer table rows
+ */
+export const SkeletonAuditTable: React.FC<{ rows?: number }> = ({ rows = 5 }) => {
+  return (
+    <div className="divide-y divide-border/60" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="p-3.5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="w-8 h-8 rounded-full" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-32" radius="sm" />
+              <Skeleton className="h-3 w-20" radius="sm" />
+            </div>
+          </div>
+          <Skeleton className="h-5 w-24" radius="pill" />
+          <Skeleton className="h-4 w-40" radius="sm" />
+          <Skeleton className="h-3 w-20" radius="sm" />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Full page layout skeleton for route transitions and session loading
+ */
+export const SkeletonPage: React.FC = () => {
+  return (
+    <div className="min-h-[70vh] p-6 max-w-6xl mx-auto space-y-6" aria-hidden="true">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-64" radius="sm" />
+          <Skeleton className="h-4 w-96" radius="sm" />
+        </div>
+        <Skeleton className="h-9 w-32" radius="pill" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="p-4 rounded-xl bg-surface border border-border space-y-2">
+            <Skeleton className="h-4 w-24" radius="pill" />
+            <Skeleton className="h-8 w-16" radius="sm" />
+            <Skeleton className="h-3 w-32" radius="sm" />
+          </div>
+        ))}
+      </div>
+      <div className="p-6 rounded-2xl bg-surface border border-border space-y-4">
+        <Skeleton className="h-5 w-48" radius="sm" />
+        <SkeletonTable rows={5} />
+      </div>
+    </div>
+  );
+};
+
+
 

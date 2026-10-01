@@ -19,8 +19,8 @@ import {
   ArrowLeft,
   ArrowRight,
   Search,
-  Loader2,
 } from 'lucide-react';
+import { SkeletonTable } from '../ui/skeleton';
 
 interface ClassManagementViewProps {
   schoolId?: number | null;
@@ -479,9 +479,8 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
           </div>
 
           {isLoadingDetailStudents ? (
-            <div className="py-12 text-center text-xs text-ink/50 italic flex flex-col items-center gap-2">
-              <Loader2 className="w-5 h-5 text-forest animate-spin" />
-              <span>Loading enrolled students roster...</span>
+            <div className="py-4">
+              <SkeletonTable rows={4} />
             </div>
           ) : detailStudents.length === 0 ? (
             <div className="py-12 text-center bg-bg border border-dashed border-border rounded-card space-y-2">

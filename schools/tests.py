@@ -287,3 +287,104 @@ class BulkImportApiTests(TestCase):
         self.assertEqual(sec.class_teacher.mobile_number, "+919876543222")
         self.assertEqual(sec.class_teacher_subject, "Mathematics")
 
+
+class SchoolUploadPolicyTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.school = School.objects.create(name="St. Xavier's High School", max_students=50, max_teachers=10)
+
+        # Super Admin
+        self.admin = User.objects.create_user(
+            username="superadmin_test",
+            email="admin@test.com",
+            password="adminpassword123",
+            role="Super Admin",
+        )
+        cap_school, _ = Capability.objects.get_or_create(name="CREATE_SCHOOL")
+        UserCapability.objects.create(user=self.admin, capability=cap_school)
+
+        # Upload Capability
+        self.upload_cap, _ = Capability.objects.get_or_create(name="UPLOAD_STUDY_MATERIAL")
+
+        # Teacher 1 (Has prior individual permission)
+        self.teacher1 = User.objects.create_user(
+            username="teacher_prior",
+            email="prior@test.com",
+            password="pass",
+            role="Teacher",
+            school=self.school,
+        )
+        UserCapability.objects.create(user=self.teacher1, capability=self.upload_cap)
+
+        # Teacher 2 (Does not have permission initially)
+        self.teacher2 = User.objects.create_user(
+            username="teacher_noprior",
+            email="noprior@test.com",
+            password="pass",
+            role="Teacher",
+            school=self.school,
+        )
+
+        self.client.force_authenticate(user=self.admin)
+
+    def test_get_upload_policy(self):
+        res = self.client.get(f"/api/schools/{self.school.id}/upload-policy/")
+        self.assertEqual(res.status_code, 200)
+        data = res.data
+        self.assertIn("teachers", data)
+        self.assertIn("students", data)
+        self.assertIn("school_admins", data)
+        self.assertEqual(data["teachers"]["enabled"], False)
+        self.assertEqual(data["teachers"]["total_count"], 2)
+        self.assertEqual(data["teachers"]["active_with_permission"], 1)
+
+    def test_bulk_enable_and_preserve_prior(self):
+        # 1. Enable bulk upload for teachers
+        res = self.client.post(
+            f"/api/schools/{self.school.id}/upload-policy/",
+            {"role_group": "teachers", "enabled": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(self.teacher1.has_capability("UPLOAD_STUDY_MATERIAL"))
+        self.assertTrue(self.teacher2.has_capability("UPLOAD_STUDY_MATERIAL"))
+
+        prior_users = res.data["teachers"]["prior_users"]
+        self.assertEqual(len(prior_users), 1)
+        self.assertEqual(prior_users[0]["id"], self.teacher1.id)
+
+        # 2. Disable bulk upload with preserve_prior_grants=True
+        res = self.client.post(
+            f"/api/schools/{self.school.id}/upload-policy/",
+            {"role_group": "teachers", "enabled": False, "preserve_prior_grants": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["teachers"]["enabled"], False)
+
+        # Teacher 1 should PRESERVE capability
+        self.assertTrue(self.teacher1.has_capability("UPLOAD_STUDY_MATERIAL"))
+        # Teacher 2 should LOSE capability
+        self.assertFalse(self.teacher2.has_capability("UPLOAD_STUDY_MATERIAL"))
+
+    def test_bulk_enable_and_revoke_all(self):
+        # 1. Enable bulk upload
+        self.client.post(
+            f"/api/schools/{self.school.id}/upload-policy/",
+            {"role_group": "teachers", "enabled": True},
+            format="json",
+        )
+
+        # 2. Disable with preserve_prior_grants=False
+        res = self.client.post(
+            f"/api/schools/{self.school.id}/upload-policy/",
+            {"role_group": "teachers", "enabled": False, "preserve_prior_grants": False},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+
+        # Both should lose capability
+        self.assertFalse(self.teacher1.has_capability("UPLOAD_STUDY_MATERIAL"))
+        self.assertFalse(self.teacher2.has_capability("UPLOAD_STUDY_MATERIAL"))
+
+

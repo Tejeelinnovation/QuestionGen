@@ -13,6 +13,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { fetchJobPages, exportJobJson, type ExtractedPage, type StructuredSection } from '../../api/ingestion';
+import { Skeleton } from '../../components/ui/skeleton';
 
 interface DatasetInspectionModalProps {
   jobId: number;
@@ -206,9 +207,37 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
 
         {/* Content Area */}
         {isLoading ? (
-          <div className="flex-1 flex items-center justify-center text-xs text-ink/60 gap-2">
-            <div className="w-4 h-4 border-2 border-forest/30 border-t-forest rounded-full animate-spin" />
-            <span>Loading extracted dataset...</span>
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden p-4 gap-4" aria-hidden="true">
+            <div className="w-full md:w-64 border border-border rounded-xl p-3 space-y-2.5 bg-surface-muted/30">
+              <Skeleton className="h-4 w-32" radius="sm" />
+              <div className="space-y-2">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="p-2 rounded-lg bg-surface border border-border/60 space-y-1.5">
+                    <Skeleton className="h-3.5 w-24" radius="sm" />
+                    <Skeleton className="h-2.5 w-16" radius="pill" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 border border-border rounded-xl p-4 space-y-4 bg-surface">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-5 w-48" radius="sm" />
+                <Skeleton className="h-6 w-20" radius="pill" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-3.5 w-full" radius="sm" />
+                <Skeleton className="h-3.5 w-5/6" radius="sm" />
+                <Skeleton className="h-3.5 w-4/5" radius="sm" />
+                <Skeleton className="h-3.5 w-2/3" radius="sm" />
+              </div>
+              <div className="pt-3 border-t border-border/60 space-y-2">
+                <Skeleton className="h-4 w-36" radius="sm" />
+                <div className="grid grid-cols-2 gap-2">
+                  <Skeleton className="h-12 w-full" radius="card" />
+                  <Skeleton className="h-12 w-full" radius="card" />
+                </div>
+              </div>
+            </div>
           </div>
         ) : viewMode === 'RAW_JSON' ? (
           <div className="flex-1 flex flex-col bg-[#1e1e1e] text-emerald-400 font-mono text-xs overflow-hidden">
