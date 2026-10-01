@@ -144,46 +144,60 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="relative w-full max-w-5xl h-[88vh] bg-surface border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-1.5 sm:p-4 overflow-hidden">
+      <div className="relative w-full max-w-6xl h-[95dvh] sm:h-[88vh] bg-surface border border-border rounded-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Top Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-surface-muted/50 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded bg-forest/10 text-forest border border-forest/20">
+        <div className="px-3.5 py-3 sm:px-6 sm:py-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-surface-muted/50 shrink-0">
+          {/* Title Row */}
+          <div className="flex items-center justify-between w-full sm:w-auto min-w-0">
+            <div className="flex items-center gap-2 min-w-0 pr-2">
+              <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-forest/10 text-forest border border-forest/20 shrink-0">
                 JOB #{jobId}
               </span>
-              <h2 className="text-base font-heading font-bold text-ink">{jobTitle}</h2>
+              <h2
+                className="text-sm sm:text-base font-heading font-bold text-ink truncate max-w-[200px] xs:max-w-xs sm:max-w-md"
+                title={jobTitle}
+              >
+                {jobTitle}
+              </h2>
             </div>
-            <p className="text-xs text-ink/60 mt-0.5">
-              Inspecting extracted reading order, LaTeX formulas, and pedagogical blocks.
-            </p>
+            {/* Mobile Close Button */}
+            <button
+              onClick={onClose}
+              className="sm:hidden p-1.5 rounded-lg hover:bg-surface-muted text-ink/50 hover:text-ink shrink-0 cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Controls Row */}
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
             {/* View Mode Toggle */}
-            <div className="flex items-center bg-surface border border-border rounded-xl p-0.5 text-xs font-heading font-semibold">
+            <div className="flex items-center bg-surface border border-border rounded-xl p-0.5 text-[11px] sm:text-xs font-heading font-semibold">
               <button
                 onClick={() => setViewMode('BLOCKS')}
-                className={`px-3 py-1 rounded-lg transition-all ${
-                  viewMode === 'BLOCKS' ? 'bg-ink text-white' : 'text-ink/60 hover:text-ink'
+                className={`px-2.5 sm:px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'BLOCKS' ? 'bg-ink text-white shadow-xs' : 'text-ink/60 hover:text-ink'
                 }`}
               >
                 Visual Sections
               </button>
               <button
                 onClick={() => setViewMode('RAW_JSON')}
-                className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
-                  viewMode === 'RAW_JSON' ? 'bg-ink text-white' : 'text-ink/60 hover:text-ink'
+                className={`px-2.5 sm:px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  viewMode === 'RAW_JSON' ? 'bg-ink text-white shadow-xs' : 'text-ink/60 hover:text-ink'
                 }`}
               >
                 <FileCode className="w-3.5 h-3.5" /> Full JSON
               </button>
             </div>
 
+            {/* Desktop Close Button */}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-xl hover:bg-surface-muted text-ink/40 hover:text-ink transition-colors"
+              className="hidden sm:flex p-1.5 rounded-xl hover:bg-surface-muted text-ink/40 hover:text-ink transition-colors cursor-pointer"
+              aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
@@ -199,7 +213,7 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
         ) : viewMode === 'RAW_JSON' ? (
           <div className="flex-1 flex flex-col bg-[#1e1e1e] text-emerald-400 font-mono text-xs overflow-hidden">
             {/* JSON Viewer Sub-Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 bg-[#252526] border-b border-[#333333] shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-2.5 bg-[#252526] border-b border-[#333333] shrink-0">
               <div className="flex items-center gap-2">
                 <span className="text-white/60 text-[11px] font-sans">Scope:</span>
                 <div className="flex items-center bg-[#1e1e1e] rounded-lg p-0.5 text-[11px] font-sans">
@@ -235,7 +249,7 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
               <button
                 onClick={handleDownloadFullJson}
                 disabled={isExporting}
-                className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-sans font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto justify-center px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-sans font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Download className="w-3.5 h-3.5 text-emerald-400" />
                 <span>{isExporting ? 'Preparing...' : 'Download Full JSON (.json)'}</span>
@@ -244,17 +258,17 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
 
             {/* Warning banner when on Full Preview */}
             {jsonScope === 'FULL_PREVIEW' && (
-              <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-[11px] font-sans flex items-center gap-2 shrink-0">
+              <div className="px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-[11px] font-sans flex items-center gap-2 shrink-0">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
                 <span>
-                  Showing high-performance preview (first 250 lines) to prevent browser freeze. The complete dataset has {pages.length} pages. Click &quot;Download Full JSON&quot; above to save the entire file.
+                  Showing high-performance preview (first 250 lines). Click &quot;Download Full JSON&quot; above to save the complete {pages.length}-page dataset.
                 </span>
               </div>
             )}
 
             {/* Code Body */}
-            <div className="flex-1 p-6 overflow-y-auto selection:bg-emerald-900">
-              <pre className="font-mono text-xs whitespace-pre-wrap leading-relaxed">
+            <div className="flex-1 p-3 sm:p-6 overflow-y-auto selection:bg-emerald-900">
+              <pre className="font-mono text-xs whitespace-pre-wrap break-all leading-relaxed">
                 {jsonScope === 'PAGE'
                   ? pageJson
                   : fullJson
@@ -264,9 +278,49 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex overflow-hidden">
-            {/* Left Sidebar: Pages List */}
-            <div className="w-56 border-r border-border bg-surface-muted/30 overflow-y-auto p-3 space-y-1.5 shrink-0">
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            {/* Mobile Page Navigator Bar (Visible on < 768px, replaces the crushing sidebar) */}
+            <div className="md:hidden flex items-center justify-between gap-2 px-3 py-2 bg-surface-muted/70 border-b border-border shrink-0">
+              <button
+                onClick={() => setSelectedPageIndex((prev) => Math.max(0, prev - 1))}
+                disabled={selectedPageIndex === 0 || pages.length === 0}
+                className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink disabled:opacity-30 cursor-pointer shrink-0 active:scale-95"
+              >
+                ← Prev
+              </button>
+
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-xs font-heading font-semibold text-ink/70 shrink-0">Page</span>
+                <select
+                  value={selectedPageIndex}
+                  onChange={(e) => setSelectedPageIndex(Number(e.target.value))}
+                  disabled={pages.length === 0}
+                  className="px-2 py-1 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink focus:outline-none focus:border-forest max-w-[120px] xs:max-w-[150px] truncate"
+                >
+                  {pages.length === 0 ? (
+                    <option value={0}>0</option>
+                  ) : (
+                    pages.map((p, idx) => (
+                      <option key={p.id} value={idx}>
+                        {p.page_number} ({p.layout_type.replace('_COLUMN', '')})
+                      </option>
+                    ))
+                  )}
+                </select>
+                <span className="text-xs text-ink/50 shrink-0">of {pages.length}</span>
+              </div>
+
+              <button
+                onClick={() => setSelectedPageIndex((prev) => Math.min(pages.length - 1, prev + 1))}
+                disabled={selectedPageIndex >= pages.length - 1 || pages.length === 0}
+                className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink disabled:opacity-30 cursor-pointer shrink-0 active:scale-95"
+              >
+                Next →
+              </button>
+            </div>
+
+            {/* Desktop & Tablet Left Sidebar (Hidden on mobile, visible on md: 768px+) */}
+            <div className="hidden md:block w-56 border-r border-border bg-surface-muted/30 overflow-y-auto p-3 space-y-1.5 shrink-0">
               <p className="text-[11px] font-heading font-bold text-ink/50 uppercase tracking-wider px-2 mb-2">
                 Pages ({pages.length})
               </p>
@@ -274,18 +328,18 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                 <button
                   key={p.id}
                   onClick={() => setSelectedPageIndex(idx)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-heading font-semibold flex items-center justify-between transition-all ${
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-heading font-semibold flex items-center justify-between transition-all cursor-pointer ${
                     selectedPageIndex === idx
                       ? 'bg-ink text-white shadow-xs'
                       : 'hover:bg-surface text-ink/70 hover:text-ink border border-transparent hover:border-border'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Layout className="w-3.5 h-3.5 opacity-60" />
-                    <span>Page {p.page_number}</span>
+                  <div className="flex items-center gap-2 truncate">
+                    <Layout className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                    <span className="truncate">Page {p.page_number}</span>
                   </div>
                   <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${
                       selectedPageIndex === idx ? 'bg-white/20 text-white' : 'bg-surface-muted text-ink/60'
                     }`}
                   >
@@ -295,22 +349,22 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
               ))}
             </div>
 
-            {/* Right Pane: Extracted Page Sections */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-surface">
+            {/* Right Content Pane (Takes 100% width on mobile, flex-1 on tablet/desktop) */}
+            <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 bg-surface">
               {currentPage ? (
                 <>
-                  <div className="flex items-center justify-between pb-3 border-b border-border">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1.5 pb-3 border-b border-border">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-heading font-bold text-sm text-ink">
                         Page {currentPage.page_number}
                       </span>
                       {currentPage.chapter_title && (
-                        <span className="text-xs text-ink/60">
+                        <span className="text-xs text-ink/60 truncate max-w-xs">
                           — {currentPage.chapter_title}
                         </span>
                       )}
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-forest/10 text-forest border border-forest/20">
+                    <span className="self-start xs:self-auto px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-forest/10 text-forest border border-forest/20 shrink-0">
                       Layout: {currentPage.layout_type}
                     </span>
                   </div>
@@ -320,10 +374,10 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                       currentPage.structured_content.map((sec, sIdx) => (
                         <div
                           key={sIdx}
-                          className="p-4 rounded-xl border border-border bg-surface-muted/30 hover:border-forest/30 transition-all space-y-2"
+                          className="p-3 sm:p-4 rounded-xl border border-border bg-surface-muted/30 hover:border-forest/30 transition-all space-y-2"
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
                               {getSectionBadge(sec.type)}
                               {sec.heading && (
                                 <span className="text-xs font-heading font-bold text-ink">
@@ -345,12 +399,12 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                           )}
 
                           {sec.latex_equations && sec.latex_equations.length > 0 && (
-                            <div className="p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/20 font-mono text-xs text-purple-900">
+                            <div className="p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/20 font-mono text-xs text-purple-900 overflow-x-auto">
                               <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1">
                                 Extracted LaTeX:
                               </p>
                               {sec.latex_equations.map((eq, eqIdx) => (
-                                <div key={eqIdx} className="bg-white/80 p-1.5 rounded border border-purple-200 my-1">
+                                <div key={eqIdx} className="bg-white/80 p-1.5 rounded border border-purple-200 my-1 break-all">
                                   <code>{eq}</code>
                                 </div>
                               ))}
@@ -358,8 +412,8 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                           )}
 
                           {sec.image_caption && (
-                            <div className="text-[11px] font-heading font-medium text-ink/60 italic flex items-center gap-1.5">
-                              <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
+                            <div className="text-[11px] font-heading font-medium text-ink/60 italic flex items-center gap-1.5 flex-wrap">
+                              <ImageIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                               <span>{sec.image_caption}</span>
                             </div>
                           )}
@@ -374,7 +428,7 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                 </>
               ) : (
                 <div className="p-8 text-center text-xs text-ink/50">
-                  Select a page from the left to inspect its extracted structure.
+                  Select a page to inspect its extracted structure.
                 </div>
               )}
             </div>

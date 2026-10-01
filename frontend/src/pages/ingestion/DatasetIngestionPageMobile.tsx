@@ -8,10 +8,12 @@ import {
   HeartHandshake,
   Download,
   Eye,
+  Play,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import {
   fetchIngestionJobs,
+  processIngestionChunk,
   deleteIngestionJob,
   exportJobJson,
   type IngestionJobSummary,
@@ -27,6 +29,7 @@ export const DatasetIngestionPageMobile: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [inspectionJob, setInspectionJob] = useState<{ id: number; title: string } | null>(null);
+  const [processingJobIds, setProcessingJobIds] = useState<Set<number>>(new Set());
 
   const loadJobs = async () => {
     try {
@@ -42,6 +45,46 @@ export const DatasetIngestionPageMobile: React.FC = () => {
   useEffect(() => {
     loadJobs();
   }, []);
+
+  const handleAutoProcessAll = async (jobId: number) => {
+    if (processingJobIds.has(jobId)) return;
+    setProcessingJobIds((prev) => new Set(prev).add(jobId));
+
+    let isDone = false;
+    while (!isDone) {
+      try {
+        const res = await processIngestionChunk(jobId, 20);
+        setJobs((prevJobs) =>
+          prevJobs.map((j) =>
+            j.id === jobId
+              ? {
+                  ...j,
+                  processed_pages: res.processed_pages,
+                  progress_percentage: res.progress_percentage,
+                  status: res.status as any,
+                  current_stage: res.current_stage,
+                }
+              : j
+          )
+        );
+
+        if (res.is_finished || res.status === 'COMPLETED' || res.status === 'FAILED') {
+          isDone = true;
+        }
+      } catch (err) {
+        console.error(`Error processing chunk for job ${jobId}`, err);
+        isDone = true;
+      }
+    }
+
+    setProcessingJobIds((prev) => {
+      const next = new Set(prev);
+      next.delete(jobId);
+      return next;
+    });
+
+    loadJobs();
+  };
 
   const handleDeleteJob = async (jobId: number) => {
     if (!window.confirm('Remove this submission?')) return;
@@ -70,27 +113,46 @@ export const DatasetIngestionPageMobile: React.FC = () => {
     }
   };
 
+  const totalPages = jobs.reduce((acc, j) => acc + (j.processed_pages || 0), 0);
+
   return (
-    <div className="w-full px-4 py-5 space-y-5 animate-in fade-in duration-200">
+    <div className="w-full space-y-4 pb-28 animate-in fade-in duration-200">
       {/* ── Mobile Header ── */}
       <div className="space-y-1">
-        <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-forest">
-          {isSuperAdmin ? 'AI Dataset' : 'Study Material'}
-        </span>
-        <h1 className="text-xl font-heading font-extrabold text-ink">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-forest animate-pulse" />
+          <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-forest">
+            {isSuperAdmin ? 'AI Dataset Pipeline' : 'Study Material'}
+          </span>
+        </div>
+        <h1 className="text-xl font-heading font-extrabold text-ink tracking-tight">
           {isSuperAdmin ? 'Document Ingestion' : 'Submit Material'}
         </h1>
         <p className="text-xs text-ink/60 font-body">
           {isSuperAdmin
-            ? 'Process textbooks & notes for AI dataset extraction.'
+            ? 'Extract multi-column text, formulas in LaTeX, and diagrams.'
             : 'Upload reference materials or notes for academic review.'}
         </p>
       </div>
 
-      {/* ── Floating / Full-Width Upload Button ── */}
+      {/* ── Super Admin Quick Metric Chips ── */}
+      {isSuperAdmin && jobs.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="p-3 rounded-xl border border-border bg-surface shadow-2xs">
+            <span className="text-[10px] font-heading font-bold text-ink/50 uppercase">Documents</span>
+            <p className="text-lg font-heading font-extrabold text-ink mt-0.5">{jobs.length}</p>
+          </div>
+          <div className="p-3 rounded-xl border border-border bg-surface shadow-2xs">
+            <span className="text-[10px] font-heading font-bold text-ink/50 uppercase">Pages Ready</span>
+            <p className="text-lg font-heading font-extrabold text-ink mt-0.5">{totalPages}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Upload Action Button (Full-width, high-contrast, touch-optimized) ── */}
       <button
         onClick={() => setIsUploadOpen(true)}
-        className="w-full py-3 px-4 rounded-xl bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold shadow-sm flex items-center justify-center gap-2 active:scale-98 transition-all"
+        className="w-full min-h-[46px] py-2.5 px-4 rounded-xl bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold shadow-sm flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer"
       >
         <UploadCloud className="w-4 h-4" />
         <span>Upload PDF Document</span>
@@ -98,7 +160,7 @@ export const DatasetIngestionPageMobile: React.FC = () => {
 
       {/* Contributor Message */}
       {!isSuperAdmin && (
-        <div className="p-3.5 rounded-xl border border-forest/20 bg-forest/5 flex items-start gap-2.5">
+        <div className="p-3 rounded-xl border border-forest/20 bg-forest/5 flex items-start gap-2.5">
           <HeartHandshake className="w-4 h-4 text-forest shrink-0 mt-0.5" />
           <p className="text-[11px] text-ink/75 leading-relaxed font-body">
             Thank you! Your uploaded study materials help teachers build better question papers.
@@ -106,92 +168,151 @@ export const DatasetIngestionPageMobile: React.FC = () => {
         </div>
       )}
 
-      {/* ── Submissions List ── */}
-      <div className="space-y-3">
+      {/* ── Submissions Queue ── */}
+      <div className="space-y-3 pt-1">
         <div className="flex items-center justify-between text-xs font-heading font-bold text-ink/60 uppercase tracking-wider px-1">
-          <span>{isSuperAdmin ? 'Documents' : 'My Uploads'}</span>
-          <span>{jobs.length}</span>
+          <span>{isSuperAdmin ? 'Queue' : 'My Uploads'}</span>
+          <span className="font-mono text-ink/40">{jobs.length} files</span>
         </div>
 
         {isLoading ? (
           <div className="p-8 text-center text-xs text-ink/60 flex items-center justify-center gap-2">
             <div className="w-4 h-4 border-2 border-forest/30 border-t-forest rounded-full animate-spin" />
-            <span>Loading...</span>
+            <span>Loading submissions...</span>
           </div>
         ) : jobs.length === 0 ? (
-          <div className="p-6 text-center rounded-xl border border-dashed border-border bg-surface space-y-1.5">
-            <FileText className="w-6 h-6 text-ink/30 mx-auto" />
-            <p className="text-xs font-heading font-bold text-ink">No materials uploaded</p>
+          <div className="p-8 text-center rounded-xl border border-dashed border-border bg-surface space-y-2">
+            <FileText className="w-8 h-8 text-ink/30 mx-auto" />
+            <p className="text-xs font-heading font-bold text-ink">No materials uploaded yet</p>
             <p className="text-[11px] text-ink/50">Tap the button above to upload a PDF</p>
           </div>
         ) : (
-          jobs.map((job) => (
-            <div key={job.id} className="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-2.5">
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-forest/10 text-forest">
-                    {job.board || 'NCERT'} {job.standard ? `· Class ${job.standard}` : ''}
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-surface-muted text-ink/70">
-                    {job.subject || 'General'}
-                  </span>
-                  {!isSuperAdmin && (
-                    job.status === 'COMPLETED' ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-emerald-500/10 text-emerald-700">
-                        <CheckCircle2 className="w-2.5 h-2.5" /> Accepted
+          jobs.map((job) => {
+            const isProcessing = processingJobIds.has(job.id);
+            return (
+              <div
+                key={job.id}
+                className="p-3.5 rounded-xl border border-border bg-surface shadow-2xs space-y-3"
+              >
+                {/* Badges & Meta */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-forest/10 text-forest border border-forest/20">
+                      {job.board || 'NCERT'} {job.standard ? `· Class ${job.standard}` : ''}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-surface-muted text-ink/70">
+                      {job.subject || 'General'}
+                    </span>
+                    {isSuperAdmin && (
+                      <span
+                        className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${
+                          job.status === 'COMPLETED'
+                            ? 'bg-emerald-500/10 text-emerald-700'
+                            : job.status === 'FAILED'
+                            ? 'bg-red-500/10 text-red-700'
+                            : 'bg-amber-500/10 text-amber-700'
+                        }`}
+                      >
+                        {job.status}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-blue-500/10 text-blue-700">
-                        <Clock className="w-2.5 h-2.5" /> Under Review
-                      </span>
-                    )
-                  )}
-                </div>
-                <h3 className="text-xs font-heading font-bold text-ink leading-snug">{job.title}</h3>
-              </div>
-
-              {/* Progress on Mobile (Super Admin) */}
-              {isSuperAdmin && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[9px] text-ink/50 font-mono">
-                    <span>{job.processed_pages}/{job.total_pages} pages</span>
-                    <span>{job.progress_percentage}%</span>
+                    )}
+                    {!isSuperAdmin && (
+                      job.status === 'COMPLETED' ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-emerald-500/10 text-emerald-700">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Accepted
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-blue-500/10 text-blue-700">
+                          <Clock className="w-2.5 h-2.5" /> Under Review
+                        </span>
+                      )
+                    )}
                   </div>
-                  <div className="w-full h-1 rounded-full bg-surface-muted overflow-hidden">
-                    <div className="h-full bg-forest" style={{ width: `${job.progress_percentage}%` }} />
-                  </div>
-                </div>
-              )}
 
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                  {/* Title */}
+                  <h3 className="text-xs font-heading font-bold text-ink leading-snug break-words">
+                    {job.title}
+                  </h3>
+                </div>
+
+                {/* Progress Bar (Super Admin) */}
                 {isSuperAdmin && (
-                  <>
-                    <button
-                      onClick={() => setInspectionJob({ id: job.id, title: job.title })}
-                      className="px-2.5 py-1 rounded-lg border border-border text-[11px] font-heading font-semibold text-ink flex items-center gap-1"
-                    >
-                      <Eye className="w-3 h-3" />
-                      <span>Inspect</span>
-                    </button>
-                    <button
-                      onClick={() => handleDownloadJson(job)}
-                      className="p-1.5 rounded-lg border border-border text-ink/70"
-                      title="Download JSON"
-                    >
-                      <Download className="w-3 h-3" />
-                    </button>
-                  </>
+                  <div className="space-y-1 bg-surface-muted/40 p-2 rounded-lg border border-border/40">
+                    <div className="flex justify-between items-center text-[10px] text-ink/60 font-mono">
+                      <span className="truncate max-w-[200px]">
+                        {job.current_stage || `${job.processed_pages}/${job.total_pages} pages`}
+                      </span>
+                      <span className="font-bold">{job.progress_percentage}%</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-surface-muted overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          job.status === 'FAILED' ? 'bg-red-500' : 'bg-forest'
+                        }`}
+                        style={{ width: `${job.progress_percentage}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
-                <button
-                  onClick={() => handleDeleteJob(job.id)}
-                  className="p-1.5 rounded-lg border border-border text-ink/40 hover:text-red-600"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+
+                {/* Action Controls (Touch-Friendly: min 38px height) */}
+                <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-border/50">
+                  {/* Left: Auto Extract / Resume (Super Admin) */}
+                  <div className="flex items-center gap-1.5">
+                    {isSuperAdmin && job.status !== 'COMPLETED' && (
+                      <button
+                        onClick={() => handleAutoProcessAll(job.id)}
+                        disabled={isProcessing}
+                        className="min-h-[38px] px-3 py-1.5 rounded-lg bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Extracting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>Extract</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Right: Inspect, Download, Delete */}
+                  <div className="flex items-center gap-1.5">
+                    {isSuperAdmin && (
+                      <>
+                        <button
+                          onClick={() => setInspectionJob({ id: job.id, title: job.title })}
+                          className="min-h-[38px] min-w-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-ink text-xs font-heading font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                          title="Inspect Visual & JSON"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-ink/70" />
+                          <span>View</span>
+                        </button>
+                        <button
+                          onClick={() => handleDownloadJson(job)}
+                          className="min-h-[38px] min-w-[38px] p-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-ink/70 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+                          title="Download Dataset JSON"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleDeleteJob(job.id)}
+                      className="min-h-[38px] min-w-[38px] p-2 rounded-lg border border-border/80 bg-surface hover:bg-red-50 text-ink/40 hover:text-red-600 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -212,3 +333,4 @@ export const DatasetIngestionPageMobile: React.FC = () => {
     </div>
   );
 };
+

@@ -118,49 +118,66 @@ export const DatasetIngestionPageTablet: React.FC = () => {
   };
 
   const totalPagesCount = jobs.reduce((acc, j) => acc + (j.processed_pages || 0), 0);
+  const completedJobsCount = jobs.filter((j) => j.status === 'COMPLETED').length;
 
   return (
-    <div className="max-w-4xl mx-auto px-5 py-6 space-y-6 animate-in fade-in duration-200">
+    <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* ── Tablet Header Bar ── */}
-      <div className="flex items-center justify-between gap-3 pb-4 border-b border-border">
+      <div className="flex items-center justify-between gap-4 pb-5 border-b border-border">
         <div>
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="w-2 h-2 rounded-full bg-forest animate-pulse" />
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-forest animate-pulse" />
             <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-forest">
-              {isSuperAdmin ? 'AI Pipeline' : 'Material Submissions'}
+              {isSuperAdmin ? 'AI Dataset Pipeline' : 'Study Material Submissions'}
             </span>
           </div>
           <h1 className="text-2xl font-heading font-extrabold text-ink tracking-tight">
             {isSuperAdmin ? 'Document Ingestion' : 'Contribute Study Material'}
           </h1>
+          <p className="text-xs text-ink/60 font-body mt-0.5">
+            {isSuperAdmin
+              ? 'Multi-column layout analysis, LaTeX formulas, and pedagogical blocks.'
+              : 'Upload reference materials to assist automated question generation.'}
+          </p>
         </div>
 
         <button
           onClick={() => setIsUploadOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold shadow-sm transition-all shrink-0 active:scale-95"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold shadow-sm transition-all shrink-0 active:scale-95 cursor-pointer"
         >
           <UploadCloud className="w-4 h-4" />
           <span>Upload PDF</span>
         </button>
       </div>
 
-      {/* ── Tablet Super Admin Stats (2-column grid) ── */}
+      {/* ── Tablet Super Admin Stats Bento Grid (3-column grid) ── */}
       {isSuperAdmin ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3.5">
           <div className="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-ink/50">
-              <span className="text-xs font-heading font-bold uppercase">Documents</span>
+              <span className="text-[11px] font-heading font-bold uppercase">Documents</span>
               <BookOpen className="w-4 h-4 text-forest" />
             </div>
-            <p className="text-xl font-heading font-extrabold text-ink">{jobs.length}</p>
+            <p className="text-2xl font-heading font-extrabold text-ink">{jobs.length}</p>
+            <p className="text-[10px] text-ink/50">Submitted textbook files</p>
           </div>
 
           <div className="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-ink/50">
-              <span className="text-xs font-heading font-bold uppercase">Pages Processed</span>
+              <span className="text-[11px] font-heading font-bold uppercase">Pages Extracted</span>
               <Layers className="w-4 h-4 text-purple-600" />
             </div>
-            <p className="text-xl font-heading font-extrabold text-ink">{totalPagesCount}</p>
+            <p className="text-2xl font-heading font-extrabold text-ink">{totalPagesCount}</p>
+            <p className="text-[10px] text-ink/50">Structured dataset pages</p>
+          </div>
+
+          <div className="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-1">
+            <div className="flex items-center justify-between text-ink/50">
+              <span className="text-[11px] font-heading font-bold uppercase">Datasets Ready</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            </div>
+            <p className="text-2xl font-heading font-extrabold text-ink">{completedJobsCount}</p>
+            <p className="text-[10px] text-ink/50">Ready for question gen</p>
           </div>
         </div>
       ) : (
@@ -174,34 +191,51 @@ export const DatasetIngestionPageTablet: React.FC = () => {
 
       {/* ── Tablet Document Cards ── */}
       <div className="space-y-3">
-        <h2 className="text-xs font-heading font-bold text-ink/60 uppercase tracking-wider px-1">
-          {isSuperAdmin ? 'Material Queue' : 'My Uploads'} ({jobs.length})
-        </h2>
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-xs font-heading font-bold text-ink/60 uppercase tracking-wider">
+            {isSuperAdmin ? 'Material Queue' : 'My Uploads'} ({jobs.length})
+          </h2>
+          <span className="text-[11px] font-mono text-ink/40">Real-time status</span>
+        </div>
 
         {isLoading ? (
-          <div className="p-8 text-center text-xs text-ink/60 flex items-center justify-center gap-2">
+          <div className="p-10 text-center text-xs text-ink/60 flex items-center justify-center gap-2">
             <div className="w-4 h-4 border-2 border-forest/30 border-t-forest rounded-full animate-spin" />
-            <span>Loading...</span>
+            <span>Loading submissions...</span>
           </div>
         ) : jobs.length === 0 ? (
-          <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-surface space-y-2">
+          <div className="p-10 text-center rounded-2xl border border-dashed border-border bg-surface space-y-2">
             <FileText className="w-8 h-8 text-ink/30 mx-auto" />
             <p className="text-xs font-heading font-bold text-ink">No documents submitted yet</p>
+            <p className="text-[11px] text-ink/50">Upload a PDF to start dataset extraction</p>
           </div>
         ) : (
           jobs.map((job) => {
             const isProcessing = processingJobIds.has(job.id);
             return (
               <div key={job.id} className="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-forest/10 text-forest">
-                        {job.board} {job.standard ? `Class ${job.standard}` : ''}
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-forest/10 text-forest border border-forest/20">
+                        {job.board || 'NCERT'} {job.standard ? `· Class ${job.standard}` : ''}
                       </span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-muted text-ink/70">
-                        {job.subject}
+                        {job.subject || 'General'}
                       </span>
+                      {isSuperAdmin && (
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                            job.status === 'COMPLETED'
+                              ? 'bg-emerald-500/10 text-emerald-700'
+                              : job.status === 'FAILED'
+                              ? 'bg-red-500/10 text-red-700'
+                              : 'bg-amber-500/10 text-amber-700'
+                          }`}
+                        >
+                          {job.status}
+                        </span>
+                      )}
                       {!isSuperAdmin && (
                         job.status === 'COMPLETED' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700">
@@ -214,41 +248,56 @@ export const DatasetIngestionPageTablet: React.FC = () => {
                         )
                       )}
                     </div>
-                    <h3 className="text-sm font-heading font-bold text-ink">{job.title}</h3>
+                    <h3 className="text-sm font-heading font-bold text-ink leading-snug break-words">
+                      {job.title}
+                    </h3>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Tablet Action Buttons (Touch friendly: 40px height) */}
+                  <div className="flex items-center gap-2 shrink-0">
                     {isSuperAdmin && (
                       <>
                         {job.status !== 'COMPLETED' && (
                           <button
                             onClick={() => handleAutoProcessAll(job.id)}
                             disabled={isProcessing}
-                            className="p-2 rounded-xl bg-forest text-white hover:bg-forest/90"
-                            title="Auto-extract all"
+                            className="min-h-[40px] px-3.5 py-2 rounded-xl bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                            title="Auto-extract all pages"
                           >
-                            <Play className="w-4 h-4" />
+                            {isProcessing ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Extracting...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                                <span>Extract</span>
+                              </>
+                            )}
                           </button>
                         )}
                         <button
                           onClick={() => setInspectionJob({ id: job.id, title: job.title })}
-                          className="p-2 rounded-xl border border-border bg-surface text-ink hover:bg-surface-muted"
+                          className="min-h-[40px] px-3 py-2 rounded-xl border border-border bg-surface text-ink hover:bg-surface-muted text-xs font-heading font-semibold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
                           title="Inspect Data"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-4 h-4 text-ink/70" />
+                          <span>View</span>
                         </button>
                         <button
                           onClick={() => handleDownloadJson(job)}
-                          className="p-2 rounded-xl border border-border bg-surface text-ink hover:bg-surface-muted"
+                          className="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-border bg-surface text-ink hover:bg-surface-muted active:scale-95 transition-all flex items-center justify-center cursor-pointer"
                           title="Download JSON"
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-4 h-4 text-ink/70" />
                         </button>
                       </>
                     )}
                     <button
                       onClick={() => handleDeleteJob(job.id)}
-                      className="p-2 rounded-xl border border-border text-ink/40 hover:text-red-600"
+                      className="min-h-[40px] min-w-[40px] p-2 rounded-xl border border-border bg-surface text-ink/40 hover:text-red-600 hover:bg-red-50 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+                      title="Remove"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -256,13 +305,18 @@ export const DatasetIngestionPageTablet: React.FC = () => {
                 </div>
 
                 {isSuperAdmin && (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-ink/50 font-mono">
+                  <div className="space-y-1 bg-surface-muted/40 p-2.5 rounded-lg border border-border/40">
+                    <div className="flex justify-between items-center text-[10px] text-ink/60 font-mono">
                       <span>{job.current_stage || `${job.processed_pages}/${job.total_pages} pages`}</span>
-                      <span>{job.progress_percentage}%</span>
+                      <span className="font-bold">{job.progress_percentage}%</span>
                     </div>
                     <div className="w-full h-1.5 rounded-full bg-surface-muted overflow-hidden">
-                      <div className="h-full bg-forest" style={{ width: `${job.progress_percentage}%` }} />
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          job.status === 'FAILED' ? 'bg-red-500' : 'bg-forest'
+                        }`}
+                        style={{ width: `${job.progress_percentage}%` }}
+                      />
                     </div>
                   </div>
                 )}

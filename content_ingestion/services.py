@@ -120,11 +120,6 @@ class IngestionService:
             job.save(update_fields=["status", "error_message"])
             return {"error": "Source file missing", "is_finished": True}
 
-        # For digital textbooks, PyMuPDF is ultra-fast in-memory (<35MB RAM).
-        # We can process 20 pages per batch to drastically reduce HTTP round-trips over the network.
-        if job.document_kind == DocumentKind.TEXTBOOK and chunk_size < 20:
-            chunk_size = 20
-
         doc = fitz.open(file_path)
         total_pages = len(doc)
         start_page = job.processed_pages + 1
