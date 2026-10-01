@@ -22,6 +22,7 @@ import {
 } from '../../api/ingestion';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
+import { SkeletonIngestionList } from '../../components/ui/skeleton';
 
 export const DatasetIngestionPageTablet: React.FC = () => {
   const { user, hasCapability } = useAuth();
@@ -199,10 +200,7 @@ export const DatasetIngestionPageTablet: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="p-10 text-center text-xs text-ink/60 flex items-center justify-center gap-2">
-            <div className="w-4 h-4 border-2 border-forest/30 border-t-forest rounded-full animate-spin" />
-            <span>Loading submissions...</span>
-          </div>
+          <SkeletonIngestionList count={3} />
         ) : jobs.length === 0 ? (
           <div className="p-10 text-center rounded-2xl border border-dashed border-border bg-surface space-y-2">
             <FileText className="w-8 h-8 text-ink/30 mx-auto" />

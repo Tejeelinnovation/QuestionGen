@@ -25,6 +25,7 @@ import {
 } from '../../api/ingestion';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
+import { SkeletonIngestionList } from '../../components/ui/skeleton';
 
 export const DatasetIngestionPageDesktop: React.FC = () => {
   const { user, hasCapability } = useAuth();
@@ -222,10 +223,7 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="p-12 text-center text-xs text-ink/60 flex items-center justify-center gap-2">
-            <div className="w-4 h-4 border-2 border-forest/30 border-t-forest rounded-full animate-spin" />
-            <span>Loading submissions...</span>
-          </div>
+          <SkeletonIngestionList count={4} />
         ) : jobs.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-surface-muted border border-border mx-auto flex items-center justify-center text-ink/40">

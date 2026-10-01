@@ -685,35 +685,42 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
             CapabilityName.CREATE_TEACHER,
             CapabilityName.CREATE_STUDENT,
             CapabilityName.VIEW_SCHOOL_WIDE_CONTROLS,
+            CapabilityName.UPLOAD_STUDY_MATERIAL,
         ],
         "Teacher": [
             CapabilityName.CREATE_STUDENT,
             CapabilityName.GENERATE_SELECT_QUESTIONS,
             CapabilityName.CREATE_PAPER,
             CapabilityName.ASSIGN_TEST,
+            CapabilityName.UPLOAD_STUDY_MATERIAL,
         ],
         "Data Entry Operator": [
             CapabilityName.DATA_ENTRY_OPERATOR,
             CapabilityName.GENERATE_SELECT_QUESTIONS,
             CapabilityName.VALIDATOR,
+            CapabilityName.UPLOAD_STUDY_MATERIAL,
         ],
         "Validator": [
             CapabilityName.VALIDATOR,
             CapabilityName.GENERATE_SELECT_QUESTIONS,
             CapabilityName.DATA_ENTRY_OPERATOR,
+            CapabilityName.UPLOAD_STUDY_MATERIAL,
         ],
         "DEO & Validator": [
             CapabilityName.DATA_ENTRY_OPERATOR,
             CapabilityName.VALIDATOR,
             CapabilityName.GENERATE_SELECT_QUESTIONS,
+            CapabilityName.UPLOAD_STUDY_MATERIAL,
         ],
         "Student": [
             CapabilityName.ATTEMPT_TEST,
             CapabilityName.VIEW_OWN_RESULT,
+            CapabilityName.UPLOAD_STUDY_MATERIAL,
         ],
         "Question Bank Manager": [
             CapabilityName.INGEST_GLOBAL_QUESTIONS,
             CapabilityName.GENERATE_SELECT_QUESTIONS,
+            CapabilityName.UPLOAD_STUDY_MATERIAL,
         ],
     }
 

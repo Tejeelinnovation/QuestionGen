@@ -5,10 +5,11 @@ import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { PermissionManager } from './PermissionManager';
 import type { User, CapabilityName, ClassSection } from '../../types';
-import { X, UserCheck, Shield, Check, AlertCircle, RefreshCw, BookOpen, GraduationCap } from 'lucide-react';
+import { X, UserCheck, Shield, Check, AlertCircle, BookOpen, GraduationCap } from 'lucide-react';
 import { PhoneInput } from '../ui/phone-input';
 import { SearchableSubjectSelect } from '../ui/searchable-subject-select';
 import { CustomSelect } from '../ui/custom-select';
+import { Skeleton } from '../ui/skeleton';
 
 interface UpdateUserModalProps {
   userId: number | null;
@@ -238,9 +239,28 @@ export const UpdateUserModal: React.FC<UpdateUserModalProps> = ({
         {/* Drawer Body */}
         <div className="flex-1 overflow-y-auto p-6">
           {isLoading && (
-            <div className="py-16 text-center space-y-3 text-ink/60">
-              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-forest" />
-              <p className="text-xs font-medium">Fetching scoped user data...</p>
+            <div className="space-y-4 pt-2" aria-hidden="true">
+              <div className="space-y-1.5">
+                <Skeleton className="h-3.5 w-28" radius="sm" />
+                <Skeleton className="h-9 w-full" radius="card" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3.5 w-20" radius="sm" />
+                  <Skeleton className="h-9 w-full" radius="card" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3.5 w-20" radius="sm" />
+                  <Skeleton className="h-9 w-full" radius="card" />
+                </div>
+              </div>
+              <div className="space-y-2 pt-2">
+                <Skeleton className="h-3.5 w-36" radius="sm" />
+                <div className="grid grid-cols-2 gap-2">
+                  <Skeleton className="h-16 w-full" radius="card" />
+                  <Skeleton className="h-16 w-full" radius="card" />
+                </div>
+              </div>
             </div>
           )}
 

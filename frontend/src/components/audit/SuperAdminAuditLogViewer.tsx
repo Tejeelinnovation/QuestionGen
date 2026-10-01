@@ -15,6 +15,7 @@ import {
   GraduationCap,
 } from 'lucide-react';
 import { Pagination } from '../ui/pagination';
+import { Skeleton } from '../ui/skeleton';
 
 export const SuperAdminAuditLogViewer: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -349,12 +350,15 @@ export const SuperAdminAuditLogViewer: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="py-12 text-center text-ink/50">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto text-forest mb-2" />
-                    <span>Loading audit records...</span>
-                  </td>
-                </tr>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="py-3.5 px-4"><Skeleton className="h-3.5 w-24" radius="sm" /></td>
+                    <td className="py-3.5 px-3"><Skeleton className="h-4 w-16" radius="pill" /></td>
+                    <td className="py-3.5 px-3"><Skeleton className="h-3.5 w-28" radius="sm" /></td>
+                    <td className="py-3.5 px-4"><Skeleton className="h-3.5 w-64" radius="sm" /></td>
+                    <td className="py-3.5 px-3 text-right"><Skeleton className="h-6 w-12 ml-auto" radius="pill" /></td>
+                  </tr>
+                ))
               ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-ink/50 space-y-1">

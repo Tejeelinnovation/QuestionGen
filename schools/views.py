@@ -5,6 +5,7 @@ Views for the schools app.
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -100,6 +101,184 @@ class SchoolViewSet(viewsets.ModelViewSet):
             school,
             metadata={"name": school.name, "school_id": school.id},
         )
+
+    @action(detail=True, methods=["get", "post"], url_path="upload-policy")
+    def upload_policy(self, request, pk=None):
+        """
+        Manage school-level bulk study material upload permissions.
+        - GET: Returns the current bulk toggle status and lists any users who held individual grants prior to bulk.
+        - POST: Enables or disables bulk permissions with conflict resolution for prior individual grants.
+        """
+        school = self.get_object()
+
+        if not (request.user.is_superuser or request.user.has_capability("CREATE_SCHOOL")):
+            return Response(
+                {"detail": "Only Super Admins can manage school bulk upload policies."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from users.models import Capability, CapabilityName, User, UserCapability
+
+        policy = school.config.get("study_material_bulk_policy") or {}
+        roles_meta = {
+            "teachers": {"label": "Teachers"},
+            "students": {"label": "Students"},
+            "school_admins": {"label": "School Admins"},
+        }
+
+        cap = Capability.objects.filter(name=CapabilityName.UPLOAD_STUDY_MATERIAL).first()
+        if not cap:
+            return Response(
+                {"detail": "UPLOAD_STUDY_MATERIAL capability not found in database."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        def get_group_users_qs(group_key: str, only_active: bool = False):
+            qs = User.objects.filter(school=school)
+            if only_active:
+                qs = qs.filter(is_active=True)
+            if group_key == "teachers":
+                return qs.filter(role__in=["Teacher", "teacher"])
+            elif group_key == "students":
+                return qs.filter(role__in=["Student", "student"])
+            elif group_key == "school_admins":
+                return qs.filter(role__in=["School Admin", "school_admin"])
+            return qs.none()
+
+        if request.method == "GET":
+            result = {}
+            for key in roles_meta.keys():
+                group_policy = policy.get(key, {})
+                enabled = bool(group_policy.get("enabled", False))
+                prior_ids = group_policy.get("prior_grant_user_ids", [])
+
+                users_qs = get_group_users_qs(key, only_active=True)
+                total_count = users_qs.count()
+                active_with_cap = (
+                    users_qs.filter(user_capabilities__capability=cap).distinct().count()
+                )
+
+                prior_users = []
+                if prior_ids:
+                    prior_qs = User.objects.filter(id__in=prior_ids, school=school)
+                    for u in prior_qs:
+                        full_name = f"{u.first_name} {u.last_name}".strip()
+                        prior_users.append({
+                            "id": u.id,
+                            "username": u.username,
+                            "name": full_name or u.username,
+                        })
+
+                result[key] = {
+                    "enabled": enabled,
+                    "total_count": total_count,
+                    "active_with_permission": active_with_cap,
+                    "prior_users": prior_users,
+                }
+            return Response(result)
+
+        elif request.method == "POST":
+            role_group = request.data.get("role_group")
+            if role_group not in roles_meta:
+                return Response(
+                    {"detail": f"Invalid role_group. Must be one of: {list(roles_meta.keys())}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            enabled = bool(request.data.get("enabled", False))
+            preserve_prior = bool(request.data.get("preserve_prior_grants", True))
+
+            users_qs = get_group_users_qs(role_group, only_active=False)
+
+            with transaction.atomic():
+                group_policy = policy.get(role_group, {})
+
+                if enabled:
+                    # Record prior individual holders before bulk grant
+                    existing_user_ids = list(
+                        users_qs.filter(user_capabilities__capability=cap)
+                        .values_list("id", flat=True)
+                    )
+                    group_policy["prior_grant_user_ids"] = existing_user_ids
+                    group_policy["enabled"] = True
+
+                    # Grant to all users in this group who don't already have it
+                    unassigned_users = users_qs.exclude(id__in=existing_user_ids)
+                    new_caps = [
+                        UserCapability(
+                            user=u,
+                            capability=cap,
+                            granted_by=request.user,
+                        )
+                        for u in unassigned_users
+                    ]
+                    UserCapability.objects.bulk_create(new_caps, ignore_conflicts=True)
+
+                    log_action(
+                        request.user,
+                        "school.bulk_upload_policy.enabled",
+                        school,
+                        metadata={
+                            "role_group": role_group,
+                            "prior_grant_count": len(existing_user_ids),
+                            "total_affected": users_qs.count(),
+                        },
+                    )
+                else:
+                    prior_ids = set(group_policy.get("prior_grant_user_ids", []))
+                    group_policy["enabled"] = False
+
+                    if preserve_prior and prior_ids:
+                        # Revoke only from users granted by bulk, keep prior individual grants
+                        revoke_qs = users_qs.exclude(id__in=prior_ids)
+                        UserCapability.objects.filter(
+                            user__in=revoke_qs,
+                            capability=cap,
+                        ).delete()
+                    else:
+                        # Revoke for all in this role group
+                        UserCapability.objects.filter(
+                            user__in=users_qs,
+                            capability=cap,
+                        ).delete()
+
+                    group_policy["prior_grant_user_ids"] = []
+
+                    log_action(
+                        request.user,
+                        "school.bulk_upload_policy.disabled",
+                        school,
+                        metadata={
+                            "role_group": role_group,
+                            "preserved_prior": preserve_prior,
+                            "prior_count": len(prior_ids),
+                        },
+                    )
+
+                policy[role_group] = group_policy
+                school.config["study_material_bulk_policy"] = policy
+                school.save(update_fields=["config"])
+
+            # Return refreshed policy structure
+            result = {}
+            for key in roles_meta.keys():
+                gp = policy.get(key, {})
+                en = bool(gp.get("enabled", False))
+                pids = gp.get("prior_grant_user_ids", [])
+                u_qs = get_group_users_qs(key, only_active=True)
+                p_users = []
+                if pids:
+                    p_qs = User.objects.filter(id__in=pids, school=school)
+                    for u in p_qs:
+                        fn = f"{u.first_name} {u.last_name}".strip()
+                        p_users.append({"id": u.id, "username": u.username, "name": fn or u.username})
+                result[key] = {
+                    "enabled": en,
+                    "total_count": u_qs.count(),
+                    "active_with_permission": u_qs.filter(user_capabilities__capability=cap).distinct().count(),
+                    "prior_users": p_users,
+                }
+            return Response(result)
 
 
 class ClassSectionViewSet(viewsets.ModelViewSet):
