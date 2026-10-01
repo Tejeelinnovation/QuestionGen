@@ -88,23 +88,24 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-surface border border-border rounded-2xl shadow-2xl p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+      <div className="relative w-full max-w-xl bg-surface border border-border rounded-xl sm:rounded-2xl shadow-2xl p-4 sm:p-8 animate-in fade-in zoom-in-95 duration-200 my-auto">
         <button
           onClick={onClose}
           disabled={isUploading}
-          className="absolute top-5 right-5 text-ink/40 hover:text-ink transition-colors"
+          className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 p-1 text-ink/40 hover:text-ink transition-colors cursor-pointer"
+          aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-forest/10 border border-forest/20 flex items-center justify-center text-forest">
-            <UploadCloud className="w-5 h-5" />
+        <div className="flex items-center gap-3 mb-5 pr-8">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-forest/10 border border-forest/20 flex items-center justify-center text-forest shrink-0">
+            <UploadCloud className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <h2 className="text-lg font-heading font-bold text-ink">Upload Document for Dataset</h2>
-            <p className="text-xs text-ink/60">
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-lg font-heading font-bold text-ink truncate">Upload Document for Dataset</h2>
+            <p className="text-[11px] sm:text-xs text-ink/60 line-clamp-1">
               Extract multi-column text, formulas in LaTeX, and diagrams for AI training.
             </p>
           </div>
@@ -252,19 +253,19 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+          <div className="flex flex-col-reverse xs:flex-row xs:items-center justify-end gap-2.5 pt-4 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isUploading}
-              className="px-4 py-2 text-xs font-heading font-semibold text-ink/70 hover:text-ink rounded-xl border border-border hover:bg-surface-muted transition-colors"
+              className="w-full xs:w-auto px-4 py-2.5 text-xs font-heading font-semibold text-ink/70 hover:text-ink rounded-xl border border-border hover:bg-surface-muted transition-colors cursor-pointer text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isUploading || !file}
-              className="px-5 py-2 text-xs font-heading font-bold text-white bg-forest hover:bg-forest/90 rounded-xl transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+              className="w-full xs:w-auto px-5 py-2.5 text-xs font-heading font-bold text-white bg-forest hover:bg-forest/90 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {isUploading ? (
                 <>
