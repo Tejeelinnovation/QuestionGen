@@ -20,6 +20,7 @@ import { PrintViewPage } from './pages/papers/PrintViewPage';
 import { PaperDetailPage } from './pages/papers/PaperDetailPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
+import { DatasetIngestionPage } from './pages/ingestion/DatasetIngestionPage';
 import { RequireCapability } from './auth/RequireCapability';
 import { useAuth } from './auth/AuthContext';
 
@@ -199,6 +200,14 @@ export const routes: RouteObject[] = [
         element: (
           <RequireCapability anyOf={['VIEW_OWN_RESULT', 'ASSIGN_TEST', 'CREATE_PAPER', 'VIEW_SCHOOL_WIDE_CONTROLS']}>
             <ResultPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'dataset-ingestion',
+        element: (
+          <RequireCapability anyOf={['UPLOAD_STUDY_MATERIAL', 'CREATE_SCHOOL']}>
+            <DatasetIngestionPage />
           </RequireCapability>
         ),
       },

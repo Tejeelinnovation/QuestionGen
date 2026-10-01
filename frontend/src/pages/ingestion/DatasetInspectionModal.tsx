@@ -1,0 +1,386 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  X,
+  FileCode,
+  Layout,
+  BookOpen,
+  Image as ImageIcon,
+  FlaskConical,
+  Sigma,
+  HelpCircle,
+  Lightbulb,
+  Download,
+  AlertTriangle,
+} from 'lucide-react';
+import { fetchJobPages, exportJobJson, type ExtractedPage, type StructuredSection } from '../../api/ingestion';
+
+interface DatasetInspectionModalProps {
+  jobId: number;
+  jobTitle: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
+  jobId,
+  jobTitle,
+  isOpen,
+  onClose,
+}) => {
+  const [pages, setPages] = useState<ExtractedPage[]>([]);
+  const [selectedPageIndex, setSelectedPageIndex] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<'BLOCKS' | 'RAW_JSON'>('BLOCKS');
+  const [jsonScope, setJsonScope] = useState<'PAGE' | 'FULL_PREVIEW'>('PAGE');
+  const [fullJson, setFullJson] = useState<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setIsLoading(true);
+    // Only load page records for instant, non-blocking modal display
+    fetchJobPages(jobId)
+      .then((pagesData) => {
+        setPages(pagesData);
+        setSelectedPageIndex(0);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setIsLoading(false);
+      });
+  }, [isOpen, jobId]);
+
+  if (!isOpen) return null;
+
+  const currentPage = pages[selectedPageIndex];
+
+  const pageJson = useMemo(() => {
+    if (!currentPage) return '{}';
+    return JSON.stringify(currentPage, null, 2);
+  }, [currentPage]);
+
+  const fullJsonPreview = useMemo(() => {
+    if (!fullJson) return '';
+    const raw = JSON.stringify(fullJson, null, 2);
+    const lines = raw.split('\n');
+    if (lines.length > 250) {
+      return (
+        lines.slice(0, 250).join('\n') +
+        `\n\n  // ... [Showing preview of first 250 lines out of ${lines.length.toLocaleString()} lines]` +
+        `\n  // ... [Click "Download Full JSON" above to download the complete ${pages.length}-page dataset without browser lag]` +
+        '\n}'
+      );
+    }
+    return raw;
+  }, [fullJson, pages.length]);
+
+  const handleDownloadFullJson = async () => {
+    setIsExporting(true);
+    try {
+      const data = fullJson || (await exportJobJson(jobId));
+      if (!fullJson) setFullJson(data);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dataset_${jobTitle.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${jobId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Failed to download JSON dataset.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const getSectionBadge = (type: StructuredSection['type']) => {
+    switch (type) {
+      case 'ACTIVITY':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-heading font-bold bg-amber-500/10 text-amber-700 border border-amber-500/20">
+            <FlaskConical className="w-3 h-3" /> ACTIVITY
+          </span>
+        );
+      case 'FORMULA':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-heading font-bold bg-purple-500/10 text-purple-700 border border-purple-500/20">
+            <Sigma className="w-3 h-3" /> FORMULA (LATEX)
+          </span>
+        );
+      case 'SOLVED_EXAMPLE':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-heading font-bold bg-blue-500/10 text-blue-700 border border-blue-500/20">
+            <Lightbulb className="w-3 h-3" /> SOLVED EXAMPLE
+          </span>
+        );
+      case 'EXERCISE_QUESTION':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-heading font-bold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+            <HelpCircle className="w-3 h-3" /> EXERCISE QUESTION
+          </span>
+        );
+      case 'DIAGRAM':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-heading font-bold bg-indigo-500/10 text-indigo-700 border border-indigo-500/20">
+            <ImageIcon className="w-3 h-3" /> DIAGRAM
+          </span>
+        );
+      case 'DEFINITION':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-heading font-bold bg-teal-500/10 text-teal-700 border border-teal-500/20">
+            <BookOpen className="w-3 h-3" /> DEFINITION / LAW
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-heading font-bold bg-slate-500/10 text-slate-700 border border-slate-500/20">
+            PARAGRAPH
+          </span>
+        );
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
+      <div className="relative w-full max-w-5xl h-[88vh] bg-surface border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        {/* Top Header */}
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-surface-muted/50 shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 text-[10px] font-mono font-semibold rounded bg-forest/10 text-forest border border-forest/20">
+                JOB #{jobId}
+              </span>
+              <h2 className="text-base font-heading font-bold text-ink">{jobTitle}</h2>
+            </div>
+            <p className="text-xs text-ink/60 mt-0.5">
+              Inspecting extracted reading order, LaTeX formulas, and pedagogical blocks.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-surface border border-border rounded-xl p-0.5 text-xs font-heading font-semibold">
+              <button
+                onClick={() => setViewMode('BLOCKS')}
+                className={`px-3 py-1 rounded-lg transition-all ${
+                  viewMode === 'BLOCKS' ? 'bg-ink text-white' : 'text-ink/60 hover:text-ink'
+                }`}
+              >
+                Visual Sections
+              </button>
+              <button
+                onClick={() => setViewMode('RAW_JSON')}
+                className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  viewMode === 'RAW_JSON' ? 'bg-ink text-white' : 'text-ink/60 hover:text-ink'
+                }`}
+              >
+                <FileCode className="w-3.5 h-3.5" /> Full JSON
+              </button>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl hover:bg-surface-muted text-ink/40 hover:text-ink transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center text-xs text-ink/60 gap-2">
+            <div className="w-4 h-4 border-2 border-forest/30 border-t-forest rounded-full animate-spin" />
+            <span>Loading extracted dataset...</span>
+          </div>
+        ) : viewMode === 'RAW_JSON' ? (
+          <div className="flex-1 flex flex-col bg-[#1e1e1e] text-emerald-400 font-mono text-xs overflow-hidden">
+            {/* JSON Viewer Sub-Header */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-[#252526] border-b border-[#333333] shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-white/60 text-[11px] font-sans">Scope:</span>
+                <div className="flex items-center bg-[#1e1e1e] rounded-lg p-0.5 text-[11px] font-sans">
+                  <button
+                    onClick={() => setJsonScope('PAGE')}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      jsonScope === 'PAGE' ? 'bg-forest text-white font-bold' : 'text-white/70 hover:text-white'
+                    }`}
+                  >
+                    Page {currentPage ? currentPage.page_number : 1} JSON
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setJsonScope('FULL_PREVIEW');
+                      if (!fullJson) {
+                        try {
+                          const data = await exportJobJson(jobId);
+                          setFullJson(data);
+                        } catch (e) {
+                          console.error(e);
+                        }
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      jsonScope === 'FULL_PREVIEW' ? 'bg-forest text-white font-bold' : 'text-white/70 hover:text-white'
+                    }`}
+                  >
+                    Full Dataset Preview
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDownloadFullJson}
+                disabled={isExporting}
+                className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-sans font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{isExporting ? 'Preparing...' : 'Download Full JSON (.json)'}</span>
+              </button>
+            </div>
+
+            {/* Warning banner when on Full Preview */}
+            {jsonScope === 'FULL_PREVIEW' && (
+              <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-[11px] font-sans flex items-center gap-2 shrink-0">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                <span>
+                  Showing high-performance preview (first 250 lines) to prevent browser freeze. The complete dataset has {pages.length} pages. Click &quot;Download Full JSON&quot; above to save the entire file.
+                </span>
+              </div>
+            )}
+
+            {/* Code Body */}
+            <div className="flex-1 p-6 overflow-y-auto selection:bg-emerald-900">
+              <pre className="font-mono text-xs whitespace-pre-wrap leading-relaxed">
+                {jsonScope === 'PAGE'
+                  ? pageJson
+                  : fullJson
+                  ? fullJsonPreview
+                  : '// Loading full dataset preview...'}
+              </pre>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left Sidebar: Pages List */}
+            <div className="w-56 border-r border-border bg-surface-muted/30 overflow-y-auto p-3 space-y-1.5 shrink-0">
+              <p className="text-[11px] font-heading font-bold text-ink/50 uppercase tracking-wider px-2 mb-2">
+                Pages ({pages.length})
+              </p>
+              {pages.map((p, idx) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPageIndex(idx)}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-heading font-semibold flex items-center justify-between transition-all ${
+                    selectedPageIndex === idx
+                      ? 'bg-ink text-white shadow-xs'
+                      : 'hover:bg-surface text-ink/70 hover:text-ink border border-transparent hover:border-border'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Layout className="w-3.5 h-3.5 opacity-60" />
+                    <span>Page {p.page_number}</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                      selectedPageIndex === idx ? 'bg-white/20 text-white' : 'bg-surface-muted text-ink/60'
+                    }`}
+                  >
+                    {p.layout_type.replace('_COLUMN', '')}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Right Pane: Extracted Page Sections */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-surface">
+              {currentPage ? (
+                <>
+                  <div className="flex items-center justify-between pb-3 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <span className="font-heading font-bold text-sm text-ink">
+                        Page {currentPage.page_number}
+                      </span>
+                      {currentPage.chapter_title && (
+                        <span className="text-xs text-ink/60">
+                          — {currentPage.chapter_title}
+                        </span>
+                      )}
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-forest/10 text-forest border border-forest/20">
+                      Layout: {currentPage.layout_type}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {currentPage.structured_content && currentPage.structured_content.length > 0 ? (
+                      currentPage.structured_content.map((sec, sIdx) => (
+                        <div
+                          key={sIdx}
+                          className="p-4 rounded-xl border border-border bg-surface-muted/30 hover:border-forest/30 transition-all space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {getSectionBadge(sec.type)}
+                              {sec.heading && (
+                                <span className="text-xs font-heading font-bold text-ink">
+                                  {sec.heading}
+                                </span>
+                              )}
+                            </div>
+                            {sec.column_index ? (
+                              <span className="text-[10px] font-mono text-ink/40">
+                                Column {sec.column_index}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {sec.text && (
+                            <p className="text-xs text-ink/80 leading-relaxed font-body whitespace-pre-line">
+                              {sec.text}
+                            </p>
+                          )}
+
+                          {sec.latex_equations && sec.latex_equations.length > 0 && (
+                            <div className="p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/20 font-mono text-xs text-purple-900">
+                              <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1">
+                                Extracted LaTeX:
+                              </p>
+                              {sec.latex_equations.map((eq, eqIdx) => (
+                                <div key={eqIdx} className="bg-white/80 p-1.5 rounded border border-purple-200 my-1">
+                                  <code>{eq}</code>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {sec.image_caption && (
+                            <div className="text-[11px] font-heading font-medium text-ink/60 italic flex items-center gap-1.5">
+                              <ImageIcon className="w-3.5 h-3.5 text-indigo-500" />
+                              <span>{sec.image_caption}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center text-xs text-ink/40 border border-dashed border-border rounded-xl">
+                        No sections extracted for this page yet.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="p-8 text-center text-xs text-ink/50">
+                  Select a page from the left to inspect its extracted structure.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

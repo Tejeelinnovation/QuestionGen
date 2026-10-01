@@ -29,6 +29,15 @@ urlpatterns = [
     # Schools tenant management
     path("api/schools/", include(("schools.urls", "schools"), namespace="schools")),
 
+    # Content Ingestion & Training Dataset Collection
+    path("api/ingest/", include(("content_ingestion.urls", "content_ingestion"), namespace="content_ingestion")),
+
     # System audit logs & proctoring metrics
     path("api/", include(("core.urls", "core"), namespace="core")),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
