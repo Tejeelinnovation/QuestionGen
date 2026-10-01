@@ -195,7 +195,8 @@ DOCUMENT_EXTRACTOR_BACKEND = env("DOCUMENT_EXTRACTOR_BACKEND", default="auto")
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 GEMINI_MODEL_NAME = env("GEMINI_MODEL_NAME", default="gemini-2.0-flash")
 GOOGLE_DRIVE_FOLDER_ID = env("GOOGLE_DRIVE_FOLDER_ID", default="")
-GOOGLE_DRIVE_CREDENTIALS_FILE = env("GOOGLE_DRIVE_CREDENTIALS_FILE", default="")
+GOOGLE_DRIVE_USER_TOKEN_FILE = env("GOOGLE_DRIVE_USER_TOKEN_FILE", default="google_drive_token.json")
+GOOGLE_DRIVE_USER_TOKEN_JSON = env("GOOGLE_DRIVE_USER_TOKEN_JSON", default="")
 
 # ---------------------------------------------------------------------------
 # Default primary key type
