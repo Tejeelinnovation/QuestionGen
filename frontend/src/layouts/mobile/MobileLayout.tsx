@@ -7,6 +7,7 @@ import {
   BookOpen,
   User as UserIcon,
   Database,
+  UploadCloud,
 } from 'lucide-react';
 
 export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
@@ -19,6 +20,7 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
   const isTeacher = hasCapability('CREATE_PAPER') && !isSuperAdmin && !isSchoolAdmin;
   const isStudent = hasCapability('ATTEMPT_TEST') && !isTeacher && !isSchoolAdmin && !isSuperAdmin;
   const isQBM = (hasCapability('INGEST_GLOBAL_QUESTIONS') || hasCapability('DATA_ENTRY_OPERATOR') || hasCapability('VALIDATOR')) && !isSuperAdmin;
+  const canUploadMaterial = hasCapability('UPLOAD_STUDY_MATERIAL') || isSuperAdmin;
 
   const tabs = [
     {
@@ -36,6 +38,17 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
             icon: Database,
             path: '/dashboard/qbm',
             isActive: location.pathname.startsWith('/dashboard/qbm'),
+          },
+        ]
+      : []),
+    ...(canUploadMaterial
+      ? [
+          {
+            id: 'dataset-ingestion',
+            label: isSuperAdmin ? 'Datasets' : 'Material',
+            icon: UploadCloud,
+            path: '/dataset-ingestion',
+            isActive: location.pathname.startsWith('/dataset-ingestion'),
           },
         ]
       : []),
