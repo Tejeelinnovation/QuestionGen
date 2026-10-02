@@ -138,9 +138,29 @@ class IngestionQueueWorker:
     @classmethod
     def _process_job_chunks(cls, job: IngestionJob, service: IngestionService, chunk_size: int = 15):
         """
-        Processes an individual job in batches of pages.
-        Updates progress after each chunk and yields CPU so web server stays responsive.
+        Processes an individual job.
+        If DOCUMENT_AI_MICROSERVICE_URL is set, delegates to the Standalone AI Microservice.
+        Otherwise falls back to the local memory-safe chunk processor.
         """
+        from django.conf import settings
+        from .extractors.remote_client import RemoteAiMicroserviceExtractor
+
+        remote_client = RemoteAiMicroserviceExtractor()
+        if remote_client.is_configured:
+            logger.info(f"Dispatching Job #{job.pk} to Remote AI Microservice ({remote_client.service_url})...")
+            callback_url = getattr(settings, "BACKEND_BASE_URL", "").rstrip("/") + f"/api/ingest/jobs/{job.pk}/webhook/"
+            try:
+                job.status = JobStatus.EXTRACTING
+                job.current_stage = "Processing via Document AI Microservice in cloud..."
+                job.save(update_fields=["status", "current_stage"])
+                remote_client.dispatch_extraction(job, callback_url=callback_url)
+                return
+            except Exception as remote_err:
+                logger.warning(
+                    f"Remote microservice failed for Job #{job.pk} ({remote_err}). "
+                    "Falling back to local chunk pipeline."
+                )
+
         while True:
             # If job was initialized but total_pages is 0, initialize it
             if job.total_pages == 0:
