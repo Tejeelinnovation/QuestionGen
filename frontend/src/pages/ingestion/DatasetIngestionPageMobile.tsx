@@ -9,6 +9,8 @@ import {
   Download,
   Eye,
   Play,
+  RotateCcw,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import {
@@ -16,6 +18,7 @@ import {
   enqueueJob,
   enqueueAllJobs,
   deleteIngestionJob,
+  resetIngestionJob,
   exportJobJson,
   type IngestionJobSummary,
 } from '../../api/ingestion';
@@ -32,6 +35,7 @@ export const DatasetIngestionPageMobile: React.FC = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [inspectionJob, setInspectionJob] = useState<{ id: number; title: string } | null>(null);
   const [processingJobIds, setProcessingJobIds] = useState<Set<number>>(new Set());
+  const [resettingJobIds, setResettingJobIds] = useState<Set<number>>(new Set());
   const [isBulkEnqueuing, setIsBulkEnqueuing] = useState(false);
 
   const loadJobs = async () => {
@@ -73,6 +77,22 @@ export const DatasetIngestionPageMobile: React.FC = () => {
       console.error(`Error enqueuing job ${jobId}`, err);
     } finally {
       setProcessingJobIds((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+    }
+  };
+
+  const handleResetJob = async (jobId: number) => {
+    try {
+      setResettingJobIds((prev) => new Set(prev).add(jobId));
+      await resetIngestionJob(jobId);
+      await loadJobs();
+    } catch (err) {
+      console.error(`Error resetting job ${jobId}`, err);
+    } finally {
+      setResettingJobIds((prev) => {
         const next = new Set(prev);
         next.delete(jobId);
         return next;
@@ -289,9 +309,13 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                         style={{ width: `${job.progress_percentage}%` }}
                       />
                     </div>
-                    {job.status === 'FAILED' && job.error_message && (
-                      <div className="text-[10px] text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200/60 mt-1 font-mono break-words">
-                        {job.error_message}
+                    {job.status === 'FAILED' && (
+                      <div className="flex items-start gap-1.5 p-2 rounded bg-red-50 border border-red-200 text-red-800 text-[10px] mt-1 font-mono">
+                        <AlertCircle className="w-3 h-3 text-red-600 shrink-0 mt-0.5" />
+                        <div className="flex-1 break-words">
+                          <span className="font-bold">Error: </span>
+                          {job.error_message || 'Cloud runner encountered an error.'}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -302,24 +326,44 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                 <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-border/50">
                   {/* Left: Auto Extract / Resume (Super Admin) */}
                   <div className="flex items-center gap-1.5">
-                    {isSuperAdmin && job.status !== 'COMPLETED' && (
-                      <button
-                        onClick={() => handleAutoProcessAll(job.id)}
-                        disabled={isProcessing || job.status === 'EXTRACTING'}
-                        className="min-h-[38px] px-3 py-1.5 rounded-lg bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-                      >
-                        {isProcessing || job.status === 'EXTRACTING' ? (
-                          <>
-                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Extracting...</span>
-                          </>
-                        ) : (
-                          <>
+                    {isSuperAdmin && (
+                      <>
+                        {job.status === 'EXTRACTING' ? (
+                          <div className="flex items-center gap-1">
+                            <div className="min-h-[38px] px-2.5 py-1.5 rounded-lg bg-forest/80 text-white text-xs font-heading font-semibold flex items-center gap-1 shadow-2xs">
+                              <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              <span>Extracting...</span>
+                            </div>
+                            <button
+                              onClick={() => handleResetJob(job.id)}
+                              disabled={resettingJobIds.has(job.id)}
+                              className="min-h-[38px] px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-heading font-semibold flex items-center gap-1 active:scale-95 disabled:opacity-50 cursor-pointer"
+                              title="Stop & Reset"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Reset</span>
+                            </button>
+                          </div>
+                        ) : job.status === 'FAILED' ? (
+                          <button
+                            onClick={() => handleAutoProcessAll(job.id)}
+                            disabled={isProcessing}
+                            className="min-h-[38px] px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Retry</span>
+                          </button>
+                        ) : job.status !== 'COMPLETED' ? (
+                          <button
+                            onClick={() => handleAutoProcessAll(job.id)}
+                            disabled={isProcessing}
+                            className="min-h-[38px] px-3 py-1.5 rounded-lg bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                          >
                             <Play className="w-3.5 h-3.5 fill-current" />
                             <span>Extract</span>
-                          </>
-                        )}
-                      </button>
+                          </button>
+                        ) : null}
+                      </>
                     )}
                   </div>
 

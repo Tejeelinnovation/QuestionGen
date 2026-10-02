@@ -63,6 +63,10 @@ class IngestionJobListCreateView(generics.ListCreateAPIView):
         if not user_can_upload_material(user):
             raise PermissionDenied("You do not have permission to upload or view study materials.")
 
+        # Cleanup any stuck extracting jobs that have timed out (>2 minutes)
+        from .queue import IngestionQueueWorker
+        IngestionQueueWorker.cleanup_stalled_jobs(timeout_minutes=2)
+
         # Super Admin sees all materials across all schools
         if is_super_admin(user):
             return IngestionJob.objects.all().prefetch_related("chapters")
@@ -252,6 +256,32 @@ class IngestionJobEnqueueAllView(APIView):
         )
 
 
+class IngestionJobResetView(APIView):
+    """
+    Resets an extracting or failed job back to PENDING. RESTRICTED TO SUPER ADMIN.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        user = request.user
+        if not user_can_upload_material(user):
+            raise PermissionDenied("You do not have permission to manage ingestion jobs.")
+
+        from django.shortcuts import get_object_or_404
+        job = get_object_or_404(IngestionJob, pk=pk)
+        job.status = JobStatus.PENDING
+        job.error_message = ""
+        job.current_stage = "Job reset by admin. Ready for extraction."
+        job.save(update_fields=["status", "error_message", "current_stage"])
+
+        IngestionQueueWorker.mark_job_completed_or_failed(job.pk)
+        return Response(
+            {"status": "RESET", "job_id": job.pk, "job_status": job.status},
+            status=status.HTTP_200_OK,
+        )
+
+
 class IngestionJobPagesListView(generics.ListAPIView):
     """
     List extracted pages for a specific job. RESTRICTED TO SUPER ADMIN.
@@ -380,9 +410,13 @@ class IngestionJobWebhookView(APIView):
         data = request.data
         if data.get("status") == "FAILED":
             job.status = JobStatus.FAILED
-            job.error_message = data.get("error_message", "Microservice extraction failed.")
-            job.save(update_fields=["status", "error_message"])
-            return Response({"status": "ERROR_RECORDED"}, status=status.HTTP_200_OK)
+            error_msg = data.get("error_message") or data.get("error") or "Microservice extraction failed."
+            job.error_message = error_msg
+            job.current_stage = f"Failed: {error_msg[:120]}"
+            job.save(update_fields=["status", "error_message", "current_stage"])
+            from .queue import IngestionQueueWorker
+            IngestionQueueWorker.mark_job_completed_or_failed(job.pk)
+            return Response({"status": "ERROR_RECORDED", "error": error_msg}, status=status.HTTP_200_OK)
 
         toc_entries = data.get("table_of_contents", [])
         pages_data = data.get("pages", [])

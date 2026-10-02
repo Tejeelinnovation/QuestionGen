@@ -59,3 +59,18 @@ jobs:
             --callback-url "$CALLBACK_URL" \
             --document-kind "$DOCUMENT_KIND" \
             --webhook-secret "$WEBHOOK_SECRET"
+
+      - name: Report Failure to Backend Webhook
+        if: failure()
+        env:
+          JOB_ID: ${{ github.event.client_payload.job_id || inputs.job_id }}
+          CALLBACK_URL: ${{ github.event.client_payload.callback_url || inputs.callback_url }}
+          WEBHOOK_SECRET: ${{ secrets.INGESTION_WEBHOOK_SECRET || '' }}
+        run: |
+          if [ -n "$CALLBACK_URL" ]; then
+            echo "Notifying Django backend of runner failure: $CALLBACK_URL"
+            curl -s -X POST "$CALLBACK_URL" \
+              -H "Content-Type: application/json" \
+              -H "X-Ingestion-Secret: $WEBHOOK_SECRET" \
+              -d "{\"job_id\": \"$JOB_ID\", \"status\": \"FAILED\", \"error_message\": \"GitHub Actions runner workflow failed during extraction. Check GitHub Actions workflow run logs for full details.\"}" || true
+          fi

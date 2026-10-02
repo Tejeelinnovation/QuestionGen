@@ -141,3 +141,15 @@ export const enqueueAllJobs = async (): Promise<{
 export const deleteIngestionJob = async (id: number): Promise<void> => {
   await apiClient.delete(`/api/ingest/jobs/${id}/`);
 };
+
+export const resetIngestionJob = async (
+  id: number
+): Promise<{
+  status: string;
+  job_id: number;
+  job_status: string;
+}> => {
+  const response = await apiClient.post(`/api/ingest/jobs/${id}/reset/`);
+  return response.data;
+};
+

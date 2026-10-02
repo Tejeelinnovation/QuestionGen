@@ -120,6 +120,7 @@ def main():
             error_payload = {
                 "job_id": args.job_id,
                 "status": "FAILED",
+                "error_message": f"Worker extraction error: {str(exc)}",
                 "error": str(exc),
             }
             send_webhook(args.callback_url, error_payload, secret=args.webhook_secret)

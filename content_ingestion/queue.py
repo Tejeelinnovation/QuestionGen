@@ -127,11 +127,47 @@ class IngestionQueueWorker:
             logger.info("IngestionQueueWorker loop exited cleanly.")
 
     @classmethod
+    def cleanup_stalled_jobs(cls, timeout_minutes: int = 2) -> list[int]:
+        """
+        Scans for any jobs stuck in EXTRACTING for more than `timeout_minutes` without updates,
+        and marks them as FAILED with an informative error message.
+        Returns the IDs of timed out jobs.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+
+        stale_cutoff = timezone.now() - timedelta(minutes=timeout_minutes)
+        stalled_jobs = IngestionJob.objects.filter(
+            status=JobStatus.EXTRACTING,
+            updated_at__lt=stale_cutoff,
+        )
+        timed_out_ids = []
+        for stalled in stalled_jobs:
+            logger.warning(f"Job #{stalled.pk} timed out in EXTRACTING state (>{timeout_minutes} mins). Marking as FAILED.")
+            stalled.status = JobStatus.FAILED
+            stalled.error_message = (
+                f"Extraction timed out after {timeout_minutes} minutes. The cloud runner did not deliver results back to Render. "
+                "Common causes: 1) BACKEND_BASE_URL is not set to your live HTTPS Render domain in Render Environment, "
+                "2) GitHub Actions runner encountered an error, or 3) GitHub Actions queue was delayed. "
+                "Verify BACKEND_BASE_URL on Render and click 'Retry Extraction'."
+            )
+            stalled.current_stage = f"Timed out after {timeout_minutes} mins. Check Render BACKEND_BASE_URL & retry."
+            stalled.save(update_fields=["status", "error_message", "current_stage"])
+            timed_out_ids.append(stalled.pk)
+            with cls._lock:
+                cls._dispatched_job_ids.discard(stalled.pk)
+
+        return timed_out_ids
+
+    @classmethod
     def _acquire_next_job(cls) -> Optional[IngestionJob]:
         """
         Finds the next job to process:
         Picks oldest PENDING job, excluding any jobs that have already been dispatched to a remote runner.
+        Automatically marks any stalled jobs (>2 minutes in EXTRACTING) as FAILED.
         """
+        cls.cleanup_stalled_jobs(timeout_minutes=2)
+
         with cls._lock:
             dispatched_ids = set(cls._dispatched_job_ids)
 
@@ -180,10 +216,12 @@ class IngestionQueueWorker:
             except Exception as remote_err:
                 with cls._lock:
                     cls._dispatched_job_ids.discard(job.pk)
-                logger.warning(
-                    f"Remote microservice failed for Job #{job.pk} ({remote_err}). "
-                    "Falling back to local chunk pipeline."
-                )
+                logger.error(f"Remote extraction dispatch failed for Job #{job.pk}: {remote_err}", exc_info=True)
+                job.status = JobStatus.FAILED
+                job.error_message = f"Cloud dispatch error: {str(remote_err)}"
+                job.current_stage = "Cloud runner dispatch failed. Check environment configuration."
+                job.save(update_fields=["status", "error_message", "current_stage"])
+                return
 
         while True:
             # If job was initialized but total_pages is 0, initialize it
