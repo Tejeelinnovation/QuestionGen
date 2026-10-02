@@ -98,3 +98,6 @@ Thumbs.db
 
 # ---- Docker (future) ----
 docker-compose.override.yml
+
+# Local deployment scripts
+deploy.ps1
