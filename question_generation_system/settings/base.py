@@ -276,4 +276,12 @@ else:
 
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
 
+# ---------------------------------------------------------------------------
+# Document AI Microservice & GitHub Actions Dispatcher
+# ---------------------------------------------------------------------------
+DOCUMENT_AI_MICROSERVICE_URL = env("DOCUMENT_AI_MICROSERVICE_URL", default="")
+GITHUB_DISPATCH_TOKEN = env("GITHUB_DISPATCH_TOKEN", default="")
+GITHUB_DISPATCH_REPO = env("GITHUB_DISPATCH_REPO", default="queraai/QuestionGen")
+BACKEND_BASE_URL = env("BACKEND_BASE_URL", default="http://localhost:8000")
+
 
