@@ -124,7 +124,25 @@ class IngestionJobDetailView(generics.RetrieveDestroyAPIView):
         # Only Super Admin or the owner can delete
         if not (is_super_admin(user) or instance.uploaded_by_id == user.id):
             raise PermissionDenied("You cannot delete this document.")
+
+        # Clean up Google Drive cloud backup
+        if instance.google_drive_file_id:
+            try:
+                from content_ingestion.storage.drive_client import GoogleDriveClient
+                client = GoogleDriveClient()
+                client.delete_file(instance.google_drive_file_id)
+            except Exception as drive_err:
+                logger.warning(f"Could not delete Google Drive file for job #{instance.pk}: {drive_err}")
+
+        # Clean up local file if still present
+        if instance.source_file:
+            try:
+                instance.source_file.delete(save=False)
+            except Exception as file_err:
+                logger.warning(f"Could not delete local file for job #{instance.pk}: {file_err}")
+
         super().perform_destroy(instance)
+
 
 
 class IngestionJobProcessChunkView(APIView):

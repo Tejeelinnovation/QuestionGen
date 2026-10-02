@@ -349,7 +349,10 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                   {isSuperAdmin && (
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center justify-between text-[11px] text-ink/60">
-                        <span className="font-mono">
+                        <span className="font-mono flex items-center gap-1.5 truncate max-w-[80%]">
+                          {job.current_stage?.includes('Google Drive') && (
+                            <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                          )}
                           {job.current_stage || `${job.processed_pages} of ${job.total_pages} pages processed`}
                         </span>
                         <span className="font-mono font-bold text-ink">
@@ -368,8 +371,14 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                           style={{ width: `${job.progress_percentage}%` }}
                         />
                       </div>
+                      {job.status === 'FAILED' && job.error_message && (
+                        <div className="text-[11px] text-red-600 bg-red-50 px-2.5 py-1 rounded-md border border-red-200/60 mt-1 font-mono break-words">
+                          {job.error_message}
+                        </div>
+                      )}
                     </div>
                   )}
+
                 </div>
               );
             })}

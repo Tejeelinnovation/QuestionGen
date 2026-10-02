@@ -13,10 +13,13 @@ export interface IngestionJobSummary {
   processed_pages: number;
   progress_percentage: number;
   current_stage: string;
+  error_message?: string;
+  google_drive_file_id?: string;
   google_drive_url: string;
   created_at: string;
   updated_at: string;
 }
+
 
 export interface ExtractedChapter {
   id: number;

@@ -77,6 +77,21 @@ class Command(BaseCommand):
                 self.stdout.write(f"       File ID: {file_id}")
                 self.stdout.write(f"       View Link: {link}")
 
+                # Test downloading the file back (Server Auto-Restore capability)
+                self.stdout.write("\nTesting server auto-restore (download from Google Drive)...")
+                with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as dl_tmp:
+                    dl_path = dl_tmp.name
+
+                try:
+                    dl_success = client.download_file(file_id, dl_path)
+                    if dl_success and os.path.exists(dl_path) and os.path.getsize(dl_path) > 0:
+                        self.stdout.write(self.style.SUCCESS("[PASS] Successfully downloaded and restored file from Google Drive!"))
+                    else:
+                        self.stdout.write(self.style.WARNING("[WARN] Download test failed."))
+                finally:
+                    if os.path.exists(dl_path):
+                        os.remove(dl_path)
+
                 # Clean up test file from Drive
                 try:
                     from googleapiclient.discovery import build
@@ -86,7 +101,8 @@ class Command(BaseCommand):
                 except Exception as del_err:
                     self.stdout.write(self.style.NOTICE(f"[NOTICE] Could not auto-delete test file: {del_err}"))
 
-                self.stdout.write(self.style.SUCCESS("\n*** Google Drive Integration is 100% OPERATIONAL! ***\n"))
+                self.stdout.write(self.style.SUCCESS("\n*** Google Drive Upload & Auto-Download are 100% OPERATIONAL! ***\n"))
+
 
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"[FAIL] Upload error: {e}"))

@@ -156,3 +156,71 @@ class GoogleDriveClient:
             "file_id": f"local_{os.path.basename(local_file_path)}",
             "web_view_link": f"/media/ingestion_raw/{os.path.basename(local_file_path)}",
         }
+
+    def download_file(self, file_id: str, destination_path: str) -> bool:
+        """
+        Downloads a file from Google Drive given its file_id and writes it to destination_path.
+        Returns True if download succeeded and file is non-empty, False otherwise.
+        """
+        if not file_id or file_id.startswith("local_"):
+            return False
+
+        creds = self.get_credentials()
+        if not creds:
+            logger.warning("No Google Drive credentials configured. Cannot download file.")
+            return False
+
+        try:
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaIoBaseDownload
+            import io
+
+            service = build("drive", "v3", credentials=creds)
+            request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
+
+            os.makedirs(os.path.dirname(os.path.abspath(destination_path)), exist_ok=True)
+            with open(destination_path, "wb") as fh:
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while not done:
+                    status, done = downloader.next_chunk()
+                    if status:
+                        logger.debug(f"Google Drive download progress: {int(status.progress() * 100)}%")
+
+            if os.path.exists(destination_path) and os.path.getsize(destination_path) > 0:
+                logger.info(f"Successfully downloaded Google Drive file {file_id} to {destination_path}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Google Drive download failed for file {file_id}: {e}", exc_info=True)
+            if os.path.exists(destination_path):
+                try:
+                    os.remove(destination_path)
+                except OSError:
+                    pass
+            return False
+
+    def delete_file(self, file_id: str) -> bool:
+        """
+        Deletes a file from Google Drive given its file_id.
+        Returns True if successful, False otherwise.
+        """
+        if not file_id or file_id.startswith("local_"):
+            return False
+
+        creds = self.get_credentials()
+        if not creds:
+            return False
+
+        try:
+            from googleapiclient.discovery import build
+
+            service = build("drive", "v3", credentials=creds)
+            service.files().delete(fileId=file_id, supportsAllDrives=True).execute()
+            logger.info(f"Successfully deleted Google Drive file {file_id}")
+            return True
+        except Exception as e:
+            logger.warning(f"Could not delete Google Drive file {file_id}: {e}")
+            return False
+
+
