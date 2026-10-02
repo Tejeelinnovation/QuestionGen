@@ -84,10 +84,13 @@ class IngestionJobListSerializer(serializers.ModelSerializer):
             "processed_pages",
             "progress_percentage",
             "current_stage",
+            "error_message",
+            "google_drive_file_id",
             "google_drive_url",
             "created_at",
             "updated_at",
         ]
+
 
 
 class IngestionJobDetailSerializer(serializers.ModelSerializer):

@@ -40,17 +40,69 @@ class IngestionService:
         self.toc_detector = TocDetector()
         self.drive_client = GoogleDriveClient()
 
+    def ensure_source_file_available(self, job: IngestionJob) -> Optional[str]:
+        """
+        Ensures that the source PDF exists on the server's local storage.
+        If the server restarted and the file is missing locally, automatically
+        downloads it from the Google Drive cloud backup.
+        """
+        file_path = ""
+        try:
+            if job.source_file and hasattr(job.source_file, "path"):
+                file_path = job.source_file.path
+        except Exception:
+            file_path = ""
+
+        # 1. If file already exists and is non-empty on disk, return immediately
+        if file_path and os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            return file_path
+
+        # 2. Determine target path on server disk
+        media_root = getattr(settings, "MEDIA_ROOT", "media")
+        if not file_path:
+            safe_title = "".join(c for c in job.title if c.isalnum() or c in (" ", "_", "-")).rstrip()
+            safe_title = safe_title.replace(" ", "_") or "document"
+            file_path = os.path.join(str(media_root), "ingestion_raw", f"{safe_title}_{job.pk}.pdf")
+
+        # 3. Attempt to auto-restore from Google Drive cloud backup
+        if job.google_drive_file_id:
+            logger.info(
+                f"Local PDF missing for Job #{job.pk}. Auto-restoring from Google Drive (ID: {job.google_drive_file_id})..."
+            )
+            # Update stage so UI (Mobile, Tablet, Desktop) informs user in real-time
+            job.current_stage = "Restoring PDF from Google Drive cloud backup..."
+            job.save(update_fields=["current_stage"])
+
+            os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+            success = self.drive_client.download_file(job.google_drive_file_id, file_path)
+
+            if success and os.path.exists(file_path):
+                logger.info(f"Successfully restored Job #{job.pk} PDF from Google Drive to {file_path}")
+                try:
+                    rel_path = os.path.relpath(file_path, str(media_root)).replace("\\", "/")
+                    if not job.source_file or not job.source_file.name or job.source_file.name != rel_path:
+                        job.source_file.name = rel_path
+                        job.file_size_bytes = os.path.getsize(file_path)
+                        job.save(update_fields=["source_file", "file_size_bytes"])
+                except Exception as e:
+                    logger.warning(f"Could not update source_file.name for Job #{job.pk}: {e}")
+                return file_path
+            else:
+                logger.error(f"Failed to restore Job #{job.pk} from Google Drive.")
+
+        return None
+
     def initialize_job(self, job: IngestionJob) -> IngestionJob:
         """
         Inspects the uploaded PDF, detects total pages, granularity, and Table of Contents.
         """
-        if not job.source_file or not os.path.exists(job.source_file.path):
+        file_path = self.ensure_source_file_available(job)
+        if not file_path:
             job.status = JobStatus.FAILED
-            job.error_message = "Source file does not exist on disk."
+            job.error_message = "Source file does not exist on disk and could not be retrieved from Google Drive."
             job.save(update_fields=["status", "error_message"])
             return job
 
-        file_path = job.source_file.path
         job.file_size_bytes = os.path.getsize(file_path)
 
         try:
@@ -102,6 +154,7 @@ class IngestionService:
         """
         Processes the next chunk of pages for an ingestion job.
         Safe for 512MB RAM servers and avoids web request timeouts.
+        Automatically restores PDF from Google Drive if the server restarted.
         """
         if job.status == JobStatus.COMPLETED:
             return {
@@ -110,17 +163,19 @@ class IngestionService:
                 "processed_pages": job.processed_pages,
                 "total_pages": job.total_pages,
                 "progress_percentage": 100,
+                "current_stage": job.current_stage,
                 "is_finished": True,
             }
 
-        file_path = job.source_file.path if job.source_file else ""
-        if not file_path or not os.path.exists(file_path):
+        file_path = self.ensure_source_file_available(job)
+        if not file_path:
             job.status = JobStatus.FAILED
-            job.error_message = "Source file missing."
+            job.error_message = "Source file missing on server and could not be restored from Google Drive."
             job.save(update_fields=["status", "error_message"])
-            return {"error": "Source file missing", "is_finished": True}
+            return {"error": job.error_message, "is_finished": True}
 
         doc = fitz.open(file_path)
+
         total_pages = len(doc)
         start_page = job.processed_pages + 1
         end_page = min(total_pages, start_page + chunk_size - 1)
@@ -241,6 +296,20 @@ class IngestionService:
 
             job.save(update_fields=["processed_pages", "status", "current_stage"])
             doc.close()
+
+            # Disk Space Optimization:
+            # Once extraction is 100% complete and verified backed up in Google Drive,
+            # clean up the temporary PDF from server disk so Render/server storage never gets full!
+            if job.status == JobStatus.COMPLETED and job.google_drive_file_id:
+                try:
+                    if file_path and os.path.exists(file_path):
+                        os.remove(file_path)
+                        logger.info(
+                            f"Cleaned up temporary local PDF for completed Job #{job.pk} ({file_path}) to conserve server disk space."
+                        )
+                except Exception as cleanup_err:
+                    logger.warning(f"Could not clean up temporary local file for Job #{job.pk}: {cleanup_err}")
+
 
             return {
                 "job_id": job.pk,
