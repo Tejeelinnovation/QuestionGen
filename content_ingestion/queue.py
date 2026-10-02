@@ -48,6 +48,12 @@ class IngestionQueueWorker:
 
     _lock = threading.Lock()
     _is_running = False
+    _dispatched_job_ids: set[int] = set()
+
+    @classmethod
+    def mark_job_completed_or_failed(cls, job_id: int):
+        with cls._lock:
+            cls._dispatched_job_ids.discard(job_id)
 
     @classmethod
     def is_running(cls) -> bool:
@@ -124,22 +130,35 @@ class IngestionQueueWorker:
     def _acquire_next_job(cls) -> Optional[IngestionJob]:
         """
         Finds the next job to process:
-        First prioritizes any interrupted EXTRACTING jobs, then oldest PENDING jobs.
+        Picks oldest PENDING job, excluding any jobs that have already been dispatched to a remote runner.
         """
-        # Check for interrupted extracting jobs first
-        active_job = IngestionJob.objects.filter(status=JobStatus.EXTRACTING).order_by("created_at").first()
+        with cls._lock:
+            dispatched_ids = set(cls._dispatched_job_ids)
+
+        # 1. Check for interrupted local extracting jobs (not remote dispatched)
+        active_job = (
+            IngestionJob.objects.filter(status=JobStatus.EXTRACTING)
+            .exclude(pk__in=dispatched_ids)
+            .order_by("created_at")
+            .first()
+        )
         if active_job:
             return active_job
 
-        # Pick next pending job
-        pending_job = IngestionJob.objects.filter(status=JobStatus.PENDING).order_by("created_at").first()
+        # 2. Pick next pending job
+        pending_job = (
+            IngestionJob.objects.filter(status=JobStatus.PENDING)
+            .exclude(pk__in=dispatched_ids)
+            .order_by("created_at")
+            .first()
+        )
         return pending_job
 
     @classmethod
     def _process_job_chunks(cls, job: IngestionJob, service: IngestionService, chunk_size: int = 15):
         """
         Processes an individual job.
-        If DOCUMENT_AI_MICROSERVICE_URL is set, delegates to the Standalone AI Microservice.
+        If DOCUMENT_AI_MICROSERVICE_URL or GITHUB_DISPATCH_TOKEN is set, delegates to the Standalone AI Microservice / GitHub runner.
         Otherwise falls back to the local memory-safe chunk processor.
         """
         from django.conf import settings
@@ -147,15 +166,20 @@ class IngestionQueueWorker:
 
         remote_client = RemoteAiMicroserviceExtractor()
         if remote_client.is_configured:
-            logger.info(f"Dispatching Job #{job.pk} to Remote AI Microservice ({remote_client.service_url})...")
+            logger.info(f"Dispatching Job #{job.pk} to Remote AI Microservice / GitHub Actions ({remote_client.mode})...")
             callback_url = getattr(settings, "BACKEND_BASE_URL", "").rstrip("/") + f"/api/ingest/jobs/{job.pk}/webhook/"
             try:
+                with cls._lock:
+                    cls._dispatched_job_ids.add(job.pk)
+
                 job.status = JobStatus.EXTRACTING
-                job.current_stage = "Processing via Document AI Microservice in cloud..."
+                job.current_stage = "Launched 16GB RAM GitHub Actions runner in cloud..."
                 job.save(update_fields=["status", "current_stage"])
                 remote_client.dispatch_extraction(job, callback_url=callback_url)
                 return
             except Exception as remote_err:
+                with cls._lock:
+                    cls._dispatched_job_ids.discard(job.pk)
                 logger.warning(
                     f"Remote microservice failed for Job #{job.pk} ({remote_err}). "
                     "Falling back to local chunk pipeline."
