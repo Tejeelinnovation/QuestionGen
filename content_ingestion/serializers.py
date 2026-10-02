@@ -5,6 +5,7 @@ Serializers for content_ingestion app.
 from rest_framework import serializers
 
 from .models import ExtractedChapter, ExtractedItem, ExtractedPage, IngestionJob
+from .queue import get_job_queue_position
 
 
 class ExtractedChapterSerializer(serializers.ModelSerializer):
@@ -68,6 +69,7 @@ class ExtractedPageSerializer(serializers.ModelSerializer):
 
 class IngestionJobListSerializer(serializers.ModelSerializer):
     progress_percentage = serializers.ReadOnlyField()
+    queue_position = serializers.SerializerMethodField()
 
     class Meta:
         model = IngestionJob
@@ -84,6 +86,7 @@ class IngestionJobListSerializer(serializers.ModelSerializer):
             "processed_pages",
             "progress_percentage",
             "current_stage",
+            "queue_position",
             "error_message",
             "google_drive_file_id",
             "google_drive_url",
@@ -91,12 +94,15 @@ class IngestionJobListSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def get_queue_position(self, obj):
+        return get_job_queue_position(obj)
 
 
 class IngestionJobDetailSerializer(serializers.ModelSerializer):
     chapters = ExtractedChapterSerializer(many=True, read_only=True)
     progress_percentage = serializers.ReadOnlyField()
     items_count = serializers.SerializerMethodField()
+    queue_position = serializers.SerializerMethodField()
 
     class Meta:
         model = IngestionJob
@@ -113,6 +119,7 @@ class IngestionJobDetailSerializer(serializers.ModelSerializer):
             "processed_pages",
             "progress_percentage",
             "current_stage",
+            "queue_position",
             "google_drive_file_id",
             "google_drive_url",
             "error_message",
@@ -126,6 +133,9 @@ class IngestionJobDetailSerializer(serializers.ModelSerializer):
 
     def get_items_count(self, obj) -> int:
         return obj.items.count()
+
+    def get_queue_position(self, obj):
+        return get_job_queue_position(obj)
 
 
 class IngestionJobCreateSerializer(serializers.ModelSerializer):

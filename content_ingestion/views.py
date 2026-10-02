@@ -19,7 +19,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import ExtractedItem, ExtractedPage, IngestionJob
+from .models import ExtractedItem, ExtractedPage, IngestionJob, JobStatus
+from .queue import IngestionQueueWorker, get_job_queue_position
 from .serializers import (
     ExtractedItemSerializer,
     ExtractedPageSerializer,
@@ -89,6 +90,10 @@ class IngestionJobListCreateView(generics.ListCreateAPIView):
         service.initialize_job(job)
         job.refresh_from_db()
 
+        # Automatically start background queue worker for newly uploaded job
+        if job.status == JobStatus.PENDING:
+            IngestionQueueWorker.trigger_worker()
+
         # If Super Admin, return full details. If contributor, return list summary
         if is_super_admin(user):
             detail_serializer = IngestionJobDetailSerializer(job)
@@ -144,7 +149,6 @@ class IngestionJobDetailView(generics.RetrieveDestroyAPIView):
         super().perform_destroy(instance)
 
 
-
 class IngestionJobProcessChunkView(APIView):
     """
     Process next chunk of pages. RESTRICTED TO SUPER ADMIN.
@@ -168,6 +172,84 @@ class IngestionJobProcessChunkView(APIView):
         service = IngestionService()
         result = service.process_chunk(job, chunk_size=chunk_size)
         return Response(result, status=status.HTTP_200_OK)
+
+
+class IngestionJobEnqueueView(APIView):
+    """
+    Enqueue an individual job for background queue processing.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        user = request.user
+        try:
+            job = IngestionJob.objects.get(pk=pk)
+        except IngestionJob.DoesNotExist:
+            return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not (is_super_admin(user) or job.uploaded_by_id == user.id):
+            raise PermissionDenied("You do not have permission to process this document.")
+
+        if job.status == JobStatus.COMPLETED:
+            return Response(
+                {"detail": "Job is already completed.", "status": job.status},
+                status=status.HTTP_200_OK,
+            )
+
+        if job.status == JobStatus.FAILED:
+            job.status = JobStatus.PENDING
+            job.error_message = ""
+            job.current_stage = "Queued for background extraction..."
+            job.save(update_fields=["status", "error_message", "current_stage"])
+
+        IngestionQueueWorker.trigger_worker()
+        queue_pos = get_job_queue_position(job)
+
+        return Response(
+            {
+                "job_id": job.pk,
+                "status": job.status,
+                "queue_position": queue_pos,
+                "message": f"Job #{job.pk} enqueued for processing.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class IngestionJobEnqueueAllView(APIView):
+    """
+    Enqueue all pending/failed jobs in the background queue. RESTRICTED TO SUPER ADMIN.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if not is_super_admin(user):
+            raise PermissionDenied("Only Super Admin can bulk enqueue jobs.")
+
+        jobs_to_queue = IngestionJob.objects.filter(
+            status__in=[JobStatus.PENDING, JobStatus.FAILED]
+        )
+        count = jobs_to_queue.count()
+
+        # Reset failed jobs so worker picks them up cleanly
+        jobs_to_queue.filter(status=JobStatus.FAILED).update(
+            status=JobStatus.PENDING,
+            error_message="",
+            current_stage="Queued for background extraction...",
+        )
+
+        IngestionQueueWorker.trigger_worker()
+
+        return Response(
+            {
+                "enqueued_count": count,
+                "message": f"{count} job(s) queued for background processing.",
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class IngestionJobPagesListView(generics.ListAPIView):

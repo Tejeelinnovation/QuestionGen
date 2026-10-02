@@ -228,3 +228,54 @@ class IngestionApiTests(TestCase):
         self.assertEqual(res_export.status_code, status.HTTP_200_OK)
         self.assertIn("content_tree", res_export.data)
         self.assertEqual(len(res_export.data["content_tree"]), 3)
+
+
+class TaskQueueTests(TestCase):
+    def setUp(self):
+        from users.models import Capability, CapabilityName, UserCapability
+        self.school = School.objects.create(name="Greenwood High")
+        self.superadmin = User.objects.create_user(username="super_admin_queue", password="password123")
+        super_cap, _ = Capability.objects.get_or_create(name=CapabilityName.CREATE_SCHOOL)
+        UserCapability.objects.create(user=self.superadmin, capability=super_cap)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.superadmin)
+
+    def test_queue_position_and_enqueue_endpoints(self):
+        from content_ingestion.queue import get_job_queue_position
+
+        job1 = IngestionJob.objects.create(
+            title="Book 1",
+            school=self.school,
+            uploaded_by=self.superadmin,
+            status=JobStatus.PENDING,
+            total_pages=5,
+        )
+        job2 = IngestionJob.objects.create(
+            title="Book 2",
+            school=self.school,
+            uploaded_by=self.superadmin,
+            status=JobStatus.PENDING,
+            total_pages=10,
+        )
+
+        # Job 1 is first in queue, Job 2 is second
+        self.assertEqual(get_job_queue_position(job1), 1)
+        self.assertEqual(get_job_queue_position(job2), 2)
+
+        # When Job 1 transitions to EXTRACTING, its position becomes 0 (active)
+        job1.status = JobStatus.EXTRACTING
+        job1.save()
+        self.assertEqual(get_job_queue_position(job1), 0)
+        # Job 2 is now next in line (position 2 because 1 job is extracting)
+        self.assertEqual(get_job_queue_position(job2), 2)
+
+        # Test enqueue endpoint
+        res_enqueue = self.client.post(f"/api/ingest/jobs/{job2.pk}/enqueue/")
+        self.assertEqual(res_enqueue.status_code, status.HTTP_200_OK)
+        self.assertIn("queue_position", res_enqueue.data)
+
+        # Test bulk enqueue-all endpoint
+        res_bulk = self.client.post("/api/ingest/jobs/enqueue-all/")
+        self.assertEqual(res_bulk.status_code, status.HTTP_200_OK)
+        self.assertIn("enqueued_count", res_bulk.data)
+

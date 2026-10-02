@@ -7,6 +7,8 @@ from django.urls import path
 from .views import (
     ExtractedItemListView,
     IngestionJobDetailView,
+    IngestionJobEnqueueAllView,
+    IngestionJobEnqueueView,
     IngestionJobExportJsonView,
     IngestionJobListCreateView,
     IngestionJobPagesListView,
@@ -16,8 +18,12 @@ from .views import (
 urlpatterns = [
     # Jobs list and create: GET /api/ingest/jobs/, POST /api/ingest/jobs/
     path("jobs/", IngestionJobListCreateView.as_view(), name="job-list-create"),
+    # Bulk enqueue all pending/failed jobs: POST /api/ingest/jobs/enqueue-all/
+    path("jobs/enqueue-all/", IngestionJobEnqueueAllView.as_view(), name="job-enqueue-all"),
     # Job detail & delete: GET /api/ingest/jobs/{id}/, DELETE /api/ingest/jobs/{id}/
     path("jobs/<int:pk>/", IngestionJobDetailView.as_view(), name="job-detail"),
+    # Enqueue specific job for background queue: POST /api/ingest/jobs/{id}/enqueue/
+    path("jobs/<int:pk>/enqueue/", IngestionJobEnqueueView.as_view(), name="job-enqueue"),
     # Process next chunk of pages: POST /api/ingest/jobs/{id}/process-chunk/
     path("jobs/<int:pk>/process-chunk/", IngestionJobProcessChunkView.as_view(), name="job-process-chunk"),
     # List pages: GET /api/ingest/jobs/{id}/pages/
