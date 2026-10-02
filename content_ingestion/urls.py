@@ -14,6 +14,7 @@ from .views import (
     IngestionJobPagesListView,
     IngestionJobProcessChunkView,
     IngestionJobResetView,
+    IngestionJobSourcePdfView,
     IngestionJobWebhookView,
 )
 
@@ -26,6 +27,8 @@ urlpatterns = [
     path("jobs/<int:pk>/", IngestionJobDetailView.as_view(), name="job-detail"),
     # Reset job back to PENDING: POST /api/ingest/jobs/{id}/reset/
     path("jobs/<int:pk>/reset/", IngestionJobResetView.as_view(), name="job-reset"),
+    # Stream raw source PDF for remote runner: GET /api/ingest/jobs/{id}/source-pdf/
+    path("jobs/<int:pk>/source-pdf/", IngestionJobSourcePdfView.as_view(), name="job-source-pdf"),
     # Webhook receiver for Standalone AI Microservice: POST /api/ingest/jobs/{id}/webhook/
     path("jobs/<int:pk>/webhook/", IngestionJobWebhookView.as_view(), name="job-webhook"),
     # Enqueue specific job for background queue: POST /api/ingest/jobs/{id}/enqueue/

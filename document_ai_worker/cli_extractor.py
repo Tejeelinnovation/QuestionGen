@@ -34,21 +34,61 @@ logger = logging.getLogger("document-ai-cli")
 def download_file(url: str, dest_path: str) -> None:
     """
     Downloads a PDF from a direct URL or Google Drive link.
+    Validates that the downloaded file is a genuine PDF binary.
     """
+    import re
     logger.info(f"Downloading PDF from: {url}")
-    if "drive.google.com" in url and "id=" in url:
-        file_id = url.split("id=")[1].split("&")[0]
-        download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    else:
-        download_url = url
 
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    req = urllib.request.Request(download_url, headers=headers)
-    with urllib.request.urlopen(req, timeout=120) as response, open(dest_path, "wb") as out_file:
-        out_file.write(response.read())
+    # Check if this is a Google Drive link
+    drive_id = None
+    if "drive.google.com" in url:
+        m = re.search(r"/file/d/([a-zA-Z0-9_-]+)", url)
+        if m:
+            drive_id = m.group(1)
+        else:
+            m = re.search(r"[?&]id=([a-zA-Z0-9_-]+)", url)
+            if m:
+                drive_id = m.group(1)
+
+    if drive_id:
+        logger.info(f"Detected Google Drive File ID: {drive_id}. Downloading with confirmation handling...")
+        session = requests.Session()
+        drive_url = "https://drive.google.com/uc?export=download"
+        res = session.get(drive_url, params={"id": drive_id}, stream=True, timeout=120)
+        # Check for Google Drive virus warning token
+        for k, v in res.cookies.items():
+            if k.startswith("download_warning"):
+                res = session.get(drive_url, params={"id": drive_id, "confirm": v}, stream=True, timeout=120)
+                break
+        res.raise_for_status()
+        with open(dest_path, "wb") as f:
+            for chunk in res.iter_content(chunk_size=32768):
+                if chunk:
+                    f.write(chunk)
+    else:
+        # Standard direct URL download (including Django backend source PDF endpoint)
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        res = requests.get(url, headers=headers, stream=True, timeout=120)
+        res.raise_for_status()
+        with open(dest_path, "wb") as f:
+            for chunk in res.iter_content(chunk_size=32768):
+                if chunk:
+                    f.write(chunk)
 
     size_mb = os.path.getsize(dest_path) / (1024 * 1024)
-    logger.info(f"Downloaded PDF successfully: {size_mb:.2f} MB saved to {dest_path}")
+    logger.info(f"Downloaded file: {size_mb:.2f} MB saved to {dest_path}")
+
+    # Validate PDF Magic Bytes (%PDF-)
+    with open(dest_path, "rb") as f:
+        magic = f.read(5)
+        if magic != b"%PDF-":
+            f.seek(0)
+            sample = f.read(500).decode("utf-8", errors="ignore")
+            raise ValueError(
+                f"Downloaded file from {url} is not a valid PDF! (First bytes: {magic!r}). "
+                f"Content preview: {sample[:150]}"
+            )
+
 
 
 def send_webhook(callback_url: str, payload: dict, secret: str = "") -> None:
