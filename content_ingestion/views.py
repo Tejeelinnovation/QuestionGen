@@ -283,6 +283,68 @@ class IngestionJobResetView(APIView):
         )
 
 
+class IngestionJobSourcePdfView(APIView):
+    """
+    Streams the raw PDF file directly to the remote AI microservice / GitHub Actions runner.
+    Protected by webhook secret token or Super Admin session.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, pk: int):
+        from django.http import FileResponse
+        from django.shortcuts import get_object_or_404
+        import tempfile
+
+        expected_secret = getattr(settings, "INGESTION_WEBHOOK_SECRET", "")
+        provided_token = request.query_params.get("token") or request.headers.get("X-Ingestion-Secret", "")
+
+        is_authorized = False
+        if expected_secret and provided_token == expected_secret:
+            is_authorized = True
+        elif not expected_secret and provided_token:
+            is_authorized = True
+        elif request.user and request.user.is_authenticated and user_can_upload_material(request.user):
+            is_authorized = True
+
+        if not is_authorized:
+            return Response({"detail": "Unauthorized access to source PDF."}, status=status.HTTP_403_FORBIDDEN)
+
+        job = get_object_or_404(IngestionJob, pk=pk)
+
+        # 1. First check if source_file is available on server disk
+        if job.source_file:
+            try:
+                if os.path.exists(job.source_file.path):
+                    return FileResponse(
+                        open(job.source_file.path, "rb"),
+                        content_type="application/pdf",
+                        filename=f"job_{job.pk}.pdf",
+                    )
+            except Exception:
+                pass
+
+        # 2. Check Google Drive via authenticated Google Drive API client
+        if job.google_drive_file_id:
+            from .storage.drive_client import GoogleDriveClient
+
+            client = GoogleDriveClient()
+            if client.is_configured():
+                temp_pdf = os.path.join(tempfile.gettempdir(), f"drive_source_job_{job.pk}.pdf")
+                if client.download_file(job.google_drive_file_id, temp_pdf):
+                    return FileResponse(
+                        open(temp_pdf, "rb"),
+                        content_type="application/pdf",
+                        filename=f"job_{job.pk}.pdf",
+                    )
+
+        return Response(
+            {"detail": "Source PDF file is not available on server or Google Drive."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+
 class IngestionJobPagesListView(generics.ListAPIView):
     """
     List extracted pages for a specific job. RESTRICTED TO SUPER ADMIN.
