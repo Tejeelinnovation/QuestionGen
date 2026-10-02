@@ -157,9 +157,75 @@ class GoogleDriveClient:
             "web_view_link": f"/media/ingestion_raw/{os.path.basename(local_file_path)}",
         }
 
-    def upload_bytes(self, data: bytes, destination_name: str, mime_type: str = "image/png") -> Dict[str, str]:
+    _folder_cache: Dict[str, str] = {}
+
+    def get_or_create_subfolder(self, service: Any, subfolder_name: str, parent_id: Optional[str] = None) -> Optional[str]:
         """
-        Uploads in-memory image bytes directly to Google Drive without touching local disk.
+        Finds or creates a subfolder inside parent_id (or self.folder_id).
+        Uses memory cache to avoid repeated Drive API lookups.
+        """
+        parent = parent_id or self.folder_id
+        cache_key = f"{parent}_{subfolder_name}"
+        if cache_key in self._folder_cache:
+            return self._folder_cache[cache_key]
+
+        try:
+            query = f"mimeType = 'application/vnd.google-apps.folder' and name = '{subfolder_name}' and trashed = false"
+            if parent:
+                query += f" and '{parent}' in parents"
+
+            response = service.files().list(
+                q=query,
+                spaces="drive",
+                fields="files(id, name)",
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+            ).execute()
+
+            files = response.get("files", [])
+            if files:
+                folder_id = files[0]["id"]
+            else:
+                folder_metadata: Dict[str, Any] = {
+                    "name": subfolder_name,
+                    "mimeType": "application/vnd.google-apps.folder",
+                }
+                if parent:
+                    folder_metadata["parents"] = [parent]
+
+                folder = service.files().create(
+                    body=folder_metadata,
+                    fields="id",
+                    supportsAllDrives=True,
+                ).execute()
+                folder_id = folder.get("id")
+
+                try:
+                    service.permissions().create(
+                        fileId=folder_id,
+                        body={"role": "reader", "type": "anyone"},
+                        supportsAllDrives=True,
+                    ).execute()
+                except Exception:
+                    pass
+
+            if folder_id:
+                self._folder_cache[cache_key] = folder_id
+                return folder_id
+        except Exception as e:
+            logger.warning(f"Could not get or create subfolder '{subfolder_name}': {e}")
+
+        return parent
+
+    def upload_bytes(
+        self,
+        data: bytes,
+        destination_name: str,
+        mime_type: str = "image/png",
+        subfolder_name: str = "Extracted-Diagrams",
+    ) -> Dict[str, str]:
+        """
+        Uploads in-memory image bytes directly to a subfolder inside Google Drive without touching local disk.
         Returns {'file_id': ..., 'web_view_link': ..., 'direct_url': ...}.
         """
         creds = self.get_credentials()
@@ -171,9 +237,16 @@ class GoogleDriveClient:
 
                 service = build("drive", "v3", credentials=creds)
 
+                # Route into dedicated subfolder (e.g. 'Extracted-Diagrams')
+                target_folder_id = self.folder_id
+                if subfolder_name:
+                    sub_id = self.get_or_create_subfolder(service, subfolder_name, parent_id=self.folder_id)
+                    if sub_id:
+                        target_folder_id = sub_id
+
                 file_metadata: Dict[str, Any] = {"name": destination_name}
-                if self.folder_id:
-                    file_metadata["parents"] = [self.folder_id]
+                if target_folder_id:
+                    file_metadata["parents"] = [target_folder_id]
 
                 media = MediaIoBaseUpload(io.BytesIO(data), mimetype=mime_type, resumable=False)
                 uploaded = (
