@@ -8,6 +8,7 @@ running in high-memory environments (e.g. Hugging Face Spaces 16GB free tier).
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 import requests
@@ -110,6 +111,18 @@ class RemoteAiMicroserviceExtractor:
                 "Accept": "application/vnd.github+json",
                 "User-Agent": "Django-Document-AI-Dispatcher",
             }
+            drive_token_json = getattr(settings, "GOOGLE_DRIVE_USER_TOKEN_JSON", "")
+            if not drive_token_json:
+                token_file = getattr(settings, "GOOGLE_DRIVE_USER_TOKEN_FILE", "google_drive_token.json")
+                if os.path.exists(token_file):
+                    try:
+                        with open(token_file, "r", encoding="utf-8") as tf:
+                            drive_token_json = tf.read().strip()
+                    except Exception:
+                        pass
+
+            drive_folder_id = getattr(settings, "GOOGLE_DRIVE_FOLDER_ID", "")
+
             payload = {
                 "event_type": "extract_document",
                 "client_payload": {
@@ -118,6 +131,8 @@ class RemoteAiMicroserviceExtractor:
                     "document_kind": job.document_kind,
                     "pdf_url": pdf_url,
                     "callback_url": callback_url,
+                    "drive_token_json": drive_token_json,
+                    "drive_folder_id": drive_folder_id,
                 },
             }
             logger.info(f"Triggering GitHub Actions runner on {self.github_repo} for Job #{job.pk}...")
