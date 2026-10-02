@@ -13,6 +13,7 @@ from .views import (
     IngestionJobListCreateView,
     IngestionJobPagesListView,
     IngestionJobProcessChunkView,
+    IngestionJobWebhookView,
 )
 
 urlpatterns = [
@@ -22,6 +23,8 @@ urlpatterns = [
     path("jobs/enqueue-all/", IngestionJobEnqueueAllView.as_view(), name="job-enqueue-all"),
     # Job detail & delete: GET /api/ingest/jobs/{id}/, DELETE /api/ingest/jobs/{id}/
     path("jobs/<int:pk>/", IngestionJobDetailView.as_view(), name="job-detail"),
+    # Webhook receiver for Standalone AI Microservice: POST /api/ingest/jobs/{id}/webhook/
+    path("jobs/<int:pk>/webhook/", IngestionJobWebhookView.as_view(), name="job-webhook"),
     # Enqueue specific job for background queue: POST /api/ingest/jobs/{id}/enqueue/
     path("jobs/<int:pk>/enqueue/", IngestionJobEnqueueView.as_view(), name="job-enqueue"),
     # Process next chunk of pages: POST /api/ingest/jobs/{id}/process-chunk/

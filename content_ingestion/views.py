@@ -357,3 +357,122 @@ class ExtractedItemListView(generics.ListAPIView):
             qs = qs.filter(chapter_id=chapter_id)
 
         return qs
+
+
+class IngestionJobWebhookView(APIView):
+    """
+    Receives completed extraction results from the Standalone AI Microservice.
+    Atomically updates ExtractedChapter, ExtractedPage, and ExtractedItem in the database.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request, pk: int):
+        from django.db import transaction
+        from .models import ExtractedChapter, ExtractedItem, ExtractedPage, ItemType
+
+        try:
+            job = IngestionJob.objects.get(pk=pk)
+        except IngestionJob.DoesNotExist:
+            return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        if data.get("status") == "FAILED":
+            job.status = JobStatus.FAILED
+            job.error_message = data.get("error_message", "Microservice extraction failed.")
+            job.save(update_fields=["status", "error_message"])
+            return Response({"status": "ERROR_RECORDED"}, status=status.HTTP_200_OK)
+
+        toc_entries = data.get("table_of_contents", [])
+        pages_data = data.get("pages", [])
+        total_pages = data.get("total_pages", len(pages_data))
+        granularity = data.get("granularity", job.granularity)
+
+        try:
+            with transaction.atomic():
+                job.total_pages = total_pages
+                job.processed_pages = total_pages
+                job.granularity = granularity
+                job.table_of_contents = toc_entries
+
+                # 1. Populate Chapters
+                job.chapters.all().delete()
+                chapter_map = {}
+                for ch_data in toc_entries:
+                    ch_num = ch_data.get("chapter_number", 1)
+                    ch_obj = ExtractedChapter.objects.create(
+                        job=job,
+                        chapter_number=ch_num,
+                        title=ch_data.get("title", f"Chapter {ch_num}"),
+                        start_page=ch_data.get("start_page", 1),
+                        end_page=ch_data.get("end_page", 1),
+                        summary=ch_data.get("summary", ""),
+                    )
+                    chapter_map[ch_num] = ch_obj
+
+                # 2. Populate Pages
+                job.pages.all().delete()
+                pages_to_create = []
+                for p_data in pages_data:
+                    p_num = p_data.get("page_number", 1)
+                    matched_ch = chapter_map.get(p_data.get("chapter_number"))
+                    sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
+                    pages_to_create.append(
+                        ExtractedPage(
+                            job=job,
+                            page_number=p_num,
+                            chapter=matched_ch,
+                            layout_type=p_data.get("layout_type", "SINGLE_COLUMN"),
+                            raw_text=p_data.get("raw_text", ""),
+                            structured_content=sections,
+                        )
+                    )
+
+                created_pages = ExtractedPage.objects.bulk_create(pages_to_create)
+
+                # 3. Populate Items
+                items_to_create = []
+                for page_obj, p_data in zip(created_pages, pages_data):
+                    sections = p_data.get("sections", [])
+                    for sec in sections:
+                        sec_dict = sec if isinstance(sec, dict) else sec.model_dump()
+                        raw_type = sec_dict.get("type", "PARAGRAPH")
+                        item_type = raw_type if raw_type in ItemType.values else ItemType.PARAGRAPH
+
+                        items_to_create.append(
+                            ExtractedItem(
+                                job=job,
+                                page=page_obj,
+                                chapter=page_obj.chapter,
+                                item_type=item_type,
+                                heading=sec_dict.get("heading", ""),
+                                content=sec_dict.get("text", ""),
+                                latex_equations=sec_dict.get("latex_equations", []),
+                                image_path=sec_dict.get("image_path", ""),
+                                image_caption=sec_dict.get("image_caption", ""),
+                                metadata=sec_dict.get("metadata", {}),
+                            )
+                        )
+
+                if items_to_create:
+                    ExtractedItem.objects.bulk_create(items_to_create, batch_size=500)
+
+                job.status = JobStatus.COMPLETED
+                job.current_stage = f"Completed via AI Microservice! Structured all {total_pages} pages."
+                job.save()
+
+            # Render ephemeral disk cleanup
+            if job.google_drive_file_id and job.source_file:
+                try:
+                    job.source_file.delete(save=False)
+                except Exception:
+                    pass
+
+            return Response({"status": "SUCCESS", "job_id": job.pk}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            job.status = JobStatus.FAILED
+            job.error_message = f"Failed to save webhook payload: {str(e)}"
+            job.save(update_fields=["status", "error_message"])
+            return Response({"status": "ERROR", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

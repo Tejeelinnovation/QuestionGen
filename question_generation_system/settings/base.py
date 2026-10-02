@@ -192,6 +192,7 @@ STORAGES = {
 # Document Ingestion & Extractor configuration
 # ---------------------------------------------------------------------------
 DOCUMENT_EXTRACTOR_BACKEND = env("DOCUMENT_EXTRACTOR_BACKEND", default="auto")
+DOCUMENT_AI_MICROSERVICE_URL = env("DOCUMENT_AI_MICROSERVICE_URL", default="")
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 GEMINI_MODEL_NAME = env("GEMINI_MODEL_NAME", default="gemini-2.0-flash")
 GOOGLE_DRIVE_FOLDER_ID = env("GOOGLE_DRIVE_FOLDER_ID", default="")
