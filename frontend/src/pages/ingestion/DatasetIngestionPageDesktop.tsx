@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   Clock,
   HeartHandshake,
+  RotateCcw,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import {
@@ -21,6 +23,7 @@ import {
   enqueueJob,
   enqueueAllJobs,
   deleteIngestionJob,
+  resetIngestionJob,
   type IngestionJobSummary,
   exportJobJson,
 } from '../../api/ingestion';
@@ -37,6 +40,7 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [inspectionJob, setInspectionJob] = useState<{ id: number; title: string } | null>(null);
   const [processingJobIds, setProcessingJobIds] = useState<Set<number>>(new Set());
+  const [resettingJobIds, setResettingJobIds] = useState<Set<number>>(new Set());
   const [isBulkEnqueuing, setIsBulkEnqueuing] = useState(false);
 
   const loadJobs = async () => {
@@ -78,6 +82,22 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
       console.error(`Error enqueuing job ${jobId}`, err);
     } finally {
       setProcessingJobIds((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
+    }
+  };
+
+  const handleResetJob = async (jobId: number) => {
+    try {
+      setResettingJobIds((prev) => new Set(prev).add(jobId));
+      await resetIngestionJob(jobId);
+      await loadJobs();
+    } catch (err) {
+      console.error(`Error resetting job ${jobId}`, err);
+    } finally {
+      setResettingJobIds((prev) => {
         const next = new Set(prev);
         next.delete(jobId);
         return next;
@@ -334,25 +354,42 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                       {/* Super Admin Exclusive Controls */}
                       {isSuperAdmin && (
                         <>
-                          {job.status !== 'COMPLETED' && (
+                          {job.status === 'EXTRACTING' ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="px-3 py-1.5 rounded-xl bg-forest/80 text-white text-xs font-heading font-semibold flex items-center gap-1.5 shadow-xs">
+                                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Extracting...</span>
+                              </div>
+                              <button
+                                onClick={() => handleResetJob(job.id)}
+                                disabled={resettingJobIds.has(job.id)}
+                                className="px-2.5 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-heading font-medium transition-all flex items-center gap-1 shadow-xs disabled:opacity-50"
+                                title="Stop and reset extraction back to Pending"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Reset</span>
+                              </button>
+                            </div>
+                          ) : job.status === 'FAILED' ? (
                             <button
                               onClick={() => handleAutoProcessAll(job.id)}
-                              disabled={isProcessing || job.status === 'EXTRACTING'}
+                              disabled={isProcessing}
+                              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-heading font-semibold transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                              title="Retry extraction"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Retry Extraction</span>
+                            </button>
+                          ) : job.status !== 'COMPLETED' ? (
+                            <button
+                              onClick={() => handleAutoProcessAll(job.id)}
+                              disabled={isProcessing}
                               className="px-3 py-1.5 rounded-xl bg-forest text-white text-xs font-heading font-semibold hover:bg-forest/90 transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                             >
-                              {isProcessing || job.status === 'EXTRACTING' ? (
-                                <>
-                                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                  <span>Extracting...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="w-3 h-3" />
-                                  <span>Auto-Extract</span>
-                                </>
-                              )}
+                              <Play className="w-3 h-3" />
+                              <span>Auto-Extract</span>
                             </button>
-                          )}
+                          ) : null}
 
                           <button
                             onClick={() => setInspectionJob({ id: job.id, title: job.title })}
@@ -395,7 +432,7 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Progress Bar (Super Admin shows percentage; Contributor shows simple bar) */}
+                  {/* Progress Bar & Detailed Error Card */}
                   {isSuperAdmin && (
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center justify-between text-[11px] text-ink/60">
@@ -421,9 +458,23 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                           style={{ width: `${job.progress_percentage}%` }}
                         />
                       </div>
-                      {job.status === 'FAILED' && job.error_message && (
-                        <div className="text-[11px] text-red-600 bg-red-50 px-2.5 py-1 rounded-md border border-red-200/60 mt-1 font-mono break-words">
-                          {job.error_message}
+                      {job.status === 'FAILED' && (
+                        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs mt-2 animate-in fade-in duration-200">
+                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                          <div className="flex-1 space-y-1">
+                            <div className="font-heading font-bold text-red-900 flex items-center justify-between">
+                              <span>Extraction Failed</span>
+                              <button
+                                onClick={() => handleAutoProcessAll(job.id)}
+                                className="text-[11px] underline font-sans text-red-700 hover:text-red-900 font-semibold"
+                              >
+                                Retry Now
+                              </button>
+                            </div>
+                            <p className="font-mono text-[11px] text-red-700 leading-relaxed break-words">
+                              {job.error_message || 'The cloud runner was unable to extract or deliver results.'}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>

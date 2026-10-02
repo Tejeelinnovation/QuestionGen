@@ -82,6 +82,18 @@ class RemoteAiMicroserviceExtractor:
 
         # 1. Dispatch to GitHub Actions (16GB RAM Runner)
         if self.mode == "GITHUB_ACTIONS":
+            if (
+                not callback_url
+                or not callback_url.startswith("http")
+                or ("localhost" in callback_url and not getattr(settings, "DEBUG", False))
+                or ("127.0.0.1" in callback_url and not getattr(settings, "DEBUG", False))
+            ):
+                raise ValueError(
+                    "BACKEND_BASE_URL is not set to your live HTTPS Render domain. "
+                    "GitHub Actions running in the cloud cannot deliver results back to 'localhost' or an empty address. "
+                    "Please add BACKEND_BASE_URL=https://<your-render-app>.onrender.com to your Render Environment variables."
+                )
+
             dispatch_url = f"https://api.github.com/repos/{self.github_repo}/dispatches"
             headers = {
                 "Authorization": f"Bearer {self.github_token}",
