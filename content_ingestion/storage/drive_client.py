@@ -157,6 +157,59 @@ class GoogleDriveClient:
             "web_view_link": f"/media/ingestion_raw/{os.path.basename(local_file_path)}",
         }
 
+    def upload_bytes(self, data: bytes, destination_name: str, mime_type: str = "image/png") -> Dict[str, str]:
+        """
+        Uploads in-memory image bytes directly to Google Drive without touching local disk.
+        Returns {'file_id': ..., 'web_view_link': ..., 'direct_url': ...}.
+        """
+        creds = self.get_credentials()
+        if creds:
+            try:
+                from googleapiclient.discovery import build
+                from googleapiclient.http import MediaIoBaseUpload
+                import io
+
+                service = build("drive", "v3", credentials=creds)
+
+                file_metadata: Dict[str, Any] = {"name": destination_name}
+                if self.folder_id:
+                    file_metadata["parents"] = [self.folder_id]
+
+                media = MediaIoBaseUpload(io.BytesIO(data), mimetype=mime_type, resumable=False)
+                uploaded = (
+                    service.files()
+                    .create(
+                        body=file_metadata,
+                        media_body=media,
+                        fields="id, webViewLink, webContentLink",
+                        supportsAllDrives=True,
+                    )
+                    .execute()
+                )
+
+                file_id = uploaded.get("id", "")
+                web_view_link = uploaded.get("webViewLink", "")
+
+                try:
+                    service.permissions().create(
+                        fileId=file_id,
+                        body={"role": "reader", "type": "anyone"},
+                        supportsAllDrives=True,
+                    ).execute()
+                except Exception:
+                    pass
+
+                direct_url = f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+                return {
+                    "file_id": file_id,
+                    "web_view_link": web_view_link,
+                    "direct_url": direct_url,
+                }
+            except Exception as e:
+                logger.warning(f"Google Drive upload bytes failed for {destination_name}: {e}")
+
+        return {"file_id": "", "web_view_link": "", "direct_url": ""}
+
     def download_file(self, file_id: str, destination_path: str) -> bool:
         """
         Downloads a file from Google Drive given its file_id and writes it to destination_path.

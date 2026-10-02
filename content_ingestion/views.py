@@ -12,6 +12,7 @@ Privacy & Permission Architecture:
   - Search atomic extracted training items
 """
 
+from django.conf import settings
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -447,12 +448,12 @@ class IngestionJobWebhookView(APIView):
 
                 # 2. Populate Pages
                 job.pages.all().delete()
-                media_root = getattr(settings, "MEDIA_ROOT", "media")
-                job_media_dir = os.path.join(str(media_root), "extracted_assets", f"job_{job.pk}")
-                os.makedirs(job_media_dir, exist_ok=True)
-
                 from .krutidev import krutidev_to_unicode
+                from .storage.drive_client import GoogleDriveClient
                 import base64
+
+                drive_client = GoogleDriveClient()
+                is_drive_active = drive_client.is_configured()
 
                 pages_to_create = []
                 for p_data in pages_data:
@@ -460,7 +461,7 @@ class IngestionJobWebhookView(APIView):
                     matched_ch = chapter_map.get(p_data.get("chapter_number"))
                     raw_sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
 
-                    # Process sections: convert KrutiDev and decode Base64 images
+                    # Process sections: convert KrutiDev and upload diagrams directly to Google Drive
                     processed_sections = []
                     for s_idx, sec_dict in enumerate(raw_sections, start=1):
                         heading = krutidev_to_unicode(sec_dict.get("heading", ""))
@@ -472,15 +473,21 @@ class IngestionJobWebhookView(APIView):
                             try:
                                 header, encoded = image_data.split(",", 1)
                                 ext = "png"
+                                mime = "image/png"
                                 if "jpeg" in header or "jpg" in header:
                                     ext = "jpg"
-                                img_filename = f"page_{p_num}_fig_{s_idx}.{ext}"
-                                abs_img_path = os.path.join(job_media_dir, img_filename)
-                                with open(abs_img_path, "wb") as img_file:
-                                    img_file.write(base64.b64decode(encoded))
-                                image_path = f"/media/extracted_assets/job_{job.pk}/{img_filename}"
+                                    mime = "image/jpeg"
+                                raw_bytes = base64.b64decode(encoded)
+                                img_filename = f"job_{job.pk}_p{p_num}_fig_{s_idx}.{ext}"
+
+                                if is_drive_active:
+                                    drive_res = drive_client.upload_bytes(raw_bytes, destination_name=img_filename, mime_type=mime)
+                                    image_path = drive_res.get("direct_url") or drive_res.get("web_view_link") or image_data
+                                else:
+                                    image_path = image_data
                             except Exception as img_err:
-                                logger.warning(f"Could not save base64 image: {img_err}")
+                                logger.warning(f"Could not upload image to Drive: {img_err}")
+                                image_path = image_data
 
                         sec_dict["heading"] = heading
                         sec_dict["text"] = text_val
