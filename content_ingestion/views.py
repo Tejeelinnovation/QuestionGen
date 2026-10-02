@@ -296,22 +296,26 @@ class IngestionJobSourcePdfView(APIView):
         from django.http import FileResponse
         from django.shortcuts import get_object_or_404
         import tempfile
+        import hashlib
+
+        job = get_object_or_404(IngestionJob, pk=pk)
 
         expected_secret = getattr(settings, "INGESTION_WEBHOOK_SECRET", "")
         provided_token = request.query_params.get("token") or request.headers.get("X-Ingestion-Secret", "")
+        signed_token = hashlib.sha256(f"{job.pk}_{settings.SECRET_KEY}".encode()).hexdigest()[:16]
 
         is_authorized = False
         if expected_secret and provided_token == expected_secret:
             is_authorized = True
-        elif not expected_secret and provided_token:
+        elif provided_token == signed_token:
+            is_authorized = True
+        elif not expected_secret and job.status in (JobStatus.EXTRACTING, JobStatus.PENDING):
             is_authorized = True
         elif request.user and request.user.is_authenticated and user_can_upload_material(request.user):
             is_authorized = True
 
         if not is_authorized:
             return Response({"detail": "Unauthorized access to source PDF."}, status=status.HTTP_403_FORBIDDEN)
-
-        job = get_object_or_404(IngestionJob, pk=pk)
 
         # 1. First check if source_file is available on server disk
         if job.source_file:

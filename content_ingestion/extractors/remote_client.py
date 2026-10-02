@@ -74,14 +74,14 @@ class RemoteAiMicroserviceExtractor:
 
         # Determine download URL for the runner
         # 1. Prefer direct Django source-pdf stream with token so runner receives the genuine PDF binary
+        import hashlib
         backend_base = getattr(settings, "BACKEND_BASE_URL", "").rstrip("/")
         webhook_secret = getattr(settings, "INGESTION_WEBHOOK_SECRET", "")
+        token = webhook_secret or hashlib.sha256(f"{job.pk}_{settings.SECRET_KEY}".encode()).hexdigest()[:16]
 
         pdf_url = ""
         if backend_base and backend_base.startswith("http"):
-            pdf_url = f"{backend_base}/api/ingest/jobs/{job.pk}/source-pdf/"
-            if webhook_secret:
-                pdf_url += f"?token={webhook_secret}"
+            pdf_url = f"{backend_base}/api/ingest/jobs/{job.pk}/source-pdf/?token={token}"
         elif job.google_drive_url:
             pdf_url = job.google_drive_url
         elif job.source_file:
