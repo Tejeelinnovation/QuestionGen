@@ -12,6 +12,9 @@ Privacy & Permission Architecture:
   - Search atomic extracted training items
 """
 
+import logging
+import os
+import tempfile
 from django.conf import settings
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
@@ -19,6 +22,8 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from .models import ExtractedItem, ExtractedPage, IngestionJob, JobStatus
 from .queue import IngestionQueueWorker, get_job_queue_position
@@ -317,17 +322,16 @@ class IngestionJobSourcePdfView(APIView):
         if not is_authorized:
             return Response({"detail": "Unauthorized access to source PDF."}, status=status.HTTP_403_FORBIDDEN)
 
-        # 1. First check if source_file is available on server disk
+        # 1. First check if source_file is available on server
         if job.source_file:
             try:
-                if os.path.exists(job.source_file.path):
-                    return FileResponse(
-                        open(job.source_file.path, "rb"),
-                        content_type="application/pdf",
-                        filename=f"job_{job.pk}.pdf",
-                    )
-            except Exception:
-                pass
+                return FileResponse(
+                    job.source_file.open("rb"),
+                    content_type="application/pdf",
+                    filename=f"job_{job.pk}.pdf",
+                )
+            except Exception as file_err:
+                logger.warning(f"Could not stream source_file directly for job #{job.pk}: {file_err}")
 
         # 2. Check Google Drive via authenticated Google Drive API client
         if job.google_drive_file_id:
