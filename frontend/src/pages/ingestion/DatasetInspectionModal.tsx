@@ -14,6 +14,29 @@ import {
 } from 'lucide-react';
 import { fetchJobPages, exportJobJson, type ExtractedPage, type StructuredSection } from '../../api/ingestion';
 import { Skeleton } from '../../components/ui/skeleton';
+import 'katex/dist/katex.min.css';
+import katex from 'katex';
+
+const MathFormula: React.FC<{ math: string }> = ({ math }) => {
+  const clean = math.replace(/^\$+|\$+$/g, '').trim();
+  const html = useMemo(() => {
+    try {
+      return katex.renderToString(clean, { throwOnError: false, displayMode: true });
+    } catch {
+      return null;
+    }
+  }, [clean]);
+
+  if (!html) {
+    return <code className="text-xs font-mono text-purple-800">{math}</code>;
+  }
+  return (
+    <div
+      className="my-1.5 py-1 px-3 bg-white/95 rounded-lg border border-purple-200/80 shadow-2xs overflow-x-auto text-center"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+};
 
 interface DatasetInspectionModalProps {
   jobId: number;
@@ -428,22 +451,47 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                           )}
 
                           {sec.latex_equations && sec.latex_equations.length > 0 && (
-                            <div className="p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/20 font-mono text-xs text-purple-900 overflow-x-auto">
-                              <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1">
-                                Extracted LaTeX:
+                            <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-1.5">
+                              <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <Sigma className="w-3.5 h-3.5" />
+                                <span>Mathematical Formula</span>
                               </p>
                               {sec.latex_equations.map((eq, eqIdx) => (
-                                <div key={eqIdx} className="bg-white/80 p-1.5 rounded border border-purple-200 my-1 break-all">
-                                  <code>{eq}</code>
-                                </div>
+                                <MathFormula key={eqIdx} math={eq} />
                               ))}
                             </div>
                           )}
 
-                          {sec.image_caption && (
-                            <div className="text-[11px] font-heading font-medium text-ink/60 italic flex items-center gap-1.5 flex-wrap">
-                              <ImageIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                              <span>{sec.image_caption}</span>
+                          {(sec.image_path || sec.type === 'DIAGRAM') && (
+                            <div className="my-3 p-3 bg-white rounded-xl border border-border/80 shadow-xs flex flex-col items-center">
+                              {sec.image_path ? (
+                                <img
+                                  src={
+                                    sec.image_path.startsWith('http') || sec.image_path.startsWith('data:')
+                                      ? sec.image_path
+                                      : `${import.meta.env.VITE_API_URL || ''}${sec.image_path}`
+                                  }
+                                  alt={sec.image_caption || 'Diagram'}
+                                  className="max-h-80 w-auto object-contain rounded-lg border border-border/40 shadow-xs transition-transform hover:scale-[1.01]"
+                                  onError={(e) => {
+                                    const target = e.currentTarget;
+                                    if (!target.src.includes('media') && !target.src.startsWith('data:')) {
+                                      target.src = `/media/${sec.image_path?.replace(/^\/+/, '')}`;
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-28 bg-surface-muted/60 border border-dashed border-border rounded-lg flex flex-col items-center justify-center text-ink/40 gap-1.5">
+                                  <ImageIcon className="w-5 h-5 opacity-40" />
+                                  <span className="text-[11px]">Diagram detected in document</span>
+                                </div>
+                              )}
+                              {sec.image_caption && (
+                                <p className="mt-2 text-xs font-heading font-medium text-ink/70 italic text-center flex items-center gap-1.5">
+                                  <ImageIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                  <span>{sec.image_caption}</span>
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>

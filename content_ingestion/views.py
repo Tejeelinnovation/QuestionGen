@@ -413,19 +413,54 @@ class IngestionJobWebhookView(APIView):
 
                 # 2. Populate Pages
                 job.pages.all().delete()
+                media_root = getattr(settings, "MEDIA_ROOT", "media")
+                job_media_dir = os.path.join(str(media_root), "extracted_assets", f"job_{job.pk}")
+                os.makedirs(job_media_dir, exist_ok=True)
+
+                from .krutidev import krutidev_to_unicode
+                import base64
+
                 pages_to_create = []
                 for p_data in pages_data:
                     p_num = p_data.get("page_number", 1)
                     matched_ch = chapter_map.get(p_data.get("chapter_number"))
-                    sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
+                    raw_sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
+
+                    # Process sections: convert KrutiDev and decode Base64 images
+                    processed_sections = []
+                    for s_idx, sec_dict in enumerate(raw_sections, start=1):
+                        heading = krutidev_to_unicode(sec_dict.get("heading", ""))
+                        text_val = krutidev_to_unicode(sec_dict.get("text", ""))
+                        image_path = sec_dict.get("image_path", "")
+                        image_data = sec_dict.get("image_data", "")
+
+                        if image_data and image_data.startswith("data:image/"):
+                            try:
+                                header, encoded = image_data.split(",", 1)
+                                ext = "png"
+                                if "jpeg" in header or "jpg" in header:
+                                    ext = "jpg"
+                                img_filename = f"page_{p_num}_fig_{s_idx}.{ext}"
+                                abs_img_path = os.path.join(job_media_dir, img_filename)
+                                with open(abs_img_path, "wb") as img_file:
+                                    img_file.write(base64.b64decode(encoded))
+                                image_path = f"/media/extracted_assets/job_{job.pk}/{img_filename}"
+                            except Exception as img_err:
+                                logger.warning(f"Could not save base64 image: {img_err}")
+
+                        sec_dict["heading"] = heading
+                        sec_dict["text"] = text_val
+                        sec_dict["image_path"] = image_path
+                        processed_sections.append(sec_dict)
+
                     pages_to_create.append(
                         ExtractedPage(
                             job=job,
                             page_number=p_num,
                             chapter=matched_ch,
                             layout_type=p_data.get("layout_type", "SINGLE_COLUMN"),
-                            raw_text=p_data.get("raw_text", ""),
-                            structured_content=sections,
+                            raw_text=krutidev_to_unicode(p_data.get("raw_text", "")),
+                            structured_content=processed_sections,
                         )
                     )
 
@@ -433,10 +468,9 @@ class IngestionJobWebhookView(APIView):
 
                 # 3. Populate Items
                 items_to_create = []
-                for page_obj, p_data in zip(created_pages, pages_data):
-                    sections = p_data.get("sections", [])
-                    for sec in sections:
-                        sec_dict = sec if isinstance(sec, dict) else sec.model_dump()
+                for page_obj in created_pages:
+                    sections = page_obj.structured_content or []
+                    for sec_dict in sections:
                         raw_type = sec_dict.get("type", "PARAGRAPH")
                         item_type = raw_type if raw_type in ItemType.values else ItemType.PARAGRAPH
 
