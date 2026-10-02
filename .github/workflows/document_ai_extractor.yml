@@ -51,6 +51,8 @@ jobs:
           CALLBACK_URL: ${{ github.event.client_payload.callback_url || inputs.callback_url }}
           DOCUMENT_KIND: ${{ github.event.client_payload.document_kind || inputs.document_kind || 'TEXTBOOK' }}
           WEBHOOK_SECRET: ${{ secrets.INGESTION_WEBHOOK_SECRET || '' }}
+          DRIVE_TOKEN_JSON: ${{ github.event.client_payload.drive_token_json || secrets.GOOGLE_DRIVE_USER_TOKEN_JSON || '' }}
+          DRIVE_FOLDER_ID: ${{ github.event.client_payload.drive_folder_id || secrets.GOOGLE_DRIVE_FOLDER_ID || '' }}
         run: |
           echo "Starting Document AI Worker for Job #$JOB_ID..."
           PYTHONPATH=document_ai_worker python document_ai_worker/cli_extractor.py \
@@ -69,7 +71,7 @@ jobs:
         run: |
           if [ -n "$CALLBACK_URL" ]; then
             echo "Notifying Django backend of runner failure: $CALLBACK_URL"
-            curl -s -X POST "$CALLBACK_URL" \
+            curl -s --retry 3 --retry-delay 5 -X POST "$CALLBACK_URL" \
               -H "Content-Type: application/json" \
               -H "X-Ingestion-Secret: $WEBHOOK_SECRET" \
               -d "{\"job_id\": \"$JOB_ID\", \"status\": \"FAILED\", \"error_message\": \"GitHub Actions runner workflow failed during extraction. Check GitHub Actions workflow run logs for full details.\"}" || true

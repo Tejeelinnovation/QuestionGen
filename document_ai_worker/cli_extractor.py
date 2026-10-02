@@ -13,14 +13,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import logging
 import os
 import sys
 import tempfile
+import time
 import urllib.request
 import requests
 
+from engine.drive_uploader import WorkerGoogleDriveUploader
 from engine.handwriting_pipeline import HandwritingPipeline
 from engine.textbook_pipeline import TextbookPipeline
 
@@ -91,20 +94,39 @@ def download_file(url: str, dest_path: str) -> None:
 
 
 
-def send_webhook(callback_url: str, payload: dict, secret: str = "") -> None:
+def send_webhook(callback_url: str, payload: dict, secret: str = "", max_retries: int = 5) -> None:
     """
-    Posts the extraction result back to the Django backend.
+    Posts the extraction result back to the Django backend with automatic retry
+    if the backend returns 502/503/504 or encounters temporary connection drops.
     """
-    logger.info(f"Delivering extraction results to Webhook: {callback_url}")
+    payload_kb = len(json.dumps(payload, default=str)) // 1024
+    logger.info(f"Delivering extraction results to Webhook: {callback_url} (Payload size: ~{payload_kb} KB)")
     headers = {"Content-Type": "application/json"}
     if secret:
         headers["X-Ingestion-Secret"] = secret
 
-    res = requests.post(callback_url, json=payload, headers=headers, timeout=120)
-    logger.info(f"Webhook response status code: {res.status_code}")
-    if res.status_code >= 400:
-        logger.error(f"Webhook error response: {res.text}")
-        res.raise_for_status()
+    for attempt in range(1, max_retries + 1):
+        try:
+            res = requests.post(callback_url, json=payload, headers=headers, timeout=60)
+            logger.info(f"Webhook attempt #{attempt} status code: {res.status_code}")
+            if res.status_code in (502, 503, 504) and attempt < max_retries:
+                logger.warning(
+                    f"Backend returned HTTP {res.status_code} (likely restarting or deploying). "
+                    f"Waiting 10s before retry #{attempt + 1}..."
+                )
+                time.sleep(10)
+                continue
+            if res.status_code >= 400:
+                logger.error(f"Webhook error response: {res.text}")
+                res.raise_for_status()
+            return
+        except requests.exceptions.RequestException as exc:
+            if attempt < max_retries:
+                logger.warning(f"Webhook connection attempt #{attempt} failed: {exc}. Retrying in 10s...")
+                time.sleep(10)
+            else:
+                logger.error(f"All {max_retries} webhook delivery attempts failed.")
+                raise
 
 
 def main():
@@ -139,7 +161,44 @@ def main():
             f"Granularity: {granularity}"
         )
 
-        # 3. Assemble JSON Payload matching Django IngestionJobWebhookView expectations
+        # 3. Direct Google Drive Diagram Uploading from 16GB runner
+        drive_uploader = WorkerGoogleDriveUploader()
+        is_drive_active = drive_uploader.is_configured()
+        logger.info(f"Worker Google Drive Uploader active: {is_drive_active}")
+
+        uploaded_diagram_count = 0
+        for p in pages:
+            for s_idx, sec in enumerate(p.sections):
+                raw_b64 = getattr(sec, "image_data", "")
+                if raw_b64 and raw_b64.startswith("data:image/"):
+                    if is_drive_active:
+                        try:
+                            header, encoded = raw_b64.split(",", 1)
+                            ext = "png"
+                            mime = "image/png"
+                            if "jpeg" in header or "jpg" in header:
+                                ext = "jpg"
+                                mime = "image/jpeg"
+                            raw_bytes = base64.b64decode(encoded)
+                            filename = f"job_{args.job_id}_p{p.page_number}_fig_{s_idx + 1}.{ext}"
+                            direct_url = drive_uploader.upload_bytes(
+                                raw_bytes,
+                                destination_name=filename,
+                                mime_type=mime,
+                                subfolder_name="Extracted-Diagrams",
+                            )
+                            if direct_url:
+                                sec.image_path = direct_url
+                                uploaded_diagram_count += 1
+                        except Exception as up_err:
+                            logger.warning(f"Could not upload diagram to Drive: {up_err}")
+
+                    # Strip heavy raw image_data so webhook payload stays tiny (<50KB)
+                    sec.image_data = ""
+
+        logger.info(f"Direct Drive upload complete: {uploaded_diagram_count} diagrams saved to Google Drive.")
+
+        # 4. Assemble lightweight JSON Payload matching Django IngestionJobWebhookView
         payload = {
             "job_id": args.job_id,
             "status": "COMPLETED",
@@ -149,13 +208,13 @@ def main():
             "total_pages": len(pages),
         }
 
-        # 4. Dispatch back to Django Webhook
+        # 5. Dispatch back to Django Webhook with auto-retry
         send_webhook(args.callback_url, payload, secret=args.webhook_secret)
         logger.info(f"[SUCCESS] IngestionJob #{args.job_id} successfully extracted and delivered!")
 
     except Exception as exc:
         logger.error(f"[ERROR] Failed during extraction of Job #{args.job_id}: {exc}", exc_info=True)
-        # Notify Django backend of failure so UI updates immediately
+        # Notify Django backend of failure with retry so UI updates immediately
         try:
             error_payload = {
                 "job_id": args.job_id,
@@ -163,7 +222,7 @@ def main():
                 "error_message": f"Worker extraction error: {str(exc)}",
                 "error": str(exc),
             }
-            send_webhook(args.callback_url, error_payload, secret=args.webhook_secret)
+            send_webhook(args.callback_url, error_payload, secret=args.webhook_secret, max_retries=3)
         except Exception as notify_err:
             logger.error(f"Could not send error notification to webhook: {notify_err}")
         sys.exit(1)
