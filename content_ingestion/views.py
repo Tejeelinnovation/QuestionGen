@@ -462,6 +462,10 @@ class IngestionJobWebhookView(APIView):
                 job.current_stage = f"Completed via AI Microservice! Structured all {total_pages} pages."
                 job.save()
 
+            # Release from queue worker tracking
+            from .queue import IngestionQueueWorker
+            IngestionQueueWorker.mark_job_completed_or_failed(job.pk)
+
             # Render ephemeral disk cleanup
             if job.google_drive_file_id and job.source_file:
                 try:
@@ -472,6 +476,9 @@ class IngestionJobWebhookView(APIView):
             return Response({"status": "SUCCESS", "job_id": job.pk}, status=status.HTTP_200_OK)
 
         except Exception as e:
+            from .queue import IngestionQueueWorker
+            IngestionQueueWorker.mark_job_completed_or_failed(job.pk)
+
             job.status = JobStatus.FAILED
             job.error_message = f"Failed to save webhook payload: {str(e)}"
             job.save(update_fields=["status", "error_message"])
