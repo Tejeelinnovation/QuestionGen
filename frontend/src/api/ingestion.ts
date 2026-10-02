@@ -13,6 +13,7 @@ export interface IngestionJobSummary {
   processed_pages: number;
   progress_percentage: number;
   current_stage: string;
+  queue_position?: number | null;
   error_message?: string;
   google_drive_file_id?: string;
   google_drive_url: string;
@@ -114,6 +115,26 @@ export const fetchJobPages = async (
 
 export const exportJobJson = async (id: number): Promise<any> => {
   const response = await apiClient.get(`/api/ingest/jobs/${id}/export-json/`);
+  return response.data;
+};
+
+export const enqueueJob = async (
+  id: number
+): Promise<{
+  job_id: number;
+  status: string;
+  queue_position: number | null;
+  message: string;
+}> => {
+  const response = await apiClient.post(`/api/ingest/jobs/${id}/enqueue/`);
+  return response.data;
+};
+
+export const enqueueAllJobs = async (): Promise<{
+  enqueued_count: number;
+  message: string;
+}> => {
+  const response = await apiClient.post('/api/ingest/jobs/enqueue-all/');
   return response.data;
 };
 

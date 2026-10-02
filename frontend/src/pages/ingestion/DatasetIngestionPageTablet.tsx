@@ -15,7 +15,8 @@ import {
 import { useAuth } from '../../auth/AuthContext';
 import {
   fetchIngestionJobs,
-  processIngestionChunk,
+  enqueueJob,
+  enqueueAllJobs,
   deleteIngestionJob,
   type IngestionJobSummary,
   exportJobJson,
@@ -33,6 +34,7 @@ export const DatasetIngestionPageTablet: React.FC = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [inspectionJob, setInspectionJob] = useState<{ id: number; title: string } | null>(null);
   const [processingJobIds, setProcessingJobIds] = useState<Set<number>>(new Set());
+  const [isBulkEnqueuing, setIsBulkEnqueuing] = useState(false);
 
   const loadJobs = async () => {
     try {
@@ -49,44 +51,47 @@ export const DatasetIngestionPageTablet: React.FC = () => {
     loadJobs();
   }, []);
 
+  // Poll every 3s while any job is active in the background queue
+  useEffect(() => {
+    const hasActiveJobs = jobs.some(
+      (j) => j.status === 'PENDING' || j.status === 'EXTRACTING' || j.status === 'PARSING'
+    );
+    if (!hasActiveJobs) return;
+
+    const interval = setInterval(() => {
+      loadJobs();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [jobs]);
+
   const handleAutoProcessAll = async (jobId: number) => {
     if (processingJobIds.has(jobId)) return;
     setProcessingJobIds((prev) => new Set(prev).add(jobId));
-
-    let isDone = false;
-    while (!isDone) {
-      try {
-        const res = await processIngestionChunk(jobId, 20);
-        setJobs((prevJobs) =>
-          prevJobs.map((j) =>
-            j.id === jobId
-              ? {
-                  ...j,
-                  processed_pages: res.processed_pages,
-                  progress_percentage: res.progress_percentage,
-                  status: res.status as any,
-                  current_stage: res.current_stage,
-                }
-              : j
-          )
-        );
-
-        if (res.is_finished || res.status === 'COMPLETED' || res.status === 'FAILED') {
-          isDone = true;
-        }
-      } catch (err) {
-        console.error(`Error processing chunk for job ${jobId}`, err);
-        isDone = true;
-      }
+    try {
+      await enqueueJob(jobId);
+      await loadJobs();
+    } catch (err) {
+      console.error(`Error enqueuing job ${jobId}`, err);
+    } finally {
+      setProcessingJobIds((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
     }
+  };
 
-    setProcessingJobIds((prev) => {
-      const next = new Set(prev);
-      next.delete(jobId);
-      return next;
-    });
-
-    loadJobs();
+  const handleEnqueueAll = async () => {
+    try {
+      setIsBulkEnqueuing(true);
+      await enqueueAllJobs();
+      await loadJobs();
+    } catch (err) {
+      console.error('Error bulk enqueuing jobs', err);
+    } finally {
+      setIsBulkEnqueuing(false);
+    }
   };
 
   const handleDownloadJson = async (job: IngestionJobSummary) => {
@@ -193,10 +198,31 @@ export const DatasetIngestionPageTablet: React.FC = () => {
       {/* ── Tablet Document Cards ── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-heading font-bold text-ink/60 uppercase tracking-wider">
-            {isSuperAdmin ? 'Material Queue' : 'My Uploads'} ({jobs.length})
-          </h2>
-          <span className="text-[11px] font-mono text-ink/40">Real-time status</span>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-heading font-bold text-ink/60 uppercase tracking-wider">
+              {isSuperAdmin ? 'Material Queue' : 'My Uploads'} ({jobs.length})
+            </h2>
+            <span className="text-[11px] font-mono text-ink/40">Real-time queue</span>
+          </div>
+          {isSuperAdmin && jobs.some((j) => j.status === 'PENDING' || j.status === 'FAILED') && (
+            <button
+              onClick={handleEnqueueAll}
+              disabled={isBulkEnqueuing}
+              className="min-h-[36px] px-3 py-1.5 rounded-xl bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50"
+            >
+              {isBulkEnqueuing ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Queueing...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Extract All Pending</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {isLoading ? (
@@ -222,26 +248,36 @@ export const DatasetIngestionPageTablet: React.FC = () => {
                         {job.subject || 'General'}
                       </span>
                       {isSuperAdmin && (
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                            job.status === 'COMPLETED'
-                              ? 'bg-emerald-500/10 text-emerald-700'
-                              : job.status === 'FAILED'
-                              ? 'bg-red-500/10 text-red-700'
-                              : 'bg-amber-500/10 text-amber-700'
-                          }`}
-                        >
-                          {job.status}
-                        </span>
+                        job.status === 'COMPLETED' ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-700">
+                            Completed
+                          </span>
+                        ) : job.status === 'EXTRACTING' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Extracting
+                          </span>
+                        ) : job.status === 'PENDING' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-700">
+                            <Clock className="w-3 h-3" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Queued'}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-red-500/10 text-red-700">
+                            Failed
+                          </span>
+                        )
                       )}
                       {!isSuperAdmin && (
                         job.status === 'COMPLETED' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700">
                             <CheckCircle2 className="w-3 h-3" /> Accepted
                           </span>
-                        ) : (
+                        ) : job.status === 'EXTRACTING' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-700">
-                            <Clock className="w-3 h-3" /> Under Review
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Processing...
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-700">
+                            <Clock className="w-3 h-3" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Under Review'}
                           </span>
                         )
                       )}
@@ -258,11 +294,11 @@ export const DatasetIngestionPageTablet: React.FC = () => {
                         {job.status !== 'COMPLETED' && (
                           <button
                             onClick={() => handleAutoProcessAll(job.id)}
-                            disabled={isProcessing}
+                            disabled={isProcessing || job.status === 'EXTRACTING'}
                             className="min-h-[40px] px-3.5 py-2 rounded-xl bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
                             title="Auto-extract all pages"
                           >
-                            {isProcessing ? (
+                            {isProcessing || job.status === 'EXTRACTING' ? (
                               <>
                                 <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 <span>Extracting...</span>
