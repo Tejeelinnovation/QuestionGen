@@ -11,6 +11,7 @@ Handles:
 
 from __future__ import annotations
 
+import base64
 import logging
 import math
 import os
@@ -19,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pymupdf as fitz
 
+from .krutidev import krutidev_to_unicode
 from .schema import ChapterSchema, PageSchema, SectionSchema
 
 logger = logging.getLogger(__name__)
@@ -87,9 +89,10 @@ class TextbookPipeline:
                     if num_match:
                         ch_num = int(num_match.group(1))
 
+                    clean_title = krutidev_to_unicode(title)
                     chapters.append(ChapterSchema(
                         chapter_number=ch_num,
-                        title=title,
+                        title=clean_title,
                         start_page=start_pg,
                         end_page=start_pg,  # Will compute end page below
                     ))
@@ -181,7 +184,7 @@ class TextbookPipeline:
         sections: List[SectionSchema] = []
         for b in sorted_blocks:
             x0, y0, x1, y1, text, block_no, col_idx = b
-            clean_text = text.strip()
+            clean_text = krutidev_to_unicode(text.strip())
             if not clean_text:
                 continue
 
@@ -197,11 +200,12 @@ class TextbookPipeline:
                     text="",
                     column_index=0,
                     image_path=img.get("path", ""),
+                    image_data=img.get("data", ""),
                     image_caption=img.get("caption", ""),
                     metadata={"bbox": img.get("bbox", [])},
                 ))
 
-        raw_text = "\n\n".join(b[4].strip() for b in text_blocks)
+        raw_text = "\n\n".join(krutidev_to_unicode(b[4].strip()) for b in text_blocks)
 
         return PageSchema(
             page_number=page_num,
@@ -280,6 +284,7 @@ class TextbookPipeline:
                     text=text,
                     column_index=col_idx,
                     image_path=best_img.get("path", ""),
+                    image_data=best_img.get("data", ""),
                     image_caption=text,
                     metadata={"bbox": list(bbox)},
                 )
@@ -363,12 +368,16 @@ class TextbookPipeline:
             try:
                 base_img = doc.extract_image(xref)
                 ext = base_img["ext"]
+                image_bytes = base_img["image"]
+                b64_str = base64.b64encode(image_bytes).decode("utf-8")
+                image_data_uri = f"data:image/{ext};base64,{b64_str}"
+
                 filename = f"page_{page_num}_fig_{img_idx + 1}.{ext}"
                 filepath = os.path.join(self.media_dir, filename)
 
                 if not os.path.exists(filepath):
                     with open(filepath, "wb") as f:
-                        f.write(base_img["image"])
+                        f.write(image_bytes)
 
                 # Try to get image bbox on page
                 rects = page.get_image_rects(xref)
@@ -377,6 +386,7 @@ class TextbookPipeline:
                 images.append({
                     "path": filepath,
                     "filename": filename,
+                    "data": image_data_uri,
                     "bbox": bbox,
                     "linked": False,
                     "caption": "",

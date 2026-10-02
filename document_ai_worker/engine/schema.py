@@ -39,6 +39,7 @@ class SectionSchema(BaseModel):
     column_index: int = 1
     latex_equations: List[str] = Field(default_factory=list)
     image_path: str = ""
+    image_data: Optional[str] = ""
     image_caption: str = ""
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
