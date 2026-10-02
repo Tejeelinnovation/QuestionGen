@@ -69,9 +69,9 @@ class IngestionJobListCreateView(generics.ListCreateAPIView):
         if not user_can_upload_material(user):
             raise PermissionDenied("You do not have permission to upload or view study materials.")
 
-        # Cleanup any stuck extracting jobs that have timed out (>2 minutes)
+        # Cleanup any stuck extracting jobs that have timed out (>45 minutes)
         from .queue import IngestionQueueWorker
-        IngestionQueueWorker.cleanup_stalled_jobs(timeout_minutes=2)
+        IngestionQueueWorker.cleanup_stalled_jobs(timeout_minutes=45)
 
         # Super Admin sees all materials across all schools
         if is_super_admin(user):
@@ -208,10 +208,12 @@ class IngestionJobEnqueueView(APIView):
             )
 
         if job.status == JobStatus.FAILED:
+            from django.utils import timezone
             job.status = JobStatus.PENDING
             job.error_message = ""
             job.current_stage = "Queued for background extraction..."
-            job.save(update_fields=["status", "error_message", "current_stage"])
+            job.updated_at = timezone.now()
+            job.save(update_fields=["status", "error_message", "current_stage", "updated_at"])
 
         IngestionQueueWorker.trigger_worker()
         queue_pos = get_job_queue_position(job)
@@ -245,10 +247,12 @@ class IngestionJobEnqueueAllView(APIView):
         count = jobs_to_queue.count()
 
         # Reset failed jobs so worker picks them up cleanly
+        from django.utils import timezone
         jobs_to_queue.filter(status=JobStatus.FAILED).update(
             status=JobStatus.PENDING,
             error_message="",
             current_stage="Queued for background extraction...",
+            updated_at=timezone.now(),
         )
 
         IngestionQueueWorker.trigger_worker()
@@ -275,11 +279,13 @@ class IngestionJobResetView(APIView):
             raise PermissionDenied("You do not have permission to manage ingestion jobs.")
 
         from django.shortcuts import get_object_or_404
+        from django.utils import timezone
         job = get_object_or_404(IngestionJob, pk=pk)
         job.status = JobStatus.PENDING
         job.error_message = ""
         job.current_stage = "Job reset by admin. Ready for extraction."
-        job.save(update_fields=["status", "error_message", "current_stage"])
+        job.updated_at = timezone.now()
+        job.save(update_fields=["status", "error_message", "current_stage", "updated_at"])
 
         IngestionQueueWorker.mark_job_completed_or_failed(job.pk)
         return Response(
@@ -460,6 +466,76 @@ class ExtractedItemListView(generics.ListAPIView):
         return qs
 
 
+def _async_upload_diagrams_to_drive(job_id: int, pending_diagrams: list):
+    """
+    Background worker thread that uploads extracted diagrams to Google Drive
+    and updates ExtractedPage and ExtractedItem models with thumbnail URLs.
+    Runs asynchronously so the webhook returns 200 OK immediately without hitting Render 30s timeout.
+    """
+    if not pending_diagrams:
+        return
+
+    try:
+        from .storage.drive_client import GoogleDriveClient
+        from .models import ExtractedItem, ExtractedPage, IngestionJob
+        from django.utils import timezone
+        import base64
+
+        drive_client = GoogleDriveClient()
+        if not drive_client.is_configured():
+            logger.info(f"Google Drive client not configured for async diagram upload on Job #{job_id}.")
+            return
+
+        uploaded_count = 0
+        for diag in pending_diagrams:
+            try:
+                raw_bytes = base64.b64decode(diag["encoded"])
+                filename = diag["filename"]
+                mime = diag["mime"]
+                page_num = diag["page_num"]
+                sec_idx = diag["section_idx"]
+
+                drive_res = drive_client.upload_bytes(
+                    raw_bytes,
+                    destination_name=filename,
+                    mime_type=mime,
+                    subfolder_name="Extracted-Diagrams",
+                )
+                direct_url = drive_res.get("direct_url") or drive_res.get("web_view_link")
+                if direct_url:
+                    uploaded_count += 1
+                    # Update page structured_content
+                    page_obj = ExtractedPage.objects.filter(job_id=job_id, page_number=page_num).first()
+                    if page_obj and page_obj.structured_content:
+                        sc = list(page_obj.structured_content)
+                        if 0 <= sec_idx < len(sc):
+                            sc[sec_idx]["image_path"] = direct_url
+                            if "image_data" in sc[sec_idx]:
+                                sc[sec_idx]["image_data"] = ""
+                            page_obj.structured_content = sc
+                            page_obj.save(update_fields=["structured_content"])
+
+                    # Update matching extracted items
+                    ExtractedItem.objects.filter(
+                        job_id=job_id,
+                        page__page_number=page_num,
+                        image_path__startswith="data:image/",
+                    ).update(image_path=direct_url)
+
+            except Exception as single_err:
+                logger.warning(f"Failed to async upload diagram {diag.get('filename')}: {single_err}")
+
+        # Update stage message
+        from django.utils import timezone
+        IngestionJob.objects.filter(pk=job_id).update(
+            current_stage=f"Completed! Structured all pages and saved {uploaded_count} diagram(s) to Google Drive.",
+            updated_at=timezone.now(),
+        )
+        logger.info(f"Successfully uploaded {uploaded_count}/{len(pending_diagrams)} diagrams to Google Drive for Job #{job_id}.")
+    except Exception as err:
+        logger.error(f"Async diagram upload worker encountered error for Job #{job_id}: {err}", exc_info=True)
+
+
 class IngestionJobWebhookView(APIView):
     """
     Receives completed extraction results from the Standalone AI Microservice.
@@ -471,6 +547,7 @@ class IngestionJobWebhookView(APIView):
 
     def post(self, request, pk: int):
         from django.db import transaction
+        from django.utils import timezone
         from .models import ExtractedChapter, ExtractedItem, ExtractedPage, ItemType
 
         try:
@@ -484,7 +561,8 @@ class IngestionJobWebhookView(APIView):
             error_msg = data.get("error_message") or data.get("error") or "Microservice extraction failed."
             job.error_message = error_msg
             job.current_stage = f"Failed: {error_msg[:120]}"
-            job.save(update_fields=["status", "error_message", "current_stage"])
+            job.updated_at = timezone.now()
+            job.save(update_fields=["status", "error_message", "current_stage", "updated_at"])
             from .queue import IngestionQueueWorker
             IngestionQueueWorker.mark_job_completed_or_failed(job.pk)
             return Response({"status": "ERROR_RECORDED", "error": error_msg}, status=status.HTTP_200_OK)
@@ -493,6 +571,8 @@ class IngestionJobWebhookView(APIView):
         pages_data = data.get("pages", [])
         total_pages = data.get("total_pages", len(pages_data))
         granularity = data.get("granularity", job.granularity)
+
+        pending_diagrams = []
 
         try:
             with transaction.atomic():
@@ -519,11 +599,6 @@ class IngestionJobWebhookView(APIView):
                 # 2. Populate Pages
                 job.pages.all().delete()
                 from .krutidev import krutidev_to_unicode
-                from .storage.drive_client import GoogleDriveClient
-                import base64
-
-                drive_client = GoogleDriveClient()
-                is_drive_active = drive_client.is_configured()
 
                 pages_to_create = []
                 for p_data in pages_data:
@@ -531,7 +606,7 @@ class IngestionJobWebhookView(APIView):
                     matched_ch = chapter_map.get(p_data.get("chapter_number"))
                     raw_sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
 
-                    # Process sections: convert KrutiDev and upload diagrams directly to Google Drive
+                    # Process sections: convert KrutiDev and gather diagrams for async background upload
                     processed_sections = []
                     for s_idx, sec_dict in enumerate(raw_sections, start=1):
                         heading = krutidev_to_unicode(sec_dict.get("heading", ""))
@@ -547,16 +622,16 @@ class IngestionJobWebhookView(APIView):
                                 if "jpeg" in header or "jpg" in header:
                                     ext = "jpg"
                                     mime = "image/jpeg"
-                                raw_bytes = base64.b64decode(encoded)
                                 img_filename = f"job_{job.pk}_p{p_num}_fig_{s_idx}.{ext}"
-
-                                if is_drive_active:
-                                    drive_res = drive_client.upload_bytes(raw_bytes, destination_name=img_filename, mime_type=mime)
-                                    image_path = drive_res.get("direct_url") or drive_res.get("web_view_link") or image_data
-                                else:
-                                    image_path = image_data
-                            except Exception as img_err:
-                                logger.warning(f"Could not upload image to Drive: {img_err}")
+                                pending_diagrams.append({
+                                    "page_num": p_num,
+                                    "section_idx": s_idx - 1,
+                                    "filename": img_filename,
+                                    "mime": mime,
+                                    "encoded": encoded,
+                                })
+                                image_path = image_data
+                            except Exception:
                                 image_path = image_data
 
                         sec_dict["heading"] = heading
@@ -605,7 +680,8 @@ class IngestionJobWebhookView(APIView):
 
                 job.status = JobStatus.COMPLETED
                 job.current_stage = f"Completed via AI Microservice! Structured all {total_pages} pages."
-                job.save()
+                job.updated_at = timezone.now()
+                job.save(update_fields=["status", "current_stage", "total_pages", "processed_pages", "granularity", "table_of_contents", "updated_at"])
 
             # Release from queue worker tracking
             from .queue import IngestionQueueWorker
@@ -618,6 +694,16 @@ class IngestionJobWebhookView(APIView):
                 except Exception:
                     pass
 
+            # Launch async Google Drive diagram upload in background thread
+            if pending_diagrams:
+                import threading
+                threading.Thread(
+                    target=_async_upload_diagrams_to_drive,
+                    args=(job.pk, pending_diagrams),
+                    daemon=True,
+                    name=f"AsyncDriveUploader-Job-{job.pk}",
+                ).start()
+
             return Response({"status": "SUCCESS", "job_id": job.pk}, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -626,5 +712,6 @@ class IngestionJobWebhookView(APIView):
 
             job.status = JobStatus.FAILED
             job.error_message = f"Failed to save webhook payload: {str(e)}"
-            job.save(update_fields=["status", "error_message"])
+            job.updated_at = timezone.now()
+            job.save(update_fields=["status", "error_message", "updated_at"])
             return Response({"status": "ERROR", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

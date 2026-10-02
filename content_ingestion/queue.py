@@ -127,10 +127,11 @@ class IngestionQueueWorker:
             logger.info("IngestionQueueWorker loop exited cleanly.")
 
     @classmethod
-    def cleanup_stalled_jobs(cls, timeout_minutes: int = 2) -> list[int]:
+    def cleanup_stalled_jobs(cls, timeout_minutes: int = 45) -> list[int]:
         """
         Scans for any jobs stuck in EXTRACTING for more than `timeout_minutes` without updates,
         and marks them as FAILED with an informative error message.
+        Defaults to 45 minutes to safely handle 100+ page textbooks on cloud runners.
         Returns the IDs of timed out jobs.
         """
         from datetime import timedelta
@@ -146,13 +147,14 @@ class IngestionQueueWorker:
             logger.warning(f"Job #{stalled.pk} timed out in EXTRACTING state (>{timeout_minutes} mins). Marking as FAILED.")
             stalled.status = JobStatus.FAILED
             stalled.error_message = (
-                f"Extraction timed out after {timeout_minutes} minutes. The cloud runner did not deliver results back to Render. "
+                f"Extraction timed out after {timeout_minutes} minutes without receiving results from cloud runner. "
                 "Common causes: 1) BACKEND_BASE_URL is not set to your live HTTPS Render domain in Render Environment, "
                 "2) GitHub Actions runner encountered an error, or 3) GitHub Actions queue was delayed. "
                 "Verify BACKEND_BASE_URL on Render and click 'Retry Extraction'."
             )
-            stalled.current_stage = f"Timed out after {timeout_minutes} mins. Check Render BACKEND_BASE_URL & retry."
-            stalled.save(update_fields=["status", "error_message", "current_stage"])
+            stalled.current_stage = f"Timed out after {timeout_minutes} mins. Ready for retry."
+            stalled.updated_at = timezone.now()
+            stalled.save(update_fields=["status", "error_message", "current_stage", "updated_at"])
             timed_out_ids.append(stalled.pk)
             with cls._lock:
                 cls._dispatched_job_ids.discard(stalled.pk)
@@ -164,9 +166,9 @@ class IngestionQueueWorker:
         """
         Finds the next job to process:
         Picks oldest PENDING job, excluding any jobs that have already been dispatched to a remote runner.
-        Automatically marks any stalled jobs (>2 minutes in EXTRACTING) as FAILED.
+        Automatically marks any stalled jobs (>45 minutes in EXTRACTING) as FAILED.
         """
-        cls.cleanup_stalled_jobs(timeout_minutes=2)
+        cls.cleanup_stalled_jobs(timeout_minutes=45)
 
         with cls._lock:
             dispatched_ids = set(cls._dispatched_job_ids)
@@ -198,6 +200,7 @@ class IngestionQueueWorker:
         Otherwise falls back to the local memory-safe chunk processor.
         """
         from django.conf import settings
+        from django.utils import timezone
         from .extractors.remote_client import RemoteAiMicroserviceExtractor
 
         remote_client = RemoteAiMicroserviceExtractor()
@@ -210,7 +213,8 @@ class IngestionQueueWorker:
 
                 job.status = JobStatus.EXTRACTING
                 job.current_stage = "Launched 16GB RAM GitHub Actions runner in cloud..."
-                job.save(update_fields=["status", "current_stage"])
+                job.updated_at = timezone.now()
+                job.save(update_fields=["status", "current_stage", "updated_at"])
                 remote_client.dispatch_extraction(job, callback_url=callback_url)
                 return
             except Exception as remote_err:
@@ -220,7 +224,8 @@ class IngestionQueueWorker:
                 job.status = JobStatus.FAILED
                 job.error_message = f"Cloud dispatch error: {str(remote_err)}"
                 job.current_stage = "Cloud runner dispatch failed. Check environment configuration."
-                job.save(update_fields=["status", "error_message", "current_stage"])
+                job.updated_at = timezone.now()
+                job.save(update_fields=["status", "error_message", "current_stage", "updated_at"])
                 return
 
         while True:

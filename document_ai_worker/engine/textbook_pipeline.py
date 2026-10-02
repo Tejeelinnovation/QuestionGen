@@ -361,14 +361,35 @@ class TextbookPipeline:
     def _extract_page_images(self, doc: fitz.Document, page: fitz.Page, page_num: int) -> List[Dict[str, Any]]:
         """
         Extracts images on the page and records their positions for spatial caption pairing.
+        Filters out tiny decoration icons (<60x60) and optimizes diagram image payloads.
         """
         images = []
         for img_idx, img_info in enumerate(page.get_images(full=True)):
             xref = img_info[0]
             try:
                 base_img = doc.extract_image(xref)
-                ext = base_img["ext"]
+                w = base_img.get("width", 0)
+                h = base_img.get("height", 0)
+                # Filter out tiny icons, decorative rules, or spacer bullets
+                if w < 60 or h < 60:
+                    continue
+
+                ext = base_img.get("ext", "png").lower()
                 image_bytes = base_img["image"]
+
+                # If large image, compress to optimized JPEG using PyMuPDF native pixmap
+                if len(image_bytes) > 250_000:
+                    try:
+                        pix = fitz.Pixmap(doc, xref)
+                        if pix.n >= 5:
+                            pix = fitz.Pixmap(fitz.csRGB, pix)
+                        compressed = pix.tobytes("jpeg", jpg_quality=82)
+                        if len(compressed) < len(image_bytes):
+                            image_bytes = compressed
+                            ext = "jpg"
+                    except Exception:
+                        pass
+
                 b64_str = base64.b64encode(image_bytes).decode("utf-8")
                 image_data_uri = f"data:image/{ext};base64,{b64_str}"
 
