@@ -20,7 +20,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pymupdf as fitz
 
-from .krutidev import krutidev_to_unicode
 from .schema import ChapterSchema, PageSchema, SectionSchema
 
 logger = logging.getLogger(__name__)
@@ -99,7 +98,7 @@ class TextbookPipeline:
                     if num_match:
                         ch_num = int(num_match.group(1))
 
-                    clean_title = krutidev_to_unicode(title)
+                    clean_title = title.strip()
                     chapters.append(ChapterSchema(
                         chapter_number=ch_num,
                         title=clean_title,
@@ -194,7 +193,7 @@ class TextbookPipeline:
         sections: List[SectionSchema] = []
         for b in sorted_blocks:
             x0, y0, x1, y1, text, block_no, col_idx = b
-            clean_text = krutidev_to_unicode(text.strip())
+            clean_text = text.strip()
             if not clean_text:
                 continue
 
@@ -215,7 +214,7 @@ class TextbookPipeline:
                     metadata={"bbox": img.get("bbox", [])},
                 ))
 
-        raw_text = "\n\n".join(krutidev_to_unicode(b[4].strip()) for b in text_blocks)
+        raw_text = "\n\n".join(b[4].strip() for b in text_blocks)
 
         return PageSchema(
             page_number=page_num,

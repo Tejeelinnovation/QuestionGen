@@ -15,7 +15,6 @@ import re
 from typing import Any, Dict, List, Tuple
 import pymupdf as fitz
 
-from content_ingestion.krutidev import krutidev_to_unicode
 
 
 class DigitalPdfExtractor:
@@ -58,7 +57,7 @@ class DigitalPdfExtractor:
         # block_type == 0 is text, block_type == 1 is image
         raw_blocks = page.get_text("blocks")
         text_blocks = [b for b in raw_blocks if b[6] == 0 and b[4].strip()]
-        raw_full_text = "\n\n".join(krutidev_to_unicode(b[4].strip()) for b in text_blocks)
+        raw_full_text = "\n\n".join(b[4].strip() for b in text_blocks)
 
         # 2. Extract embedded images on this page
         extracted_images = self._extract_images(doc, page, page_number)
@@ -70,7 +69,7 @@ class DigitalPdfExtractor:
         sections = []
         for block in sorted_blocks:
             x0, y0, x1, y1, text, block_no, col_idx = block
-            clean_text = krutidev_to_unicode(text.strip())
+            clean_text = text.strip()
             if not clean_text:
                 continue
 

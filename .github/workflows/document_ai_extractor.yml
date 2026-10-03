@@ -50,10 +50,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-document-ai-models-
 
-      - name: Install System Libraries
+      - name: Install System Libraries & Google Tesseract OCR
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libglib2.0-0 \
+            tesseract-ocr \
+            tesseract-ocr-hin \
+            tesseract-ocr-ben \
+            tesseract-ocr-guj \
+            tesseract-ocr-mar \
+            tesseract-ocr-tam \
+            tesseract-ocr-tel
 
       - name: Install Dependencies
         run: |
@@ -71,6 +79,7 @@ jobs:
           WEBHOOK_SECRET: ${{ secrets.INGESTION_WEBHOOK_SECRET || '' }}
           DRIVE_TOKEN_JSON: ${{ github.event.client_payload.drive_token_json || secrets.GOOGLE_DRIVE_USER_TOKEN_JSON || '' }}
           DRIVE_FOLDER_ID: ${{ github.event.client_payload.drive_folder_id || secrets.GOOGLE_DRIVE_FOLDER_ID || '' }}
+          GEMINI_API_KEY: ${{ github.event.client_payload.gemini_api_key || secrets.GEMINI_API_KEY || '' }}
         run: |
           echo "Starting Document AI Worker for Job #$JOB_ID..."
           PYTHONPATH=document_ai_worker python document_ai_worker/cli_extractor.py \
@@ -78,7 +87,8 @@ jobs:
             --pdf-url "$PDF_URL" \
             --callback-url "$CALLBACK_URL" \
             --document-kind "$DOCUMENT_KIND" \
-            --webhook-secret "$WEBHOOK_SECRET"
+            --webhook-secret "$WEBHOOK_SECRET" \
+            --gemini-api-key "$GEMINI_API_KEY"
 
       - name: Report Failure to Backend Webhook
         if: failure()

@@ -617,7 +617,7 @@ class IngestionJobWebhookView(APIView):
 
                 # 2. Populate Pages
                 job.pages.all().delete()
-                from .krutidev import krutidev_to_unicode
+
 
                 pages_to_create = []
                 for p_data in pages_data:
@@ -625,11 +625,11 @@ class IngestionJobWebhookView(APIView):
                     matched_ch = chapter_map.get(p_data.get("chapter_number"))
                     raw_sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
 
-                    # Process sections: convert KrutiDev and gather diagrams for async background upload
+                    # Process sections and gather diagrams for async background upload
                     processed_sections = []
                     for s_idx, sec_dict in enumerate(raw_sections, start=1):
-                        heading = krutidev_to_unicode(sec_dict.get("heading", ""))
-                        text_val = krutidev_to_unicode(sec_dict.get("text", ""))
+                        heading = sec_dict.get("heading", "")
+                        text_val = sec_dict.get("text", "")
                         image_path = sec_dict.get("image_path", "")
                         image_data = sec_dict.get("image_data", "")
 
@@ -664,7 +664,7 @@ class IngestionJobWebhookView(APIView):
                             page_number=p_num,
                             chapter=matched_ch,
                             layout_type=p_data.get("layout_type", "SINGLE_COLUMN"),
-                            raw_text=krutidev_to_unicode(p_data.get("raw_text", "")),
+                            raw_text=p_data.get("raw_text", ""),
                             structured_content=processed_sections,
                         )
                     )

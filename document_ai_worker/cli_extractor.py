@@ -213,6 +213,7 @@ def main():
     parser.add_argument("--callback-url", type=str, required=True, help="Django Webhook Callback URL")
     parser.add_argument("--document-kind", type=str, default="TEXTBOOK", help="TEXTBOOK or HANDWRITTEN_NOTES")
     parser.add_argument("--webhook-secret", type=str, default="", help="Optional webhook verification secret")
+    parser.add_argument("--gemini-api-key", type=str, default="", help="Optional Google Gemini API Key for fast vision handwriting")
 
     args = parser.parse_args()
 
@@ -266,10 +267,12 @@ def main():
 
         engine_name = "Rule-Based Pipeline"
         if effective_kind == "HANDWRITTEN_NOTES":
-            logger.info("Initializing EasyOCR Deep Learning Handwriting Pipeline...")
-            pipeline = HandwritingPipeline(media_dir=os.path.join(temp_dir, "assets"))
+            gemini_key = args.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
+            pipeline_label = "Gemini 2.0 Flash Vision AI" if gemini_key else "Tesseract/EasyOCR AI"
+            logger.info(f"Initializing Handwriting Pipeline ({pipeline_label})...")
+            pipeline = HandwritingPipeline(media_dir=os.path.join(temp_dir, "assets"), gemini_api_key=gemini_key)
             chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
-            engine_name = "EasyOCR AI (Handwriting)"
+            engine_name = "Gemini Flash AI (Handwriting)" if gemini_key else "Tesseract/EasyOCR (Handwriting)"
         else:
             use_docling = os.environ.get("USE_DOCLING", "1") == "1"
             extracted_successfully = False

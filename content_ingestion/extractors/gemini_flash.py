@@ -70,9 +70,9 @@ class GeminiFlashExtractor(BaseExtractor):
     Multimodal document extractor utilizing Gemini Flash Vision.
     """
 
-    def __init__(self, api_key: str = "", model_name: str = "gemini-2.0-flash"):
+    def __init__(self, api_key: str = "", model_name: str = "gemini-3.8-flash"):
         self.api_key = api_key or getattr(settings, "GEMINI_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
-        self.model_name = model_name or getattr(settings, "GEMINI_MODEL_NAME", "gemini-2.0-flash")
+        self.model_name = model_name or getattr(settings, "GEMINI_MODEL_NAME", "gemini-3.8-flash")
         self.fallback_extractor = DigitalPdfExtractor()
 
     def extract_page(self, doc: fitz.Document, page_number: int) -> Dict[str, Any]:
