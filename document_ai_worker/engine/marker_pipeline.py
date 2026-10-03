@@ -73,9 +73,12 @@ class MarkerPipeline:
         # Ensure LLAMA_CPP_BINARY is present in environment if installed
         sub_env = dict(os.environ)
         if "LLAMA_CPP_BINARY" not in sub_env:
-            llama_bin = shutil.which("llama-server") or "/usr/local/bin/llama-server"
-            if os.path.exists(llama_bin):
-                sub_env["LLAMA_CPP_BINARY"] = llama_bin
+            for candidate in ["/opt/llama-cpp/llama-server", shutil.which("llama-server"), "/usr/local/bin/llama-server"]:
+                if candidate and os.path.exists(candidate):
+                    sub_env["LLAMA_CPP_BINARY"] = candidate
+                    break
+
+        sub_env.setdefault("SURYA_INFERENCE_STARTUP_TIMEOUT", "120")
 
         logger.info(f"Running Marker command: {' '.join(cmd)}")
         try:
