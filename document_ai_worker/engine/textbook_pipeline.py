@@ -16,7 +16,7 @@ import logging
 import math
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pymupdf as fitz
 
@@ -48,7 +48,12 @@ class TextbookPipeline:
         self.media_dir = media_dir
         os.makedirs(self.media_dir, exist_ok=True)
 
-    def process_pdf(self, pdf_path: str, max_pages: Optional[int] = None) -> Tuple[List[ChapterSchema], List[PageSchema], str]:
+    def process_pdf(
+        self,
+        pdf_path: str,
+        max_pages: Optional[int] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> Tuple[List[ChapterSchema], List[PageSchema], str]:
         """
         Executes full textbook extraction:
         1. Detects Table of Contents (TOC) & chapter ranges.
@@ -57,6 +62,9 @@ class TextbookPipeline:
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         pages_to_process = min(total_pages, max_pages) if max_pages else total_pages
+
+        if progress_callback:
+            progress_callback(0, pages_to_process, f"Opened document ({pages_to_process} pages). Detecting TOC & structure...")
 
         # 1. Detect TOC & Chapters
         toc_entries, granularity = self._detect_toc(doc)
@@ -67,6 +75,8 @@ class TextbookPipeline:
             page_num = p_idx + 1
             page_schema = self._extract_single_page(doc, page_num, toc_entries)
             pages.append(page_schema)
+            if progress_callback:
+                progress_callback(page_num, pages_to_process, f"Extracting page {page_num} of {pages_to_process} (layout & LaTeX)...")
 
         doc.close()
         return toc_entries, pages, granularity

@@ -94,6 +94,37 @@ def download_file(url: str, dest_path: str) -> None:
 
 
 
+def send_progress(
+    callback_url: str,
+    job_id: int,
+    processed_pages: int,
+    total_pages: int,
+    stage: str,
+    secret: str = "",
+) -> None:
+    """
+    Sends non-blocking progress updates to the Django backend.
+    Catches any network hiccups so extraction is never aborted due to a progress ping.
+    """
+    headers = {"Content-Type": "application/json"}
+    if secret:
+        headers["X-Ingestion-Secret"] = secret
+
+    payload = {
+        "job_id": job_id,
+        "status": "PROGRESS",
+        "processed_pages": processed_pages,
+        "total_pages": total_pages,
+        "current_stage": stage,
+    }
+    pct = int((processed_pages / total_pages * 100) if total_pages else 0)
+    logger.info(f"[Progress] {processed_pages}/{total_pages} ({pct}%) - {stage}")
+    try:
+        requests.post(callback_url, json=payload, headers=headers, timeout=5)
+    except Exception as p_err:
+        logger.debug(f"[Progress] Heartbeat delivery notice: {p_err}")
+
+
 def send_webhook(callback_url: str, payload: dict, secret: str = "", max_retries: int = 5) -> None:
     """
     Posts the extraction result back to the Django backend with automatic retry
@@ -146,15 +177,47 @@ def main():
         # 1. Download file
         download_file(args.pdf_url, local_pdf)
 
-        # 2. Select appropriate extraction pipeline
+        import pymupdf as fitz
+        try:
+            preview_doc = fitz.open(local_pdf)
+            detected_total_pages = len(preview_doc)
+            preview_doc.close()
+        except Exception:
+            detected_total_pages = 0
+
+        send_progress(
+            args.callback_url,
+            args.job_id,
+            0,
+            detected_total_pages,
+            f"PDF downloaded ({detected_total_pages} pages). Initializing AI extractor...",
+            secret=args.webhook_secret,
+        )
+
+        # 2. Select appropriate extraction pipeline with throttled progress reporting
+        last_progress_time = [0.0]
+
+        def on_pipeline_progress(processed: int, total: int, stage_text: str):
+            now = time.time()
+            if processed == 0 or processed == total or (now - last_progress_time[0]) >= 1.5:
+                last_progress_time[0] = now
+                send_progress(
+                    args.callback_url,
+                    args.job_id,
+                    processed,
+                    total,
+                    stage_text,
+                    secret=args.webhook_secret,
+                )
+
         if args.document_kind == "HANDWRITTEN_NOTES":
             logger.info("Initializing Handwriting Pipeline...")
             pipeline = HandwritingPipeline(media_dir=os.path.join(temp_dir, "assets"))
-            chapters, pages, granularity = pipeline.process_pdf(local_pdf)
+            chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
         else:
             logger.info("Initializing Textbook & Pedagogical Pipeline...")
             pipeline = TextbookPipeline(media_dir=os.path.join(temp_dir, "assets"))
-            chapters, pages, granularity = pipeline.process_pdf(local_pdf)
+            chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
 
         logger.info(
             f"Extraction complete! Found {len(chapters)} chapters and {len(pages)} pages. "
@@ -166,35 +229,64 @@ def main():
         is_drive_active = drive_uploader.is_configured()
         logger.info(f"Worker Google Drive Uploader active: {is_drive_active}")
 
-        uploaded_diagram_count = 0
+        diagram_targets = []
         for p in pages:
             for s_idx, sec in enumerate(p.sections):
                 raw_b64 = getattr(sec, "image_data", "")
                 if raw_b64 and raw_b64.startswith("data:image/"):
-                    if is_drive_active:
-                        try:
-                            header, encoded = raw_b64.split(",", 1)
-                            ext = "png"
-                            mime = "image/png"
-                            if "jpeg" in header or "jpg" in header:
-                                ext = "jpg"
-                                mime = "image/jpeg"
-                            raw_bytes = base64.b64decode(encoded)
-                            filename = f"job_{args.job_id}_p{p.page_number}_fig_{s_idx + 1}.{ext}"
-                            direct_url = drive_uploader.upload_bytes(
-                                raw_bytes,
-                                destination_name=filename,
-                                mime_type=mime,
-                                subfolder_name="Extracted-Diagrams",
-                            )
-                            if direct_url:
-                                sec.image_path = direct_url
-                                uploaded_diagram_count += 1
-                        except Exception as up_err:
-                            logger.warning(f"Could not upload diagram to Drive: {up_err}")
+                    diagram_targets.append((p, s_idx, sec))
 
-                    # Strip heavy raw image_data so webhook payload stays tiny (<50KB)
-                    sec.image_data = ""
+        total_diagrams = len(diagram_targets)
+        if total_diagrams > 0 and is_drive_active:
+            send_progress(
+                args.callback_url,
+                args.job_id,
+                len(pages),
+                len(pages),
+                f"Pages structured. Uploading {total_diagrams} diagrams to Google Drive...",
+                secret=args.webhook_secret,
+            )
+
+        uploaded_diagram_count = 0
+        last_diagram_progress = time.time()
+        for p, s_idx, sec in diagram_targets:
+            raw_b64 = getattr(sec, "image_data", "")
+            if is_drive_active:
+                try:
+                    header, encoded = raw_b64.split(",", 1)
+                    ext = "png"
+                    mime = "image/png"
+                    if "jpeg" in header or "jpg" in header:
+                        ext = "jpg"
+                        mime = "image/jpeg"
+                    raw_bytes = base64.b64decode(encoded)
+                    filename = f"job_{args.job_id}_p{p.page_number}_fig_{s_idx + 1}.{ext}"
+                    direct_url = drive_uploader.upload_bytes(
+                        raw_bytes,
+                        destination_name=filename,
+                        mime_type=mime,
+                        subfolder_name="Extracted-Diagrams",
+                    )
+                    if direct_url:
+                        sec.image_path = direct_url
+                        uploaded_diagram_count += 1
+                except Exception as up_err:
+                    logger.warning(f"Could not upload diagram to Drive: {up_err}")
+
+            # Strip heavy raw image_data so webhook payload stays tiny (<50KB)
+            sec.image_data = ""
+
+            now = time.time()
+            if (now - last_diagram_progress) >= 2.0 or uploaded_diagram_count == total_diagrams:
+                last_diagram_progress = now
+                send_progress(
+                    args.callback_url,
+                    args.job_id,
+                    len(pages),
+                    len(pages),
+                    f"Uploaded {uploaded_diagram_count} of {total_diagrams} diagrams to Google Drive...",
+                    secret=args.webhook_secret,
+                )
 
         logger.info(f"Direct Drive upload complete: {uploaded_diagram_count} diagrams saved to Google Drive.")
 
@@ -207,6 +299,15 @@ def main():
             "pages": [p.model_dump() for p in pages],
             "total_pages": len(pages),
         }
+
+        send_progress(
+            args.callback_url,
+            args.job_id,
+            len(pages),
+            len(pages),
+            f"Delivering structured dataset ({len(pages)} pages, {uploaded_diagram_count} diagrams) to backend...",
+            secret=args.webhook_secret,
+        )
 
         # 5. Dispatch back to Django Webhook with auto-retry
         send_webhook(args.callback_url, payload, secret=args.webhook_secret)

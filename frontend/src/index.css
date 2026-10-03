@@ -115,10 +115,34 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton-shimmer {
+  .skeleton-shimmer,
+  .progress-active-stripe {
     animation: none !important;
     background: var(--color-surface-muted) !important;
   }
+}
+
+/* Active Progress Bar Shimmer for Real-time Document AI Extraction */
+@keyframes progress-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.progress-active-stripe {
+  background: linear-gradient(
+    90deg,
+    #059669 0%,
+    #34d399 25%,
+    #10b981 50%,
+    #34d399 75%,
+    #059669 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 2.2s linear infinite;
 }
 
 /* ─────────────────────────────────────────────────────────────────

@@ -440,22 +440,37 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                           {job.current_stage?.includes('Google Drive') && (
                             <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
                           )}
+                          {job.status === 'EXTRACTING' && !job.current_stage?.includes('Google Drive') && (
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                          )}
                           {job.current_stage || `${job.processed_pages} of ${job.total_pages} pages processed`}
                         </span>
                         <span className="font-mono font-bold text-ink">
-                          {job.progress_percentage}%
+                          {job.status === 'EXTRACTING' && job.progress_percentage === 0 ? (
+                            <span className="text-emerald-700 font-semibold animate-pulse">Starting...</span>
+                          ) : (
+                            `${job.progress_percentage}%`
+                          )}
                         </span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-surface-muted overflow-hidden border border-border/50">
                         <div
-                          className={`h-full transition-all duration-300 ${
+                          className={`h-full transition-all duration-500 ease-out ${
                             job.status === 'COMPLETED'
                               ? 'bg-forest'
                               : job.status === 'FAILED'
                               ? 'bg-red-500'
+                              : job.status === 'EXTRACTING'
+                              ? 'progress-active-stripe'
                               : 'bg-emerald-500'
                           }`}
-                          style={{ width: `${job.progress_percentage}%` }}
+                          style={{
+                            width: `${
+                              job.status === 'EXTRACTING'
+                                ? Math.max(job.progress_percentage, 5)
+                                : job.progress_percentage
+                            }%`,
+                          }}
                         />
                       </div>
                       {job.status === 'FAILED' && (
