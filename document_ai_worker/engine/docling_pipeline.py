@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import pymupdf as fitz
 from PIL import Image
 
-from .krutidev import convert_krutidev_to_unicode, is_krutidev_text
+from .krutidev import krutidev_to_unicode, is_krutidev
 from .schema import ChapterSchema, PageSchema, SectionSchema
 
 logger = logging.getLogger(__name__)
@@ -125,8 +125,8 @@ class DoclingPipeline:
 
                 raw_text = getattr(item, "text", "") or ""
                 # KrutiDev decode if legacy font
-                if raw_text and is_krutidev_text(raw_text):
-                    clean_text = convert_krutidev_to_unicode(raw_text).strip()
+                if raw_text and is_krutidev(raw_text):
+                    clean_text = krutidev_to_unicode(raw_text).strip()
                 else:
                     clean_text = raw_text.strip()
 
