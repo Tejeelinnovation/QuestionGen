@@ -17,6 +17,7 @@ export interface IngestionJobSummary {
   error_message?: string;
   google_drive_file_id?: string;
   google_drive_url: string;
+  metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }

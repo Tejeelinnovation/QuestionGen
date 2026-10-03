@@ -232,41 +232,56 @@ _K2U_MAPPINGS: list[Tuple[str, str]] = [
 ]
 
 _KRUTIDEV_TRIGGERS = [
-    "dksf", "foHk", "izf", "gSA", "osQ", "thok", "rFkk", "vkSj", "esa", "dgrs", "gksrh", "gksrk"
+    "dksf", "foHk", "izf", "gSA", "osQ", "thok", "rFkk", "vkSj", "esa", "dgrs", "gksrh", "gksrk",
+    "vè;", "ljy", "js[kk", "fcanq", "f=k", "lehdj.k", "fn,", "fn;k", "blfy,", "mQè", "vko`Qfr",
+    "Hkwfedk", "mnkgj.k", "iz'ukoyh", "f=kHkqt", "nwjh", "d{kk", "dks.", "yac", "Kkr", "T;kfefr",
+    "chtxf.kr", "lw=k", "x-v{k", "y-v{k", "mís'", "fopkj", "LFkfr", "dks.k", "var%", "O;kid"
 ]
 
 
 def is_krutidev(text: str) -> bool:
-    if not text or len(text) < 10:
+    if not text:
         return False
     if any("\u0900" <= c <= "\u097f" for c in text):
         return False
-    matches = sum(1 for trigger in _KRUTIDEV_TRIGGERS if trigger in text)
-    return matches >= 2
+    return any(trigger in text for trigger in _KRUTIDEV_TRIGGERS)
 
 
 def krutidev_to_unicode(text: str) -> str:
     if not text or not is_krutidev(text):
         return text
 
-    converted = text
-    for k, u in _K2U_MAPPINGS:
-        converted = converted.replace(k, u)
+    # Split to preserve parenthesized English words: (Straight Lines), (Introduction), etc.
+    parts = re.split(r"(\([A-Za-z0-9\s\,\.\-\+\=\_\/]+\))", text)
+    result = []
+    for part in parts:
+        if part.startswith("(") and part.endswith(")"):
+            result.append(part)
+            continue
 
-    def fix_chhoti_ee(match):
-        char_seq = match.group(1)
-        return char_seq + "ि"
+        converted = part
+        for k, u in _K2U_MAPPINGS:
+            converted = converted.replace(k, u)
 
-    converted = re.sub(r"f((?:[\u0915-\u0939]\u094d)*[\u0915-\u0939])", fix_chhoti_ee, converted)
+        def fix_chhoti_ee(match):
+            char_seq = match.group(1)
+            return char_seq + "ि"
 
-    def fix_reph(match):
-        char_seq = match.group(1)
-        return "र्" + char_seq
+        converted = re.sub(r"f((?:[\u0915-\u0939]\u094d)*[\u0915-\u0939])", fix_chhoti_ee, converted)
 
-    converted = re.sub(
-        r"((?:[\u0915-\u0939]\u094d)*[\u0915-\u0939][\u093e-\u094c\u0901-\u0903]*)Z",
-        fix_reph,
-        converted,
-    )
+        def fix_reph(match):
+            char_seq = match.group(1)
+            return "र्" + char_seq
 
-    return converted
+        converted = re.sub(
+            r"((?:[\u0915-\u0939]\u094d)*[\u0915-\u0939][\u093e-\u094c\u0901-\u0903]*)Z",
+            fix_reph,
+            converted,
+        )
+
+        # Fix decimal points between digits that were mapped from KrutiDev 'ण्'
+        converted = re.sub(r"(\d)ण्(\d)", r"\1.\2", converted)
+
+        result.append(converted)
+
+    return "".join(result)

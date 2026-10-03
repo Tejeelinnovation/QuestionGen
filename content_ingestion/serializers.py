@@ -90,6 +90,7 @@ class IngestionJobListSerializer(serializers.ModelSerializer):
             "error_message",
             "google_drive_file_id",
             "google_drive_url",
+            "metadata",
             "created_at",
             "updated_at",
         ]

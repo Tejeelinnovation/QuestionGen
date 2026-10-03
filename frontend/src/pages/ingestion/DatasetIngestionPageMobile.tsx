@@ -11,6 +11,7 @@ import {
   Play,
   RotateCcw,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import {
@@ -281,6 +282,28 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                         </span>
                       )
                     )}
+
+                    {/* Extraction Engine Tag */}
+                    {job.metadata?.extraction_engine ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
+                        <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                        {job.metadata.extraction_engine}
+                      </span>
+                    ) : job.current_stage?.includes('Marker') ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
+                        <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                        Marker AI
+                      </span>
+                    ) : job.status === 'EXTRACTING' ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-purple-500/10 text-purple-700 border border-purple-500/20 animate-pulse">
+                        <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                        Marker AI
+                      </span>
+                    ) : job.status === 'COMPLETED' ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-surface-muted text-ink/65 border border-border">
+                        Document AI
+                      </span>
+                    ) : null}
                   </div>
 
                   {/* Title */}

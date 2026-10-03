@@ -697,10 +697,15 @@ class IngestionJobWebhookView(APIView):
                 if items_to_create:
                     ExtractedItem.objects.bulk_create(items_to_create, batch_size=500)
 
+                engine = data.get("engine") or "Marker AI (Surya + Texify)"
+                if not job.metadata or not isinstance(job.metadata, dict):
+                    job.metadata = {}
+                job.metadata["extraction_engine"] = engine
+
                 job.status = JobStatus.COMPLETED
-                job.current_stage = f"Completed via AI Microservice! Structured all {total_pages} pages."
+                job.current_stage = f"Completed via {engine}! Structured all {total_pages} pages."
                 job.updated_at = timezone.now()
-                job.save(update_fields=["status", "current_stage", "total_pages", "processed_pages", "granularity", "table_of_contents", "updated_at"])
+                job.save(update_fields=["status", "current_stage", "metadata", "total_pages", "processed_pages", "granularity", "table_of_contents", "updated_at"])
 
             # Release from queue worker tracking
             from .queue import IngestionQueueWorker

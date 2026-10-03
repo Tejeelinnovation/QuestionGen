@@ -17,6 +17,7 @@ import base64
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -25,6 +26,7 @@ import requests
 
 from engine.drive_uploader import WorkerGoogleDriveUploader
 from engine.handwriting_pipeline import HandwritingPipeline
+from engine.marker_pipeline import MarkerPipeline
 from engine.textbook_pipeline import TextbookPipeline
 
 logging.basicConfig(
@@ -210,14 +212,31 @@ def main():
                     secret=args.webhook_secret,
                 )
 
+        engine_name = "Rule-Based Pipeline"
         if args.document_kind == "HANDWRITTEN_NOTES":
             logger.info("Initializing Handwriting Pipeline...")
             pipeline = HandwritingPipeline(media_dir=os.path.join(temp_dir, "assets"))
             chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
+            engine_name = "Handwriting Pipeline"
         else:
-            logger.info("Initializing Textbook & Pedagogical Pipeline...")
-            pipeline = TextbookPipeline(media_dir=os.path.join(temp_dir, "assets"))
-            chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
+            marker_available = bool(shutil.which("marker_single")) or os.environ.get("USE_MARKER", "1") == "1"
+            extracted_successfully = False
+            if marker_available:
+                try:
+                    logger.info("Initializing Marker AI Pipeline (Surya Layout + Texify LaTeX)...")
+                    marker_pipeline = MarkerPipeline(media_dir=os.path.join(temp_dir, "assets"))
+                    chapters, pages, granularity = marker_pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
+                    extracted_successfully = True
+                    engine_name = "Marker AI (Surya + Texify)"
+                    logger.info("[SUCCESS] Marker AI successfully extracted structured document!")
+                except Exception as marker_err:
+                    logger.warning(f"Marker AI encountered an issue: {marker_err}. Falling back to TextbookPipeline...")
+
+            if not extracted_successfully:
+                logger.info("Initializing Textbook & Pedagogical Pipeline (Enhanced Fallback)...")
+                pipeline = TextbookPipeline(media_dir=os.path.join(temp_dir, "assets"))
+                chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
+                engine_name = "Rule-Based Engine"
 
         logger.info(
             f"Extraction complete! Found {len(chapters)} chapters and {len(pages)} pages. "
@@ -233,7 +252,8 @@ def main():
         for p in pages:
             for s_idx, sec in enumerate(p.sections):
                 raw_b64 = getattr(sec, "image_data", "")
-                if raw_b64 and raw_b64.startswith("data:image/"):
+                img_p = getattr(sec, "image_path", "")
+                if (raw_b64 and raw_b64.startswith("data:image/")) or (img_p and os.path.exists(img_p)):
                     diagram_targets.append((p, s_idx, sec))
 
         total_diagrams = len(diagram_targets)
@@ -251,15 +271,28 @@ def main():
         last_diagram_progress = time.time()
         for p, s_idx, sec in diagram_targets:
             raw_b64 = getattr(sec, "image_data", "")
-            if is_drive_active:
+            img_p = getattr(sec, "image_path", "")
+            raw_bytes = b""
+            ext = "png"
+            mime = "image/png"
+
+            if raw_b64 and raw_b64.startswith("data:image/"):
+                header, encoded = raw_b64.split(",", 1)
+                if "jpeg" in header or "jpg" in header:
+                    ext = "jpg"
+                    mime = "image/jpeg"
+                raw_bytes = base64.b64decode(encoded)
+            elif img_p and os.path.exists(img_p):
+                ext = img_p.split(".")[-1].lower()
+                mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
                 try:
-                    header, encoded = raw_b64.split(",", 1)
-                    ext = "png"
-                    mime = "image/png"
-                    if "jpeg" in header or "jpg" in header:
-                        ext = "jpg"
-                        mime = "image/jpeg"
-                    raw_bytes = base64.b64decode(encoded)
+                    with open(img_p, "rb") as imf:
+                        raw_bytes = imf.read()
+                except Exception as read_err:
+                    logger.warning(f"Could not read image file {img_p}: {read_err}")
+
+            if is_drive_active and raw_bytes:
+                try:
                     filename = f"job_{args.job_id}_p{p.page_number}_fig_{s_idx + 1}.{ext}"
                     direct_url = drive_uploader.upload_bytes(
                         raw_bytes,
@@ -298,6 +331,7 @@ def main():
             "chapters": [ch.model_dump() for ch in chapters],
             "pages": [p.model_dump() for p in pages],
             "total_pages": len(pages),
+            "engine": engine_name,
         }
 
         send_progress(
