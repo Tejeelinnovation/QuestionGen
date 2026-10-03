@@ -70,6 +70,13 @@ class MarkerPipeline:
         if max_pages:
             cmd.extend(["--max_pages", str(max_pages)])
 
+        # Ensure LLAMA_CPP_BINARY is present in environment if installed
+        sub_env = dict(os.environ)
+        if "LLAMA_CPP_BINARY" not in sub_env:
+            llama_bin = shutil.which("llama-server") or "/usr/local/bin/llama-server"
+            if os.path.exists(llama_bin):
+                sub_env["LLAMA_CPP_BINARY"] = llama_bin
+
         logger.info(f"Running Marker command: {' '.join(cmd)}")
         try:
             proc = subprocess.Popen(
@@ -78,6 +85,7 @@ class MarkerPipeline:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                env=sub_env,
             )
 
             # Monitor runner output for progress
