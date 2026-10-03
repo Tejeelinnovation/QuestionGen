@@ -697,7 +697,7 @@ class IngestionJobWebhookView(APIView):
                 if items_to_create:
                     ExtractedItem.objects.bulk_create(items_to_create, batch_size=500)
 
-                engine = data.get("engine") or "Marker AI (Surya + Texify)"
+                engine = data.get("engine") or "Docling AI (DocLayNet)"
                 if not job.metadata or not isinstance(job.metadata, dict):
                     job.metadata = {}
                 job.metadata["extraction_engine"] = engine

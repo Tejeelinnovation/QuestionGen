@@ -39,42 +39,31 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Cache Hugging Face & Marker Models
+      - name: Cache Hugging Face, Docling & EasyOCR Models
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/huggingface
-            ~/.cache/datalab
-          key: ${{ runner.os }}-marker-models-v1
+            ~/.cache/docling
+            ~/.EasyOCR
+          key: ${{ runner.os }}-document-ai-models-v1
           restore-keys: |
-            ${{ runner.os }}-marker-models-
+            ${{ runner.os }}-document-ai-models-
 
-      - name: Install llama.cpp (llama-server) for Surya AI OCR
+      - name: Install System Libraries
         run: |
-          echo "Installing llama-server and backend libraries for Surya / Marker AI..."
-          sudo mkdir -p /opt/llama-cpp
-          curl -sL --retry 3 https://github.com/ggml-org/llama.cpp/releases/download/b11372/llama-b11372-bin-ubuntu-x64.tar.gz -o /tmp/llama.tar.gz
-          sudo tar -xzf /tmp/llama.tar.gz -C /opt/llama-cpp --strip-components=1
-          sudo chmod +x /opt/llama-cpp/llama-server
-          # Copy libraries to /usr/local/lib for system-wide resolution as well
-          sudo cp /opt/llama-cpp/*.so* /usr/local/lib/ 2>/dev/null || true
-          sudo ldconfig
-          echo "/opt/llama-cpp" >> $GITHUB_PATH
-          echo "LLAMA_CPP_BINARY=/opt/llama-cpp/llama-server" >> $GITHUB_ENV
-          echo "SURYA_INFERENCE_STARTUP_TIMEOUT=120" >> $GITHUB_ENV
-          echo "Verifying llama-server binary in /opt/llama-cpp:"
-          /opt/llama-cpp/llama-server --version || true
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install opencv-python-headless
           pip install -r document_ai_worker/requirements.txt
 
       - name: Execute Document AI Extraction
         env:
-          LLAMA_CPP_BINARY: /opt/llama-cpp/llama-server
-          SURYA_INFERENCE_STARTUP_TIMEOUT: "120"
           JOB_ID: ${{ github.event.client_payload.job_id || inputs.job_id }}
           PDF_URL: ${{ github.event.client_payload.pdf_url || inputs.pdf_url }}
           CALLBACK_URL: ${{ github.event.client_payload.callback_url || inputs.callback_url }}
