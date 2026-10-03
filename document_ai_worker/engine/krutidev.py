@@ -232,10 +232,19 @@ _K2U_MAPPINGS: list[Tuple[str, str]] = [
 ]
 
 _KRUTIDEV_TRIGGERS = [
-    "dksf", "foHk", "izf", "gSA", "osQ", "thok", "rFkk", "vkSj", "esa", "dgrs", "gksrh", "gksrk",
-    "vè;", "ljy", "js[kk", "fcanq", "f=k", "lehdj.k", "fn,", "fn;k", "blfy,", "mQè", "vko`Qfr",
-    "Hkwfedk", "mnkgj.k", "iz'ukoyh", "f=kHkqt", "nwjh", "d{kk", "dks.", "yac", "Kkr", "T;kfefr",
-    "chtxf.kr", "lw=k", "x-v{k", "y-v{k", "mís'", "fopkj", "LFkfr", "dks.k", "var%", "O;kid"
+    # Auxiliary verbs and common suffixes
+    "gSA", "gSaA", "gS", "gSa", "gksrh", "gksrk", "gksrs", "gks", "dgrs", "fn,", "fn;k", "fn;s",
+    "dhft,", "fyf[k,", "djsa", "djrs", "djrk", "Fkk", "Fks", "Fkh", "ugha",
+    # Postpositions, pronouns & conjunctions
+    "osQ", "dksQ", "rFkk", "vkSj", "esa", "blfy,", "mlesa", "blosQ", "ftlesa", "ftldk", "ftlls",
+    "fdlh", "ftls", ";fn", "rks", ";g", "og", ",oa",
+    # Mathematics & Geometry vocabulary
+    "Hkwfedk", "vè;", "ljy", "js[kk", "fcanq", "f=k", "f=kHkqt", "lehdj.k", "mnkgj.k", "iz'ukoyh",
+    "nwjh", "d{kk", "dks.", "dks.k", "yac", "Kkr", "T;kfefr", "chtxf.kr", "lw=k", "x-v{k", "y-v{k",
+    "mís'", "fopkj", "LFkfr", "var%", "O;kid", "vko`Qfr", "thok", "mQè", "foHk", "izf",
+    # Statistics & Textbook vocabulary (e.g. NCERT Chapter 14 & 15)
+    "cYysckt", "ekè;", "ekfè;dk", "fuEufyf[kr", "ckjackjrk", "vUrjky", "lkj.kh", "laP;h",
+    "oxZ", "iz'u", "mÙkj", "oxhZÑr", "vkadM+", "cgqyd", "eku", "leku", "vuqikr", "çdkj",
 ]
 
 
@@ -247,8 +256,10 @@ def is_krutidev(text: str) -> bool:
     return any(trigger in text for trigger in _KRUTIDEV_TRIGGERS)
 
 
-def krutidev_to_unicode(text: str) -> str:
-    if not text or not is_krutidev(text):
+def krutidev_to_unicode(text: str, force: bool = False) -> str:
+    if not text:
+        return text
+    if not force and not is_krutidev(text):
         return text
 
     # Split to preserve parenthesized English words: (Straight Lines), (Introduction), etc.

@@ -62,9 +62,44 @@ class DoclingPipeline:
                 f"Starting IBM Docling AI (DocLayNet Layout + Tables) for {pages_to_process} pages...",
             )
 
-        # 2. Configure Docling pipeline options for high-speed CPU extraction & crisp figures
+        # 2. Inspect document to detect legacy non-Unicode fonts (Walkman-Chanakya, KrutiDev, DevLys, etc.)
+        has_legacy_fonts = False
+        try:
+            for p_i in range(min(total_pages, 5)):
+                for font_tuple in fitz_doc[p_i].get_fonts():
+                    fname = (font_tuple[3] if len(font_tuple) > 3 else "").lower()
+                    if any(f in fname for f in ("chanakya", "kruti", "devlys", "walkman", "shree", "shivaji", "bilingual", "aps", "akruti", "kundli")):
+                        has_legacy_fonts = True
+                        break
+                if has_legacy_fonts:
+                    break
+                sample_p_txt = fitz_doc[p_i].get_text("text")
+                if is_krutidev(sample_p_txt):
+                    has_legacy_fonts = True
+                    break
+        except Exception as probe_err:
+            logger.debug(f"Document font probe note: {probe_err}")
+
+        force_ocr_env = os.environ.get("DOCLING_FORCE_FULL_PAGE_OCR", "").lower() in ("1", "true", "yes")
+        enable_full_page = has_legacy_fonts or force_ocr_env
+
+        logger.info(
+            f"Docling OCR Configuration: do_ocr=True, force_full_page_ocr={enable_full_page} "
+            f"(legacy_font_detected={has_legacy_fonts}, env_override={force_ocr_env})"
+        )
+
         pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = False  # Textbooks have embedded vector text layer; avoids slow CPU OCR
+        pipeline_options.do_ocr = True
+        try:
+            from docling.datamodel.pipeline_options import EasyOcrOptions
+            pipeline_options.ocr_options = EasyOcrOptions(
+                force_full_page_ocr=enable_full_page,
+                lang=["hi", "en"],
+                use_gpu=False,
+            )
+        except Exception as ocr_opt_err:
+            logger.warning(f"Could not initialize EasyOcrOptions: {ocr_opt_err}. Proceeding with default OCR options.")
+
         pipeline_options.generate_picture_images = True
         pipeline_options.images_scale = 2.0  # Crisp 200+ DPI images for diagrams
 
@@ -218,6 +253,9 @@ class DoclingPipeline:
                         table_md = item.export_to_markdown()
                     except Exception:
                         table_md = clean_text
+
+                    if table_md and is_krutidev(table_md):
+                        table_md = krutidev_to_unicode(table_md)
 
                     sections.append(SectionSchema(
                         type="PARAGRAPH",
