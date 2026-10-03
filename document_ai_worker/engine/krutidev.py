@@ -285,3 +285,8 @@ def krutidev_to_unicode(text: str) -> str:
         result.append(converted)
 
     return "".join(result)
+
+
+# Compatibility aliases
+convert_krutidev_to_unicode = krutidev_to_unicode
+is_krutidev_text = is_krutidev
