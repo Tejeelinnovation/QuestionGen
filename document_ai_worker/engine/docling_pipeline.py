@@ -19,7 +19,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import pymupdf as fitz
 from PIL import Image
 
-from .krutidev import krutidev_to_unicode, is_krutidev
 from .schema import ChapterSchema, PageSchema, SectionSchema
 
 logger = logging.getLogger(__name__)
@@ -73,10 +72,6 @@ class DoclingPipeline:
                         break
                 if has_legacy_fonts:
                     break
-                sample_p_txt = fitz_doc[p_i].get_text("text")
-                if is_krutidev(sample_p_txt):
-                    has_legacy_fonts = True
-                    break
         except Exception as probe_err:
             logger.debug(f"Document font probe note: {probe_err}")
 
@@ -90,15 +85,31 @@ class DoclingPipeline:
 
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = True
+
+        # Configure Google Tesseract OCR for ultra-fast, lightweight C++ conversion (~0.5s per page)
+        ocr_langs = ["hin", "eng"]
+        env_langs = os.environ.get("TESSERACT_LANGS", "")
+        if env_langs:
+            ocr_langs = [l.strip() for l in env_langs.split(",") if l.strip()]
+
         try:
-            from docling.datamodel.pipeline_options import EasyOcrOptions
-            pipeline_options.ocr_options = EasyOcrOptions(
+            from docling.datamodel.pipeline_options import TesseractCliOcrOptions
+            pipeline_options.ocr_options = TesseractCliOcrOptions(
                 force_full_page_ocr=enable_full_page,
-                lang=["hi", "en"],
-                use_gpu=False,
+                lang=ocr_langs,
             )
-        except Exception as ocr_opt_err:
-            logger.warning(f"Could not initialize EasyOcrOptions: {ocr_opt_err}. Proceeding with default OCR options.")
+            logger.info(f"Initialized Google Tesseract CLI OCR (langs={ocr_langs}, force_full_page={enable_full_page})")
+        except Exception as tesseract_err:
+            logger.warning(f"TesseractCliOcrOptions not available: {tesseract_err}. Falling back to EasyOcrOptions...")
+            try:
+                from docling.datamodel.pipeline_options import EasyOcrOptions
+                pipeline_options.ocr_options = EasyOcrOptions(
+                    force_full_page_ocr=enable_full_page,
+                    lang=["hi", "en"],
+                    use_gpu=False,
+                )
+            except Exception as easy_err:
+                logger.warning(f"EasyOCR fallback also failed: {easy_err}. Using default OCR.")
 
         pipeline_options.generate_picture_images = True
         pipeline_options.images_scale = 2.0  # Crisp 200+ DPI images for diagrams
@@ -159,11 +170,7 @@ class DoclingPipeline:
                 label_str = str(label.name if hasattr(label, "name") else label).upper()
 
                 raw_text = getattr(item, "text", "") or ""
-                # KrutiDev decode if legacy font
-                if raw_text and is_krutidev(raw_text):
-                    clean_text = krutidev_to_unicode(raw_text).strip()
-                else:
-                    clean_text = raw_text.strip()
+                clean_text = raw_text.strip()
 
                 bbox = []
                 if hasattr(item, "prov") and item.prov:
@@ -253,9 +260,6 @@ class DoclingPipeline:
                         table_md = item.export_to_markdown()
                     except Exception:
                         table_md = clean_text
-
-                    if table_md and is_krutidev(table_md):
-                        table_md = krutidev_to_unicode(table_md)
 
                     sections.append(SectionSchema(
                         type="PARAGRAPH",

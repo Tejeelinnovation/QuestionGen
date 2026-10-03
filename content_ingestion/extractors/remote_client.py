@@ -133,6 +133,7 @@ class RemoteAiMicroserviceExtractor:
                     "callback_url": callback_url,
                     "drive_token_json": drive_token_json,
                     "drive_folder_id": drive_folder_id,
+                    "gemini_api_key": getattr(settings, "GEMINI_API_KEY", "") or os.getenv("GEMINI_API_KEY", ""),
                 },
             }
             logger.info(f"Triggering GitHub Actions runner on {self.github_repo} for Job #{job.pk}...")

@@ -24,23 +24,80 @@ logger = logging.getLogger(__name__)
 
 class HandwritingPipeline:
     """
-    Processes handwritten notes and scanned exam papers using EasyOCR neural networks.
+    Processes handwritten notes and scanned exam papers using Gemini 2.0 Flash Vision
+    with Tesseract / EasyOCR fallback.
     """
 
-    def __init__(self, media_dir: str = "/tmp/extracted_assets"):
+    def __init__(self, media_dir: str = "/tmp/extracted_assets", gemini_api_key: str = ""):
         self.media_dir = media_dir
+        self.gemini_api_key = gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
         os.makedirs(self.media_dir, exist_ok=True)
         self._reader = None
 
+    def _transcribe_with_gemini(self, b64_img: str, page_num: int) -> Optional[str]:
+        if not self.gemini_api_key:
+            return None
+        import requests
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={self.gemini_api_key}"
+        prompt = (
+            "Transcribe all handwritten notes, formulas, equations, definitions, and questions on this page. "
+            "Output clear structured text in natural reading order. "
+            "Convert any mathematical or chemical expressions to LaTeX notation enclosed in dollar signs (e.g. $E=mc^2$)."
+        )
+        pure_b64 = b64_img.split(",", 1)[-1] if "," in b64_img else b64_img
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": "image/png",
+                                "data": pure_b64,
+                            }
+                        },
+                    ],
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.1,
+            },
+        }
+        try:
+            res = requests.post(url, json=payload, timeout=30)
+            if res.status_code == 200:
+                data = res.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        return parts[0].get("text", "").strip()
+            else:
+                logger.warning(f"Gemini Flash API returned HTTP {res.status_code}: {res.text[:120]}")
+        except Exception as gemini_err:
+            logger.warning(f"Gemini Flash request error on page {page_num}: {gemini_err}")
+        return None
+
+    def _transcribe_with_tesseract(self, img_path: str) -> Optional[str]:
+        import subprocess
+        try:
+            cmd = ["tesseract", img_path, "stdout", "-l", "hin+eng"]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+            if res.returncode == 0 and res.stdout.strip():
+                return res.stdout.strip()
+        except Exception:
+            pass
+        return None
+
     def _get_reader(self):
-        if self._reader is None:
+        if self._reader is None and not self.gemini_api_key:
             try:
                 import easyocr
                 logger.info("Initializing EasyOCR Deep Learning Reader (Hindi + English)...")
-                # Initialize EasyOCR for English and Hindi on CPU
                 self._reader = easyocr.Reader(["en", "hi"], gpu=False)
             except Exception as ocr_init_err:
-                logger.warning(f"EasyOCR initialization failed: {ocr_init_err}. Will use digital text extraction.")
+                logger.warning(f"EasyOCR initialization note: {ocr_init_err}.")
                 self._reader = False
         return self._reader
 
@@ -57,12 +114,13 @@ class HandwritingPipeline:
         total_pages = len(doc)
         pages_to_process = min(total_pages, max_pages) if max_pages else total_pages
 
+        init_msg = (
+            f"Opened notes ({pages_to_process} pages). Initializing Gemini 2.0 Flash Vision AI..."
+            if self.gemini_api_key
+            else f"Opened notes ({pages_to_process} pages). Initializing Tesseract/EasyOCR..."
+        )
         if progress_callback:
-            progress_callback(
-                0,
-                pages_to_process,
-                f"Opened notes ({pages_to_process} pages). Initializing EasyOCR AI...",
-            )
+            progress_callback(0, pages_to_process, init_msg)
 
         reader = self._get_reader()
 
@@ -84,26 +142,34 @@ class HandwritingPipeline:
             # 2. Extract digital text if present
             digital_text = page.get_text("text").strip()
 
-            # 3. Neural Handwriting Recognition using EasyOCR
-            ocr_text_lines: List[str] = []
-            if reader:
+            # 3. Handwriting transcription (Gemini Flash Vision -> Tesseract -> EasyOCR)
+            transcribed_text = ""
+            engine_used = ""
+            if self.gemini_api_key:
+                gemini_text = self._transcribe_with_gemini(img_b64, page_num)
+                if gemini_text:
+                    transcribed_text = gemini_text
+                    engine_used = "Gemini 2.0 Flash Vision"
+
+            if not transcribed_text:
+                tess_text = self._transcribe_with_tesseract(img_path)
+                if tess_text:
+                    transcribed_text = tess_text
+                    engine_used = "Tesseract OCR"
+
+            if not transcribed_text and reader:
                 try:
                     ocr_results = reader.readtext(img_path, detail=1, paragraph=True)
-                    # ocr_results: list of [bbox, text] or [bbox, text, prob]
-                    for item in ocr_results:
-                        if len(item) >= 2:
-                            line_str = str(item[1]).strip()
-                            if line_str:
-                                ocr_text_lines.append(line_str)
+                    lines = [str(item[1]).strip() for item in ocr_results if len(item) >= 2 and str(item[1]).strip()]
+                    if lines:
+                        transcribed_text = "\n\n".join(lines)
+                        engine_used = "EasyOCR"
                 except Exception as ocr_err:
                     logger.warning(f"EasyOCR error on page {page_num}: {ocr_err}")
 
-            if ocr_text_lines:
-                transcribed_text = "\n\n".join(ocr_text_lines)
-            elif digital_text:
-                transcribed_text = digital_text
-            else:
-                transcribed_text = f"[Handwritten Notes Page {page_num}: High-resolution scan captured.]"
+            if not transcribed_text:
+                transcribed_text = digital_text or f"[Handwritten Notes Page {page_num}: High-resolution scan captured.]"
+                engine_used = "Digital Text"
 
             # 4. Structure sections
             sections = self._structure_notes(transcribed_text, img_path, img_b64, page_num)
@@ -121,7 +187,7 @@ class HandwritingPipeline:
                 progress_callback(
                     page_num,
                     pages_to_process,
-                    f"Transcribed handwritten page {page_num} of {pages_to_process} with EasyOCR AI...",
+                    f"Transcribed handwritten page {page_num} of {pages_to_process} ({engine_used})...",
                 )
 
         doc.close()
@@ -131,7 +197,7 @@ class HandwritingPipeline:
             title="Handwritten Notes Collection",
             start_page=1,
             end_page=total_pages,
-            summary="Transcribed handwritten notes using EasyOCR Neural Network.",
+            summary="Transcribed handwritten notes using high-precision AI vision.",
         )]
 
         return chapters, pages, "TOPIC"
