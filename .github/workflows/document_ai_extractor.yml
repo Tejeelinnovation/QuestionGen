@@ -49,6 +49,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-marker-models-
 
+      - name: Install llama.cpp (llama-server) for Surya AI OCR
+        run: |
+          echo "Installing llama-server binary for Surya / Marker AI..."
+          mkdir -p /tmp/llama-cpp
+          curl -sL --retry 3 https://github.com/ggml-org/llama.cpp/releases/download/b11372/llama-b11372-bin-ubuntu-x64.tar.gz -o /tmp/llama-cpp/llama.tar.gz
+          tar -xzf /tmp/llama-cpp/llama.tar.gz -C /tmp/llama-cpp --strip-components=1
+          sudo cp /tmp/llama-cpp/llama-server /usr/local/bin/
+          sudo cp /tmp/llama-cpp/*.so* /usr/local/lib/ 2>/dev/null || true
+          sudo ldconfig
+          echo "LLAMA_CPP_BINARY=/usr/local/bin/llama-server" >> $GITHUB_ENV
+          echo "Verifying llama-server binary:"
+          /usr/local/bin/llama-server --version || true
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -57,6 +70,7 @@ jobs:
 
       - name: Execute Document AI Extraction
         env:
+          LLAMA_CPP_BINARY: /usr/local/bin/llama-server
           JOB_ID: ${{ github.event.client_payload.job_id || inputs.job_id }}
           PDF_URL: ${{ github.event.client_payload.pdf_url || inputs.pdf_url }}
           CALLBACK_URL: ${{ github.event.client_payload.callback_url || inputs.callback_url }}
