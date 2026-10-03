@@ -556,6 +556,25 @@ class IngestionJobWebhookView(APIView):
             return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
 
         data = request.data
+        if data.get("status") == "PROGRESS":
+            job.status = JobStatus.EXTRACTING
+            job.processed_pages = data.get("processed_pages", job.processed_pages)
+            if "total_pages" in data and data["total_pages"]:
+                job.total_pages = data["total_pages"]
+            if "current_stage" in data:
+                job.current_stage = data["current_stage"]
+            job.updated_at = timezone.now()
+            job.save(update_fields=["status", "processed_pages", "total_pages", "current_stage", "updated_at"])
+            return Response(
+                {
+                    "status": "PROGRESS_UPDATED",
+                    "processed_pages": job.processed_pages,
+                    "total_pages": job.total_pages,
+                    "progress_percentage": job.progress_percentage,
+                },
+                status=status.HTTP_200_OK,
+            )
+
         if data.get("status") == "FAILED":
             job.status = JobStatus.FAILED
             error_msg = data.get("error_message") or data.get("error") or "Microservice extraction failed."

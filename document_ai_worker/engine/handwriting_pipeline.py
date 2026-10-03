@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import pymupdf as fitz
 
@@ -30,13 +30,21 @@ class HandwritingPipeline:
         self.media_dir = media_dir
         os.makedirs(self.media_dir, exist_ok=True)
 
-    def process_pdf(self, pdf_path: str, max_pages: Optional[int] = None) -> Tuple[List[ChapterSchema], List[PageSchema], str]:
+    def process_pdf(
+        self,
+        pdf_path: str,
+        max_pages: Optional[int] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> Tuple[List[ChapterSchema], List[PageSchema], str]:
         """
         Transcribes handwritten pages into structured notes with LaTeX.
         """
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         pages_to_process = min(total_pages, max_pages) if max_pages else total_pages
+
+        if progress_callback:
+            progress_callback(0, pages_to_process, f"Opened notes ({pages_to_process} pages). Processing scans...")
 
         pages: List[PageSchema] = []
         for p_idx in range(pages_to_process):
@@ -64,6 +72,9 @@ class HandwritingPipeline:
                 chapter_title="Handwritten Notes",
                 sections=sections,
             ))
+
+            if progress_callback:
+                progress_callback(page_num, pages_to_process, f"Transcribing page {page_num} of {pages_to_process}...")
 
         doc.close()
 
