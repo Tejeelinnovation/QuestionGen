@@ -51,7 +51,7 @@ def root():
     return {
         "service": "Document AI Worker Microservice",
         "status": "online",
-        "engine": "Marker + Surya + PyMuPDF",
+        "engine": "Docling + DocLayNet + EasyOCR",
         "version": "1.0.0",
     }
 

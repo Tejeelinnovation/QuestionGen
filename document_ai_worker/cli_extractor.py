@@ -24,9 +24,9 @@ import time
 import urllib.request
 import requests
 
+from engine.docling_pipeline import DoclingPipeline
 from engine.drive_uploader import WorkerGoogleDriveUploader
 from engine.handwriting_pipeline import HandwritingPipeline
-from engine.marker_pipeline import MarkerPipeline
 from engine.textbook_pipeline import TextbookPipeline
 
 logging.basicConfig(
@@ -93,7 +93,51 @@ def download_file(url: str, dest_path: str) -> None:
                 f"Downloaded file from {url} is not a valid PDF! (First bytes: {magic!r}). "
                 f"Content preview: {sample[:150]}"
             )
+def auto_detect_document_kind(pdf_path: str) -> str:
+    """
+    Inspects PDF structure in ~5 milliseconds.
+    Determines whether the document is a printed digital TEXTBOOK or a scanned/camera HANDWRITTEN_NOTES.
+    """
+    import pymupdf as fitz
+    try:
+        doc = fitz.open(pdf_path)
+        sample_pages = min(len(doc), 3)
+        if sample_pages == 0:
+            doc.close()
+            return "TEXTBOOK"
 
+        total_chars = 0
+        scanned_bitmap_pages = 0
+        has_vector_fonts = False
+
+        for p_idx in range(sample_pages):
+            page = doc[p_idx]
+            fonts = page.get_fonts()
+            if fonts:
+                has_vector_fonts = True
+
+            text = page.get_text("text").strip()
+            total_chars += len(text)
+
+            images = page.get_images()
+            # If the page consists essentially of a full-bleed camera photo with almost zero digital text
+            if len(images) >= 1 and len(text) < 60:
+                scanned_bitmap_pages += 1
+
+        doc.close()
+
+        avg_chars = total_chars / max(sample_pages, 1)
+
+        # Scanned handwritten photos: mostly full-page images and very low/zero selectable text
+        if scanned_bitmap_pages >= (sample_pages / 2) or (avg_chars < 80 and not has_vector_fonts):
+            logger.info(f"[Auto-Detector] Detected HANDWRITTEN_NOTES (avg_chars={avg_chars:.1f}, scans={scanned_bitmap_pages}/{sample_pages})")
+            return "HANDWRITTEN_NOTES"
+
+        logger.info(f"[Auto-Detector] Detected printed TEXTBOOK (avg_chars={avg_chars:.1f}, vector_fonts={has_vector_fonts})")
+        return "TEXTBOOK"
+    except Exception as detect_err:
+        logger.warning(f"[Auto-Detector] Probe encountered error: {detect_err}. Defaulting to TEXTBOOK.")
+        return "TEXTBOOK"
 
 
 def send_progress(
@@ -212,25 +256,33 @@ def main():
                     secret=args.webhook_secret,
                 )
 
+        # Pre-Flight Auto-Inspection (5ms): determines if printed textbook or handwritten notes
+        if args.document_kind in ("AUTO", "TEXTBOOK", ""):
+            effective_kind = auto_detect_document_kind(local_pdf)
+        else:
+            effective_kind = args.document_kind
+
+        logger.info(f"Pipeline route: {effective_kind} (user selection: {args.document_kind})")
+
         engine_name = "Rule-Based Pipeline"
-        if args.document_kind == "HANDWRITTEN_NOTES":
-            logger.info("Initializing Handwriting Pipeline...")
+        if effective_kind == "HANDWRITTEN_NOTES":
+            logger.info("Initializing EasyOCR Deep Learning Handwriting Pipeline...")
             pipeline = HandwritingPipeline(media_dir=os.path.join(temp_dir, "assets"))
             chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
-            engine_name = "Handwriting Pipeline"
+            engine_name = "EasyOCR AI (Handwriting)"
         else:
-            marker_available = bool(shutil.which("marker_single")) or os.environ.get("USE_MARKER", "1") == "1"
+            use_docling = os.environ.get("USE_DOCLING", "1") == "1"
             extracted_successfully = False
-            if marker_available:
+            if use_docling:
                 try:
-                    logger.info("Initializing Marker AI Pipeline (Surya Layout + Texify LaTeX)...")
-                    marker_pipeline = MarkerPipeline(media_dir=os.path.join(temp_dir, "assets"))
-                    chapters, pages, granularity = marker_pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
+                    logger.info("Initializing IBM Docling AI Pipeline (DocLayNet Layout + Tables)...")
+                    docling_pipeline = DoclingPipeline(media_dir=os.path.join(temp_dir, "assets"))
+                    chapters, pages, granularity = docling_pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
                     extracted_successfully = True
-                    engine_name = "Marker AI (Surya + Texify)"
-                    logger.info("[SUCCESS] Marker AI successfully extracted structured document!")
-                except Exception as marker_err:
-                    logger.warning(f"Marker AI encountered an issue: {marker_err}. Falling back to TextbookPipeline...")
+                    engine_name = "Docling AI (DocLayNet)"
+                    logger.info("[SUCCESS] IBM Docling AI successfully extracted structured document!")
+                except Exception as docling_err:
+                    logger.warning(f"Docling AI encountered an issue: {docling_err}. Falling back to TextbookPipeline...")
 
             if not extracted_successfully:
                 logger.info("Initializing Textbook & Pedagogical Pipeline (Enhanced Fallback)...")
