@@ -342,6 +342,11 @@ class TextbookPipeline:
         """
         Converts mathematical & chemical expressions into LaTeX format ($...$).
         """
+        # Exclude regular prose containing substantial Devanagari / Hindi characters
+        devanagari_count = sum(1 for c in text if "\u0900" <= c <= "\u097f")
+        if devanagari_count > 15:
+            return False, []
+
         formulas = []
         has_symbol = any(c in self.MATH_SYMBOLS for c in text)
         has_operator = bool(self.MATH_OPERATORS.search(text))
@@ -351,6 +356,9 @@ class TextbookPipeline:
 
         lines = [line.strip() for line in text.split("\n") if line.strip()]
         for line in lines:
+            line_deva = sum(1 for c in line if "\u0900" <= c <= "\u097f")
+            if line_deva > 10:
+                continue
             if any(c in self.MATH_SYMBOLS for c in line) or "=" in line:
                 normalized = line
                 normalized = normalized.replace("√", r"\sqrt")
@@ -366,34 +374,37 @@ class TextbookPipeline:
                 normalized = normalized.replace("÷", r"\div ")
                 formulas.append(f"${normalized}$")
 
-        return True, formulas
+        return bool(formulas), formulas
 
     def _extract_page_images(self, doc: fitz.Document, page: fitz.Page, page_num: int) -> List[Dict[str, Any]]:
         """
-        Extracts images on the page and records their positions for spatial caption pairing.
-        Filters out tiny decoration icons (<60x60) and optimizes diagram image payloads.
+        Extracts images on the page using visual viewport clipping.
+        This captures full color, alpha masks, vector diagrams, and annotations
+        without producing solid black rectangles.
         """
         images = []
         for img_idx, img_info in enumerate(page.get_images(full=True)):
             xref = img_info[0]
             try:
-                base_img = doc.extract_image(xref)
-                w = base_img.get("width", 0)
-                h = base_img.get("height", 0)
-                # Filter out tiny icons, decorative rules, or spacer bullets
-                if w < 60 or h < 60:
+                rects = page.get_image_rects(xref)
+                if not rects:
+                    continue
+                rect = rects[0]
+                # Filter out tiny decoration icons (<35x35)
+                if rect.width < 35 or rect.height < 35:
                     continue
 
-                ext = base_img.get("ext", "png").lower()
-                image_bytes = base_img["image"]
+                # Visual viewport clipping directly from the page at 200 DPI
+                clip_pix = page.get_pixmap(clip=rect, dpi=200)
+                if clip_pix.n >= 5:
+                    clip_pix = fitz.Pixmap(fitz.csRGB, clip_pix)
+                image_bytes = clip_pix.tobytes("png")
+                ext = "png"
 
-                # If large image, compress to optimized JPEG using PyMuPDF native pixmap
+                # If large image, compress to JPEG
                 if len(image_bytes) > 250_000:
                     try:
-                        pix = fitz.Pixmap(doc, xref)
-                        if pix.n >= 5:
-                            pix = fitz.Pixmap(fitz.csRGB, pix)
-                        compressed = pix.tobytes("jpeg", jpg_quality=82)
+                        compressed = clip_pix.tobytes("jpeg", jpg_quality=85)
                         if len(compressed) < len(image_bytes):
                             image_bytes = compressed
                             ext = "jpg"
@@ -410,19 +421,16 @@ class TextbookPipeline:
                     with open(filepath, "wb") as f:
                         f.write(image_bytes)
 
-                # Try to get image bbox on page
-                rects = page.get_image_rects(xref)
-                bbox = list(rects[0]) if rects else [0, 0, 0, 0]
-
                 images.append({
                     "path": filepath,
                     "filename": filename,
                     "data": image_data_uri,
-                    "bbox": bbox,
+                    "bbox": list(rect),
                     "linked": False,
                     "caption": "",
                 })
-            except Exception:
+            except Exception as err:
+                logger.warning(f"Error rendering image {img_idx} on page {page_num}: {err}")
                 continue
 
         return images

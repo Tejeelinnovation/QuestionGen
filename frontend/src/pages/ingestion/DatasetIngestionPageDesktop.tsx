@@ -345,6 +345,28 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                             </span>
                           )
                         )}
+
+                        {/* Extraction Engine Tag */}
+                        {job.metadata?.extraction_engine ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
+                            <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                            {job.metadata.extraction_engine}
+                          </span>
+                        ) : job.current_stage?.includes('Marker') ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
+                            <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                            Marker AI (Surya + Texify)
+                          </span>
+                        ) : job.status === 'EXTRACTING' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-500/10 text-purple-700 border border-purple-500/20 animate-pulse">
+                            <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                            Marker AI Engine
+                          </span>
+                        ) : job.status === 'COMPLETED' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-surface-muted text-ink/65 border border-border">
+                            Document AI Engine
+                          </span>
+                        ) : null}
                       </div>
                       <h3 className="text-sm font-heading font-bold text-ink">{job.title}</h3>
                     </div>

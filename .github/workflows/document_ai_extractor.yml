@@ -39,9 +39,20 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Cache Hugging Face & Marker Models
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/datalab
+          key: ${{ runner.os }}-marker-models-v1
+          restore-keys: |
+            ${{ runner.os }}-marker-models-
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r document_ai_worker/requirements.txt
 
       - name: Execute Document AI Extraction
