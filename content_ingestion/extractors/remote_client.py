@@ -128,7 +128,7 @@ class RemoteAiMicroserviceExtractor:
                 "client_payload": {
                     "job_id": job.pk,
                     "title": job.title,
-                    "document_kind": job.document_kind,
+                    "document_kind": job.document_kind or "AUTO",
                     "pdf_url": pdf_url,
                     "callback_url": callback_url,
                     "drive_token_json": drive_token_json,
@@ -150,7 +150,7 @@ class RemoteAiMicroserviceExtractor:
         payload = {
             "job_id": job.pk,
             "title": job.title,
-            "document_kind": job.document_kind,
+            "document_kind": job.document_kind or "AUTO",
             "pdf_url": pdf_url,
             "callback_url": callback_url,
         }

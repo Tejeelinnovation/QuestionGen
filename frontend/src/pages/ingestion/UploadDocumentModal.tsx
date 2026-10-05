@@ -15,10 +15,10 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('Mathematics');
-  const [standard, setStandard] = useState<number>(10);
-  const [board, setBoard] = useState('NCERT');
-  const [documentKind, setDocumentKind] = useState<'TEXTBOOK' | 'HANDWRITTEN_NOTES'>('TEXTBOOK');
+  const [subject, setSubject] = useState('');
+  const [standard, setStandard] = useState<number | ''>('');
+  const [board, setBoard] = useState('');
+  const [documentKind, setDocumentKind] = useState<string>('AUTO');
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,10 +29,10 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     if (isOpen) {
       setFile(null);
       setTitle('');
-      setSubject('Mathematics');
-      setStandard(10);
-      setBoard('NCERT');
-      setDocumentKind('TEXTBOOK');
+      setSubject('');
+      setStandard('');
+      setBoard('');
+      setDocumentKind('AUTO');
       setError(null);
     }
   }, [isOpen]);
@@ -71,10 +71,18 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     const formData = new FormData();
     formData.append('source_file', file);
     formData.append('title', title.trim());
-    formData.append('subject', subject);
-    formData.append('standard', String(standard));
-    formData.append('board', board);
-    formData.append('document_kind', documentKind);
+    if (subject.trim()) {
+      formData.append('subject', subject.trim());
+    }
+    if (standard !== '') {
+      formData.append('standard', String(standard));
+    }
+    if (board) {
+      formData.append('board', board);
+    }
+    if (documentKind && documentKind !== 'AUTO') {
+      formData.append('document_kind', documentKind);
+    }
 
     try {
       const job = await createIngestionJob(formData);
@@ -86,6 +94,8 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       setError(err?.response?.data?.detail || err?.message || 'Failed to upload document.');
     }
   };
+
+  const isNonEducational = ['NEWSPAPER', 'MAGAZINE', 'OTHER'].includes(documentKind);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
@@ -165,7 +175,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
               <div className="space-y-1">
                 <UploadCloud className="w-8 h-8 text-ink/40 mx-auto" />
                 <p className="text-xs font-heading font-semibold text-ink">Click to select PDF or drag and drop</p>
-                <p className="text-[11px] text-ink/50">Supports Textbooks, Chapter booklets, and Notes up to 100MB</p>
+                <p className="text-[11px] text-ink/50">Supports Textbooks, Papers, Newspapers, and Notes up to 100MB</p>
               </div>
             )}
           </div>
@@ -180,7 +190,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. NCERT Class 10 Mathematics Chapter 1-5"
+              placeholder="e.g. NCERT Class 10 Mathematics or The Times of India"
               className="w-full px-3.5 py-2 text-xs rounded-xl border border-border bg-surface text-ink focus:outline-none focus:border-forest"
             />
           </div>
@@ -193,11 +203,17 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
               </label>
               <select
                 value={documentKind}
-                onChange={(e) => setDocumentKind(e.target.value as any)}
+                onChange={(e) => setDocumentKind(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-ink focus:outline-none focus:border-forest"
               >
-                <option value="TEXTBOOK">Digitally Typed Textbook</option>
-                <option value="HANDWRITTEN_NOTES">Handwritten Notes (OCR Track)</option>
+                <option value="AUTO">✨ Auto-Detect (Recommended)</option>
+                <option value="TEXTBOOK">Textbook (Full Book / Digital)</option>
+                <option value="SINGLE_CHAPTER">Single Chapter</option>
+                <option value="WORKSHEET_OR_EXAM">Worksheet or Exam Paper</option>
+                <option value="NOTES">Notes / Handwritten (OCR Track)</option>
+                <option value="NEWSPAPER">Newspaper</option>
+                <option value="MAGAZINE">Magazine</option>
+                <option value="OTHER">Other Material</option>
               </select>
             </div>
 
@@ -210,14 +226,26 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 onChange={(e) => setBoard(e.target.value)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-ink focus:outline-none focus:border-forest"
               >
+                <option value="">Not Specified (Optional)</option>
                 <option value="NCERT">NCERT</option>
                 <option value="CBSE">CBSE</option>
                 <option value="GSEB">GSEB (Gujarat Board)</option>
                 <option value="ICSE">ICSE</option>
                 <option value="STATE_BOARD">State Board</option>
+                <option value="OTHER">Other Board</option>
               </select>
             </div>
           </div>
+
+          {/* Non-educational warning banner */}
+          {isNonEducational && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+              <span>
+                <strong>Notice:</strong> Non-educational document type selected ({documentKind}). Full dataset extraction and layout structuring will proceed normally, but automated curriculum question generation may not find standard curricular exercises.
+              </span>
+            </div>
+          )}
 
           {/* Subject & Standard */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -229,7 +257,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="e.g. Mathematics, Science"
+                placeholder="e.g. Mathematics, Science (Optional)"
                 className="w-full px-3.5 py-2 text-xs rounded-xl border border-border bg-surface text-ink focus:outline-none focus:border-forest"
               />
             </div>
@@ -240,10 +268,11 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
               </label>
               <select
                 value={standard}
-                onChange={(e) => setStandard(Number(e.target.value))}
+                onChange={(e) => setStandard(e.target.value ? Number(e.target.value) : '')}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-ink focus:outline-none focus:border-forest"
               >
-                {[6, 7, 8, 9, 10, 11, 12].map((cls) => (
+                <option value="">Not Specified (Optional)</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((cls) => (
                   <option key={cls} value={cls}>
                     Class {cls}
                   </option>

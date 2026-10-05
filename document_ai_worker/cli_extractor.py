@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -22,6 +24,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+import uuid
 import requests
 
 from engine.docling_pipeline import DoclingPipeline
@@ -93,51 +96,28 @@ def download_file(url: str, dest_path: str) -> None:
                 f"Downloaded file from {url} is not a valid PDF! (First bytes: {magic!r}). "
                 f"Content preview: {sample[:150]}"
             )
-def auto_detect_document_kind(pdf_path: str) -> str:
+from engine.document_classifier import classify_document, DocumentClassificationResult
+
+
+def auto_detect_document_kind(
+    pdf_path: str,
+    user_document_kind: str = "AUTO",
+    doc_title: str = "",
+) -> DocumentClassificationResult:
     """
-    Inspects PDF structure in ~5 milliseconds.
-    Determines whether the document is a printed digital TEXTBOOK or a scanned/camera HANDWRITTEN_NOTES.
+    Inspects PDF structure using evidence-based document classifier.
+    Returns DocumentClassificationResult with kind, confidence, evidence.
+    On error or failure, returns 'UNKNOWN' with low confidence (never TEXTBOOK).
     """
-    import pymupdf as fitz
     try:
-        doc = fitz.open(pdf_path)
-        sample_pages = min(len(doc), 3)
-        if sample_pages == 0:
-            doc.close()
-            return "TEXTBOOK"
-
-        total_chars = 0
-        scanned_bitmap_pages = 0
-        has_vector_fonts = False
-
-        for p_idx in range(sample_pages):
-            page = doc[p_idx]
-            fonts = page.get_fonts()
-            if fonts:
-                has_vector_fonts = True
-
-            text = page.get_text("text").strip()
-            total_chars += len(text)
-
-            images = page.get_images()
-            # If the page consists essentially of a full-bleed camera photo with almost zero digital text
-            if len(images) >= 1 and len(text) < 60:
-                scanned_bitmap_pages += 1
-
-        doc.close()
-
-        avg_chars = total_chars / max(sample_pages, 1)
-
-        # Scanned handwritten photos: mostly full-page images and very low/zero selectable text
-        if scanned_bitmap_pages >= (sample_pages / 2) or (avg_chars < 80 and not has_vector_fonts):
-            logger.info(f"[Auto-Detector] Detected HANDWRITTEN_NOTES (avg_chars={avg_chars:.1f}, scans={scanned_bitmap_pages}/{sample_pages})")
-            return "HANDWRITTEN_NOTES"
-
-        logger.info(f"[Auto-Detector] Detected printed TEXTBOOK (avg_chars={avg_chars:.1f}, vector_fonts={has_vector_fonts})")
-        return "TEXTBOOK"
+        return classify_document(pdf_path, user_document_kind=user_document_kind, doc_title=doc_title)
     except Exception as detect_err:
-        logger.warning(f"[Auto-Detector] Probe encountered error: {detect_err}. Defaulting to TEXTBOOK.")
-        return "TEXTBOOK"
+        logger.warning(f"[Auto-Detector] Probe encountered error: {detect_err}. Returning UNKNOWN with low confidence.")
+        return DocumentClassificationResult(
+            kind="UNKNOWN",
+            confidence=0.10,
+            evidence=f"Probe error: {detect_err}",
+        )
 
 
 def send_progress(
@@ -151,11 +131,8 @@ def send_progress(
     """
     Sends non-blocking progress updates to the Django backend.
     Catches any network hiccups so extraction is never aborted due to a progress ping.
+    Signs payload with HMAC-SHA256 if secret is provided.
     """
-    headers = {"Content-Type": "application/json"}
-    if secret:
-        headers["X-Ingestion-Secret"] = secret
-
     payload = {
         "job_id": job_id,
         "status": "PROGRESS",
@@ -163,28 +140,51 @@ def send_progress(
         "total_pages": total_pages,
         "current_stage": stage,
     }
+    raw_bytes = json.dumps(payload, default=str).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if secret:
+        ts_str = str(int(time.time()))
+        to_sign = f"{ts_str}.".encode("utf-8") + raw_bytes
+        sig = hmac.new(secret.encode("utf-8"), to_sign, hashlib.sha256).hexdigest()
+        headers["X-Ingestion-Timestamp"] = ts_str
+        headers["X-Ingestion-Signature"] = f"sha256={sig}"
+
     pct = int((processed_pages / total_pages * 100) if total_pages else 0)
     logger.info(f"[Progress] {processed_pages}/{total_pages} ({pct}%) - {stage}")
     try:
-        requests.post(callback_url, json=payload, headers=headers, timeout=5)
+        requests.post(callback_url, data=raw_bytes, headers=headers, timeout=5)
     except Exception as p_err:
         logger.debug(f"[Progress] Heartbeat delivery notice: {p_err}")
 
 
-def send_webhook(callback_url: str, payload: dict, secret: str = "", max_retries: int = 5) -> None:
+def send_webhook(
+    callback_url: str,
+    payload: dict,
+    secret: str = "",
+    max_retries: int = 5,
+    idempotency_key: str = "",
+) -> None:
     """
     Posts the extraction result back to the Django backend with automatic retry
     if the backend returns 502/503/504 or encounters temporary connection drops.
+    Signs payload with HMAC-SHA256 bound to timestamp (X-Ingestion-Signature, X-Ingestion-Timestamp).
     """
-    payload_kb = len(json.dumps(payload, default=str)) // 1024
+    raw_bytes = json.dumps(payload, default=str).encode("utf-8")
+    payload_kb = len(raw_bytes) // 1024
     logger.info(f"Delivering extraction results to Webhook: {callback_url} (Payload size: ~{payload_kb} KB)")
     headers = {"Content-Type": "application/json"}
+    if idempotency_key:
+        headers["X-Idempotency-Key"] = idempotency_key
     if secret:
-        headers["X-Ingestion-Secret"] = secret
+        ts_str = str(int(time.time()))
+        to_sign = f"{ts_str}.".encode("utf-8") + raw_bytes
+        sig = hmac.new(secret.encode("utf-8"), to_sign, hashlib.sha256).hexdigest()
+        headers["X-Ingestion-Timestamp"] = ts_str
+        headers["X-Ingestion-Signature"] = f"sha256={sig}"
 
     for attempt in range(1, max_retries + 1):
         try:
-            res = requests.post(callback_url, json=payload, headers=headers, timeout=60)
+            res = requests.post(callback_url, data=raw_bytes, headers=headers, timeout=60)
             logger.info(f"Webhook attempt #{attempt} status code: {res.status_code}")
             if res.status_code in (502, 503, 504) and attempt < max_retries:
                 logger.warning(
@@ -211,11 +211,15 @@ def main():
     parser.add_argument("--job-id", type=int, required=True, help="Django IngestionJob ID")
     parser.add_argument("--pdf-url", type=str, required=True, help="Public or Drive URL of PDF")
     parser.add_argument("--callback-url", type=str, required=True, help="Django Webhook Callback URL")
-    parser.add_argument("--document-kind", type=str, default="TEXTBOOK", help="TEXTBOOK or HANDWRITTEN_NOTES")
+    parser.add_argument("--document-kind", type=str, default="AUTO", help="AUTO, TEXTBOOK, NEWSPAPER, etc.")
+    parser.add_argument("--title", type=str, default="", help="Optional document title")
     parser.add_argument("--webhook-secret", type=str, default="", help="Optional webhook verification secret")
     parser.add_argument("--gemini-api-key", type=str, default="", help="Optional Google Gemini API Key for fast vision handwriting")
+    parser.add_argument("--idempotency-key", type=str, default="", help="Optional unique idempotency key for this run")
 
     args = parser.parse_args()
+    idempotency_key = args.idempotency_key or f"job_{args.job_id}_{uuid.uuid4().hex[:16]}"
+    logger.info(f"Execution idempotency key: {idempotency_key}")
 
     temp_dir = tempfile.mkdtemp(prefix="doc_ai_cli_")
     local_pdf = os.path.join(temp_dir, f"job_{args.job_id}.pdf")
@@ -257,13 +261,17 @@ def main():
                     secret=args.webhook_secret,
                 )
 
-        # Pre-Flight Auto-Inspection (5ms): determines if printed textbook or handwritten notes
-        if args.document_kind in ("AUTO", "TEXTBOOK", ""):
-            effective_kind = auto_detect_document_kind(local_pdf)
-        else:
-            effective_kind = args.document_kind
-
-        logger.info(f"Pipeline route: {effective_kind} (user selection: {args.document_kind})")
+        # Document Classification using multi-modal evidence
+        classification_res = auto_detect_document_kind(
+            local_pdf,
+            user_document_kind=args.document_kind,
+            doc_title=args.title,
+        )
+        effective_kind = classification_res.kind
+        logger.info(
+            f"Pipeline route: {effective_kind} (confidence={classification_res.confidence}, "
+            f"user_document_kind='{args.document_kind}', evidence={classification_res.evidence})"
+        )
 
         engine_name = "Rule-Based Pipeline"
         if effective_kind == "HANDWRITTEN_NOTES":
@@ -381,7 +389,11 @@ def main():
         # 4. Assemble lightweight JSON Payload matching Django IngestionJobWebhookView
         payload = {
             "job_id": args.job_id,
+            "idempotency_key": idempotency_key,
             "status": "COMPLETED",
+            "document_kind": effective_kind,
+            "classification_confidence": classification_res.confidence,
+            "classification_evidence": classification_res.evidence,
             "granularity": granularity,
             "chapters": [ch.model_dump() for ch in chapters],
             "pages": [p.model_dump() for p in pages],
@@ -399,7 +411,12 @@ def main():
         )
 
         # 5. Dispatch back to Django Webhook with auto-retry
-        send_webhook(args.callback_url, payload, secret=args.webhook_secret)
+        send_webhook(
+            args.callback_url,
+            payload,
+            secret=args.webhook_secret,
+            idempotency_key=idempotency_key,
+        )
         logger.info(f"[SUCCESS] IngestionJob #{args.job_id} successfully extracted and delivered!")
 
     except Exception as exc:
@@ -408,11 +425,18 @@ def main():
         try:
             error_payload = {
                 "job_id": args.job_id,
+                "idempotency_key": idempotency_key if "idempotency_key" in locals() else "",
                 "status": "FAILED",
                 "error_message": f"Worker extraction error: {str(exc)}",
                 "error": str(exc),
             }
-            send_webhook(args.callback_url, error_payload, secret=args.webhook_secret, max_retries=3)
+            send_webhook(
+                args.callback_url,
+                error_payload,
+                secret=args.webhook_secret,
+                max_retries=3,
+                idempotency_key=idempotency_key if "idempotency_key" in locals() else "",
+            )
         except Exception as notify_err:
             logger.error(f"Could not send error notification to webhook: {notify_err}")
         sys.exit(1)

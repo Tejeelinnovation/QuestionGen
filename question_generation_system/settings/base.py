@@ -283,6 +283,7 @@ DOCUMENT_AI_MICROSERVICE_URL = env("DOCUMENT_AI_MICROSERVICE_URL", default="")
 GITHUB_DISPATCH_TOKEN = env("GITHUB_DISPATCH_TOKEN", default="")
 GITHUB_DISPATCH_REPO = env("GITHUB_DISPATCH_REPO", default="queraai/QuestionGen")
 BACKEND_BASE_URL = env("BACKEND_BASE_URL", default="http://localhost:8000")
+INGESTION_WEBHOOK_SECRET = env("INGESTION_WEBHOOK_SECRET", default="")
 
 # Support large extracted textbook payloads and multi-page diagrams
 DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB
