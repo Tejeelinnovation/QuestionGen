@@ -92,6 +92,35 @@ class IngestionService:
 
         return None
 
+    def _trigger_async_drive_backup(self, job_id: int, file_path: str, dest_name: str) -> None:
+        """
+        Uploads the source PDF to Google Drive asynchronously in a background daemon thread.
+        Guarantees that large uploads (50MB+) do not block HTTP requests or trigger Gunicorn worker timeouts.
+        """
+        import threading
+
+        def _worker():
+            try:
+                logger.info(f"[Drive-Backup] Starting async cloud backup for Job #{job_id} ({dest_name})...")
+                drive_info = self.drive_client.upload_file(file_path, dest_name)
+                file_id = drive_info.get("file_id", "")
+                web_link = drive_info.get("web_view_link", "")
+                if file_id:
+                    IngestionJob.objects.filter(pk=job_id).update(
+                        google_drive_file_id=file_id,
+                        google_drive_url=web_link,
+                    )
+                    logger.info(f"[Drive-Backup] Successfully backed up Job #{job_id} to Google Drive (file_id: {file_id})")
+            except Exception as e:
+                logger.warning(f"[Drive-Backup] Async Google Drive backup failed for Job #{job_id}: {e}")
+
+        thread = threading.Thread(
+            target=_worker,
+            name=f"DriveBackup-Job-{job_id}",
+            daemon=True,
+        )
+        thread.start()
+
     def initialize_job(self, job: IngestionJob) -> IngestionJob:
         """
         Inspects the uploaded PDF, detects total pages, granularity, and Table of Contents.
@@ -130,17 +159,19 @@ class IngestionService:
                         end_page=entry["end_page"],
                     )
 
-            # Cloud storage backup to Google Drive
-            dest_name = f"{job.title.replace(' ', '_')}_{job.pk}.pdf"
-            drive_info = self.drive_client.upload_file(file_path, dest_name)
-            job.google_drive_file_id = drive_info.get("file_id", "")
-            job.google_drive_url = drive_info.get("web_view_link", "")
+            doc.close()
 
             job.status = JobStatus.PENDING
             job.current_stage = f"Initialized. {job.total_pages} pages detected. Ready for extraction."
             job.save()
 
-            doc.close()
+            # Cloud storage backup to Google Drive (Non-blocking / Background thread)
+            # Guarantees that large files (50MB+) do not block HTTP response or trigger Gunicorn timeouts
+            import re
+            clean_title = re.sub(r"[^\w\.-]", "_", job.title)[:60].strip("_") or "doc"
+            dest_name = f"{clean_title}_{job.pk}.pdf"
+            self._trigger_async_drive_backup(job.pk, file_path, dest_name)
+
             return job
 
         except Exception as e:
