@@ -201,6 +201,8 @@ class IngestionQueueWorker:
         """
         from django.conf import settings
         from django.utils import timezone
+        from .extractors.remote_client import RemoteAiMicroserviceExtractor
+
         # If job is not yet initialized (e.g. 0 pages), initialize it first
         if job.total_pages == 0:
             service.initialize_job(job)
