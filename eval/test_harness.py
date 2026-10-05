@@ -375,6 +375,48 @@ class EvalHarnessTests(unittest.TestCase):
         self.assertEqual(response.schema_version, "1.1.0")
         self.assertEqual(len(response.pages), 1)
 
+    def test_legacy_font_quarantine_corrupted_text(self):
+        """
+        Confirms that when a page has legacy_font_encoding=True and OCR is unavailable,
+        the corrupted text layer is NOT saved as content. needs_review is set to True,
+        raw_text is cleared, and the corrupted string is quarantined in metadata.raw_text_unreliable.
+        """
+        from document_ai_worker.engine.textbook_pipeline import TextbookPipeline
+
+        pdf_path = Path("eval/golden/hindi_gujarati_book/sample.pdf")
+        if not pdf_path.exists():
+            return
+        pipeline = TextbookPipeline(media_dir=str(self.temp_dir))
+        _, pages, _ = pipeline.process_pdf(str(pdf_path), max_pages=3, render_image_pixels=False)
+
+        # Page 3 is legacy Walkman-Chanakya
+        p3 = pages[2]
+        self.assertTrue(p3.legacy_font_encoding)
+        self.assertTrue(p3.needs_review)
+        self.assertEqual(p3.raw_text, "")
+        self.assertIn("raw_text_unreliable", p3.metadata)
+        self.assertIn("izsepan", p3.metadata["raw_text_unreliable"])
+
+    def test_classifier_ambiguous_document_scores_below_threshold(self):
+        """
+        Confirms that a deliberately ambiguous 1-page document with generic corporate text
+        and no domain markers scores below 0.60 (confidence <= 0.30, kind UNKNOWN).
+        """
+        import pymupdf as fitz
+        from document_ai_worker.engine.document_classifier import classify_document
+
+        ambig_path = self.temp_dir / "ambiguous_memo.pdf"
+        doc = fitz.open()
+        p = doc.new_page()
+        p.insert_text((72, 72), "Project status meeting minutes. We discussed quarterly goals and team allocations.")
+        doc.save(str(ambig_path))
+        doc.close()
+
+        res = classify_document(str(ambig_path))
+        self.assertEqual(res.kind, "UNKNOWN")
+        self.assertLess(res.confidence, 0.60)
+        self.assertIn("Insufficient distinct domain markers", res.evidence)
+
 
 if __name__ == "__main__":
     unittest.main()

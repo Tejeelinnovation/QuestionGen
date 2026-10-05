@@ -251,6 +251,17 @@ class TextbookPipeline:
             p_review = False
             p_quality = 1.0
 
+        # Handle legacy font encoding when OCR is unavailable or fails (Verification 2)
+        if p_legacy:
+            p_review = True
+            p_quality = 0.50
+            p_meta["raw_text_unreliable"] = raw_text
+            p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
+            raw_text = ""
+            for sec in sections:
+                if sec.type != "DIAGRAM":
+                    sec.text = ""
+
         return PageSchema(
             page_number=page_num,
             layout_type=layout_type,
