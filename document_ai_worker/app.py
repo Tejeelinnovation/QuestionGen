@@ -128,7 +128,9 @@ async def extract_document(
         else:
             logger.info(f"Routing Job #{request.job_id} to TextbookPipeline.")
             chapters, pages, granularity = textbook_pipeline.process_pdf(
-                local_pdf_path, max_pages=request.max_pages
+                local_pdf_path,
+                max_pages=request.max_pages,
+                document_kind=request.document_kind,
             )
 
         response_payload = ExtractionResponse(
@@ -197,7 +199,9 @@ async def extract_uploaded_file(
             )
         else:
             chapters, pages, granularity = textbook_pipeline.process_pdf(
-                local_pdf_path, max_pages=max_pages
+                local_pdf_path,
+                max_pages=max_pages,
+                document_kind=document_kind,
             )
 
         return ExtractionResponse(

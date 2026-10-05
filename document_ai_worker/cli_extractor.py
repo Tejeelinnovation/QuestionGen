@@ -407,7 +407,11 @@ def main():
             if not extracted_successfully:
                 logger.info("Initializing Textbook & Pedagogical Pipeline (Enhanced Fallback)...")
                 pipeline = TextbookPipeline(media_dir=os.path.join(temp_dir, "assets"))
-                chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
+                chapters, pages, granularity = pipeline.process_pdf(
+                    local_pdf,
+                    progress_callback=on_pipeline_progress,
+                    document_kind=args.document_kind,
+                )
                 engine_name = "Rule-Based Engine"
 
         logger.info(
