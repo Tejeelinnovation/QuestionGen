@@ -300,11 +300,11 @@ class PageRouter:
             ocr_lang = "hin"  # Target Hindi OCR for legacy 8-bit Devanagari fonts
             return PageDecision(
                 page_num=page_num,
-                page_kind="scanned_printed",
-                engine=f"Google Tesseract OCR (-l {ocr_lang})",
+                page_kind="digital_text",
+                engine=f"Legacy Remap / Tesseract OCR (-l {ocr_lang})",
                 route_reason=(
                     "Legacy 8-bit font encoding detected (corrupted ASCII); "
-                    f"routed to Tesseract with language '{ocr_lang}'"
+                    f"routed to deterministic remap or Tesseract Hindi OCR"
                 ),
                 detected_script="devanagari",
                 ocr_language=ocr_lang,

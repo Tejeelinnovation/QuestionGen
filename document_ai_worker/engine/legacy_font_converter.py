@@ -6,7 +6,7 @@ Supports:
 - Bhartiya Hindi, Shivaji, Shree-Lipi
 
 Converts raw 8-bit ASCII character encodings directly into modern Unicode Devanagari
-with 100% glyph fidelity in sub-millisecond execution, eliminating OCR rasterization errors.
+in sub-millisecond execution. Accuracy is measured against hand-verified ground truth.
 """
 
 from __future__ import annotations
@@ -15,6 +15,9 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 _K2U_MAPPINGS: List[Tuple[str, str]] = [
+    ("Vf^;k\xa1", "टट्टियाँ"),
+    ("Vf^;k", "टट्टिया"),
+    ("^h", "ट्टी"),
     ("ñ", "॰"),
     ("Q+Z", "QZ+"),
     ("sas", "sa"),
@@ -260,34 +263,41 @@ def is_legacy_font(font_name: str) -> bool:
     return any(sub in lower for sub in LEGACY_FONT_SUBSTRINGS)
 
 
-def remap_legacy_text(text: str) -> str:
+def remap_legacy_text(text: str) -> Tuple[str, bool]:
     """
     Converts 8-bit ASCII legacy font text (KrutiDev, Chanakya, Walkman)
     into standard Unicode Devanagari.
+    
+    Returns (converted_text, has_unmapped_bytes).
+    If any raw Latin characters or replacement bytes remain, has_unmapped_bytes is True.
     """
     if not text:
-        return text
+        return text, False
 
     # If text already contains valid Devanagari, don't corrupt it
     if any("\u0900" <= c <= "\u097f" for c in text):
-        return text
+        return text, False
 
     converted = text
     for k, u in _K2U_MAPPINGS:
         converted = converted.replace(k, u)
 
-    # Chhoti-ee matra reordering: 'f' followed by consonant cluster
+    # Chhoti-ee matra reordering: 'f' followed by consonant cluster (including nukta consonants \u0958-\u095f)
     def _fix_chhoti_ee(match: re.Match) -> str:
         return match.group(1) + "ि"
 
-    converted = re.sub(r"f((?:[\u0915-\u0939]\u094d)*[\u0915-\u0939])", _fix_chhoti_ee, converted)
+    converted = re.sub(
+        r"f((?:[\u0915-\u0939\u0958-\u095f]\u094d)*[\u0915-\u0939\u0958-\u095f])",
+        _fix_chhoti_ee,
+        converted,
+    )
 
     # Reph (half-r) reordering: consonant cluster followed by 'Z'
     def _fix_reph(match: re.Match) -> str:
         return "र्" + match.group(1)
 
     converted = re.sub(
-        r"((?:[\u0915-\u0939]\u094d)*[\u0915-\u0939][\u093e-\u094c\u0901-\u0903]*)Z",
+        r"((?:[\u0915-\u0939\u0958-\u095f]\u094d)*[\u0915-\u0939\u0958-\u095f][\u093e-\u094c\u0901-\u0903]*)Z",
         _fix_reph,
         converted,
     )
@@ -295,26 +305,32 @@ def remap_legacy_text(text: str) -> str:
     # Decimal point fix
     converted = re.sub(r"(\d)ण्(\d)", r"\1.\2", converted)
 
-    return converted
+    # Detect unmapped legacy bytes (residual ASCII letters or replacement glyphs in legacy span)
+    has_unmapped_bytes = bool(re.search(r"[a-zA-Z\ufffd]", converted))
+
+    return converted, has_unmapped_bytes
 
 
-def convert_page_spans_to_unicode(fitz_page: Any) -> Optional[str]:
+def convert_page_spans_to_unicode(fitz_page: Any) -> Tuple[Optional[str], bool]:
     """
     Extracts text spans from a PyMuPDF page using font-name awareness.
     Only spans encoded with legacy fonts are remapped to Devanagari;
     spans in standard fonts (Arial, Times-Roman, etc.) are kept as English.
+    
+    Returns (rebuilt_text, page_has_unmapped_bytes).
     """
     try:
         page_dict = fitz_page.get_text("dict")
     except Exception:
-        return None
+        return None, False
 
     blocks = page_dict.get("blocks", [])
     if not blocks:
-        return None
+        return None, False
 
     rebuilt_blocks: List[str] = []
     has_remapped_content = False
+    page_has_unmapped_bytes = False
 
     for b in blocks:
         lines = b.get("lines")
@@ -324,19 +340,30 @@ def convert_page_spans_to_unicode(fitz_page: Any) -> Optional[str]:
         b_lines: List[str] = []
         for l in lines:
             spans = l.get("spans", [])
-            line_pieces: List[str] = []
+            merged_spans: List[Tuple[bool, str]] = []
             for s in spans:
                 font = (s.get("font") or "").lower()
                 span_text = s.get("text") or ""
                 if not span_text:
                     continue
+                leg = is_legacy_font(font)
+                if merged_spans and merged_spans[-1][0] == leg:
+                    merged_spans[-1] = (leg, merged_spans[-1][1] + span_text)
+                else:
+                    merged_spans.append((leg, span_text))
 
-                if is_legacy_font(font):
-                    remapped = remap_legacy_text(span_text)
-                    line_pieces.append(remapped)
+            line_pieces: List[str] = []
+            for leg, text in merged_spans:
+                if leg:
+                    remapped, unmapped = remap_legacy_text(text)
+                    if unmapped:
+                        page_has_unmapped_bytes = True
+                        line_pieces.append(f"[UNMAPPED: {remapped}]")
+                    else:
+                        line_pieces.append(remapped)
                     has_remapped_content = True
                 else:
-                    line_pieces.append(span_text)
+                    line_pieces.append(text)
 
             if line_pieces:
                 b_lines.append(" ".join(line_pieces))
@@ -345,6 +372,6 @@ def convert_page_spans_to_unicode(fitz_page: Any) -> Optional[str]:
             rebuilt_blocks.append("\n".join(b_lines))
 
     if not has_remapped_content:
-        return None
+        return None, False
 
-    return "\n\n".join(rebuilt_blocks)
+    return "\n\n".join(rebuilt_blocks), page_has_unmapped_bytes

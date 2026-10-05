@@ -271,13 +271,17 @@ class TextbookPipeline:
         # Handle legacy font encoding (KrutiDev, Chanakya, Walkman)
         if p_legacy:
             from .legacy_font_converter import convert_page_spans_to_unicode, remap_legacy_text
-            remapped_text = convert_page_spans_to_unicode(page)
+            res = convert_page_spans_to_unicode(page)
+            if isinstance(res, tuple):
+                remapped_text, has_unmapped = res
+            else:
+                remapped_text, has_unmapped = res, False
             has_dev = bool(remapped_text and any("\u0900" <= c <= "\u097f" for c in remapped_text))
 
             from eval.run import compute_script_aware_garbage
             _, _, remap_garbage = compute_script_aware_garbage(remapped_text or "")
 
-            if has_dev and remap_garbage < 0.15:
+            if has_dev and not has_unmapped and remap_garbage < 0.15:
                 raw_text = remapped_text
                 p_review = False
                 p_quality = 0.95
@@ -286,13 +290,18 @@ class TextbookPipeline:
                 p_reason = f"{p_reason}; Successfully remapped legacy font spans to Unicode Devanagari"
                 for sec in sections:
                     if sec.type != "DIAGRAM" and sec.text:
-                        sec.text = remap_legacy_text(sec.text)
+                        sec_text, _ = remap_legacy_text(sec.text)
+                        sec.text = sec_text
             else:
-                # OCR unavailable or remap failed: strict Verification 2 quarantine
+                # OCR unavailable or remap failed or unmapped bytes present: strict quarantine
                 p_review = True
                 p_quality = 0.50
                 p_meta["raw_text_unreliable"] = raw_text
-                p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
+                if has_unmapped:
+                    p_flags.append("unmapped_legacy_bytes")
+                    p_reason = f"{p_reason}; Unmapped legacy font bytes detected; quarantined to metadata"
+                else:
+                    p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
                 raw_text = ""
                 for sec in sections:
                     if sec.type != "DIAGRAM":

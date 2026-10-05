@@ -127,6 +127,9 @@ def retry_page_with_gemini(
     local_pdf: str,
     page_num: int,
     gemini_api_key: str,
+    timeout: int = 45,
+    max_retries: int = 2,
+    retry_delay: float = 1.0,
 ) -> Optional[str]:
     """
     Renders a low-quality page to a high-DPI image and calls Gemini Vision
@@ -136,6 +139,7 @@ def retry_page_with_gemini(
         return None
 
     import base64
+    import time
     import pymupdf as fitz
     import requests
 
@@ -148,45 +152,79 @@ def retry_page_with_gemini(
         pix = page.get_pixmap(dpi=150)
         img_bytes = pix.tobytes("png")
         doc.close()
+    except Exception as render_err:
+        logger.warning(f"[Gemini Quality Gate] Page render error on page {page_num}: {render_err}")
+        return None
 
-        b64_str = base64.b64encode(img_bytes).decode("utf-8")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
-        prompt = (
-            "Transcribe all text, formulas, headings, tables, and notes from this page accurately in natural reading order. "
-            "Output clear, clean text without optical character artifacts or corrupted tokens. "
-            "Preserve formatting and line hierarchy."
-        )
-        payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [
-                        {"text": prompt},
-                        {
-                            "inline_data": {
-                                "mime_type": "image/png",
-                                "data": b64_str,
-                            }
-                        },
-                    ],
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.1,
-            },
-        }
-        res = requests.post(url, json=payload, timeout=45)
-        if res.status_code == 200:
-            data = res.json()
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts:
-                    return parts[0].get("text", "").strip()
-        else:
-            logger.warning(f"[Gemini Quality Gate] API returned HTTP {res.status_code} for page {page_num}: {res.text[:120]}")
-    except Exception as gemini_err:
-        logger.warning(f"[Gemini Quality Gate] Request error on page {page_num}: {gemini_err}")
+    b64_str = base64.b64encode(img_bytes).decode("utf-8")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
+    prompt = (
+        "Transcribe all text, formulas, headings, tables, and notes from this page accurately in natural reading order. "
+        "Output clear, clean text without optical character artifacts or corrupted tokens. "
+        "Preserve formatting and line hierarchy."
+    )
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {"text": prompt},
+                    {
+                        "inline_data": {
+                            "mime_type": "image/png",
+                            "data": b64_str,
+                        }
+                    },
+                ],
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.1,
+        },
+    }
+
+    for attempt in range(max_retries):
+        try:
+            res = requests.post(url, json=payload, timeout=timeout)
+            if res.status_code == 200:
+                try:
+                    data = res.json()
+                except Exception:
+                    logger.warning(f"[Gemini Quality Gate] Malformed JSON response for page {page_num}")
+                    return None
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts and parts[0].get("text"):
+                        return parts[0].get("text", "").strip()
+                logger.warning(f"[Gemini Quality Gate] Bad/empty candidates in response for page {page_num}")
+                return None
+            elif res.status_code == 429:
+                logger.warning(
+                    f"[Gemini Quality Gate] Rate limit 429 for page {page_num} "
+                    f"(attempt {attempt + 1}/{max_retries})"
+                )
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (2 ** attempt))
+                    continue
+                return None
+            else:
+                logger.warning(
+                    f"[Gemini Quality Gate] API returned HTTP {res.status_code} for page {page_num}: {res.text[:120]}"
+                )
+                return None
+        except requests.exceptions.Timeout:
+            logger.warning(
+                f"[Gemini Quality Gate] Timeout for page {page_num} "
+                f"(attempt {attempt + 1}/{max_retries})"
+            )
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            return None
+        except Exception as gemini_err:
+            logger.warning(f"[Gemini Quality Gate] Request error on page {page_num}: {gemini_err}")
+            return None
 
     return None
 
