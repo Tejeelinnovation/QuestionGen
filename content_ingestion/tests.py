@@ -918,3 +918,99 @@ class NullMetadataAndFilteringTests(APITestCase):
         self.assertEqual(drafts[0].question_text, "What is a test question?")
 
 
+class GeminiCacheAndBatchReliabilityTests(APITestCase):
+    """
+    Tests for Phase 8 Neon Database Gemini result caching and
+    Phase 9 batch page checkpointing and resumption.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.school = School.objects.create(name="Cache Test School")
+        self.user = User.objects.create_user(
+            username="cacheteacher",
+            email="cacheteacher@school.org",
+            password="testpassword",
+            school=self.school,
+            role="CONTRIBUTOR",
+        )
+        self.job = IngestionJob.objects.create(
+            uploaded_by=self.user,
+            school=self.school,
+            title="Batch Reliability Book",
+            status=JobStatus.PENDING,
+            total_pages=20,
+            processed_pages=0,
+        )
+
+    def test_gemini_cache_endpoint(self):
+        """Tests GET and POST /api/ingest/cache/gemini/."""
+        cache_key = "test_neon_cache_key_999"
+
+        # Initially 404
+        get_res = self.client.get(f"/api/ingest/cache/gemini/?key={cache_key}")
+        self.assertEqual(get_res.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Store cache entry
+        post_data = {
+            "cache_key": cache_key,
+            "file_hash": "hash_123",
+            "page_number": 5,
+            "prompt_version": "v1",
+            "response_data": {"extracted_notes": "Sample physics notes"},
+        }
+        post_res = self.client.post("/api/ingest/cache/gemini/", data=post_data, format="json")
+        self.assertEqual(post_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(post_res.data.get("status"), "CACHED")
+
+        # Now GET returns cached entry
+        get_res2 = self.client.get(f"/api/ingest/cache/gemini/?key={cache_key}")
+        self.assertEqual(get_res2.status_code, status.HTTP_200_OK)
+        self.assertTrue(get_res2.data.get("found"))
+        self.assertEqual(get_res2.data.get("response_data"), {"extracted_notes": "Sample physics notes"})
+
+    @override_settings(INGESTION_WEBHOOK_SECRET="test_batch_secret_123", DEBUG=False)
+    def test_batch_pages_checkpointing_and_resumption(self):
+        """Tests sending intermediate BATCH_PAGES and retrieving GET_RESUME_STATE."""
+        secret = "test_batch_secret_123"
+
+        def _make_signed_post(url, payload):
+            raw_bytes = json.dumps(payload).encode("utf-8")
+            ts = int(time.time())
+            sig = hmac.new(secret.encode("utf-8"), f"{ts}.".encode("utf-8") + raw_bytes, hashlib.sha256).hexdigest()
+            return self.client.post(
+                url,
+                data=raw_bytes,
+                content_type="application/json",
+                HTTP_X_INGESTION_TIMESTAMP=str(ts),
+                HTTP_X_INGESTION_SIGNATURE=f"sha256={sig}",
+            )
+
+        # 1. Send batch for pages 1 to 3
+        batch_payload = {
+            "status": "BATCH_PAGES",
+            "total_pages": 20,
+            "pages": [
+                {"page_number": 1, "raw_text": "Page 1 intro", "sections": [{"type": "PARAGRAPH", "text": "Intro text"}]},
+                {"page_number": 2, "raw_text": "Page 2 content", "sections": [{"type": "DEFINITION", "text": "Newton law"}]},
+                {"page_number": 3, "raw_text": "Page 3 exercises", "sections": [{"type": "EXERCISE_QUESTION", "text": "Solve for x"}]},
+            ],
+        }
+        res = _make_signed_post(f"/api/ingest/jobs/{self.job.pk}/webhook/", batch_payload)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data.get("status"), "BATCH_SAVED")
+        self.assertEqual(res.data.get("stored_pages"), [1, 2, 3])
+
+        # Verify pages exist in database
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.pages.count(), 3)
+        self.assertEqual(self.job.processed_pages, 3)
+
+        # 2. Check resume state
+        resume_res = _make_signed_post(f"/api/ingest/jobs/{self.job.pk}/webhook/", {"status": "GET_RESUME_STATE"})
+        self.assertEqual(resume_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(resume_res.data.get("stored_pages"), [1, 2, 3])
+        self.assertEqual(resume_res.data.get("processed_pages"), 3)
+
+
+

@@ -213,6 +213,23 @@ class IngestionQueueWorker:
 
         remote_client = RemoteAiMicroserviceExtractor()
         if remote_client.is_configured:
+            # Guard against simultaneous jobs exhausting GitHub Actions free tier minutes
+            import os
+            MAX_CONCURRENT_DISPATCHES = int(os.environ.get("MAX_CONCURRENT_DISPATCHES", "2"))
+            with cls._lock:
+                active_count = len(cls._dispatched_job_ids)
+
+            if active_count >= MAX_CONCURRENT_DISPATCHES:
+                logger.info(
+                    f"[Actions Minute Guard] {active_count} cloud runners active (cap={MAX_CONCURRENT_DISPATCHES}). "
+                    f"Holding Job #{job.pk} in queue to protect Actions minutes."
+                )
+                job.current_stage = f"Waiting in queue: cloud runners at capacity ({active_count}/{MAX_CONCURRENT_DISPATCHES} active). Will start automatically."
+                job.updated_at = timezone.now()
+                job.save(update_fields=["current_stage", "updated_at"])
+                time.sleep(10)
+                return
+
             logger.info(f"Dispatching Job #{job.pk} to Remote AI Microservice / GitHub Actions ({remote_client.mode})...")
             callback_url = getattr(settings, "BACKEND_BASE_URL", "").rstrip("/") + f"/api/ingest/jobs/{job.pk}/webhook/"
             try:

@@ -95,7 +95,7 @@ class TextbookPipeline:
             progress_callback(0, pages_to_process, f"Opened document ({pages_to_process} pages). Detecting TOC & structure...")
 
         # 1. Detect TOC & Chapters
-        toc_entries, granularity = self._detect_toc(doc)
+        toc_entries, granularity = self._detect_toc(doc, pdf_path=pdf_path)
 
         # 2. Probe pages with PageRouter (Phase 2 per-page routing)
         from .page_router import PageRouter
@@ -129,10 +129,24 @@ class TextbookPipeline:
         doc.close()
         return toc_entries, pages, granularity
 
-    def _detect_toc(self, doc: fitz.Document) -> Tuple[List[ChapterSchema], str]:
+    def _detect_toc(self, doc: fitz.Document, pdf_path: str = "") -> Tuple[List[ChapterSchema], str]:
         """
         Extracts chapter boundaries from the document outline or initial pages.
+        Delegates to TocExtractor when doc_type is FULL_BOOK or teacher chose it (TOC_V2_ENABLED).
         """
+        from .toc_extractor import TocExtractor, TOC_V2_ENABLED
+        from .gemini_client import get_shared_gemini_client
+
+        norm_kind = (self.document_kind or "").strip().upper()
+        if TOC_V2_ENABLED or norm_kind in ("FULL_BOOK", "TEXTBOOK", "BOOK"):
+            gemini_client = get_shared_gemini_client()
+            extractor = TocExtractor(gemini_client=gemini_client)
+            chapters, granularity, source, conf = extractor.extract_toc(
+                doc, document_kind=self.document_kind, pdf_path=pdf_path
+            )
+            if chapters:
+                return chapters, granularity
+
         chapters: List[ChapterSchema] = []
 
         # A. Try native PDF table of contents outline first

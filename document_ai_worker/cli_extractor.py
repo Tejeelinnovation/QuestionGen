@@ -86,6 +86,10 @@ def download_file(url: str, dest_path: str) -> None:
     size_mb = os.path.getsize(dest_path) / (1024 * 1024)
     logger.info(f"Downloaded file: {size_mb:.2f} MB saved to {dest_path}")
 
+    # Maximum file size guard (100 MB)
+    if size_mb > 100.0:
+        raise ValueError(f"Downloaded file size ({size_mb:.2f} MB) exceeds maximum allowed limit of 100 MB.")
+
     # Validate PDF Magic Bytes (%PDF-)
     with open(dest_path, "rb") as f:
         magic = f.read(5)
@@ -130,18 +134,24 @@ def retry_page_with_gemini(
     timeout: int = 45,
     max_retries: int = 2,
     retry_delay: float = 1.0,
+    file_hash: str = "doc",
 ) -> Optional[str]:
     """
-    Renders a low-quality page to a high-DPI image and calls Gemini Vision
-    to perform optical transcription and text cleaning.
+    Renders low-quality page and calls unified GeminiClient to perform
+    optical transcription with temperature 0, exponential backoff, and Neon/disk caching.
     """
     if not gemini_api_key:
         return None
 
-    import base64
-    import time
     import pymupdf as fitz
-    import requests
+    try:
+        from engine.gemini_client import get_shared_gemini_client
+    except ImportError:
+        from document_ai_worker.engine.gemini_client import get_shared_gemini_client
+
+    client = get_shared_gemini_client(api_key=gemini_api_key)
+    if not client.is_configured:
+        return None
 
     try:
         doc = fitz.open(local_pdf)
@@ -149,84 +159,26 @@ def retry_page_with_gemini(
             doc.close()
             return None
         page = doc[page_num - 1]
-        pix = page.get_pixmap(dpi=150)
-        img_bytes = pix.tobytes("png")
+        prompt = (
+            "Transcribe all text, formulas, headings, tables, and notes from this page accurately in natural reading order. "
+            "Output clear, clean text without optical character artifacts or corrupted tokens. "
+            "Preserve formatting and line hierarchy."
+        )
+        result = client.transcribe_page_image(
+            page=page,
+            prompt=prompt,
+            page_num=page_num,
+            file_hash=file_hash,
+            dpi=150,
+            timeout=timeout,
+            max_attempts=max_retries,
+            retry_delay=retry_delay,
+        )
         doc.close()
+        return result
     except Exception as render_err:
-        logger.warning(f"[Gemini Quality Gate] Page render error on page {page_num}: {render_err}")
+        logger.warning(f"[Gemini Quality Gate] Page render/transcription error on page {page_num}: {render_err}")
         return None
-
-    b64_str = base64.b64encode(img_bytes).decode("utf-8")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
-    prompt = (
-        "Transcribe all text, formulas, headings, tables, and notes from this page accurately in natural reading order. "
-        "Output clear, clean text without optical character artifacts or corrupted tokens. "
-        "Preserve formatting and line hierarchy."
-    )
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {"text": prompt},
-                    {
-                        "inline_data": {
-                            "mime_type": "image/png",
-                            "data": b64_str,
-                        }
-                    },
-                ],
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.1,
-        },
-    }
-
-    for attempt in range(max_retries):
-        try:
-            res = requests.post(url, json=payload, timeout=timeout)
-            if res.status_code == 200:
-                try:
-                    data = res.json()
-                except Exception:
-                    logger.warning(f"[Gemini Quality Gate] Malformed JSON response for page {page_num}")
-                    return None
-                candidates = data.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts and parts[0].get("text"):
-                        return parts[0].get("text", "").strip()
-                logger.warning(f"[Gemini Quality Gate] Bad/empty candidates in response for page {page_num}")
-                return None
-            elif res.status_code == 429:
-                logger.warning(
-                    f"[Gemini Quality Gate] Rate limit 429 for page {page_num} "
-                    f"(attempt {attempt + 1}/{max_retries})"
-                )
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay * (2 ** attempt))
-                    continue
-                return None
-            else:
-                logger.warning(
-                    f"[Gemini Quality Gate] API returned HTTP {res.status_code} for page {page_num}: {res.text[:120]}"
-                )
-                return None
-        except requests.exceptions.Timeout:
-            logger.warning(
-                f"[Gemini Quality Gate] Timeout for page {page_num} "
-                f"(attempt {attempt + 1}/{max_retries})"
-            )
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-                continue
-            return None
-        except Exception as gemini_err:
-            logger.warning(f"[Gemini Quality Gate] Request error on page {page_num}: {gemini_err}")
-            return None
-
-    return None
 
 
 def send_progress(
@@ -236,11 +188,12 @@ def send_progress(
     total_pages: int,
     stage: str,
     secret: str = "",
-) -> None:
+) -> Optional[dict]:
     """
     Sends non-blocking progress updates to the Django backend.
     Catches any network hiccups so extraction is never aborted due to a progress ping.
     Signs payload with HMAC-SHA256 if secret is provided.
+    Returns backend response dict if successful (including stored_pages for resumption).
     """
     payload = {
         "job_id": job_id,
@@ -261,21 +214,67 @@ def send_progress(
     pct = int((processed_pages / total_pages * 100) if total_pages else 0)
     logger.info(f"[Progress] {processed_pages}/{total_pages} ({pct}%) - {stage}")
     try:
-        requests.post(callback_url, data=raw_bytes, headers=headers, timeout=5)
+        res = requests.post(callback_url, data=raw_bytes, headers=headers, timeout=10)
+        if res.status_code == 200:
+            return res.json()
     except Exception as p_err:
         logger.debug(f"[Progress] Heartbeat delivery notice: {p_err}")
+    return None
+
+
+def send_page_batch(
+    callback_url: str,
+    job_id: int,
+    pages_batch: list,
+    total_pages: int,
+    secret: str = "",
+    idempotency_key: str = "",
+) -> list[int]:
+    """
+    Sends an intermediate batch of structured pages to the Django backend to
+    checkpoint extraction progress. Returns the list of stored page numbers acknowledged.
+    """
+    payload = {
+        "job_id": job_id,
+        "status": "BATCH_PAGES",
+        "idempotency_key": idempotency_key,
+        "pages": [p.model_dump() if hasattr(p, "model_dump") else p for p in pages_batch],
+        "total_pages": total_pages,
+    }
+    raw_bytes = json.dumps(payload, default=str).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if idempotency_key:
+        headers["X-Idempotency-Key"] = idempotency_key
+    if secret:
+        ts_str = str(int(time.time()))
+        to_sign = f"{ts_str}.".encode("utf-8") + raw_bytes
+        sig = hmac.new(secret.encode("utf-8"), to_sign, hashlib.sha256).hexdigest()
+        headers["X-Ingestion-Timestamp"] = ts_str
+        headers["X-Ingestion-Signature"] = f"sha256={sig}"
+
+    for attempt in range(1, 4):
+        try:
+            res = requests.post(callback_url, data=raw_bytes, headers=headers, timeout=30)
+            if res.status_code == 200:
+                data = res.json()
+                logger.info(f"[Batch Checkpoint] Checkpointed {len(pages_batch)} pages with backend.")
+                return data.get("stored_pages", [])
+        except Exception as err:
+            logger.warning(f"[Batch Checkpoint] Attempt {attempt} failed: {err}")
+            time.sleep(2)
+    return []
 
 
 def send_webhook(
     callback_url: str,
     payload: dict,
     secret: str = "",
-    max_retries: int = 5,
+    max_retries: int = 8,
     idempotency_key: str = "",
 ) -> None:
     """
-    Posts the extraction result back to the Django backend with automatic retry
-    if the backend returns 502/503/504 or encounters temporary connection drops.
+    Posts the extraction result back to the Django backend with automatic retry.
+    Tolerates Render free tier spin-up delays (~60 seconds) using progressive delays.
     Signs payload with HMAC-SHA256 bound to timestamp (X-Ingestion-Signature, X-Ingestion-Timestamp).
     """
     raw_bytes = json.dumps(payload, default=str).encode("utf-8")
@@ -291,16 +290,20 @@ def send_webhook(
         headers["X-Ingestion-Timestamp"] = ts_str
         headers["X-Ingestion-Signature"] = f"sha256={sig}"
 
+    # Progressive retry delays: 5s, 10s, 15s, 20s, 25s, 30s, 30s, 30s (~165s max wait)
+    delays = [5, 10, 15, 20, 25, 30, 30, 30]
+
     for attempt in range(1, max_retries + 1):
         try:
             res = requests.post(callback_url, data=raw_bytes, headers=headers, timeout=60)
             logger.info(f"Webhook attempt #{attempt} status code: {res.status_code}")
             if res.status_code in (502, 503, 504) and attempt < max_retries:
+                wait_sec = delays[min(attempt - 1, len(delays) - 1)]
                 logger.warning(
-                    f"Backend returned HTTP {res.status_code} (likely restarting or deploying). "
-                    f"Waiting 10s before retry #{attempt + 1}..."
+                    f"Backend returned HTTP {res.status_code} (Render free instance may be waking). "
+                    f"Waiting {wait_sec}s before retry #{attempt + 1}..."
                 )
-                time.sleep(10)
+                time.sleep(wait_sec)
                 continue
             if res.status_code >= 400:
                 logger.error(f"Webhook error response: {res.text}")
@@ -308,8 +311,9 @@ def send_webhook(
             return
         except requests.exceptions.RequestException as exc:
             if attempt < max_retries:
-                logger.warning(f"Webhook connection attempt #{attempt} failed: {exc}. Retrying in 10s...")
-                time.sleep(10)
+                wait_sec = delays[min(attempt - 1, len(delays) - 1)]
+                logger.warning(f"Webhook connection attempt #{attempt} failed: {exc}. Retrying in {wait_sec}s...")
+                time.sleep(wait_sec)
             else:
                 logger.error(f"All {max_retries} webhook delivery attempts failed.")
                 raise
@@ -345,7 +349,28 @@ def main():
         except Exception:
             detected_total_pages = 0
 
-        send_progress(
+        # Maximum page count guard (250 pages)
+        if detected_total_pages > 250:
+            raise ValueError(
+                f"Document has {detected_total_pages} pages, which exceeds the limit of 250 pages. "
+                "Please split large books into individual chapters for optimal processing."
+            )
+
+        # Gemini model verification at startup
+        gemini_key = args.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
+        if gemini_key:
+            try:
+                from engine.gemini_client import get_shared_gemini_client
+            except ImportError:
+                from document_ai_worker.engine.gemini_client import get_shared_gemini_client
+            g_client = get_shared_gemini_client(api_key=gemini_key)
+            g_client.verify_at_startup()
+
+        # Job runtime guard
+        job_start_time = time.time()
+        MAX_JOB_SECONDS = 1800  # 30 minutes timeout
+
+        init_res = send_progress(
             args.callback_url,
             args.job_id,
             0,
@@ -353,6 +378,9 @@ def main():
             f"PDF downloaded ({detected_total_pages} pages). Initializing AI extractor...",
             secret=args.webhook_secret,
         )
+        stored_pages = set((init_res or {}).get("stored_pages", []))
+        if stored_pages:
+            logger.info(f"[Resumption] Found {len(stored_pages)} previously stored pages in database.")
 
         # 2. Select appropriate extraction pipeline with throttled progress reporting
         last_progress_time = [0.0]
@@ -545,7 +573,19 @@ def main():
 
         logger.info(f"Direct Drive upload complete: {uploaded_diagram_count} diagrams saved to Google Drive.")
 
-        # 4. Assemble lightweight JSON Payload matching Django IngestionJobWebhookView
+        # Checkpoint pages in batches to ensure progress is safely persisted
+        if len(pages) > 10:
+            batch_size = 15
+            for i in range(0, len(pages), batch_size):
+                batch_slice = pages[i : i + batch_size]
+                send_page_batch(
+                    args.callback_url,
+                    args.job_id,
+                    batch_slice,
+                    len(pages),
+                    secret=args.webhook_secret,
+                    idempotency_key=f"{idempotency_key}_batch_{i // batch_size}",
+                )
         payload = {
             "schema_version": "1.1.0",
             "job_id": args.job_id,

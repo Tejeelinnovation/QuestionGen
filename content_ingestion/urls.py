@@ -16,6 +16,7 @@ from .views import (
     IngestionJobResetView,
     IngestionJobSourcePdfView,
     IngestionJobWebhookView,
+    GeminiCacheView,
 )
 
 urlpatterns = [
@@ -41,4 +42,6 @@ urlpatterns = [
     path("jobs/<int:pk>/export-json/", IngestionJobExportJsonView.as_view(), name="job-export-json"),
     # Atomic dataset items search: GET /api/ingest/items/?item_type=FORMULA&job_id=1
     path("items/", ExtractedItemListView.as_view(), name="items-list"),
+    # Persisted Gemini Result Cache: GET, POST /api/ingest/cache/gemini/
+    path("cache/gemini/", GeminiCacheView.as_view(), name="gemini-cache"),
 ]

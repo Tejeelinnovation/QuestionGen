@@ -64,6 +64,7 @@ A school platform where:
 | `papers` | `Paper`, `PaperVersion`, `Delivery` | Paper assembly, immutable versioning, print/online delivery |
 | `attempts` | `Attempt`, `Answer` | Student sittings, auto-grading MCQ, teacher grading descriptive |
 | `generation` | *(no DB models)* | Pluggable generation service interface. Currently wraps `content.filters` |
+| `content_ingestion` | `IngestionJob`, `IngestionJobPage`, `GeminiResultCache` | PDF document upload, queue dispatch, page batch caching, and worker webhook processing |
 
 ---
 
@@ -156,6 +157,14 @@ user.role_label                      ← display only, never for auth decisions
 | GET | `/api/attempts/{id}/result/` | Student/teacher result view |
 | POST | `/api/attempts/{id}/answers/{qid}/grade/` | Teacher grades descriptive answer |
 
+### Document Ingestion
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/ingest/jobs/` | Upload PDF (multipart/form-data), enforces 100MB / 250-page limits |
+| GET | `/api/ingest/jobs/{id}/` | Poll job status, progress %, and completed page numbers |
+| POST | `/api/ingest/webhook/` | HMAC-signed worker webhook: `BATCH_PAGES`, `PROGRESS`, `GET_RESUME_STATE`, `COMPLETED`, `FAILED` |
+| POST | `/api/ingest/cache/gemini/` | Read/write persistent Gemini transcription cache in Neon database |
+
 ---
 
 ## Frontend Page Map
@@ -220,6 +229,58 @@ user.role_label                      ← display only, never for auth decisions
 
 ---
 
+## Document Ingestion & Document AI Worker Subsystem
+
+```
+┌─────────────────┐       Upload PDF (≤100MB, ≤250p)      ┌─────────────────────────┐
+│ Teacher / Admin ├──────────────────────────────────────►│  Django Backend (Render)│
+└─────────────────┘                                       │    content_ingestion    │
+                                                          └───────────┬─────────────┘
+                                                                      │ Dispatches job
+                                                                      ▼ (Guard: max 2 concurrent)
+                                                          ┌─────────────────────────┐
+                                                          │ GitHub Actions Runner / │
+                                                          │  Ephemeral Docker Pod   │
+                                                          │   (document_ai_worker)  │
+                                                          └───────────┬─────────────┘
+                                                                      │
+                ┌─────────────────────────────────────────────────────┼──────────────────────────────────┐
+                ▼                                                     ▼                                  ▼
+      [Document Classifier]                                 [Extraction Engines]               [Gemini Client]
+- Rules + heuristic signals                          - TextbookPipeline (column order,       - Singleton instance
+- Categories: FULL_BOOK, SINGLE_CHAPTER,               header/footer suppression,            - gemini-3.8-flash default
+  NEWSPAPER, HANDWRITTEN_NOTES,                        diagrams with ≥60px filter)           - Strict JSON schema, temp 0
+  WORKSHEET_OR_EXAM, MAGAZINE                        - LegacyFontConverter (Chanakya/        - Rate limit (2/s), backoff
+                                                       KrutiDev → clean Unicode Hindi)       - GEMINI_CALL_CAP = 20
+                                                     - TocExtractor (Bookmarks → Gemini →    - Cache in Neon DB via API
+                                                       Regex fallback; offset calibration;   - Privacy notice: Google free
+                                                       behind TOC_V2_ENABLED flag)             tier may use data for training
+                                                     - HandwritingPipeline (Vision AI OCR)
+                │                                                     │                                  │
+                └─────────────────────────────────────────────────────┼──────────────────────────────────┘
+                                                                      │
+                                                                      ▼ Batch every 15 pages / retrying webhook
+                                                          ┌─────────────────────────┐
+                                                          │  Webhook / Batch Pages  │
+                                                          │  (Cold-start resilient) │
+                                                          └───────────┬─────────────┘
+                                                                      │
+                                                                      ▼ Stored in Neon PostgreSQL
+                                                          ┌─────────────────────────┐
+                                                          │ IngestionJobPage Cache  │
+                                                          │ (Resumes on crash/retry)│
+                                                          └─────────────────────────┘
+```
+
+### Ingestion Safety, Privacy & Resilience
+1. **Runner Minute Protection**: `MAX_CONCURRENT_DISPATCHES = 2` holds excess jobs as `PENDING`, preventing Actions quota exhaustion.
+2. **Cold-Start Resilience**: The worker retries webhooks up to 8 times with progressive backoff (delays: 5s, 10s, 15s, 20s, 25s, 30s, 30s, 30s = ~165s max tolerance) to gracefully wait for Render free-tier instances to spin up from sleep (~60s).
+3. **Crash Resumption**: Worker queries `GET_RESUME_STATE` before extracting, and streams pages in batches of 15 (`BATCH_PAGES`). If an ephemeral runner dies, a restarted runner resumes immediately from the last saved page without repeating work or burning LLM calls.
+4. **LLM Cost & Quota Protection**: `GeminiClient` enforces a hard cap of 20 calls per job (`GEMINI_CALL_CAP`), rate-limits to 2 req/sec, and retries 429/5xx errors with jitter. If quota is exhausted or the API key is missing, affected pages are flagged `needs_review=True` while the job successfully finishes.
+5. **Data Privacy Disclosure**: Google's free API tier terms allow Google to use submitted prompts and outputs for model training. Teachers and administrators must be notified before uploading student-identifiable material.
+
+---
+
 ## Key Design Rules (Must Not Break)
 
 1. **No role fields** — use `has_capability()` everywhere, never `role_label` for logic
@@ -254,6 +315,14 @@ FRONTEND_URL=https://yourapp.vercel.app
 
 # Generation backend
 GENERATION_SERVICE_BACKEND=seeded_bank
+
+# Document Ingestion & AI Worker
+INGESTION_WEBHOOK_SECRET=your-secure-webhook-hmac-secret
+MAX_CONCURRENT_DISPATCHES=2
+TOC_V2_ENABLED=false
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-3.8-flash
+GEMINI_CALL_CAP=20
 ```
 
 ```env
@@ -265,15 +334,24 @@ VITE_API_BASE_URL=https://your-django-backend.com
 
 ## Test Suites
 
-| File | Count | Covers |
+| File / Command | Count | Covers |
 |---|---|---|
 | `users/tests.py` | — | Auth, capabilities, scoping |
 | `papers/tests.py` | 16 | Paper, version, delivery, clone, finalize |
 | `attempts/tests.py` | 16 | Attempt, auto-grade, teacher grade, result |
 | `generation/tests.py` | 12 | Service interface, seeded bank, factory |
 | `content/test_validation_workflow.py` | 9 | State machine, DEO/Validator, gate enforcement |
+| `content_ingestion/tests.py` | 8 | Job upload, limits, HMAC webhooks, batching, Gemini cache |
+| `eval/test_harness.py` | 10 | Classifier, metrics, confusion matrix, regression guard |
+| `eval/test_legacy_font_lines.py` | 12 | Walkman-Chanakya & KrutiDev Hindi font mapping & nuktas |
+| `eval/test_gemini_retry.py` | 10 | Gemini rate limit, backoff, and mock fallback |
+| `eval/test_toc_v2.py` | 5 | Multilingual TOC regex, page offset calibration, validation |
+| `eval/test_gemini_hardening.py` | 6 | Startup validation, per-job call cap, DB cache persistence |
+| `python -m eval.run --mode fast` | 3 samples | Golden samples regression harness (Hindi, Newspaper, Single Chapter) |
 
-Run all: `python manage.py test`
+Run Django backend tests: `python manage.py test`
+Run Document AI unit tests: `python -m unittest discover -s eval -p "test_*.py"`
+Run Golden evaluation harness: `python -m eval.run --mode fast`
 
 ---
 

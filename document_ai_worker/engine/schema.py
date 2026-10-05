@@ -44,6 +44,8 @@ class ChapterSchema(BaseModel):
     start_page: int
     end_page: int
     summary: str = ""
+    toc_source: Optional[str] = Field(default=None, description="bookmark | gemini | regex | null")
+    toc_confidence: Optional[str] = Field(default=None, description="high | medium | low | null")
 
 
 class ArticleSchema(BaseModel):
@@ -123,6 +125,8 @@ class ExtractionResponse(BaseModel):
     total_pages: int
     processed_pages: int
     granularity: str = "WHOLE_BOOK"
+    toc_source: Optional[str] = Field(default=None, description="bookmark | gemini | regex | null")
+    toc_confidence: Optional[str] = Field(default=None, description="high | medium | low | null")
     table_of_contents: List[ChapterSchema] = Field(default_factory=list)
     pages: List[PageSchema] = Field(default_factory=list)
     error_message: Optional[str] = None

@@ -1,0 +1,45 @@
+name: CI Document AI Quality & Regression Evaluation
+
+on:
+  push:
+    branches: [staging, main]
+  pull_request:
+    branches: [staging, main]
+
+jobs:
+  test_and_eval:
+    name: Unit Tests & Regression Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Libraries & Google Tesseract OCR
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libglib2.0-0 \
+            tesseract-ocr \
+            tesseract-ocr-hin \
+            tesseract-ocr-guj
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r document_ai_worker/requirements.txt
+
+      - name: Run All Unit Tests
+        run: |
+          python -m unittest eval.test_harness eval.test_legacy_font_lines eval.test_gemini_retry eval.test_toc_v2 eval.test_gemini_hardening
+
+      - name: Run Fast Mode Eval (Fails on Metric Regression)
+        run: |
+          python -m eval.run --mode fast
