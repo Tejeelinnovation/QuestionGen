@@ -179,7 +179,7 @@ class ExtractedChapter(TimestampedModel):
         related_name="chapters",
     )
     chapter_number = models.PositiveIntegerField(default=1)
-    title = models.CharField(max_length=255)
+    title = models.TextField(default="")
     start_page = models.PositiveIntegerField(default=1)
     end_page = models.PositiveIntegerField(default=1)
     summary = models.TextField(blank=True, default="")
@@ -284,15 +284,14 @@ class ExtractedItem(TimestampedModel):
         choices=ItemType.choices,
         db_index=True,
     )
-    heading = models.CharField(max_length=255, blank=True, default="")
+    heading = models.TextField(blank=True, default="")
     content = models.TextField(help_text="Clean extracted text with LaTeX embedded.")
     latex_equations = models.JSONField(
         default=list,
         blank=True,
         help_text="List of isolated LaTeX formula strings found in this item.",
     )
-    image_path = models.CharField(
-        max_length=500,
+    image_path = models.TextField(
         blank=True,
         default="",
         help_text="Local or media path of cropped figure.",

@@ -189,10 +189,10 @@ class DoclingPipeline:
                     if ch_match:
                         try:
                             current_chapter_num = int(ch_match.group(1))
-                            current_chapter_title = clean_text
+                            current_chapter_title = clean_text[:200]
                             chapters.append(ChapterSchema(
                                 chapter_number=current_chapter_num,
-                                title=clean_text,
+                                title=current_chapter_title,
                                 start_page=page_num,
                                 end_page=page_num,
                             ))
@@ -288,7 +288,7 @@ class DoclingPipeline:
                     if clean_text:
                         sections.append(SectionSchema(
                             type="PARAGRAPH",
-                            heading=clean_text,
+                            heading=clean_text[:250],
                             text=clean_text,
                             column_index=0,
                             metadata={"bbox": bbox, "is_header": True},
