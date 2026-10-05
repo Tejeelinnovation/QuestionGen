@@ -377,9 +377,32 @@ class EvalHarnessTests(unittest.TestCase):
 
     def test_legacy_font_quarantine_corrupted_text(self):
         """
-        Confirms that when a page has legacy_font_encoding=True and OCR is unavailable,
+        Confirms that when a page has legacy_font_encoding=True and OCR/remap is unavailable or fails,
         the corrupted text layer is NOT saved as content. needs_review is set to True,
         raw_text is cleared, and the corrupted string is quarantined in metadata.raw_text_unreliable.
+        """
+        from unittest.mock import patch
+        from document_ai_worker.engine.textbook_pipeline import TextbookPipeline
+
+        pdf_path = Path("eval/golden/hindi_gujarati_book/sample.pdf")
+        if not pdf_path.exists():
+            return
+        pipeline = TextbookPipeline(media_dir=str(self.temp_dir))
+        with patch("document_ai_worker.engine.legacy_font_converter.convert_page_spans_to_unicode", return_value=None):
+            _, pages, _ = pipeline.process_pdf(str(pdf_path), max_pages=3, render_image_pixels=False)
+
+        # Page 3 is legacy Walkman-Chanakya
+        p3 = pages[2]
+        self.assertTrue(p3.legacy_font_encoding)
+        self.assertTrue(p3.needs_review)
+        self.assertEqual(p3.raw_text, "")
+        self.assertIn("raw_text_unreliable", p3.metadata)
+        self.assertIn("izsepan", p3.metadata["raw_text_unreliable"])
+
+    def test_legacy_font_verified_remap_succeeds(self):
+        """
+        Confirms that when verified remap succeeds on legacy Walkman-Chanakya text,
+        it produces valid Unicode Devanagari text, with low garbage rate and without empty pages.
         """
         from document_ai_worker.engine.textbook_pipeline import TextbookPipeline
 
@@ -389,13 +412,10 @@ class EvalHarnessTests(unittest.TestCase):
         pipeline = TextbookPipeline(media_dir=str(self.temp_dir))
         _, pages, _ = pipeline.process_pdf(str(pdf_path), max_pages=3, render_image_pixels=False)
 
-        # Page 3 is legacy Walkman-Chanakya
         p3 = pages[2]
         self.assertTrue(p3.legacy_font_encoding)
-        self.assertTrue(p3.needs_review)
-        self.assertEqual(p3.raw_text, "")
-        self.assertIn("raw_text_unreliable", p3.metadata)
-        self.assertIn("izsepan", p3.metadata["raw_text_unreliable"])
+        self.assertIn("प्रेमचंद", p3.raw_text)
+        self.assertNotIn("izsepan", p3.raw_text)
 
     def test_classifier_ambiguous_document_scores_below_threshold(self):
         """

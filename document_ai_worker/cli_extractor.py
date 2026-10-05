@@ -123,6 +123,74 @@ def auto_detect_document_kind(
         )
 
 
+def retry_page_with_gemini(
+    local_pdf: str,
+    page_num: int,
+    gemini_api_key: str,
+) -> Optional[str]:
+    """
+    Renders a low-quality page to a high-DPI image and calls Gemini Vision
+    to perform optical transcription and text cleaning.
+    """
+    if not gemini_api_key:
+        return None
+
+    import base64
+    import pymupdf as fitz
+    import requests
+
+    try:
+        doc = fitz.open(local_pdf)
+        if page_num < 1 or page_num > len(doc):
+            doc.close()
+            return None
+        page = doc[page_num - 1]
+        pix = page.get_pixmap(dpi=150)
+        img_bytes = pix.tobytes("png")
+        doc.close()
+
+        b64_str = base64.b64encode(img_bytes).decode("utf-8")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_api_key}"
+        prompt = (
+            "Transcribe all text, formulas, headings, tables, and notes from this page accurately in natural reading order. "
+            "Output clear, clean text without optical character artifacts or corrupted tokens. "
+            "Preserve formatting and line hierarchy."
+        )
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": "image/png",
+                                "data": b64_str,
+                            }
+                        },
+                    ],
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.1,
+            },
+        }
+        res = requests.post(url, json=payload, timeout=45)
+        if res.status_code == 200:
+            data = res.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    return parts[0].get("text", "").strip()
+        else:
+            logger.warning(f"[Gemini Quality Gate] API returned HTTP {res.status_code} for page {page_num}: {res.text[:120]}")
+    except Exception as gemini_err:
+        logger.warning(f"[Gemini Quality Gate] Request error on page {page_num}: {gemini_err}")
+
+    return None
+
+
 def send_progress(
     callback_url: str,
     job_id: int,
@@ -308,6 +376,52 @@ def main():
             f"Extraction complete! Found {len(chapters)} chapters and {len(pages)} pages. "
             f"Granularity: {granularity}"
         )
+
+        # 2b. Quality Gate & Single-Page Retry
+        gemini_key = args.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
+        call_cap = int(os.environ.get("GEMINI_CALL_CAP", "20"))
+        gemini_calls_made = 0
+
+        for p in pages:
+            if p.page_kind in ("image_only", "blank"):
+                continue
+
+            # Quality threshold: quality_score < 0.70 or explicit review flag
+            if p.quality_score < 0.70 or p.needs_review:
+                if gemini_key and gemini_calls_made < call_cap:
+                    logger.info(
+                        f"[Quality Gate] Page {p.page_number} scored {p.quality_score:.2f} (needs_review={p.needs_review}). "
+                        f"Retrying with Gemini Vision (call {gemini_calls_made + 1}/{call_cap})..."
+                    )
+                    transcribed = retry_page_with_gemini(local_pdf, p.page_number, gemini_key)
+                    gemini_calls_made += 1
+                    if transcribed:
+                        try:
+                            from engine.text_cleaner import clean_page_text
+                        except ImportError:
+                            from document_ai_worker.engine.text_cleaner import clean_page_text
+                        clean_res = clean_page_text(transcribed)
+                        p.raw_text = clean_res.text
+                        p.quality_score = clean_res.quality_score
+                        p.quality_flags.append("retried_with_gemini")
+                        p.quality_flags.extend(clean_res.flags)
+                        if p.quality_score >= 0.70:
+                            p.needs_review = False
+                            p.route_reason = f"{p.route_reason}; Transcribed and verified via Gemini Vision"
+                            logger.info(f"[Quality Gate] Page {p.page_number} successfully recovered (score={p.quality_score:.2f})")
+                        else:
+                            p.needs_review = True
+                            p.quality_flags.append("low_quality_post_retry")
+                    else:
+                        p.needs_review = True
+                        p.quality_flags.append("gemini_retry_failed")
+                else:
+                    p.needs_review = True
+                    if gemini_calls_made >= call_cap:
+                        p.quality_flags.append("gemini_call_cap_exhausted")
+                        logger.info(f"[Quality Gate] Page {p.page_number} capped (GEMINI_CALL_CAP={call_cap} reached). Set needs_review=True.")
+                    elif not gemini_key:
+                        p.quality_flags.append("needs_review_no_gemini_key")
 
         # 3. Direct Google Drive Diagram Uploading from 16GB runner
         drive_uploader = WorkerGoogleDriveUploader()

@@ -245,22 +245,58 @@ class TextbookPipeline:
         p_quality = getattr(decision, "quality_score", 1.0) if decision else 1.0
         p_meta = dict(getattr(decision, "metadata", {})) if decision else {}
 
+        p_flags: List[str] = []
+
         # Handle full-page image / advertisement pages
         if p_kind == "image_only":
             raw_text = ""
             p_review = False
             p_quality = 1.0
+        elif p_kind != "blank" and raw_text:
+            from .text_cleaner import clean_page_text
+            clean_res = clean_page_text(raw_text, fitz_page=page)
+            raw_text = clean_res.text
+            p_flags.extend(clean_res.flags)
+            if clean_res.glued_words:
+                p_meta["glued_words"] = clean_res.glued_words
+            p_quality = round(min(p_quality, clean_res.quality_score), 3)
+            if p_quality < 0.70:
+                p_review = True
 
-        # Handle legacy font encoding when OCR is unavailable or fails (Verification 2)
-        if p_legacy:
-            p_review = True
-            p_quality = 0.50
-            p_meta["raw_text_unreliable"] = raw_text
-            p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
-            raw_text = ""
+            # Also clean individual section text
             for sec in sections:
-                if sec.type != "DIAGRAM":
-                    sec.text = ""
+                if sec.type != "DIAGRAM" and sec.text:
+                    sec.text = clean_page_text(sec.text).text
+
+        # Handle legacy font encoding (KrutiDev, Chanakya, Walkman)
+        if p_legacy:
+            from .legacy_font_converter import convert_page_spans_to_unicode, remap_legacy_text
+            remapped_text = convert_page_spans_to_unicode(page)
+            has_dev = bool(remapped_text and any("\u0900" <= c <= "\u097f" for c in remapped_text))
+
+            from eval.run import compute_script_aware_garbage
+            _, _, remap_garbage = compute_script_aware_garbage(remapped_text or "")
+
+            if has_dev and remap_garbage < 0.15:
+                raw_text = remapped_text
+                p_review = False
+                p_quality = 0.95
+                p_flags.append("legacy_font_remapped")
+                p_engine = f"{p_engine} (Legacy Font Remap)"
+                p_reason = f"{p_reason}; Successfully remapped legacy font spans to Unicode Devanagari"
+                for sec in sections:
+                    if sec.type != "DIAGRAM" and sec.text:
+                        sec.text = remap_legacy_text(sec.text)
+            else:
+                # OCR unavailable or remap failed: strict Verification 2 quarantine
+                p_review = True
+                p_quality = 0.50
+                p_meta["raw_text_unreliable"] = raw_text
+                p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
+                raw_text = ""
+                for sec in sections:
+                    if sec.type != "DIAGRAM":
+                        sec.text = ""
         elif p_kind in ("scanned_printed", "handwriting") and not raw_text.strip():
             p_review = True
             p_quality = 0.40
@@ -281,6 +317,7 @@ class TextbookPipeline:
             legacy_font_encoding=p_legacy,
             needs_review=p_review,
             quality_score=p_quality,
+            quality_flags=p_flags,
             metadata=p_meta,
         )
 

@@ -62,6 +62,7 @@ class PageSchema(BaseModel):
     legacy_font_encoding: bool = Field(default=False, description="True if legacy 8-bit font encoding was detected")
     needs_review: bool = Field(default=False, description="True if page requires human teacher review")
     quality_score: float = Field(default=1.0, description="Quality confidence score for the extracted page (0.0 - 1.0)")
+    quality_flags: List[str] = Field(default_factory=list, description="Per-page quality flags and anomaly markers")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional per-page metadata")
 
 

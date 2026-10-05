@@ -340,7 +340,24 @@ class DoclingPipeline:
             p_quality = getattr(dec, "quality_score", 1.0) if dec else 1.0
             p_meta = dict(getattr(dec, "metadata", {})) if dec else {}
 
+            p_flags: List[str] = []
             page_raw_text = "\n\n".join(page_text_pieces)
+
+            if p_kind != "blank" and page_raw_text:
+                from .text_cleaner import clean_page_text
+                clean_res = clean_page_text(page_raw_text, fitz_page=fitz_page)
+                page_raw_text = clean_res.text
+                p_flags.extend(clean_res.flags)
+                if clean_res.glued_words:
+                    p_meta["glued_words"] = clean_res.glued_words
+                p_quality = round(min(p_quality, clean_res.quality_score), 3)
+                if p_quality < 0.70:
+                    p_review = True
+
+                for sec in sections:
+                    if sec.type != "DIAGRAM" and sec.text:
+                        sec.text = clean_page_text(sec.text).text
+
             if p_legacy:
                 has_devanagari = any("\u0900" <= c <= "\u097f" for c in page_raw_text)
                 if not has_devanagari:
@@ -368,6 +385,7 @@ class DoclingPipeline:
                 legacy_font_encoding=p_legacy,
                 needs_review=p_review,
                 quality_score=p_quality,
+                quality_flags=p_flags,
                 metadata=p_meta,
             ))
 
