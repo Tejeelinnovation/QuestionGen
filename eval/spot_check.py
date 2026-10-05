@@ -83,8 +83,10 @@ def run_spot_checks() -> Dict[str, Dict]:
     results = {}
     print("=" * 80)
     print("GROUND TRUTH WORD-LEVEL ACCURACY SPOT CHECK REPORT")
+    print("STATUS: UNVERIFIED AI-AUTHORED BASELINES — EXCLUDED FROM HEADLINE ACCURACY")
+    print("Refer to eval/spot_checks/HUMAN_REVIEW.md for human verification queue.")
     print("=" * 80)
-    print(f"{'Sample':<22} | {'Page':<5} | {'GT Words':<9} | {'Matched':<8} | {'Accuracy':<10}")
+    print(f"{'Sample':<22} | {'Page':<5} | {'GT Words':<9} | {'Matched':<8} | {'Accuracy':<10} | {'Status'}")
     print("-" * 80)
 
     total_gt = 0
@@ -93,7 +95,8 @@ def run_spot_checks() -> Dict[str, Dict]:
     for sample, page_num, gt_file, ext_text in checks:
         gt_path = SPOT_DIR / gt_file
         with open(gt_path, "r", encoding="utf-8") as f:
-            gt_text = f.read()
+            lines = [l for l in f if not l.startswith("#")]
+            gt_text = "".join(lines)
 
         acc, matched, gt_count = calculate_word_accuracy(gt_text, ext_text)
         total_gt += gt_count
@@ -104,12 +107,14 @@ def run_spot_checks() -> Dict[str, Dict]:
             "gt_words": gt_count,
             "matched_words": matched,
             "word_accuracy": acc,
+            "verified": False,
         }
-        print(f"{sample:<22} | {page_num:<5} | {gt_count:<9} | {matched:<8} | {acc:.2f}%")
+        print(f"{sample:<22} | {page_num:<5} | {gt_count:<9} | {matched:<8} | {acc:.2f}%     | UNVERIFIED")
 
     overall_acc = (total_matches / total_gt) * 100.0 if total_gt else 0.0
     print("-" * 80)
-    print(f"{'OVERALL SPOT-CHECK ACCURACY':<40} | {total_gt:<9} | {total_matches:<8} | {overall_acc:.2f}%")
+    print(f"{'OVERALL UNVERIFIED AI BENCHMARK':<40} | {total_gt:<9} | {total_matches:<8} | {overall_acc:.2f}%     | UNVERIFIED")
+    print(f"{'HEADLINE VERIFIED ACCURACY':<40} | {'N/A':<9} | {'N/A':<8} | N/A (Pending Human Review)")
     print("=" * 80)
     return results
 

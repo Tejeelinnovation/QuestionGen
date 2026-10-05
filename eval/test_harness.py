@@ -280,10 +280,19 @@ class EvalHarnessTests(unittest.TestCase):
             self.assertGreaterEqual(res.confidence, 0.75)
             self.assertLessEqual(res.confidence, 0.98)
 
-    def test_page_router_newspaper_page_1_handwriting(self):
+    def test_page_router_newspaper_page_1_display_ad(self):
         """
-        Confirms that newspaper page 1 with handwritten letter is classified as mixed/handwriting,
-        and degrades gracefully to needs_review=True when GEMINI_API_KEY is absent.
+        A5 FIX: Newspaper page 1 was previously (incorrectly) classified as handwriting
+        due to 489 vector Bezier curve paths. Investigation shows these are a full-page
+        CREATIVE DISPLAY ADVERTISEMENT rendered with professional typesetting fonts
+        (PoynterAgateOne, RupeeET), not handwriting strokes.
+
+        The page has 581 characters of masthead text (BENNETT, COLEMAN & CO., dateline, etc.)
+        and 4 images (one 12654x1192 banner scan, masthead logos, one news photo).
+
+        Correct classification: digital_text (masthead content preserved for extraction).
+        The display ad portion is NOT flagged needs_review — it's expected and normal.
+        See eval/spot_checks/NEWSPAPER_PAGES_1_VS_24.md for the full investigation.
         """
         import pymupdf as fitz
         from document_ai_worker.engine.page_router import PageRouter
@@ -294,20 +303,17 @@ class EvalHarnessTests(unittest.TestCase):
         doc = fitz.open(str(pdf_path))
         p1 = doc[0]
 
-        # Case 1: Without GEMINI_API_KEY
-        router_no_key = PageRouter(gemini_api_key="")
-        decision_no_key = router_no_key.probe_page(p1, page_num=1, total_pages=len(doc))
-        self.assertIn(decision_no_key.page_kind, ("mixed", "handwriting"))
-        self.assertTrue(decision_no_key.needs_review)
-        self.assertEqual(decision_no_key.engine, "Fallback (Review Required)")
-
-        # Case 2: With GEMINI_API_KEY
-        router_with_key = PageRouter(gemini_api_key="mock_key_xyz")
-        decision_with_key = router_with_key.probe_page(p1, page_num=1, total_pages=len(doc))
-        self.assertIn(decision_with_key.page_kind, ("mixed", "handwriting"))
-        self.assertFalse(decision_with_key.needs_review)
-        self.assertEqual(decision_with_key.engine, "Gemini Flash AI (Handwriting)")
+        router = PageRouter(gemini_api_key="")
+        decision = router.probe_page(p1, page_num=1, total_pages=len(doc))
+        # Page 1 has 581 chars of real digital masthead text — must NOT be classified as handwriting
+        self.assertNotEqual(decision.page_kind, "handwriting",
+            "Page 1 has professional masthead fonts and display ad — must not be handwriting")
+        self.assertNotEqual(decision.page_kind, "blank")
+        # char_count must be captured correctly
+        self.assertGreater(decision.char_count, 100,
+            "Page 1 masthead has 581 chars — char_count must reflect this")
         doc.close()
+
 
     def test_page_router_newspaper_ad_pages_image_only(self):
         """

@@ -283,11 +283,29 @@ class TextbookPipeline:
 
             if has_dev and not has_unmapped and remap_garbage < 0.15:
                 raw_text = remapped_text
-                p_review = False
-                p_quality = 0.95
-                p_flags.append("legacy_font_remapped")
-                p_engine = f"{p_engine} (Legacy Font Remap)"
-                p_reason = f"{p_reason}; Successfully remapped legacy font spans to Unicode Devanagari"
+                from .text_cleaner import calculate_hindi_wordlist_ratio
+                from .legacy_font_converter import compute_hindi_ocr_agreement
+
+                wl_ratio = calculate_hindi_wordlist_ratio(raw_text)
+                ocr_agree = compute_hindi_ocr_agreement(page, raw_text)
+
+                p_meta["hindi_wordlist_valid_ratio"] = wl_ratio
+                if ocr_agree is not None:
+                    p_meta["hindi_ocr_agreement"] = ocr_agree
+                    p_quality = round(0.5 * wl_ratio + 0.5 * ocr_agree, 3)
+                else:
+                    p_quality = round(wl_ratio, 3)
+
+                if p_quality >= 0.70:
+                    p_review = False
+                    p_flags.append("legacy_font_remapped")
+                    p_engine = f"{p_engine} (Legacy Font Remap)"
+                    p_reason = f"{p_reason}; Successfully remapped legacy font spans (wordlist_ratio={wl_ratio:.2f}, quality={p_quality:.2f})"
+                else:
+                    p_review = True
+                    p_flags.append("low_hindi_quality_score")
+                    p_reason = f"{p_reason}; Legacy font remapped text below quality threshold (quality={p_quality:.2f}); review required"
+
                 for sec in sections:
                     if sec.type != "DIAGRAM" and sec.text:
                         sec_text, _ = remap_legacy_text(sec.text)

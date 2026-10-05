@@ -181,17 +181,46 @@ class PageRouter:
                 drawing_count = 0
 
         # 5. Handwriting detection
-        # Signals:
-        # A. Newspaper Page 1 full-page handwritten letter/note:
-        #    Page 1, broadsheet or large page, masthead text at top (< 700 chars),
-        #    bottom 85% contains > 100 vector drawing paths (handwritten curves)
-        #    or text cues like 'Dear Wifey', 'Love from Hubby', 'homework', 'notes'.
+        # A page is ONLY classified as handwriting if there is almost NO typed text
+        # AND extremely dense hand-drawn vector strokes AND explicit handwriting keywords.
+        #
+        # IMPORTANT: A broadsheet newspaper front-page display advertisement can have
+        # 400+ Bezier curve paths (e.g. TOI Page 1 with a full-page creative ad) without
+        # any handwriting present. The previous heuristic (page_num==1 + lower_drawings>=100)
+        # was a FALSE POSITIVE for such pages. We now require ALL three signals:
+        #   1. Essentially no typed text (< 50 chars)
+        #   2. Very dense drawing paths (> 200)
+        #   3. Explicit handwriting keyword in text OR no commercial font names
         is_newspaper_hw_letter = False
+
+        # Collect all font names used on this page
+        page_font_names: set = set()
+        try:
+            for b in page.get_text("dict").get("blocks", []):
+                for l in b.get("lines", []):
+                    for s in l.get("spans", []):
+                        fn = s.get("font", "")
+                        if fn:
+                            page_font_names.add(fn.lower())
+        except Exception:
+            pass
+
+        # Commercial typesetting font name signatures (NOT handwriting)
+        COMMERCIAL_FONT_SIGS = (
+            "poynter", "nimrod", "griffith", "caslon", "times", "arial", "helvetica",
+            "georgia", "garamond", "myriad", "minion", "franklin", "frutiger",
+        )
+        has_commercial_fonts = any(
+            any(sig in fn for sig in COMMERCIAL_FONT_SIGS)
+            for fn in page_font_names
+        )
+
         if (
             rect.width > 700 and rect.height > 1000
             and page_num == 1
-            and char_count < 700
-            and lower_drawings >= 100
+            and char_count < 50          # Almost no typed text
+            and lower_drawings > 200     # Very dense pen strokes
+            and not has_commercial_fonts # No professional typefaces present
         ):
             is_newspaper_hw_letter = True
 
@@ -270,9 +299,18 @@ class PageRouter:
         # Case C: Image-Only / Full-Page Advertisement
         # Characteristic: very low native text (< 60 chars), but has images or drawings covering substantial area.
         # Only broadsheet newspapers or complex graphic layouts should be classified as silent display ads.
-        # Standard scanned pages (A4/Letter with 0 vector fonts and 1 full-page scan) are scanned documents, not ads.
+        # Standard A4 book pages (e.g. NCERT hindi_gujarati_book Page 1) have low char_count but contain
+        # genuine section titles (गद्य-खंड, प्रेमचंद) that must NOT be silently discarded.
+        # Rule: Only broadsheet dimensions qualify for silent image_only classification.
+        # A4/Letter books (width < 600, height < 850) always go through text extraction.
         is_broadsheet = (rect.width > 700 and rect.height > 1000)
-        is_display_ad = is_broadsheet or (drawing_count >= 15 and image_count > 1) or (vector_font_count > 0 and char_count < 60 and image_area_ratio > 0.50)
+        is_display_ad = (
+            is_broadsheet and (drawing_count >= 15 or image_area_ratio > 0.85)
+        ) or (
+            drawing_count >= 15 and image_count > 1
+        ) or (
+            vector_font_count > 0 and char_count < 60 and image_area_ratio > 0.50 and is_broadsheet
+        )
 
         if char_count < 60 and (image_count >= 1 or drawing_count >= 10) and is_display_ad:
             return PageDecision(
@@ -319,7 +357,32 @@ class PageRouter:
             )
 
         # Case E: Scanned Printed Page (low digital text density, high image area or bitmap font)
+        # Exclude pages that have ZERO text and are broadsheet + drawing-heavy (those are display ads,
+        # already handled above, but high drawing_count can prevent image_area_ratio from reaching 0.40).
+        # A genuine scanned page has some OCR-recoverable content; a pure vector graphic ad does not.
         if char_count < 80 and (image_area_ratio > 0.40 or vector_font_count == 0):
+            # If the page is broadsheet, has zero text, and massive drawing/image counts, treat as image_only
+            if is_broadsheet and char_count == 0 and (drawing_count > 50 or image_count > 20):
+                return PageDecision(
+                    page_num=page_num,
+                    page_kind="image_only",
+                    engine="Image/Ad Classifier",
+                    route_reason=(
+                        f"Full-page vector graphic or advertisement (0 chars, "
+                        f"{drawing_count} drawing paths, {image_count} images)"
+                    ),
+                    detected_script="none",
+                    ocr_language=None,
+                    legacy_font_encoding=False,
+                    needs_review=False,
+                    quality_score=1.0,
+                    char_count=char_count,
+                    image_count=image_count,
+                    drawing_count=drawing_count,
+                    image_area_ratio=image_area_ratio,
+                    metadata={"is_ad_or_graphic": True},
+                )
+
             # Select targeted single-language OCR (never combine hin+eng+guj)
             if dominant_script == "gujarati" or guj_ratio > 0.2:
                 ocr_lang = "guj"

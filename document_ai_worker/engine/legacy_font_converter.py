@@ -15,6 +15,48 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 _K2U_MAPPINGS: List[Tuple[str, str]] = [
+    # Walkman-Chanakya Nukta ZA glyph (byte 0x94 / \u201d / ”)
+    ("\u201dksa", "ज़ें"),
+    ("\u201dks", "ज़े"),
+    ("\u201dkk", "ज़ा"),
+    ("\u201dk", "ज़"),
+    ("\u201d;", "ज़्य"),
+    ("\u201d", "ज़"),
+    ("”ksa", "ज़ें"),
+    ("”ks", "ज़े"),
+    ("”kk", "ज़ा"),
+    ("”k", "ज़"),
+    ("”;", "ज़्य"),
+    ("”", "ज़"),
+
+    # Q-suffix and F-glyph ligatures (Chanakya & KrutiDev)
+    ("oqQ", "कु"),
+    ("owQ", "कू"),
+    ("osQ", "के"),
+    ("vksQ", "को"),
+    ("vkSQ", "कौ"),
+    ("fiQ", "fQ"),   # fiQ -> फि
+    ("iSQ", "SQ"),   # iSQ -> फै
+    ("iQk", "Qk"),   # iQk -> फा
+    ("isQ", "sQ"),   # isQ -> फे
+    ("iQ", "Q"),     # iQ -> फ
+    ("I+kQ", "फ़ा"),
+    ("I+Q", "फ़"),
+
+    # Tra ligatures (Chanakya & KrutiDev)
+    ("=kk", "त्रा"),
+    ("=k", "त्र"),
+    ("=", "त्र"),
+
+    # Dha ligatures (Chanakya & KrutiDev)
+    ("èkk", "धा"),
+    ("èk", "ध"),
+    ("è;", "ध्य"),
+    ("è", "ध"),
+    ("/kk", "धा"),
+    ("/k", "ध"),
+    ("/", "ध"),
+
     ("Vf^;k\xa1", "टट्टियाँ"),
     ("Vf^;k", "टट्टिया"),
     ("^h", "ट्टी"),
@@ -27,7 +69,6 @@ _K2U_MAPPINGS: List[Tuple[str, str]] = [
     ("‘", '"'),
     ("’", '"'),
     ("“", "'"),
-    ("”", "'"),
     ("å", "०"),
     ("ƒ", "१"),
     ("„", "२"),
@@ -147,13 +188,8 @@ _K2U_MAPPINGS: List[Tuple[str, str]] = [
     ("R", "त्"),
     ("Fk", "थ"),
     ("F", "थ्"),
-    (")", "ध"),
     ("n", "द"),
-    ("/k", "ध"),
-    ("èk", "ध"),
-    ("/", "ध्"),
     ("Ë", "ध्"),
-    ("è", "ध्"),
     ("u", "न"),
     ("Uk", "न"),
     ("U", "न्"),
@@ -236,7 +272,7 @@ _K2U_MAPPINGS: List[Tuple[str, str]] = [
     ("A", "।"),
     ("&", "-"),
     ("Œ", "—"),
-    ("]", "’"),
+    ("]", "\ufff0"),
     ("~ ", "् "),
     ("@", "/"),
 ]
@@ -279,15 +315,33 @@ def remap_legacy_text(text: str) -> Tuple[str, bool]:
         return text, False
 
     converted = text
+
+    # Walkman-Chanakya inverted type order: 's' (matra e) typed before 'z' (half-r)
+    converted = converted.replace("isz", "izs")
+    converted = converted.replace("sz", "zs")
+
     for k, u in _K2U_MAPPINGS:
         converted = converted.replace(k, u)
+
+    # Unwrap placeholder for punctuation bytes like ] (comma in Chanakya)
+    converted = converted.replace("\ufff0", ",")
+
+    # Chanakya composite glyph: macron (0xaf / \xaf) is chhoti-ee with bindu (\u093f\u0902)
+    def _fix_chhoti_ee_bindu(match: re.Match) -> str:
+        return match.group(1) + "िं"
+
+    converted = re.sub(
+        r"\xaf((?:[\u0915-\u0939\u0958-\u095f]\u093c?\u094d)*[\u0915-\u0939\u0958-\u095f]\u093c?)",
+        _fix_chhoti_ee_bindu,
+        converted,
+    )
 
     # Chhoti-ee matra reordering: 'f' followed by consonant cluster (including nukta consonants \u0958-\u095f)
     def _fix_chhoti_ee(match: re.Match) -> str:
         return match.group(1) + "ि"
 
     converted = re.sub(
-        r"f((?:[\u0915-\u0939\u0958-\u095f]\u094d)*[\u0915-\u0939\u0958-\u095f])",
+        r"f((?:[\u0915-\u0939\u0958-\u095f]\u093c?\u094d)*[\u0915-\u0939\u0958-\u095f]\u093c?)",
         _fix_chhoti_ee,
         converted,
     )
@@ -297,10 +351,13 @@ def remap_legacy_text(text: str) -> Tuple[str, bool]:
         return "र्" + match.group(1)
 
     converted = re.sub(
-        r"((?:[\u0915-\u0939\u0958-\u095f]\u094d)*[\u0915-\u0939\u0958-\u095f][\u093e-\u094c\u0901-\u0903]*)Z",
+        r"((?:[\u0915-\u0939\u0958-\u095f]\u093c?\u094d)*[\u0915-\u0939\u0958-\u095f]\u093c?[\u093e-\u094c\u0901-\u0903]*)Z",
         _fix_reph,
         converted,
     )
+
+    # Inverted vowel-plus-ra cleanup: e.g. पे्रमचंद -> प्रेमचंद
+    converted = re.sub(r"([\u0915-\u0939\u0958-\u095f]\u093c?)([\u0947\u0948\u094b\u094c\u0940])्र", r"\1्र\2", converted)
 
     # Decimal point fix
     converted = re.sub(r"(\d)ण्(\d)", r"\1.\2", converted)
@@ -371,7 +428,67 @@ def convert_page_spans_to_unicode(fitz_page: Any) -> Tuple[Optional[str], bool]:
         if b_lines:
             rebuilt_blocks.append("\n".join(b_lines))
 
-    if not has_remapped_content:
-        return None, False
-
     return "\n\n".join(rebuilt_blocks), page_has_unmapped_bytes
+
+
+def compute_hindi_ocr_agreement(fitz_page: Any, remapped_text: str) -> Optional[float]:
+    """
+    Cross-checks remapped text against Tesseract -l hin OCR of the rendered page.
+    Returns word-level agreement ratio (0.0 to 1.0), or None if Tesseract is unavailable.
+    """
+    if not remapped_text or not fitz_page:
+        return None
+    try:
+        import subprocess
+        import tempfile
+        import difflib
+        import unicodedata
+        import os
+
+        # Check if tesseract is available in system PATH
+        which_cmd = "where" if os.name == "nt" else "which"
+        proc = subprocess.run([which_cmd, "tesseract"], capture_output=True)
+        if proc.returncode != 0:
+            return None
+
+        # Render page at 150 DPI
+        pix = fitz_page.get_pixmap(dpi=150)
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+            img_path = tf.name
+        pix.save(img_path)
+
+        try:
+            ocr_proc = subprocess.run(
+                ["tesseract", img_path, "stdout", "-l", "hin", "--psm", "6"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if ocr_proc.returncode != 0:
+                return None
+            ocr_text = ocr_proc.stdout or ""
+        finally:
+            if os.path.exists(img_path):
+                try:
+                    os.remove(img_path)
+                except OSError:
+                    pass
+
+        def _tokenize(s: str) -> List[str]:
+            norm = unicodedata.normalize("NFC", s)
+            return [
+                w.strip(".,:;()[]\"\'।?!-—/")
+                for w in norm.split()
+                if len(w.strip(".,:;()[]\"\'।?!-—/")) >= 2
+            ]
+
+        r_words = _tokenize(remapped_text)
+        o_words = _tokenize(ocr_text)
+        if not r_words or not o_words:
+            return None
+
+        matcher = difflib.SequenceMatcher(None, r_words, o_words)
+        matches = sum(b.size for b in matcher.get_matching_blocks())
+        return round(matches / max(len(r_words), 1), 3)
+    except Exception:
+        return None

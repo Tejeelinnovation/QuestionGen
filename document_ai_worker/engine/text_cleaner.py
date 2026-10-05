@@ -64,6 +64,93 @@ VALID_SHORT_LABELS: Set[str] = {
 }
 
 # Common auxiliaries and prepositions that indicate glued words when suffix-attached
+# ---------------------------------------------------------------------------
+# Hindi wordlist-based quality ratio (A2)
+# ---------------------------------------------------------------------------
+import os as _os
+import unicodedata as _unicodedata
+_HINDI_WORDS: set = set()
+_HINDI_WORDS_LOADED: bool = False
+
+def _load_hindi_words() -> set:
+    """Lazy-load the bundled Hindi wordlist (GPL / LibreOffice & JanaBhaaratii)."""
+    global _HINDI_WORDS, _HINDI_WORDS_LOADED
+    if _HINDI_WORDS_LOADED:
+        return _HINDI_WORDS
+    wl_path = _os.path.join(_os.path.dirname(__file__), "..", "resources", "hindi_wordlist.txt")
+    wl_path = _os.path.normpath(wl_path)
+    try:
+        with open(wl_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    _HINDI_WORDS.add(line)
+    except FileNotFoundError:
+        pass  # wordlist absent (CI fresh checkout) – ratio will return 1.0
+    _HINDI_WORDS_LOADED = True
+    return _HINDI_WORDS
+
+
+def _is_valid_hindi_token(token: str, words: set) -> bool:
+    """Check if a Devanagari token is a valid Hindi word using heuristics + wordlist."""
+    t = _unicodedata.normalize("NFC", token.strip(".,:;()[]\"\'।?!-—/"))
+    if not t:
+        return False
+    if "-" in t:
+        parts = [p for p in t.split("-") if p]
+        return all(len(p) < 2 or _is_valid_hindi_token(p, words) for p in parts)
+    if t in words:
+        return True
+    # Without nukta (ज़ -> ज)
+    t_no_nukta = t.replace("\u093c", "")
+    if t_no_nukta in words:
+        return True
+    # Plural oblique: -ों (बैलों -> बैल, बैला)
+    if t.endswith("\u094b\u0902"):
+        s = t[:-2]
+        if s in words or (s + "\u093e") in words or t_no_nukta[:-2] in words:
+            return True
+    # Plural direct: -ें or -े
+    if t.endswith("\u0947\u0902") or t.endswith("\u0947"):
+        s = t[:-1] if t.endswith("\u0947") else t[:-2]
+        if s in words or (s + "\u093e") in words or (t_no_nukta[:-1] + "\u093e") in words:
+            return True
+    # -ी to -ा or base (बड़ी -> बड़ा)
+    if t.endswith("\u0940"):
+        s = t[:-1]
+        if s in words or (s + "\u093e") in words or (t_no_nukta[:-1] + "\u093e") in words:
+            return True
+    # -ा to base (अंतरा -> अंतर)
+    if t.endswith("\u093e"):
+        s = t[:-1]
+        if s in words or (w_no_nukta_s := t_no_nukta[:-1]) in words:
+            return True
+    return False
+
+
+def calculate_hindi_wordlist_ratio(text: str) -> float:
+    """
+    Calculates the fraction of Devanagari tokens (len >= 2) that are valid Hindi words.
+    Uses the bundled GPL/LibreOffice wordlist + inflectional heuristics.
+    Returns 1.0 for empty text or if wordlist unavailable.
+    The ratio is used in the quality gate (< 0.70 triggers review).
+    """
+    if not text:
+        return 1.0
+    words = _load_hindi_words()
+    if not words:
+        return 1.0  # Wordlist not available – degrade gracefully
+    tokens = text.split()
+    dev_tokens = [
+        t for t in tokens
+        if re.search(r"[\u0900-\u097f]", t) and len(t.strip(".,:;()[]\"\'।?!-—/")) >= 2
+    ]
+    if not dev_tokens:
+        return 1.0
+    valid = sum(1 for t in dev_tokens if _is_valid_hindi_token(t, words))
+    return round(valid / len(dev_tokens), 4)
+
+
 GLUED_SUFFIXES = [
     "has", "is", "was", "are", "were", "had", "have", "that", "with", "from", "for", "and", "the", "not", "this", "been",
 ]

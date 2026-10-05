@@ -70,6 +70,8 @@ export interface ExtractedPage {
   chapter_title: string;
   is_verified: boolean;
   items_count: number;
+  needs_review?: boolean;
+  quality_score?: number;
 }
 
 export const fetchIngestionJobs = async (): Promise<IngestionJobSummary[]> => {

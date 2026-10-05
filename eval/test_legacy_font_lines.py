@@ -76,9 +76,34 @@ class TestLegacyFontLines(unittest.TestCase):
         ("gkfen us cw<+s gkfen dk ikVZ [ksyk FkkA", "हामिद ने बूढ़े हामिद का पार्ट खेला था।"),
         ("cqf<+;k vehuk ckfydk vehuk cu xbZA", "बुढ़िया अमीना बालिका अमीना बन गई।"),
         ("bZnxkg dgkuh osQ mu izlaxksa dk mYys[k dhft,", "ईदगाह कहानी के उन प्रसंगों का उल्लेख कीजिए"),
-        ("ekuks Hkzkr`Ro dk ,d lw=k bu leLr vkRekvksa dks fijks, gq, gSA", "मानो भ्रातृत्व का एक सूत्रा इन समस्त आत्माओं को पिरोए हुए है।"),
-        ("fe^h gh osQ rks gSa] fxjs rks pdukpwj gks tk,A", "मिट्टी ही के तो हैं’ गिरे तो चकनाचूर हो जाए।"),
+        ("ekuks Hkzkr`Ro dk ,d lw=k bu leLr vkRekvksa dks fijks, gq, gSA", "मानो भ्रातृत्व का एक सूत्र इन समस्त आत्माओं को पिरोए हुए है।"),
+        ("fe^h gh osQ rks gSa] fxjs rks pdukpwj gks tk,A", "मिट्टी ही के तो हैं, गिरे तो चकनाचूर हो जाए।"),
     ]
+
+    PART_A1_TEST_CASES = [
+        ("f\u201dkys", "ज़िले"),
+        ("je\u201dkku", "रमज़ान"),
+        ("ph\u201dksa", "चीज़ें"),
+        ("\u201d;knk", "ज़्यादा"),
+        ("oqQN", "कुछ"),
+        ("fiQj", "फिर"),
+        ("osQ", "के"),
+        ("fuca\xe8k)A", "निबंध)।"),
+        ("lacaf/r", "संबंधित"),
+        ("R;kxi=k", "त्यागपत्र"),
+        ("\xafgnh", "हिंदी"),
+        ("iszepan", "प्रेमचंद"),
+        ("fueZyk] lsoklnu]", "निर्मला, सेवासदन,"),
+    ]
+
+    def test_part_a1_regression_fixes(self):
+        """Verifies all specific legacy font regressions reported in Part A1."""
+        for raw, expected in self.PART_A1_TEST_CASES:
+            actual, unmapped = remap_legacy_text(raw)
+            norm_actual = unicodedata.normalize("NFC", actual)
+            norm_expected = unicodedata.normalize("NFC", expected)
+            self.assertFalse(unmapped, f"Unmapped bytes in {raw!r}")
+            self.assertEqual(norm_actual, norm_expected, f"Failed on raw string: {raw!r}")
 
     def test_line_level_accuracy(self):
         """Verifies all 55 hand-verified lines and measures line-level accuracy."""
