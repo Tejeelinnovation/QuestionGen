@@ -1,0 +1,15 @@
+{
+  "doc_type": "NEWSPAPER",
+  "has_toc": false,
+  "chapters": [],
+  "page_kinds": {
+    "1": "FRONT_PAGE",
+    "2": "TIMES_CITY",
+    "3": "TIMES_CITY",
+    "4": "TIMES_NATION",
+    "16": "EDITORIAL_OPED",
+    "20": "BUSINESS_TIMES",
+    "24": "SPORTS"
+  },
+  "notes": "Times of India Delhi 36-page broadsheet edition, October 1, 2026. Broadsheet dimensions (990x1545 pt) with multi-column news layout."
+}

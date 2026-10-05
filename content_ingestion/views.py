@@ -75,10 +75,49 @@ class IngestionJobListCreateView(generics.ListCreateAPIView):
 
         # Super Admin sees all materials across all schools
         if is_super_admin(user):
-            return IngestionJob.objects.all().prefetch_related("chapters")
+            qs = IngestionJob.objects.all().prefetch_related("chapters")
+        else:
+            # Regular contributors see ONLY their own submitted materials
+            qs = IngestionJob.objects.filter(uploaded_by=user).prefetch_related("chapters")
 
-        # Regular contributors see ONLY their own submitted materials
-        return IngestionJob.objects.filter(uploaded_by=user).prefetch_related("chapters")
+        params = self.request.query_params
+        board = params.get("board")
+        if board:
+            if board.lower() in ("null", "none"):
+                qs = qs.filter(board__isnull=True)
+            elif board.upper() != "ALL":
+                qs = qs.filter(board__iexact=board)
+
+        standard = params.get("standard")
+        if standard:
+            if standard.lower() in ("null", "none"):
+                qs = qs.filter(standard__isnull=True)
+            elif standard.isdigit():
+                qs = qs.filter(standard=int(standard))
+
+        subject = params.get("subject")
+        if subject:
+            if subject.lower() in ("null", "none"):
+                qs = qs.filter(subject__isnull=True)
+            elif subject.upper() != "ALL":
+                qs = qs.filter(subject__icontains=subject)
+
+        document_kind = params.get("document_kind")
+        if document_kind:
+            if document_kind.lower() in ("null", "none"):
+                qs = qs.filter(document_kind__isnull=True)
+            elif document_kind.upper() != "ALL":
+                qs = qs.filter(document_kind__iexact=document_kind)
+
+        status_param = params.get("status")
+        if status_param and status_param.upper() != "ALL":
+            qs = qs.filter(status=status_param.upper())
+
+        search = params.get("search") or params.get("q")
+        if search and search.strip():
+            qs = qs.filter(title__icontains=search.strip())
+
+        return qs
 
     def get_serializer_class(self):
         if self.request.method == "POST":

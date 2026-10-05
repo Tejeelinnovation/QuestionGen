@@ -1,0 +1,11 @@
+{
+  "doc_type": "MAGAZINE",
+  "has_toc": true,
+  "chapters": [],
+  "page_kinds": {
+    "1": "COVER",
+    "2": "TABLE_OF_CONTENTS",
+    "3": "FEATURE_ARTICLE"
+  },
+  "notes": "Placeholder: Periodical or magazine publication with multi-column sidebars, rich media, and feature articles. Waiting for user-supplied PDF."
+}

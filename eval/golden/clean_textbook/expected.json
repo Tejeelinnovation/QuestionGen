@@ -1,0 +1,24 @@
+{
+  "doc_type": "FULL_BOOK",
+  "has_toc": true,
+  "chapters": [
+    {
+      "number": 1,
+      "title": "Real Numbers",
+      "start_page": 1,
+      "end_page": 18
+    },
+    {
+      "number": 2,
+      "title": "Polynomials",
+      "start_page": 19,
+      "end_page": 36
+    }
+  ],
+  "page_kinds": {
+    "1": "COVER",
+    "2": "PREFACE",
+    "3": "TABLE_OF_CONTENTS"
+  },
+  "notes": "Placeholder: Clean complete textbook with front-matter, multi-chapter TOC, and pedagogical exercises. Waiting for user-supplied PDF."
+}

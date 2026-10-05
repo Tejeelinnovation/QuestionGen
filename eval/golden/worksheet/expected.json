@@ -1,0 +1,10 @@
+{
+  "doc_type": "WORKSHEET_OR_EXAM",
+  "has_toc": false,
+  "chapters": [],
+  "page_kinds": {
+    "1": "QUESTION_PAPER_FRONT",
+    "2": "SECTION_B_QUESTIONS"
+  },
+  "notes": "Placeholder: Assessment paper or student practice worksheet with max marks, time limit, and structured question items. Waiting for user-supplied PDF."
+}

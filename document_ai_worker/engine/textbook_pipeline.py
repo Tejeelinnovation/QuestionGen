@@ -52,6 +52,7 @@ class TextbookPipeline:
         pdf_path: str,
         max_pages: Optional[int] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        extract_images: bool = True,
     ) -> Tuple[List[ChapterSchema], List[PageSchema], str]:
         """
         Executes full textbook extraction:
@@ -72,7 +73,7 @@ class TextbookPipeline:
         pages: List[PageSchema] = []
         for p_idx in range(pages_to_process):
             page_num = p_idx + 1
-            page_schema = self._extract_single_page(doc, page_num, toc_entries)
+            page_schema = self._extract_single_page(doc, page_num, toc_entries, extract_images=extract_images)
             pages.append(page_schema)
             if progress_callback:
                 progress_callback(page_num, pages_to_process, f"Extracting page {page_num} of {pages_to_process} (layout & LaTeX)...")
@@ -120,14 +121,9 @@ class TextbookPipeline:
             chapters[-1].end_page = total_pages
             granularity = "WHOLE_BOOK" if len(chapters) >= 2 else "CHAPTER"
         else:
-            # Single chapter or topic default
-            chapters = [ChapterSchema(
-                chapter_number=1,
-                title="Chapter 1",
-                start_page=1,
-                end_page=total_pages,
-            )]
-            granularity = "SINGLE_CHAPTER" if total_pages > 8 else "TOPIC"
+            # No TOC found: do not fabricate dummy "Chapter 1"
+            chapters = []
+            granularity = "UNKNOWN"
 
         return chapters, granularity
 
@@ -167,6 +163,7 @@ class TextbookPipeline:
         doc: fitz.Document,
         page_num: int,
         toc_entries: List[ChapterSchema],
+        extract_images: bool = True,
     ) -> PageSchema:
         """
         Parses a single page preserving columns, LaTeX, diagrams, and activities.
@@ -182,7 +179,7 @@ class TextbookPipeline:
                 break
 
         # 2. Extract Embedded Images
-        extracted_images = self._extract_page_images(doc, page, page_num)
+        extracted_images = self._extract_page_images(doc, page, page_num) if extract_images else []
 
         # 3. Analyze Column Layout & Sort Blocks
         raw_blocks = page.get_text("blocks")

@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework import status
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APITestCase
 
 from schools.models import School
 from .extractors.digital_parser import DigitalPdfExtractor
@@ -725,5 +725,196 @@ class Phase1DocumentIngestionTests(TestCase):
             doc.close()
             # Must NOT fabricate TOC
             self.assertEqual(toc_list, [])
+
+
+class NullMetadataAndFilteringTests(APITestCase):
+    """
+    Tests ensuring null board/standard/subject/document_kind:
+    1. Does not break creation or serializer coercion (accepts null, 'null', '', 'AUTO')
+    2. Does not break list, detail, or search/filter views
+    3. Does not break question generation and content filtering
+    """
+
+    def setUp(self):
+        from users.models import Capability, CapabilityName, UserCapability
+
+        self.school = School.objects.create(name="Delhi Public School")
+        self.user = User.objects.create_user(
+            username="teacher_null_meta",
+            email="teacher@dps.edu",
+            password="secretpassword",
+            school=self.school,
+        )
+        upload_cap, _ = Capability.objects.get_or_create(name=CapabilityName.UPLOAD_STUDY_MATERIAL)
+        UserCapability.objects.create(user=self.user, capability=upload_cap)
+
+        self.admin = User.objects.create_user(
+            username="admin_null_meta",
+            email="admin@dps.edu",
+            password="adminpassword",
+            school=None,
+        )
+        super_cap, _ = Capability.objects.get_or_create(name=CapabilityName.CREATE_SCHOOL)
+        UserCapability.objects.create(user=self.admin, capability=super_cap)
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.admin)
+
+    def test_create_job_with_explicit_null_json(self):
+        from .serializers import IngestionJobCreateSerializer
+
+        dummy_file = SimpleUploadedFile("sample.pdf", b"%PDF-1.4 dummy", content_type="application/pdf")
+        data = {
+            "title": "Unspecified Material",
+            "standard": None,
+            "board": None,
+            "subject": None,
+            "document_kind": None,
+            "source_file": dummy_file,
+        }
+        serializer = IngestionJobCreateSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        job = serializer.save(uploaded_by=self.user, school=self.school)
+        self.assertIsNone(job.standard)
+        self.assertIsNone(job.board)
+        self.assertIsNone(job.subject)
+        self.assertIsNone(job.document_kind)
+
+    def test_create_job_with_string_null_and_empty_and_auto(self):
+        """
+        Simulate multipart/form-data where nulls might arrive as 'null', '', or 'AUTO'.
+        """
+        from .serializers import IngestionJobCreateSerializer
+
+        dummy_file = SimpleUploadedFile("sample2.pdf", b"%PDF-1.4 dummy", content_type="application/pdf")
+        data = {
+            "title": "FormData Material",
+            "standard": "null",
+            "board": "",
+            "subject": "None",
+            "document_kind": "AUTO",
+            "source_file": dummy_file,
+        }
+        serializer = IngestionJobCreateSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        job = serializer.save(uploaded_by=self.user, school=self.school)
+        self.assertIsNone(job.standard)
+        self.assertIsNone(job.board)
+        self.assertIsNone(job.subject)
+        self.assertIsNone(job.document_kind)
+
+    def test_list_and_detail_views_serialize_null_metadata_safely(self):
+        job = IngestionJob.objects.create(
+            title="Null Meta Book",
+            board=None,
+            standard=None,
+            subject=None,
+            document_kind=None,
+            uploaded_by=self.user,
+            school=self.school,
+        )
+        res = self.client.get("/api/ingest/jobs/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        found = [j for j in res.data if j["id"] == job.id][0]
+        self.assertIsNone(found["standard"])
+        self.assertIsNone(found["board"])
+        self.assertIsNone(found["subject"])
+        self.assertIsNone(found["document_kind"])
+
+        detail_res = self.client.get(f"/api/ingest/jobs/{job.id}/")
+        self.assertEqual(detail_res.status_code, status.HTTP_200_OK)
+        self.assertIsNone(detail_res.data["standard"])
+        self.assertIsNone(detail_res.data["board"])
+
+    def test_filter_jobs_by_null_and_exact_values(self):
+        job_null = IngestionJob.objects.create(
+            title="Null Job",
+            board=None,
+            standard=None,
+            uploaded_by=self.user,
+            school=self.school,
+        )
+        job_cbse_10 = IngestionJob.objects.create(
+            title="Class 10 CBSE Math",
+            board="CBSE",
+            standard=10,
+            uploaded_by=self.user,
+            school=self.school,
+        )
+
+        # Filter by null standard
+        res_null_std = self.client.get("/api/ingest/jobs/?standard=null")
+        self.assertEqual(res_null_std.status_code, status.HTTP_200_OK)
+        ids = [j["id"] for j in res_null_std.data]
+        self.assertIn(job_null.id, ids)
+        self.assertNotIn(job_cbse_10.id, ids)
+
+        # Filter by standard 10
+        res_std_10 = self.client.get("/api/ingest/jobs/?standard=10")
+        self.assertEqual(res_std_10.status_code, status.HTTP_200_OK)
+        ids = [j["id"] for j in res_std_10.data]
+        self.assertIn(job_cbse_10.id, ids)
+        self.assertNotIn(job_null.id, ids)
+
+        # Filter by null board
+        res_null_board = self.client.get("/api/ingest/jobs/?board=null")
+        self.assertEqual(res_null_board.status_code, status.HTTP_200_OK)
+        ids = [j["id"] for j in res_null_board.data]
+        self.assertIn(job_null.id, ids)
+        self.assertNotIn(job_cbse_10.id, ids)
+
+    def test_question_generation_and_filtering_with_null_metadata(self):
+        """
+        Verify that question filtering and seeded bank generation do not crash
+        when board, standard, subject, or constraints contain null/None.
+        """
+        from content.filters import filter_questions
+        from content.models import Book, Chapter, Topic, Question
+        from generation.services.seeded_bank import SeededBankGenerationService
+
+        book = Book.objects.create(
+            title="General Reference",
+            subject="General",
+            grade="Class 10",
+            board="CBSE",
+        )
+        chapter = Chapter.objects.create(book=book, title="Chapter 1", chapter_order=1)
+        topic = Topic.objects.create(chapter=chapter, name="Topic 1")
+        q = Question.objects.create(
+            topic=topic,
+            question_text="What is a test question?",
+            question_type="SHORT_ANSWER",
+            difficulty="MEDIUM",
+            learner_level="INTERMEDIATE",
+            marks=2.0,
+            is_active=True,
+        )
+
+        # Filter questions with null / None / empty params
+        qs = Question.objects.filter(id=q.id)
+        filtered = filter_questions(qs, {
+            "board": None,
+            "topic_id": None,
+            "difficulty": None,
+            "search": None,
+            "marks": None,
+        })
+        self.assertEqual(filtered.count(), 1)
+
+        # Question generation service with null values in constraints
+        service = SeededBankGenerationService()
+        drafts = service.generate_questions(
+            chapter=chapter.id,
+            constraints={
+                "difficulty": None,
+                "question_type": None,
+                "learner_level": None,
+                "marks": None,
+                "school": None,
+                "validation_workflow_enabled": None,
+            },
+        )
+        self.assertGreaterEqual(len(drafts), 1)
+        self.assertEqual(drafts[0].question_text, "What is a test question?")
 
 
