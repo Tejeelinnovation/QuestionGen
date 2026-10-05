@@ -96,7 +96,10 @@ def download_file(url: str, dest_path: str) -> None:
                 f"Downloaded file from {url} is not a valid PDF! (First bytes: {magic!r}). "
                 f"Content preview: {sample[:150]}"
             )
-from engine.document_classifier import classify_document, DocumentClassificationResult
+try:
+    from engine.document_classifier import classify_document, DocumentClassificationResult
+except ImportError:
+    from document_ai_worker.engine.document_classifier import classify_document, DocumentClassificationResult
 
 
 def auto_detect_document_kind(

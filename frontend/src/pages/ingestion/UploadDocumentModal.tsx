@@ -16,7 +16,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
-  const [standard, setStandard] = useState<number | ''>('');
+  const [standard, setStandard] = useState<number | null>(null);
   const [board, setBoard] = useState('');
   const [documentKind, setDocumentKind] = useState<string>('AUTO');
   const [isUploading, setIsUploading] = useState(false);
@@ -30,7 +30,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       setFile(null);
       setTitle('');
       setSubject('');
-      setStandard('');
+      setStandard(null);
       setBoard('');
       setDocumentKind('AUTO');
       setError(null);
@@ -74,7 +74,7 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     if (subject.trim()) {
       formData.append('subject', subject.trim());
     }
-    if (standard !== '') {
+    if (standard !== null && standard !== undefined) {
       formData.append('standard', String(standard));
     }
     if (board) {
@@ -267,8 +267,8 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                 Standard / Class
               </label>
               <select
-                value={standard}
-                onChange={(e) => setStandard(e.target.value ? Number(e.target.value) : '')}
+                value={standard ?? ''}
+                onChange={(e) => setStandard(e.target.value ? Number(e.target.value) : null)}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-border bg-surface text-ink focus:outline-none focus:border-forest"
               >
                 <option value="">Not Specified (Optional)</option>

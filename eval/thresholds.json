@@ -1,0 +1,12 @@
+{
+  "_description": "Regression tolerance thresholds for evaluation runs. Any run exceeding these relative or absolute regression limits will exit non-zero.",
+  "max_doc_type_accuracy_drop": 0.00,
+  "max_toc_precision_drop": 0.05,
+  "max_toc_recall_drop": 0.05,
+  "max_page_range_accuracy_drop": 0.05,
+  "max_garbage_rate_increase": 0.03,
+  "max_empty_page_count_increase": 0,
+  "max_tiny_image_count_increase": 5,
+  "max_needs_review_rate_increase": 0.05,
+  "max_runtime_increase_pct": 0.50
+}

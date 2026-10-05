@@ -101,3 +101,7 @@ docker-compose.override.yml
 
 # Local deployment scripts
 deploy.ps1
+
+# ---- Evaluation Harness ----
+eval/golden/**/*.pdf
+eval/temp_assets/

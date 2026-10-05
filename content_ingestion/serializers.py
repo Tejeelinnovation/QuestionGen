@@ -144,6 +144,11 @@ class IngestionJobDetailSerializer(serializers.ModelSerializer):
 
 
 class IngestionJobCreateSerializer(serializers.ModelSerializer):
+    standard = serializers.IntegerField(required=False, allow_null=True)
+    board = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    subject = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    document_kind = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
     class Meta:
         model = IngestionJob
         fields = [
@@ -157,3 +162,22 @@ class IngestionJobCreateSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+    def to_internal_value(self, data):
+        # Support dict, QueryDict, or multi-part structures
+        if hasattr(data, "dict"):
+            clean_data = data.dict()
+        elif hasattr(data, "copy"):
+            clean_data = data.copy()
+        else:
+            clean_data = dict(data)
+
+        for field in ("standard", "board", "subject", "document_kind"):
+            if field in clean_data:
+                val = clean_data[field]
+                if val in ("", "null", "None", "undefined", None):
+                    clean_data[field] = None
+                elif field == "document_kind" and str(val).strip().upper() == "AUTO":
+                    clean_data[field] = None
+
+        return super().to_internal_value(clean_data)
