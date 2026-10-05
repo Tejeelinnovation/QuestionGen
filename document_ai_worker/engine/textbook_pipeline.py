@@ -70,14 +70,22 @@ class TextbookPipeline:
         # 1. Detect TOC & Chapters
         toc_entries, granularity = self._detect_toc(doc)
 
-        # 2. Extract pages
+        # 2. Probe pages with PageRouter (Phase 2 per-page routing)
+        from .page_router import PageRouter
+        router = PageRouter()
+        page_decisions = router.probe_document(doc)
+        decisions_by_page = {d.page_num: d for d in page_decisions}
+
+        # 3. Extract pages
         pages: List[PageSchema] = []
         for p_idx in range(pages_to_process):
             page_num = p_idx + 1
+            decision = decisions_by_page.get(page_num)
             page_schema = self._extract_single_page(
                 doc,
                 page_num,
                 toc_entries,
+                decision=decision,
                 extract_images=extract_images,
                 render_image_pixels=render_image_pixels,
             )
@@ -170,6 +178,7 @@ class TextbookPipeline:
         doc: fitz.Document,
         page_num: int,
         toc_entries: List[ChapterSchema],
+        decision: Optional[Any] = None,
         extract_images: bool = True,
         render_image_pixels: bool = True,
     ) -> PageSchema:
@@ -225,6 +234,23 @@ class TextbookPipeline:
 
         raw_text = "\n\n".join(b[4].strip() for b in text_blocks)
 
+        # Phase 2 Per-Page Routing Fields
+        p_kind = getattr(decision, "page_kind", "digital_text") if decision else "digital_text"
+        p_engine = getattr(decision, "engine", "TextbookPipeline (Rule-Based Fallback)") if decision else "TextbookPipeline (Rule-Based Fallback)"
+        p_reason = getattr(decision, "route_reason", "") if decision else ""
+        p_script = getattr(decision, "detected_script", "latin") if decision else "latin"
+        p_ocr_lang = getattr(decision, "ocr_language", None) if decision else None
+        p_legacy = getattr(decision, "legacy_font_encoding", False) if decision else False
+        p_review = getattr(decision, "needs_review", False) if decision else False
+        p_quality = getattr(decision, "quality_score", 1.0) if decision else 1.0
+        p_meta = dict(getattr(decision, "metadata", {})) if decision else {}
+
+        # Handle full-page image / advertisement pages
+        if p_kind == "image_only":
+            raw_text = ""
+            p_review = False
+            p_quality = 1.0
+
         return PageSchema(
             page_number=page_num,
             layout_type=layout_type,
@@ -232,6 +258,15 @@ class TextbookPipeline:
             chapter_number=matched_chapter.chapter_number if matched_chapter else None,
             chapter_title=matched_chapter.title if matched_chapter else "",
             sections=sections,
+            page_kind=p_kind,
+            engine=p_engine,
+            route_reason=p_reason,
+            detected_script=p_script,
+            ocr_language=p_ocr_lang,
+            legacy_font_encoding=p_legacy,
+            needs_review=p_review,
+            quality_score=p_quality,
+            metadata=p_meta,
         )
 
     def _sort_reading_order(self, blocks: List[Tuple], width: float, height: float) -> Tuple[str, List[Tuple]]:

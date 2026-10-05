@@ -51,12 +51,25 @@ class PageSchema(BaseModel):
     chapter_number: Optional[int] = None
     chapter_title: str = ""
     sections: List[SectionSchema] = Field(default_factory=list)
+    page_kind: str = Field(
+        default="digital_text",
+        description="digital_text | scanned_printed | handwriting | image_only | blank | mixed",
+    )
+    engine: str = Field(default="", description="Extraction engine used for this page")
+    route_reason: str = Field(default="", description="Reason for the routing decision")
+    detected_script: str = Field(default="latin", description="Primary detected script (latin, devanagari, gujarati, none)")
+    ocr_language: Optional[str] = Field(default=None, description="Per-page OCR language code (e.g. hin, guj, eng)")
+    legacy_font_encoding: bool = Field(default=False, description="True if legacy 8-bit font encoding was detected")
+    needs_review: bool = Field(default=False, description="True if page requires human teacher review")
+    quality_score: float = Field(default=1.0, description="Quality confidence score for the extracted page (0.0 - 1.0)")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional per-page metadata")
 
 
 class ExtractionResponse(BaseModel):
     """
     Structured extraction result returned by the microservice.
     """
+    schema_version: str = "1.1.0"
     job_id: int
     status: str = "COMPLETED"
     total_pages: int
@@ -65,3 +78,4 @@ class ExtractionResponse(BaseModel):
     table_of_contents: List[ChapterSchema] = Field(default_factory=list)
     pages: List[PageSchema] = Field(default_factory=list)
     error_message: Optional[str] = None
+

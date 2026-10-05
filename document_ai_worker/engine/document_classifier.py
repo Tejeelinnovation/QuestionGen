@@ -315,31 +315,46 @@ def classify_document(
             "OTHER": 0.0,
         }
 
-        # Inspect filename and title
+        evidence_categories: Dict[str, set] = {
+            "NEWSPAPER": set(),
+            "WORKSHEET_OR_EXAM": set(),
+            "FULL_BOOK": set(),
+            "SINGLE_CHAPTER": set(),
+            "NOTES": set(),
+            "MAGAZINE": set(),
+        }
+
+        # Inspect filename and title (WEAK HINT ONLY: capped at max +0.10 total)
         filename = os.path.basename(pdf_path)
         filename_lower = filename.lower()
         title_lower = (doc_title or "").lower()
         target_name = f"{filename_lower} {title_lower}"
+        filename_hint_score = 0.0
 
-        # Match known masthead in filename/title
+        # Match known masthead in filename/title (weak hint)
         for masthead in NEWSPAPER_MASTHEADS:
             if masthead in target_name:
-                scores["NEWSPAPER"] += 0.45
-                evidence_items.append(f"Filename/title matched newspaper masthead '{masthead}'")
+                filename_hint_score = min(0.10, filename_hint_score + 0.08)
+                scores["NEWSPAPER"] += filename_hint_score
+                evidence_items.append(f"Filename/title weak hint: matched masthead '{masthead}' (+{filename_hint_score:.2f})")
+                evidence_categories["NEWSPAPER"].add("filename_hint")
                 break
 
-        # Check NCERT / State board standard chapter naming convention (e.g. khat101.pdf, khmh101.pdf)
+        # Check NCERT / State board standard chapter naming convention (weak hint)
         is_ncert_chapter_file = bool(NCERT_CHAPTER_FILE_REGEX.match(filename))
-        if is_ncert_chapter_file:
-            scores["SINGLE_CHAPTER"] += 0.40
-            evidence_items.append(f"Filename matches curriculum single-chapter convention ('{filename}')")
+        if is_ncert_chapter_file and filename_hint_score == 0.0:
+            filename_hint_score = 0.08
+            scores["SINGLE_CHAPTER"] += filename_hint_score
+            evidence_items.append(f"Filename weak hint: curriculum chapter pattern ('{filename}') (+0.08)")
+            evidence_categories["SINGLE_CHAPTER"].add("filename_hint")
 
         # Check PDF metadata (Producer, Creator, Title)
         meta = doc.metadata or {}
         creator_producer = f"{meta.get('creator', '')} {meta.get('producer', '')}".lower()
         if any(tool in creator_producer for tool in ("newsgate", "woodwing", "quarkxpress", "panchayat")):
-            scores["NEWSPAPER"] += 0.20
+            scores["NEWSPAPER"] += 0.15
             evidence_items.append("PDF creation software indicates newspaper publishing workflow")
+            evidence_categories["NEWSPAPER"].add("publishing_metadata")
 
         # Sampling strategy: First 5 pages + middle page + last page
         sample_indices = list(range(min(5, total_pages)))
@@ -467,50 +482,65 @@ def classify_document(
         if has_broadsheet_dims:
             scores["NEWSPAPER"] += 0.40
             evidence_items.append("Broadsheet page dimensions (large print layout)")
+            evidence_categories["NEWSPAPER"].add("geometry")
 
         if has_dateline:
             scores["NEWSPAPER"] += 0.25
             evidence_items.append("Found newspaper dateline (Day, Month Date format)")
+            evidence_categories["NEWSPAPER"].add("dateline")
 
         if has_vol_issue:
             scores["NEWSPAPER"] += 0.15
             scores["MAGAZINE"] += 0.10
             evidence_items.append("Found volume/issue publication stamp")
+            evidence_categories["NEWSPAPER"].add("metadata")
+            evidence_categories["MAGAZINE"].add("metadata")
 
         if newspaper_keyword_hits >= 2:
             scores["NEWSPAPER"] += min(0.35, newspaper_keyword_hits * 0.08)
             evidence_items.append(f"Found {newspaper_keyword_hits} newspaper keywords (edition/reporters/sections)")
+            evidence_categories["NEWSPAPER"].add("keywords")
 
         # 2. Exam / Worksheet scoring
         if exam_keyword_hits >= 2:
             scores["WORKSHEET_OR_EXAM"] += min(0.80, 0.35 + exam_keyword_hits * 0.10)
             evidence_items.append(f"Found {exam_keyword_hits} exam instruction/marks markers")
+            evidence_categories["WORKSHEET_OR_EXAM"].add("keywords")
         if total_pages <= 5 and exam_keyword_hits >= 1:
             scores["WORKSHEET_OR_EXAM"] += 0.30
+            evidence_categories["WORKSHEET_OR_EXAM"].add("page_count")
 
         # 3. Textbook / Single Chapter scoring
         if textbook_keyword_hits >= 1:
             scores["FULL_BOOK"] += min(0.50, textbook_keyword_hits * 0.20)
             scores["SINGLE_CHAPTER"] += min(0.40, textbook_keyword_hits * 0.20)
             evidence_items.append(f"Found {textbook_keyword_hits} textbook publication markers (NCERT/reprint/TOC)")
+            evidence_categories["FULL_BOOK"].add("keywords")
+            evidence_categories["SINGLE_CHAPTER"].add("keywords")
 
         if multilingual_chapter_hits >= 1:
             scores["SINGLE_CHAPTER"] += min(0.45, multilingual_chapter_hits * 0.25)
             evidence_items.append(f"Found multilingual chapter terms ({multilingual_chapter_hits} occurrences)")
+            evidence_categories["SINGLE_CHAPTER"].add("chapter_terms")
 
         if has_chapter_opener_heading:
             scores["SINGLE_CHAPTER"] += 0.25
             evidence_items.append("Detected prominent chapter-opener title heading")
+            evidence_categories["SINGLE_CHAPTER"].add("typography")
 
         if has_running_headers:
             scores["SINGLE_CHAPTER"] += 0.20
             scores["FULL_BOOK"] += 0.10
             evidence_items.append("Detected textbook running headers/footers with page/title division")
+            evidence_categories["SINGLE_CHAPTER"].add("running_headers")
+            evidence_categories["FULL_BOOK"].add("running_headers")
 
         if pedagogy_keyword_hits >= 2:
             scores["SINGLE_CHAPTER"] += 0.25
             scores["FULL_BOOK"] += 0.20
             evidence_items.append(f"Found {pedagogy_keyword_hits} educational pedagogy markers (exercises/activities)")
+            evidence_categories["SINGLE_CHAPTER"].add("pedagogy")
+            evidence_categories["FULL_BOOK"].add("pedagogy")
 
         # Page-count differentiation between Single Chapter and Full Book
         if 5 <= total_pages <= 45 and not has_multi_chapter_toc:
@@ -518,31 +548,55 @@ def classify_document(
             if scores["SINGLE_CHAPTER"] > 0.20 or scores["FULL_BOOK"] > 0.20:
                 scores["SINGLE_CHAPTER"] += 0.35
                 evidence_items.append(f"Document length ({total_pages} pages) matches standard single chapter unit")
+                evidence_categories["SINGLE_CHAPTER"].add("page_count")
         elif total_pages > 60:
             # Full book length
             scores["FULL_BOOK"] += 0.35
             evidence_items.append(f"Document length ({total_pages} pages) indicates full book / volume")
+            evidence_categories["FULL_BOOK"].add("page_count")
 
         if has_multi_chapter_toc:
             scores["FULL_BOOK"] += 0.45
             scores["SINGLE_CHAPTER"] -= 0.30
             evidence_items.append("PDF outline contains multi-chapter Table of Contents")
+            evidence_categories["FULL_BOOK"].add("toc_outline")
 
         # 4. Scanned Notes / Handwriting
         if avg_chars_per_page < 100 and total_images >= len(sample_indices) and total_vector_fonts == 0:
             scores["NOTES"] += 0.65
             evidence_items.append(f"Scanned bitmap pages with zero vector fonts (avg chars={avg_chars_per_page:.0f})")
+            evidence_categories["NOTES"].add("scanned_bitmap")
 
         # Sort kinds by score
         sorted_kinds = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
         top_kind, top_score = sorted_kinds[0]
+        second_kind, second_score = sorted_kinds[1] if len(sorted_kinds) > 1 else ("UNKNOWN", 0.0)
+        margin = max(0.0, top_score - second_score)
 
-        # Calculate rule-based confidence
-        if top_score >= 0.45:
-            confidence = min(0.98, max(0.60, top_score))
+        # Count independent orthogonal evidence categories (excluding filename hint)
+        winning_cats = evidence_categories.get(top_kind, set())
+        orthogonal_cats = {c for c in winning_cats if c != "filename_hint"}
+        num_categories = len(orthogonal_cats)
+
+        # Calibrate confidence from real evidence instead of flat constants
+        if top_score >= 0.45 and num_categories >= 1:
+            if num_categories >= 4:
+                confidence = 0.88 + 0.08 * min(1.0, margin / 0.60)
+            elif num_categories == 3:
+                confidence = 0.80 + 0.10 * min(1.0, margin / 0.50)
+            elif num_categories == 2:
+                confidence = 0.70 + 0.12 * min(1.0, margin / 0.40)
+            else:
+                confidence = 0.58 + 0.12 * min(1.0, margin / 0.30)
+
+            # Factor in weak filename hint if present (max +0.02 boost to calibrated confidence)
+            if "filename_hint" in winning_cats:
+                confidence = min(0.96, confidence + 0.02)
+
+            confidence = round(min(0.96, max(0.60, confidence)), 3)
             assigned_kind = top_kind
         elif top_score >= 0.25:
-            confidence = round(top_score, 2)
+            confidence = round(0.40 + 0.15 * min(1.0, top_score / 0.40), 3)
             assigned_kind = top_kind
         else:
             assigned_kind = "UNKNOWN"

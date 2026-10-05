@@ -346,6 +346,9 @@ class EvalRunner:
 
         print(f"--> Evaluating {sample_dir.name} ({pdf_path.name}) [mode={mode}]...", flush=True)
         start_time = time.time()
+        import psutil
+        proc = psutil.Process()
+        mem_before = proc.memory_info().rss / (1024 * 1024)
 
         # 1. Document Classification
         class_res = classify_document(str(pdf_path), user_document_kind="AUTO")
@@ -388,6 +391,8 @@ class EvalRunner:
         total_pages = len(doc)
         doc.close()
         runtime = time.time() - start_time
+        mem_after = proc.memory_info().rss / (1024 * 1024)
+        peak_memory_mb = round(max(mem_before, mem_after), 1)
 
         # 3. Analyze TOC
         extracted_chapters = [
@@ -406,18 +411,31 @@ class EvalRunner:
         empty_page_count = 0
         page_garbage_rates = []
         review_flagged_pages = 0
+        page_kinds_summary: Dict[str, int] = {}
 
         for p_schema in pages_schema:
             raw = p_schema.raw_text or ""
-            if not raw.strip():
-                empty_page_count += 1
+            p_kind = getattr(p_schema, "page_kind", "digital_text")
+            p_review = getattr(p_schema, "needs_review", False)
+            page_kinds_summary[p_kind] = page_kinds_summary.get(p_kind, 0) + 1
+
+            if p_review:
                 review_flagged_pages += 1
-                page_garbage_rates.append(1.0)
+
+            if not raw.strip():
+                if p_kind in ("image_only", "blank"):
+                    # Legitimate image-only advertisement or blank page; not an empty page failure
+                    page_garbage_rates.append(0.0)
+                else:
+                    empty_page_count += 1
+                    if not p_review:
+                        review_flagged_pages += 1
+                    page_garbage_rates.append(1.0)
                 continue
 
             _, _, g_rate = compute_script_aware_garbage(raw)
             page_garbage_rates.append(g_rate)
-            if g_rate > 0.20:
+            if g_rate > 0.20 and not p_review:
                 review_flagged_pages += 1
 
         avg_garbage_rate = sum(page_garbage_rates) / max(len(page_garbage_rates), 1)
@@ -454,6 +472,8 @@ class EvalRunner:
             "tiny_image_count": tiny_image_count,
             "needs_review_rate": round(needs_review_rate, 3),
             "runtime_seconds": round(runtime, 2),
+            "memory_mb": peak_memory_mb,
+            "page_kinds": page_kinds_summary,
             "granularity": granularity,
             "notes": expected.get("notes", ""),
         }
@@ -502,27 +522,27 @@ class EvalRunner:
         samples = run_data["samples"]
         mode = run_data.get("mode", "fast")
 
-        print("\n" + "=" * 135)
+        print("\n" + "=" * 140)
         print(f"DOCUMENT INGESTION & EXTRACTION PIPELINE EVALUATION HARNESS [MODE: {mode.upper()}]")
-        print("=" * 135)
+        print("=" * 140)
 
         header = (
-            f"{'Sample Name':<20} | {'Doc-Type (Conf)':<18} | {'Engine Used':<25} | "
-            f"{'TOC (P/R or Status)':<24} | {'Range Acc':<9} | {'Garbage':<8} | "
-            f"{'Empty':<5} | {'<60px':<5} | {'Review':<7} | {'Runtime':<7}"
+            f"{'Sample Name':<20} | {'Doc-Type (Conf)':<18} | {'Engine Used':<24} | "
+            f"{'TOC (P/R or Status)':<22} | {'Range Acc':<9} | {'Garbage':<8} | "
+            f"{'Empty':<5} | {'<60px':<5} | {'Review':<7} | {'Runtime (Mem)':<15}"
         )
         print(header)
-        print("-" * 135)
+        print("-" * 140)
 
         failures = []
 
         for name, r in samples.items():
             if r.get("status") == "SKIPPED_NO_PDF":
-                print(f"{name:<20} | {'[NO PDF - PLACEHOLDER]':<18} | {'-':<25} | {'-':<24} | {'-':<9} | {'-':<8} | {'-':<5} | {'-':<5} | {'-':<7} | {'-':<7}")
+                print(f"{name:<20} | {'[NO PDF - PLACEHOLDER]':<18} | {'-':<24} | {'-':<22} | {'-':<9} | {'-':<8} | {'-':<5} | {'-':<5} | {'-':<7} | {'-':<15}")
                 continue
 
             if r.get("status") != "COMPLETED":
-                print(f"{name:<20} | {r.get('error', 'ERROR'):<18} | {'-':<25} | {'-':<24} | {'-':<9} | {'-':<8} | {'-':<5} | {'-':<5} | {'-':<7} | {'-':<7}")
+                print(f"{name:<20} | {r.get('error', 'ERROR'):<18} | {'-':<24} | {'-':<22} | {'-':<9} | {'-':<8} | {'-':<5} | {'-':<5} | {'-':<7} | {'-':<15}")
                 continue
 
             if not r["doc_type_correct"]:
@@ -532,7 +552,7 @@ class EvalRunner:
                 match_sym = "[OK]"
 
             doc_type_str = f"{match_sym} {r['doc_type_predicted'][:8]} ({r['confidence']:.2f})"
-            engine_str = r.get("engine", "Pipeline")[:25]
+            engine_str = r.get("engine", "Pipeline")[:24]
 
             if r["toc_precision"] is None:
                 toc_str = "n/a (no TOC)"
@@ -544,15 +564,16 @@ class EvalRunner:
             empty_str = str(r["empty_page_count"])
             tiny_str = str(r["tiny_image_count"])
             review_str = f"{r['needs_review_rate'] * 100:.1f}%"
-            runtime_str = f"{r['runtime_seconds']:.1f}s"
+            mem_val = r.get("memory_mb", 0)
+            runtime_str = f"{r['runtime_seconds']:.1f}s ({mem_val:.0f}MB)"
 
             print(
-                f"{name:<20} | {doc_type_str:<18} | {engine_str:<25} | {toc_str:<24} | "
+                f"{name:<20} | {doc_type_str:<18} | {engine_str:<24} | {toc_str:<22} | "
                 f"{range_str:<9} | {garbage_str:<8} | {empty_str:<5} | {tiny_str:<5} | "
-                f"{review_str:<7} | {runtime_str:<7}"
+                f"{review_str:<7} | {runtime_str:<15}"
             )
 
-        print("-" * 135)
+        print("-" * 140)
 
         if failures:
             print("\n[CLASSIFICATION FAILURES DETECTED]")
@@ -602,11 +623,7 @@ class EvalRunner:
         timestamp = run_data["timestamp"]
         current_file = self.results_dir / f"{timestamp}.json"
 
-        # Find previous runs
-        past_files = sorted(self.results_dir.glob("*.json"))
-        past_files = [f for f in past_files if f.name != current_file.name]
-
-        # Save current run
+        # Save current run to disk
         with open(current_file, "w", encoding="utf-8") as f:
             json.dump(run_data, f, indent=2)
         try:
@@ -615,12 +632,30 @@ class EvalRunner:
             rel_display = current_file
         print(f"\n[Artifact Saved] Results written to {rel_display}")
 
-        if not past_files:
-            print("[Baseline Run] First recorded evaluation run. Regression baseline established.")
+        current_mode = run_data.get("mode", "fast")
+        # Find previous runs matching the same mode (so fast is compared to fast, full to full)
+        past_files = sorted(self.results_dir.glob("*.json"))
+        past_files = [f for f in past_files if f.name != current_file.name]
+
+        same_mode_files = []
+        for f in past_files:
+            try:
+                with open(f, "r", encoding="utf-8") as pf:
+                    data = json.load(pf)
+                    if data.get("mode", "fast") == current_mode:
+                        same_mode_files.append(f)
+            except Exception:
+                pass
+
+        if not same_mode_files:
+            if not past_files:
+                print("[Baseline Run] First recorded evaluation run. Regression baseline established.")
+            else:
+                print(f"[Baseline Run] First recorded evaluation run for mode '{current_mode}'. Regression baseline established.")
             return 0
 
-        latest_prev_file = past_files[-1]
-        print(f"[Regression Check] Comparing against previous run: {latest_prev_file.name}")
+        latest_prev_file = same_mode_files[-1]
+        print(f"[Regression Check] Comparing against previous run ({current_mode} mode): {latest_prev_file.name}")
         with open(latest_prev_file, "r", encoding="utf-8") as f:
             prev_data = json.load(f)
 

@@ -252,6 +252,130 @@ class EvalHarnessTests(unittest.TestCase):
         exit_code_2 = self.runner.save_and_check_regression(run_2)
         self.assertEqual(exit_code_2, 0)
 
+    def test_classifier_renamed_golden_pdfs_sample_n(self):
+        """
+        Confirms that renaming golden PDFs to sample_N.pdf (stripping all filename cues)
+        produces the exact same expected classification based purely on internal content.
+        """
+        from document_ai_worker.engine.document_classifier import classify_document
+
+        samples = [
+            (Path("eval/golden/newspaper_36p/sample.pdf"), "NEWSPAPER"),
+            (Path("eval/golden/single_chapter/sample.pdf"), "SINGLE_CHAPTER"),
+            (Path("eval/golden/hindi_gujarati_book/sample.pdf"), "SINGLE_CHAPTER"),
+        ]
+
+        for i, (orig_path, expected_kind) in enumerate(samples):
+            if not orig_path.exists():
+                continue
+            renamed_path = self.temp_dir / f"sample_{i + 1}.pdf"
+            shutil.copy(orig_path, renamed_path)
+
+            res = classify_document(str(renamed_path))
+            self.assertEqual(
+                res.kind,
+                expected_kind,
+                f"Sample {orig_path} renamed to {renamed_path.name} failed! Got {res.kind}, expected {expected_kind}",
+            )
+            self.assertGreaterEqual(res.confidence, 0.75)
+            self.assertLessEqual(res.confidence, 0.98)
+
+    def test_page_router_newspaper_page_1_handwriting(self):
+        """
+        Confirms that newspaper page 1 with handwritten letter is classified as mixed/handwriting,
+        and degrades gracefully to needs_review=True when GEMINI_API_KEY is absent.
+        """
+        import pymupdf as fitz
+        from document_ai_worker.engine.page_router import PageRouter
+
+        pdf_path = Path("eval/golden/newspaper_36p/sample.pdf")
+        if not pdf_path.exists():
+            return
+        doc = fitz.open(str(pdf_path))
+        p1 = doc[0]
+
+        # Case 1: Without GEMINI_API_KEY
+        router_no_key = PageRouter(gemini_api_key="")
+        decision_no_key = router_no_key.probe_page(p1, page_num=1, total_pages=len(doc))
+        self.assertIn(decision_no_key.page_kind, ("mixed", "handwriting"))
+        self.assertTrue(decision_no_key.needs_review)
+        self.assertEqual(decision_no_key.engine, "Fallback (Review Required)")
+
+        # Case 2: With GEMINI_API_KEY
+        router_with_key = PageRouter(gemini_api_key="mock_key_xyz")
+        decision_with_key = router_with_key.probe_page(p1, page_num=1, total_pages=len(doc))
+        self.assertIn(decision_with_key.page_kind, ("mixed", "handwriting"))
+        self.assertFalse(decision_with_key.needs_review)
+        self.assertEqual(decision_with_key.engine, "Gemini Flash AI (Handwriting)")
+        doc.close()
+
+    def test_page_router_newspaper_ad_pages_image_only(self):
+        """
+        Confirms that full-page graphic advertisements (e.g. p2 De Beers, p6 Tata Sierra)
+        are tagged as image_only without triggering error reviews.
+        """
+        import pymupdf as fitz
+        from document_ai_worker.engine.page_router import PageRouter
+
+        pdf_path = Path("eval/golden/newspaper_36p/sample.pdf")
+        if not pdf_path.exists():
+            return
+        doc = fitz.open(str(pdf_path))
+        router = PageRouter()
+
+        for page_idx in (1, 5, 8, 12, 35):  # 0-indexed: pages 2, 6, 9, 13, 36
+            p = doc[page_idx]
+            dec = router.probe_page(p, page_num=page_idx + 1, total_pages=len(doc))
+            self.assertEqual(dec.page_kind, "image_only", f"Page {page_idx + 1} was not classified as image_only")
+            self.assertFalse(dec.needs_review)
+            self.assertEqual(dec.engine, "Image/Ad Classifier")
+        doc.close()
+
+    def test_page_router_legacy_font_detection(self):
+        """
+        Confirms that NCERT Hindi book with Walkman-Chanakya fonts is detected as
+        legacy_font_encoding=True and routed to Tesseract (-l hin).
+        """
+        import pymupdf as fitz
+        from document_ai_worker.engine.page_router import PageRouter
+
+        pdf_path = Path("eval/golden/hindi_gujarati_book/sample.pdf")
+        if not pdf_path.exists():
+            return
+        doc = fitz.open(str(pdf_path))
+        router = PageRouter()
+        # Page 3 contains body prose in Walkman-Chanakya
+        p3 = doc[2]
+        dec = router.probe_page(p3, page_num=3, total_pages=len(doc))
+        self.assertTrue(dec.legacy_font_encoding)
+        self.assertEqual(dec.ocr_language, "hin")
+        self.assertEqual(dec.detected_script, "devanagari")
+        doc.close()
+
+    def test_schema_backward_compatibility(self):
+        """
+        Verifies that PageSchema and ExtractionResponse maintain backwards compatibility
+        with default values and schema_version 1.1.0.
+        """
+        from document_ai_worker.engine.schema import PageSchema, ExtractionResponse
+
+        page = PageSchema(page_number=1, raw_text="Hello world")
+        self.assertEqual(page.page_kind, "digital_text")
+        self.assertEqual(page.detected_script, "latin")
+        self.assertFalse(page.legacy_font_encoding)
+        self.assertFalse(page.needs_review)
+        self.assertEqual(page.quality_score, 1.0)
+
+        response = ExtractionResponse(
+            job_id=101,
+            total_pages=1,
+            processed_pages=1,
+            pages=[page],
+        )
+        self.assertEqual(response.schema_version, "1.1.0")
+        self.assertEqual(len(response.pages), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
+

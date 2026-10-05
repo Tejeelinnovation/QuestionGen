@@ -391,6 +391,7 @@ def main():
 
         # 4. Assemble lightweight JSON Payload matching Django IngestionJobWebhookView
         payload = {
+            "schema_version": "1.1.0",
             "job_id": args.job_id,
             "idempotency_key": idempotency_key,
             "status": "COMPLETED",
