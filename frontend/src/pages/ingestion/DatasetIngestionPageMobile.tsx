@@ -243,11 +243,16 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-forest/10 text-forest border border-forest/20">
-                      {job.board || 'NCERT'} {job.standard ? `· Class ${job.standard}` : ''}
+                      {job.board || 'Not specified'} {job.standard ? `· Class ${job.standard}` : ''}
                     </span>
                     <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-surface-muted text-ink/70">
                       {job.subject || 'General'}
                     </span>
+                    {job.document_kind && (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-surface-muted text-ink/70 border border-border">
+                        {job.document_kind}
+                      </span>
+                    )}
                     {isSuperAdmin && (
                       job.status === 'COMPLETED' ? (
                         <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-700">

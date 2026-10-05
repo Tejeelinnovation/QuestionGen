@@ -88,13 +88,12 @@ class TocDetector:
             chapter_pages = self._normalize_page_ranges(chapter_pages, total_pages)
             return GranularityDetected.WHOLE_BOOK, chapter_pages
 
-        if total_pages >= 15:
-            # Multi-page document without multiple chapters detected is treated as a single Chapter
-            return GranularityDetected.CHAPTER, [
-                {"chapter_number": 1, "title": "Main Chapter", "start_page": 1, "end_page": total_pages}
-            ]
+        if len(chapter_pages) == 1:
+            chapter_pages[0]["end_page"] = total_pages
+            return GranularityDetected.CHAPTER, chapter_pages
 
-        return GranularityDetected.TOPIC, []
+        # No TOC or chapters found: return empty list (no placeholder TOC)
+        return GranularityDetected.UNKNOWN, []
 
     def _normalize_page_ranges(self, entries: List[Dict[str, Any]], total_pages: int) -> List[Dict[str, Any]]:
         """

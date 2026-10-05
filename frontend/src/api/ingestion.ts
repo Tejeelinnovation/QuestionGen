@@ -3,10 +3,12 @@ import { apiClient } from './client';
 export interface IngestionJobSummary {
   id: number;
   title: string;
-  subject: string;
+  subject: string | null;
   standard: number | null;
-  board: string;
-  document_kind: 'TEXTBOOK' | 'HANDWRITTEN_NOTES' | 'QUESTION_PAPER' | 'OTHER';
+  board: string | null;
+  document_kind: string | null;
+  classification_confidence?: number | null;
+  classification_evidence?: string;
   granularity: 'UNKNOWN' | 'WHOLE_BOOK' | 'CHAPTER' | 'TOPIC';
   status: 'PENDING' | 'PARSING' | 'EXTRACTING' | 'COMPLETED' | 'FAILED';
   total_pages: number;

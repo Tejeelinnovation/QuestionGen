@@ -14,7 +14,7 @@ from .gemini_flash import GeminiFlashExtractor
 
 
 def get_extractor(
-    document_kind: str = "TEXTBOOK",
+    document_kind: str = "AUTO",
     has_text_layer: bool = True,
     media_dir: str = "",
 ) -> BaseExtractor:

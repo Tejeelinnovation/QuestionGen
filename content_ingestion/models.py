@@ -21,9 +21,17 @@ from core.models import TimestampedModel
 
 class DocumentKind(models.TextChoices):
     TEXTBOOK = "TEXTBOOK", _("Textbook")
-    HANDWRITTEN_NOTES = "HANDWRITTEN_NOTES", _("Handwritten Notes")
+    FULL_BOOK = "FULL_BOOK", _("Full Book")
+    SINGLE_CHAPTER = "SINGLE_CHAPTER", _("Single Chapter")
+    SINGLE_TOPIC = "SINGLE_TOPIC", _("Single Topic")
+    WORKSHEET_OR_EXAM = "WORKSHEET_OR_EXAM", _("Worksheet or Exam")
     QUESTION_PAPER = "QUESTION_PAPER", _("Question Paper")
+    NOTES = "NOTES", _("Notes")
+    HANDWRITTEN_NOTES = "HANDWRITTEN_NOTES", _("Handwritten Notes")
+    NEWSPAPER = "NEWSPAPER", _("Newspaper")
+    MAGAZINE = "MAGAZINE", _("Magazine")
     OTHER = "OTHER", _("Other Material")
+    UNKNOWN = "UNKNOWN", _("Unknown")
 
 
 class GranularityDetected(models.TextChoices):
@@ -68,26 +76,42 @@ class IngestionJob(TimestampedModel):
     )
     subject = models.CharField(
         max_length=100,
+        null=True,
         blank=True,
-        default="",
+        default=None,
         help_text="Academic subject (e.g. 'Mathematics', 'Science', 'Physics').",
     )
     standard = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
+        default=None,
         help_text="Grade / Standard level (e.g. 8, 9, 10, 11, 12).",
     )
     board = models.CharField(
         max_length=50,
+        null=True,
         blank=True,
-        default="NCERT",
+        default=None,
         help_text="Educational board (e.g. 'NCERT', 'CBSE', 'GSEB').",
     )
     document_kind = models.CharField(
         max_length=30,
         choices=DocumentKind.choices,
-        default=DocumentKind.TEXTBOOK,
+        null=True,
+        blank=True,
+        default=None,
         db_index=True,
+    )
+    classification_confidence = models.FloatField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Confidence score (0.0 to 1.0) of document classifier.",
+    )
+    classification_evidence = models.TextField(
+        blank=True,
+        default="",
+        help_text="Diagnostic evidence strings explaining why this document kind was assigned.",
     )
     granularity = models.CharField(
         max_length=30,
@@ -145,6 +169,7 @@ class IngestionJob(TimestampedModel):
     table_of_contents = models.JSONField(
         default=list,
         blank=True,
+        null=True,
         help_text="Detected TOC list: [{'chapter_number': 1, 'title': '...', 'start_page': 1, 'end_page': 25}].",
     )
     metadata = models.JSONField(
@@ -166,6 +191,17 @@ class IngestionJob(TimestampedModel):
         if not self.total_pages:
             return 0
         return int((self.processed_pages / self.total_pages) * 100)
+
+    @property
+    def is_educational(self) -> bool:
+        """Returns True if the document kind is standard educational study material."""
+        if not self.document_kind:
+            return True
+        return self.document_kind not in (
+            DocumentKind.NEWSPAPER,
+            DocumentKind.MAGAZINE,
+            DocumentKind.OTHER,
+        )
 
 
 class ExtractedChapter(TimestampedModel):

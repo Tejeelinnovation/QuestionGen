@@ -312,7 +312,7 @@ class IngestionJobSourcePdfView(APIView):
         job = get_object_or_404(IngestionJob, pk=pk)
 
         expected_secret = getattr(settings, "INGESTION_WEBHOOK_SECRET", "")
-        provided_token = request.query_params.get("token") or request.headers.get("X-Ingestion-Secret", "")
+        provided_token = request.query_params.get("token") or ""
         signed_token = hashlib.sha256(f"{job.pk}_{settings.SECRET_KEY}".encode()).hexdigest()[:16]
 
         is_authorized = False
@@ -536,9 +536,81 @@ def _async_upload_diagrams_to_drive(job_id: int, pending_diagrams: list):
         logger.error(f"Async diagram upload worker encountered error for Job #{job_id}: {err}", exc_info=True)
 
 
+def verify_webhook_signature(request) -> tuple[bool, str]:
+    """
+    Verifies the HMAC-SHA256 signature from the X-Ingestion-Signature header,
+    bound to the X-Ingestion-Timestamp header to prevent replay attacks.
+    Expects:
+      - X-Ingestion-Timestamp: Unix timestamp string
+      - X-Ingestion-Signature: 'sha256=<hex_digest>' or '<hex_digest>'
+    Rejects requests older than 10 minutes (600 seconds) or with future drift (>60s).
+    """
+    import hashlib
+    import hmac
+    import time
+
+    secret = (getattr(settings, "INGESTION_WEBHOOK_SECRET", "") or os.environ.get("INGESTION_WEBHOOK_SECRET", "")).strip()
+    if not secret:
+        if getattr(settings, "DEBUG", False):
+            logger.warning("[Webhook Security] INGESTION_WEBHOOK_SECRET is not configured; skipping HMAC verification in DEBUG mode.")
+            return True, ""
+        logger.error("[Webhook Security] INGESTION_WEBHOOK_SECRET is not configured on the server.")
+        return False, "Server webhook secret is not configured."
+
+    signature_header = (
+        request.headers.get("X-Ingestion-Signature")
+        or request.META.get("HTTP_X_INGESTION_SIGNATURE")
+        or ""
+    ).strip()
+
+    if not signature_header:
+        return False, "Missing X-Ingestion-Signature header."
+
+    timestamp_header = (
+        request.headers.get("X-Ingestion-Timestamp")
+        or request.META.get("HTTP_X_INGESTION_TIMESTAMP")
+        or ""
+    ).strip()
+
+    if not timestamp_header:
+        return False, "Missing X-Ingestion-Timestamp header."
+
+    try:
+        req_timestamp = int(timestamp_header)
+    except ValueError:
+        return False, "Invalid X-Ingestion-Timestamp header format (must be integer epoch)."
+
+    now = int(time.time())
+    if (now - req_timestamp) > 600:
+        return False, f"Webhook timestamp expired ({now - req_timestamp}s old, maximum allowed age is 600s)."
+    if (req_timestamp - now) > 60:
+        return False, f"Webhook timestamp is in the future ({req_timestamp - now}s drift)."
+
+    provided_sig = signature_header[7:] if signature_header.startswith("sha256=") else signature_header
+
+    try:
+        raw_body = request.body
+        to_sign = f"{req_timestamp}.".encode("utf-8") + raw_body
+        computed_sig = hmac.new(
+            secret.encode("utf-8"),
+            to_sign,
+            hashlib.sha256,
+        ).hexdigest()
+    except Exception as exc:
+        logger.error(f"[Webhook Security] Error computing signature: {exc}")
+        return False, f"Signature computation failed: {str(exc)}"
+
+    if not hmac.compare_digest(provided_sig, computed_sig):
+        return False, "Invalid HMAC signature in X-Ingestion-Signature."
+
+    return True, ""
+
+
 class IngestionJobWebhookView(APIView):
     """
     Receives completed extraction results from the Standalone AI Microservice.
+    Secured via HMAC-SHA256 signature (X-Ingestion-Signature) and protected
+    against duplicate deliveries via X-Idempotency-Key.
     Atomically updates ExtractedChapter, ExtractedPage, and ExtractedItem in the database.
     """
 
@@ -548,15 +620,31 @@ class IngestionJobWebhookView(APIView):
     def post(self, request, pk: int):
         from django.db import transaction
         from django.utils import timezone
-        from .models import ExtractedChapter, ExtractedItem, ExtractedPage, ItemType
+        from .models import DocumentKind, ExtractedChapter, ExtractedItem, ExtractedPage, ItemType
 
-        try:
-            job = IngestionJob.objects.get(pk=pk)
-        except IngestionJob.DoesNotExist:
-            return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+        # 1. HMAC Signature Verification
+        is_valid_sig, sig_err = verify_webhook_signature(request)
+        if not is_valid_sig:
+            logger.warning(f"[Webhook Security] Rejected webhook call for Job #{pk}: {sig_err}")
+            return Response({"detail": sig_err}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # 2. Extract Idempotency Key
+        idempotency_key = (
+            request.headers.get("X-Idempotency-Key")
+            or request.META.get("HTTP_X_IDEMPOTENCY_KEY")
+            or (request.data.get("idempotency_key") if isinstance(request.data, dict) else "")
+            or ""
+        ).strip()
 
         data = request.data
+
+        # 3. Handle PROGRESS and FAILED heartbeats
         if data.get("status") == "PROGRESS":
+            try:
+                job = IngestionJob.objects.get(pk=pk)
+            except IngestionJob.DoesNotExist:
+                return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+
             job.status = JobStatus.EXTRACTING
             job.processed_pages = data.get("processed_pages", job.processed_pages)
             if "total_pages" in data and data["total_pages"]:
@@ -576,6 +664,11 @@ class IngestionJobWebhookView(APIView):
             )
 
         if data.get("status") == "FAILED":
+            try:
+                job = IngestionJob.objects.get(pk=pk)
+            except IngestionJob.DoesNotExist:
+                return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+
             job.status = JobStatus.FAILED
             error_msg = data.get("error_message") or data.get("error") or "Microservice extraction failed."
             job.error_message = error_msg
@@ -589,19 +682,73 @@ class IngestionJobWebhookView(APIView):
         toc_entries = data.get("table_of_contents") or data.get("chapters") or []
         pages_data = data.get("pages", [])
         total_pages = data.get("total_pages", len(pages_data))
-        granularity = data.get("granularity", job.granularity)
+        granularity = data.get("granularity")
 
         pending_diagrams = []
 
+        # 4. Atomic Execution with Row-Level Lock and Idempotency Guard
         try:
             with transaction.atomic():
+                try:
+                    job = IngestionJob.objects.select_for_update().get(pk=pk)
+                except IngestionJob.DoesNotExist:
+                    return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+                # Check for idempotent replay: if job is already COMPLETED and key matches
+                current_meta = job.metadata if isinstance(job.metadata, dict) else {}
+                if idempotency_key and job.status == JobStatus.COMPLETED:
+                    if current_meta.get("idempotency_key") == idempotency_key:
+                        logger.info(
+                            f"[Webhook] Idempotent replay for Job #{job.pk} with key '{idempotency_key}'. Returning cached success."
+                        )
+                        return Response(
+                            {
+                                "status": "SUCCESS",
+                                "job_id": job.pk,
+                                "detail": "Idempotent replay: payload already processed.",
+                                "idempotent_replay": True,
+                            },
+                            status=status.HTTP_200_OK,
+                        )
+
                 job.total_pages = total_pages
                 job.processed_pages = total_pages
-                job.granularity = granularity
-                job.table_of_contents = toc_entries
+                if granularity:
+                    job.granularity = granularity
+                job.table_of_contents = toc_entries if toc_entries else None
 
-                # 1. Populate Chapters
+                # Inferred document classification & teacher override logic
+                inferred_kind = data.get("document_kind")
+                if inferred_kind:
+                    # Teacher-provided metadata overrides inference:
+                    # Only assign inferred kind if the job's current kind is null, blank, or AUTO
+                    if not job.document_kind or str(job.document_kind).upper() in ("AUTO", "UNKNOWN", "NONE"):
+                        job.document_kind = inferred_kind
+                        logger.info(f"[Webhook] Assigned inferred document_kind='{inferred_kind}' to Job #{job.pk}")
+                    else:
+                        logger.info(f"[Webhook] Teacher-specified document_kind='{job.document_kind}' preserved for Job #{job.pk} (inferred was '{inferred_kind}')")
+
+                if data.get("classification_confidence") is not None:
+                    job.classification_confidence = data.get("classification_confidence")
+                if data.get("classification_evidence"):
+                    job.classification_evidence = data.get("classification_evidence")
+
+                # Non-educational types: warn in logs, do not block
+                if job.document_kind in (DocumentKind.NEWSPAPER, DocumentKind.MAGAZINE, DocumentKind.OTHER, "NEWSPAPER", "MAGAZINE", "OTHER"):
+                    logger.warning(
+                        f"[Webhook Warning] Non-educational document kind '{job.document_kind}' detected for Job #{job.pk}. "
+                        f"Dataset extraction completed normally; downstream question generation is not blocked."
+                    )
+
+                # Safe clean delete-and-recreate in explicit reverse-dependency order:
+                # 1. ExtractedItem (child of page and job)
+                job.items.all().delete()
+                # 2. ExtractedPage (child of chapter and job)
+                job.pages.all().delete()
+                # 3. ExtractedChapter (child of job)
                 job.chapters.all().delete()
+
+                # Re-create chapters
                 chapter_map = {}
                 for ch_data in toc_entries:
                     ch_num = ch_data.get("chapter_number", 1)
@@ -615,17 +762,13 @@ class IngestionJobWebhookView(APIView):
                     )
                     chapter_map[ch_num] = ch_obj
 
-                # 2. Populate Pages
-                job.pages.all().delete()
-
-
+                # Re-create pages
                 pages_to_create = []
                 for p_data in pages_data:
                     p_num = p_data.get("page_number", 1)
                     matched_ch = chapter_map.get(p_data.get("chapter_number"))
                     raw_sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
 
-                    # Process sections and gather diagrams for async background upload
                     processed_sections = []
                     for s_idx, sec_dict in enumerate(raw_sections, start=1):
                         heading = sec_dict.get("heading", "")
@@ -671,7 +814,7 @@ class IngestionJobWebhookView(APIView):
 
                 created_pages = ExtractedPage.objects.bulk_create(pages_to_create)
 
-                # 3. Populate Items
+                # Re-create items
                 items_to_create = []
                 for page_obj in created_pages:
                     sections = page_obj.structured_content or []
@@ -702,10 +845,32 @@ class IngestionJobWebhookView(APIView):
                     job.metadata = {}
                 job.metadata["extraction_engine"] = engine
 
+                if idempotency_key:
+                    job.metadata["idempotency_key"] = idempotency_key
+                    history = job.metadata.setdefault("idempotency_history", [])
+                    history.append({
+                        "key": idempotency_key,
+                        "processed_at": timezone.now().isoformat(),
+                    })
+                    if len(history) > 10:
+                        job.metadata["idempotency_history"] = history[-10:]
+
                 job.status = JobStatus.COMPLETED
                 job.current_stage = f"Completed via {engine}! Structured all {total_pages} pages."[:145]
                 job.updated_at = timezone.now()
-                job.save(update_fields=["status", "current_stage", "metadata", "total_pages", "processed_pages", "granularity", "table_of_contents", "updated_at"])
+                job.save(update_fields=[
+                    "status",
+                    "current_stage",
+                    "metadata",
+                    "total_pages",
+                    "processed_pages",
+                    "granularity",
+                    "table_of_contents",
+                    "document_kind",
+                    "classification_confidence",
+                    "classification_evidence",
+                    "updated_at",
+                ])
 
             # Release from queue worker tracking
             from .queue import IngestionQueueWorker
@@ -728,7 +893,7 @@ class IngestionJobWebhookView(APIView):
                     name=f"AsyncDriveUploader-Job-{job.pk}",
                 ).start()
 
-            return Response({"status": "SUCCESS", "job_id": job.pk}, status=status.HTTP_200_OK)
+            return Response({"status": "SUCCESS", "job_id": job.pk, "idempotent_replay": False}, status=status.HTTP_200_OK)
 
         except Exception as e:
             from .queue import IngestionQueueWorker
@@ -738,4 +903,5 @@ class IngestionJobWebhookView(APIView):
             job.error_message = f"Failed to save webhook payload: {str(e)}"
             job.updated_at = timezone.now()
             job.save(update_fields=["status", "error_message", "updated_at"])
+            logger.error(f"[Webhook Error] Failed processing Job #{job.pk}: {e}", exc_info=True)
             return Response({"status": "ERROR", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

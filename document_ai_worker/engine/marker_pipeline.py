@@ -285,19 +285,13 @@ class MarkerPipeline:
                 )
 
         if not chapters:
-            chapters = [ChapterSchema(
-                chapter_number=1,
-                title="Extracted Document",
-                start_page=1,
-                end_page=len(pages),
-                summary="Full document extracted via Marker AI.",
-            )]
-
-        # Calculate chapter end pages
-        for i in range(len(chapters) - 1):
-            chapters[i].end_page = max(chapters[i].start_page, chapters[i + 1].start_page - 1)
-        if chapters:
+            chapters = []
+            granularity = "UNKNOWN"
+        else:
+            # Calculate chapter end pages
+            for i in range(len(chapters) - 1):
+                chapters[i].end_page = max(chapters[i].start_page, chapters[i + 1].start_page - 1)
             chapters[-1].end_page = len(pages)
+            granularity = "WHOLE_BOOK" if len(chapters) > 1 else "CHAPTER"
 
-        granularity = "MULTI_CHAPTER" if len(chapters) > 1 else "SINGLE_CHAPTER"
         return chapters, pages, granularity

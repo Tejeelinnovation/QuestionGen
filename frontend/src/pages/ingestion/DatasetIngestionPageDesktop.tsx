@@ -299,14 +299,26 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-forest/10 text-forest border border-forest/20">
-                          {job.board || 'NCERT'} {job.standard ? `· Class ${job.standard}` : ''}
+                          {job.board || 'Not specified'} {job.standard ? `· Class ${job.standard}` : ''}
                         </span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-muted text-ink/70 border border-border">
                           {job.subject || 'General'}
                         </span>
-                        {job.document_kind === 'HANDWRITTEN_NOTES' && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-700 border border-amber-500/20">
-                            HANDWRITTEN
+                        {job.document_kind && (
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
+                              ['NEWSPAPER', 'MAGAZINE', 'OTHER'].includes(job.document_kind)
+                                ? 'bg-purple-500/10 text-purple-700 border-purple-500/20'
+                                : job.document_kind === 'HANDWRITTEN_NOTES' || job.document_kind === 'NOTES'
+                                ? 'bg-amber-500/10 text-amber-700 border-amber-500/20'
+                                : 'bg-blue-500/10 text-blue-700 border-blue-500/20'
+                            }`}
+                            title={job.classification_evidence}
+                          >
+                            {job.document_kind}
+                            {job.classification_confidence !== undefined && job.classification_confidence !== null
+                              ? ` (${Math.round(job.classification_confidence * 100)}%)`
+                              : ''}
                           </span>
                         )}
                         {/* Contributor Status Badge */}

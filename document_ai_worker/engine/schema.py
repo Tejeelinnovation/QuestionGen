@@ -15,7 +15,7 @@ class ExtractionRequest(BaseModel):
     """
     job_id: int
     title: str = "Document"
-    document_kind: str = Field(default="TEXTBOOK", description="TEXTBOOK or HANDWRITTEN_NOTES")
+    document_kind: str = Field(default="AUTO", description="AUTO, TEXTBOOK, NEWSPAPER, etc.")
     pdf_url: Optional[str] = Field(default=None, description="Public or Google Drive download URL")
     callback_url: Optional[str] = Field(default=None, description="Django webhook URL to post results to")
     max_pages: Optional[int] = Field(default=None, description="Optional limit on pages to parse")

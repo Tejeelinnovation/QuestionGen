@@ -18,9 +18,9 @@ on:
         required: true
         type: string
       document_kind:
-        description: 'TEXTBOOK or HANDWRITTEN_NOTES'
+        description: 'Document Kind (AUTO, TEXTBOOK, NEWSPAPER, etc.)'
         required: false
-        default: 'TEXTBOOK'
+        default: 'AUTO'
         type: string
 
 jobs:
@@ -75,7 +75,7 @@ jobs:
           JOB_ID: ${{ github.event.client_payload.job_id || inputs.job_id }}
           PDF_URL: ${{ github.event.client_payload.pdf_url || inputs.pdf_url }}
           CALLBACK_URL: ${{ github.event.client_payload.callback_url || inputs.callback_url }}
-          DOCUMENT_KIND: ${{ github.event.client_payload.document_kind || inputs.document_kind || 'TEXTBOOK' }}
+          DOCUMENT_KIND: ${{ github.event.client_payload.document_kind || inputs.document_kind || 'AUTO' }}
           WEBHOOK_SECRET: ${{ secrets.INGESTION_WEBHOOK_SECRET || '' }}
           DRIVE_TOKEN_JSON: ${{ github.event.client_payload.drive_token_json || secrets.GOOGLE_DRIVE_USER_TOKEN_JSON || '' }}
           DRIVE_FOLDER_ID: ${{ github.event.client_payload.drive_folder_id || secrets.GOOGLE_DRIVE_FOLDER_ID || '' }}
@@ -99,8 +99,23 @@ jobs:
         run: |
           if [ -n "$CALLBACK_URL" ]; then
             echo "Notifying Django backend of runner failure: $CALLBACK_URL"
-            curl -s --retry 3 --retry-delay 5 -X POST "$CALLBACK_URL" \
-              -H "Content-Type: application/json" \
-              -H "X-Ingestion-Secret: $WEBHOOK_SECRET" \
-              -d "{\"job_id\": \"$JOB_ID\", \"status\": \"FAILED\", \"error_message\": \"GitHub Actions runner workflow failed during extraction. Check GitHub Actions workflow run logs for full details.\"}" || true
+            python -c "
+import hashlib, hmac, json, os, requests, time
+url = os.environ.get('CALLBACK_URL', '')
+job_id = os.environ.get('JOB_ID', '')
+secret = os.environ.get('WEBHOOK_SECRET', '')
+payload = {'job_id': job_id, 'status': 'FAILED', 'error_message': 'GitHub Actions runner workflow failed during extraction. Check GitHub Actions workflow run logs for full details.'}
+raw = json.dumps(payload).encode('utf-8')
+headers = {'Content-Type': 'application/json'}
+if secret:
+    ts_str = str(int(time.time()))
+    to_sign = f'{ts_str}.'.encode('utf-8') + raw
+    sig = hmac.new(secret.encode('utf-8'), to_sign, hashlib.sha256).hexdigest()
+    headers['X-Ingestion-Timestamp'] = ts_str
+    headers['X-Ingestion-Signature'] = f'sha256={sig}'
+try:
+    requests.post(url, data=raw, headers=headers, timeout=15)
+except Exception as e:
+    print('Failed notifying webhook:', e)
+" || true
           fi

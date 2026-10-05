@@ -61,13 +61,30 @@ def health():
     return {"status": "healthy"}
 
 
-def _send_webhook_callback(callback_url: str, payload: dict):
+def _send_webhook_callback(callback_url: str, payload: dict, secret: str = "", idempotency_key: str = ""):
     """
-    Sends extraction result back to Django via webhook.
+    Sends extraction result back to Django via webhook with HMAC-SHA256 signature and idempotency key.
     """
+    import hashlib
+    import hmac
+    import json
+
     try:
+        secret = (secret or os.getenv("INGESTION_WEBHOOK_SECRET", "")).strip()
+        raw_bytes = json.dumps(payload, default=str).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if idempotency_key:
+            headers["X-Idempotency-Key"] = idempotency_key
+        if secret:
+            import time
+            ts_str = str(int(time.time()))
+            to_sign = f"{ts_str}.".encode("utf-8") + raw_bytes
+            sig = hmac.new(secret.encode("utf-8"), to_sign, hashlib.sha256).hexdigest()
+            headers["X-Ingestion-Timestamp"] = ts_str
+            headers["X-Ingestion-Signature"] = f"sha256={sig}"
+
         logger.info(f"Dispatching webhook callback to: {callback_url}")
-        res = requests.post(callback_url, json=payload, timeout=60)
+        res = requests.post(callback_url, data=raw_bytes, headers=headers, timeout=60)
         logger.info(f"Webhook delivered: Status {res.status_code}")
     except Exception as err:
         logger.error(f"Failed to deliver webhook callback to {callback_url}: {err}")
@@ -161,7 +178,7 @@ async def extract_document(
 async def extract_uploaded_file(
     file: UploadFile = File(...),
     job_id: int = Form(...),
-    document_kind: str = Form("TEXTBOOK"),
+    document_kind: str = Form("AUTO"),
     max_pages: Optional[int] = Form(None),
 ):
     """

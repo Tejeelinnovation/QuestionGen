@@ -141,13 +141,31 @@ class IngestionService:
             # Analyze document TOC and granularity
             granularity, toc_entries = self.toc_detector.analyze_document(doc)
             job.granularity = granularity
-            job.table_of_contents = toc_entries
+            job.table_of_contents = toc_entries if toc_entries else None
 
-            # Create ExtractedChapter records with duplicate protection
+            # Evidence-based document classification (with teacher override)
+            if not job.document_kind or str(job.document_kind).upper() in ("AUTO", "UNKNOWN", "NONE"):
+                from .document_classifier import classify_document
+                class_res = classify_document(file_path, user_document_kind=job.document_kind, doc_title=job.title)
+                job.document_kind = class_res.kind
+                job.classification_confidence = class_res.confidence
+                job.classification_evidence = class_res.evidence
+                logger.info(f"[IngestionService] Inferred Job #{job.pk} document_kind='{class_res.kind}' (conf={class_res.confidence})")
+            else:
+                logger.info(f"[IngestionService] Preserved teacher-specified document_kind='{job.document_kind}' for Job #{job.pk}")
+
+            # Non-educational types: warn in logs, do not block
+            if job.document_kind in (DocumentKind.NEWSPAPER, DocumentKind.MAGAZINE, DocumentKind.OTHER, "NEWSPAPER", "MAGAZINE", "OTHER"):
+                logger.warning(
+                    f"[IngestionService Warning] Non-educational document kind '{job.document_kind}' detected for Job #{job.pk}. "
+                    f"Extraction will proceed normally without blocking."
+                )
+
+            # Create ExtractedChapter records with duplicate protection (only if TOC exists)
             with transaction.atomic():
                 job.chapters.all().delete()
                 seen_numbers = set()
-                for idx, entry in enumerate(toc_entries, start=1):
+                for idx, entry in enumerate(toc_entries or [], start=1):
                     raw_num = entry.get("chapter_number")
                     ch_num = raw_num if (raw_num and raw_num not in seen_numbers) else (max(seen_numbers, default=0) + 1)
                     seen_numbers.add(ch_num)
