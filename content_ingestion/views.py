@@ -586,7 +586,7 @@ class IngestionJobWebhookView(APIView):
             IngestionQueueWorker.mark_job_completed_or_failed(job.pk)
             return Response({"status": "ERROR_RECORDED", "error": error_msg}, status=status.HTTP_200_OK)
 
-        toc_entries = data.get("table_of_contents", [])
+        toc_entries = data.get("table_of_contents") or data.get("chapters") or []
         pages_data = data.get("pages", [])
         total_pages = data.get("total_pages", len(pages_data))
         granularity = data.get("granularity", job.granularity)
@@ -608,7 +608,7 @@ class IngestionJobWebhookView(APIView):
                     ch_obj = ExtractedChapter.objects.create(
                         job=job,
                         chapter_number=ch_num,
-                        title=ch_data.get("title", f"Chapter {ch_num}"),
+                        title=str(ch_data.get("title", f"Chapter {ch_num}") or f"Chapter {ch_num}"),
                         start_page=ch_data.get("start_page", 1),
                         end_page=ch_data.get("end_page", 1),
                         summary=ch_data.get("summary", ""),
@@ -703,7 +703,7 @@ class IngestionJobWebhookView(APIView):
                 job.metadata["extraction_engine"] = engine
 
                 job.status = JobStatus.COMPLETED
-                job.current_stage = f"Completed via {engine}! Structured all {total_pages} pages."
+                job.current_stage = f"Completed via {engine}! Structured all {total_pages} pages."[:145]
                 job.updated_at = timezone.now()
                 job.save(update_fields=["status", "current_stage", "metadata", "total_pages", "processed_pages", "granularity", "table_of_contents", "updated_at"])
 
