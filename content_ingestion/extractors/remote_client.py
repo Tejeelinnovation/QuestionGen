@@ -144,8 +144,24 @@ class RemoteAiMicroserviceExtractor:
                 f"Triggering workflow_dispatch on {self.github_repo}@{dispatch_ref} for Job #{job.pk}..."
             )
             res = requests.post(dispatch_url, json=payload, headers=headers, timeout=20)
+            if res.status_code == 422 and "workflow_dispatch" in res.text:
+                logger.warning(
+                    f"GitHub workflow_dispatch returned 422. Falling back to repository_dispatch on {self.github_repo}..."
+                )
+                repo_dispatch_url = f"https://api.github.com/repos/{self.github_repo}/dispatches"
+                repo_payload = {
+                    "event_type": "extract_document",
+                    "client_payload": {
+                        "job_id": str(job.pk),
+                        "pdf_url": pdf_url,
+                        "callback_url": callback_url,
+                        "document_kind": job.document_kind or "AUTO",
+                    },
+                }
+                res = requests.post(repo_dispatch_url, json=repo_payload, headers=headers, timeout=20)
+
             if res.status_code not in (200, 204):
-                logger.error(f"GitHub workflow_dispatch failed ({res.status_code}): {res.text}")
+                logger.error(f"GitHub dispatch failed ({res.status_code}): {res.text}")
                 res.raise_for_status()
 
             job.current_stage = f"Launched GitHub Actions runner ({dispatch_ref} branch)..."
