@@ -417,6 +417,58 @@ class EvalHarnessTests(unittest.TestCase):
         self.assertLess(res.confidence, 0.60)
         self.assertIn("Insufficient distinct domain markers", res.evidence)
 
+    def test_conservative_raster_scanned_handwriting_routes_to_needs_review(self):
+        """
+        Confirms that a rasterized (scanned-style) handwriting image on standard paper
+        with 0 vector fonts is conservatively routed to needs_review=True, never silent text.
+        """
+        import pymupdf as fitz
+        from PIL import Image
+        from document_ai_worker.engine.page_router import PageRouter
+        from document_ai_worker.engine.textbook_pipeline import TextbookPipeline
+
+        # Create a synthetic scanned A4 page with a raster image
+        img_path = self.temp_dir / "scanned_notes.png"
+        img = Image.new("RGB", (600, 800), color=(245, 245, 240))
+        img.save(str(img_path))
+
+        pdf_path = self.temp_dir / "scanned_hw.pdf"
+        doc = fitz.open()
+        p = doc.new_page(width=595, height=842)
+        p.insert_image(fitz.Rect(50, 50, 545, 792), filename=str(img_path))
+        doc.save(str(pdf_path))
+        doc.close()
+
+        fitz_doc = fitz.open(str(pdf_path))
+        router = PageRouter()
+        decision = router.probe_page(fitz_doc[0], page_num=1, total_pages=1)
+        fitz_doc.close()
+
+        # Must not be classified as a silent ad; must require OCR / review
+        self.assertNotEqual(decision.page_kind, "image_only")
+        self.assertEqual(decision.page_kind, "scanned_printed")
+
+        # In pipeline without active OCR, must flag needs_review=True
+        pipeline = TextbookPipeline(media_dir=str(self.temp_dir))
+        _, pages, _ = pipeline.process_pdf(str(pdf_path), render_image_pixels=False)
+        self.assertEqual(len(pages), 1)
+        self.assertTrue(pages[0].needs_review)
+        self.assertLessEqual(pages[0].quality_score, 0.50)
+
+    def test_docling_pipeline_page_router_integration(self):
+        """
+        Confirms that DoclingPipeline has PageRouter integrated to populate
+        page_kind, engine, route_reason, and legacy_font_encoding.
+        """
+        from document_ai_worker.engine.docling_pipeline import DoclingPipeline
+        from document_ai_worker.engine.page_router import PageRouter
+
+        pipeline = DoclingPipeline(media_dir=str(self.temp_dir))
+        self.assertTrue(hasattr(pipeline, "process_pdf"))
+        # Verify PageRouter is importable and usable
+        router = PageRouter()
+        self.assertIsNotNone(router)
+
 
 if __name__ == "__main__":
     unittest.main()

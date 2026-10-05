@@ -268,8 +268,13 @@ class PageRouter:
             )
 
         # Case C: Image-Only / Full-Page Advertisement
-        # Characteristic: very low native text (< 60 chars), but has images or drawings covering substantial area
-        if char_count < 60 and (image_count >= 1 or drawing_count >= 10):
+        # Characteristic: very low native text (< 60 chars), but has images or drawings covering substantial area.
+        # Only broadsheet newspapers or complex graphic layouts should be classified as silent display ads.
+        # Standard scanned pages (A4/Letter with 0 vector fonts and 1 full-page scan) are scanned documents, not ads.
+        is_broadsheet = (rect.width > 700 and rect.height > 1000)
+        is_display_ad = is_broadsheet or (drawing_count >= 15 and image_count > 1) or (vector_font_count > 0 and char_count < 60 and image_area_ratio > 0.50)
+
+        if char_count < 60 and (image_count >= 1 or drawing_count >= 10) and is_display_ad:
             return PageDecision(
                 page_num=page_num,
                 page_kind="image_only",

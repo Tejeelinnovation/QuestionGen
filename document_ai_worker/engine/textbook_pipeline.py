@@ -261,6 +261,10 @@ class TextbookPipeline:
             for sec in sections:
                 if sec.type != "DIAGRAM":
                     sec.text = ""
+        elif p_kind in ("scanned_printed", "handwriting") and not raw_text.strip():
+            p_review = True
+            p_quality = 0.40
+            p_reason = f"{p_reason}; Scanned content without OCR text; manual review required"
 
         return PageSchema(
             page_number=page_num,

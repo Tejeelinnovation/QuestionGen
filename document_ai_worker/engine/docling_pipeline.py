@@ -340,10 +340,23 @@ class DoclingPipeline:
             p_quality = getattr(dec, "quality_score", 1.0) if dec else 1.0
             p_meta = dict(getattr(dec, "metadata", {})) if dec else {}
 
+            page_raw_text = "\n\n".join(page_text_pieces)
+            if p_legacy:
+                has_devanagari = any("\u0900" <= c <= "\u097f" for c in page_raw_text)
+                if not has_devanagari:
+                    p_review = True
+                    p_quality = 0.50
+                    p_meta["raw_text_unreliable"] = page_raw_text
+                    p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
+                    page_raw_text = ""
+                    for sec in sections:
+                        if sec.type != "DIAGRAM":
+                            sec.text = ""
+
             pages.append(PageSchema(
                 page_number=page_num,
                 layout_type="SINGLE_COLUMN",
-                raw_text="\n\n".join(page_text_pieces),
+                raw_text=page_raw_text,
                 chapter_number=current_chapter_num,
                 chapter_title=current_chapter_title,
                 sections=sections,
