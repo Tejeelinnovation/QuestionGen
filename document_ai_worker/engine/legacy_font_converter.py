@@ -431,6 +431,23 @@ def convert_page_spans_to_unicode(fitz_page: Any) -> Tuple[Optional[str], bool]:
     return "\n\n".join(rebuilt_blocks), page_has_unmapped_bytes
 
 
+_TESSERACT_AVAILABLE: Optional[bool] = None
+
+
+def _is_tesseract_installed() -> bool:
+    global _TESSERACT_AVAILABLE
+    if _TESSERACT_AVAILABLE is None:
+        import subprocess
+        import os
+        which_cmd = "where" if os.name == "nt" else "which"
+        try:
+            proc = subprocess.run([which_cmd, "tesseract"], capture_output=True)
+            _TESSERACT_AVAILABLE = (proc.returncode == 0)
+        except Exception:
+            _TESSERACT_AVAILABLE = False
+    return _TESSERACT_AVAILABLE
+
+
 def compute_hindi_ocr_agreement(fitz_page: Any, remapped_text: str) -> Optional[float]:
     """
     Cross-checks remapped text against Tesseract -l hin OCR of the rendered page.
@@ -445,14 +462,11 @@ def compute_hindi_ocr_agreement(fitz_page: Any, remapped_text: str) -> Optional[
         import unicodedata
         import os
 
-        # Check if tesseract is available in system PATH
-        which_cmd = "where" if os.name == "nt" else "which"
-        proc = subprocess.run([which_cmd, "tesseract"], capture_output=True)
-        if proc.returncode != 0:
+        if not _is_tesseract_installed():
             return None
 
-        # Render page at 150 DPI
-        pix = fitz_page.get_pixmap(dpi=150)
+        # Render page at 100 DPI for fast agreement verification
+        pix = fitz_page.get_pixmap(dpi=100)
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
             img_path = tf.name
         pix.save(img_path)

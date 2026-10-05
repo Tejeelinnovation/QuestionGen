@@ -12,15 +12,29 @@ Handles:
 from __future__ import annotations
 
 import base64
+import hashlib
+import io
 import logging
 import math
 import os
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from PIL import Image
 import pymupdf as fitz
 
-from .schema import ChapterSchema, PageSchema, SectionSchema
+from .schema import ArticleSchema, ChapterSchema, PageSchema, SectionSchema
+from .layout_analyzer import (
+    classify_image_heuristic,
+    cluster_columns,
+    compute_dhash,
+    crop_bbox_from_page,
+    extract_newspaper_articles,
+    find_nearest_caption,
+    hamming_distance,
+    normalize_bbox,
+)
+from .storage import StorageBackend, get_default_storage_backend
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +57,17 @@ class TextbookPipeline:
     MATH_SYMBOLS = set("±√∑∫∏≠≤≥≈∞∝∠∆∇∈∉∩∪⊂⊃⊆⊇∀∃⇒⇔πθαβγδε")
     MATH_OPERATORS = re.compile(r"(\b[a-zA-Z0-9]+\s*[\+\-\*\/\=]\s*[a-zA-Z0-9]+)|([a-zA-Z]\^[0-9]+)|([a-zA-Z]_[0-9]+)|(\b[H|C|O|N|S|P|Na|Cl|Fe|Cu|Ca|Mg][0-9]*[A-Z][0-9]*\b)")
 
-    def __init__(self, media_dir: str = "/tmp/extracted_assets"):
+    def __init__(
+        self,
+        media_dir: str = "/tmp/extracted_assets",
+        storage_backend: Optional[StorageBackend] = None,
+    ):
         self.media_dir = media_dir
         os.makedirs(self.media_dir, exist_ok=True)
+        self.storage_backend = storage_backend or get_default_storage_backend()
+        self.seen_image_hashes: Dict[str, Dict[str, Any]] = {}
+        self.seen_perceptual_hashes: List[Tuple[str, Dict[str, Any]]] = []
+        self.document_kind: str = "AUTO"
 
     def process_pdf(
         self,
@@ -54,12 +76,17 @@ class TextbookPipeline:
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         extract_images: bool = True,
         render_image_pixels: bool = True,
+        document_kind: str = "AUTO",
     ) -> Tuple[List[ChapterSchema], List[PageSchema], str]:
         """
         Executes full textbook extraction:
         1. Detects Table of Contents (TOC) & chapter ranges.
         2. Extracts each page preserving layout, columns, formulas, and diagrams.
         """
+        self.document_kind = document_kind
+        self.seen_image_hashes = {}
+        self.seen_perceptual_hashes = []
+
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         pages_to_process = min(total_pages, max_pages) if max_pages else total_pages
@@ -76,6 +103,11 @@ class TextbookPipeline:
         page_decisions = router.probe_document(doc)
         decisions_by_page = {d.page_num: d for d in page_decisions}
 
+        # Document Classification for Newspaper Article Grouping
+        from .document_classifier import classify_document
+        doc_class_res = classify_document(pdf_path, user_document_kind=document_kind)
+        is_newspaper_doc = (doc_class_res.kind == "NEWSPAPER")
+
         # 3. Extract pages
         pages: List[PageSchema] = []
         for p_idx in range(pages_to_process):
@@ -88,6 +120,7 @@ class TextbookPipeline:
                 decision=decision,
                 extract_images=extract_images,
                 render_image_pixels=render_image_pixels,
+                is_newspaper_doc=is_newspaper_doc,
             )
             pages.append(page_schema)
             if progress_callback:
@@ -181,6 +214,7 @@ class TextbookPipeline:
         decision: Optional[Any] = None,
         extract_images: bool = True,
         render_image_pixels: bool = True,
+        is_newspaper_doc: bool = False,
     ) -> PageSchema:
         """
         Parses a single page preserving columns, LaTeX, diagrams, and activities.
@@ -195,44 +229,72 @@ class TextbookPipeline:
                 matched_chapter = ch
                 break
 
-        # 2. Extract Embedded Images
+        # 2. Prepare normalized text blocks
+        raw_blocks = page.get_text("blocks")
+        text_blocks = [b for b in raw_blocks if b[6] == 0 and b[4].strip()]
+        text_block_dicts = [
+            {
+                "bbox": normalize_bbox(b[:4], width, height, origin="top_left"),
+                "text": b[4],
+                "block_no": b[5],
+                "raw_block": b,
+            }
+            for b in text_blocks
+        ]
+
+        # 3. Extract Embedded Images (with min_dimension=60, deduplication, caption pairing)
         extracted_images = (
-            self._extract_page_images(doc, page, page_num, render_image_pixels=render_image_pixels)
+            self._extract_page_images(
+                doc,
+                page,
+                page_num,
+                render_image_pixels=render_image_pixels,
+                text_block_dicts=text_block_dicts,
+            )
             if extract_images
             else []
         )
 
-        # 3. Analyze Column Layout & Sort Blocks
-        raw_blocks = page.get_text("blocks")
-        text_blocks = [b for b in raw_blocks if b[6] == 0 and b[4].strip()]
-        layout_type, sorted_blocks = self._sort_reading_order(text_blocks, width, height)
+        # 4. Analyze Column Layout & Sort Blocks (1 to 8 columns)
+        col_count, layout_type, sorted_blocks = cluster_columns(
+            text_block_dicts,
+            width,
+            height,
+            max_columns=8,
+        )
 
-        # 4. Pedagogical & Formula Classification
+        # 5. Pedagogical & Formula Classification
         sections: List[SectionSchema] = []
         for b in sorted_blocks:
-            x0, y0, x1, y1, text, block_no, col_idx = b
-            clean_text = text.strip()
+            clean_text = b["text"].strip()
             if not clean_text:
                 continue
 
-            sec = self._classify_section(clean_text, col_idx, (x0, y0, x1, y1), extracted_images)
+            col_idx = b.get("column_index", 1)
+            bbox_tuple = tuple(b["bbox"])
+            sec = self._classify_section(clean_text, col_idx, bbox_tuple, extracted_images)
+            sec.bbox = list(b["bbox"])
             sections.append(sec)
 
-        # 5. Attach any unlinked images as standalone diagram sections
+        # 6. Attach any unlinked images as standalone diagram sections
         for img in extracted_images:
             if not img.get("linked"):
                 sections.append(SectionSchema(
                     type="DIAGRAM",
-                    heading=img.get("caption", "Figure"),
+                    heading=img.get("caption") or "Figure",
                     text="",
                     column_index=0,
                     image_path=img.get("path", ""),
                     image_data=img.get("data", ""),
                     image_caption=img.get("caption", ""),
+                    image_classification=img.get("classification"),
+                    image_hash=img.get("sha256", ""),
+                    perceptual_hash=img.get("dhash", ""),
+                    bbox=img.get("bbox", []),
                     metadata={"bbox": img.get("bbox", [])},
                 ))
 
-        raw_text = "\n\n".join(b[4].strip() for b in text_blocks)
+        raw_text = "\n\n".join(b["text"].strip() for b in sorted_blocks)
 
         # Phase 2 Per-Page Routing Fields
         p_kind = getattr(decision, "page_kind", "digital_text") if decision else "digital_text"
@@ -329,13 +391,20 @@ class TextbookPipeline:
             p_quality = 0.40
             p_reason = f"{p_reason}; Scanned content without OCR text; manual review required"
 
+        # Newspaper Article Grouping (only for newspapers)
+        page_articles: List[ArticleSchema] = []
+        if is_newspaper_doc or (width > 700 and height > 1000 and col_count >= 3):
+            page_articles = extract_newspaper_articles(page_num, sections)
+
         return PageSchema(
             page_number=page_num,
             layout_type=layout_type,
+            column_count=col_count,
             raw_text=raw_text,
             chapter_number=matched_chapter.chapter_number if matched_chapter else None,
             chapter_title=matched_chapter.title if matched_chapter else "",
             sections=sections,
+            articles=page_articles,
             page_kind=p_kind,
             engine=p_engine,
             route_reason=p_reason,
@@ -350,46 +419,32 @@ class TextbookPipeline:
 
     def _sort_reading_order(self, blocks: List[Tuple], width: float, height: float) -> Tuple[str, List[Tuple]]:
         """
-        Sorts blocks in human reading order:
-        - Top full-width banners
-        - Left column (top to bottom)
-        - Right column (top to bottom)
-        - Bottom full-width footers
+        Sorts blocks in human reading order using multi-column clustering.
+        Backwards compatible with older callers expecting (layout_type, sorted_tuples).
         """
         if not blocks:
             return "SINGLE_COLUMN", []
 
-        mid_x = width / 2.0
-        left_blocks, right_blocks, span_blocks = [], [], []
-
-        for b in blocks:
-            x0, y0, x1, y1, text, block_no = b[:6]
-            block_w = x1 - x0
-
-            # Headers (top 4%) and footers (bottom 4%)
-            if y1 < height * 0.04 or y0 > height * 0.96 or block_w > width * 0.60:
-                span_blocks.append((x0, y0, x1, y1, text, block_no, 0))
-            elif x1 <= mid_x + (width * 0.06):
-                left_blocks.append((x0, y0, x1, y1, text, block_no, 1))
-            elif x0 >= mid_x - (width * 0.06):
-                right_blocks.append((x0, y0, x1, y1, text, block_no, 2))
-            else:
-                span_blocks.append((x0, y0, x1, y1, text, block_no, 0))
-
-        has_two_cols = len(left_blocks) >= 2 and len(right_blocks) >= 2
-        if has_two_cols:
-            layout_type = "HYBRID_COLUMN" if span_blocks else "TWO_COLUMN"
-            left_blocks.sort(key=lambda x: x[1])
-            right_blocks.sort(key=lambda x: x[1])
-            span_blocks.sort(key=lambda x: x[1])
-            sorted_blocks = span_blocks[:1] + left_blocks + right_blocks + span_blocks[1:]
-            return layout_type, sorted_blocks
-
-        # Default single column
-        layout_type = "SINGLE_COLUMN"
-        all_blocks = [(b[0], b[1], b[2], b[3], b[4], b[5], 0) for b in blocks]
-        all_blocks.sort(key=lambda x: x[1])
-        return layout_type, all_blocks
+        block_items = [
+            {
+                "bbox": normalize_bbox(b[:4], width, height, origin="top_left"),
+                "text": b[4],
+                "block_no": b[5],
+                "raw_block": b,
+            }
+            for b in blocks
+        ]
+        col_count, layout_type, ordered = cluster_columns(block_items, width, height, max_columns=8)
+        sorted_tuples = []
+        for item in ordered:
+            bb = item["bbox"]
+            sorted_tuples.append((
+                bb[0], bb[1], bb[2], bb[3],
+                item["text"],
+                item["block_no"],
+                item.get("column_index", 1),
+            ))
+        return layout_type, sorted_tuples
 
     def _classify_section(
         self,
@@ -418,6 +473,10 @@ class TextbookPipeline:
                     image_path=best_img.get("path", ""),
                     image_data=best_img.get("data", ""),
                     image_caption=text,
+                    image_classification=best_img.get("classification"),
+                    image_hash=best_img.get("sha256", ""),
+                    perceptual_hash=best_img.get("dhash", ""),
+                    bbox=list(bbox),
                     metadata={"bbox": list(bbox)},
                 )
 
@@ -435,6 +494,7 @@ class TextbookPipeline:
                     text=text,
                     column_index=col_idx,
                     latex_equations=latex_formulas,
+                    bbox=list(bbox),
                     metadata={"bbox": list(bbox)},
                 )
 
@@ -447,6 +507,7 @@ class TextbookPipeline:
                 text=text,
                 column_index=col_idx,
                 latex_equations=latex_formulas,
+                bbox=list(bbox),
                 metadata={"bbox": list(bbox)},
             )
 
@@ -457,6 +518,7 @@ class TextbookPipeline:
             text=text,
             column_index=col_idx,
             latex_equations=latex_formulas,
+            bbox=list(bbox),
             metadata={"bbox": list(bbox)},
         )
 
@@ -504,15 +566,21 @@ class TextbookPipeline:
         page: fitz.Page,
         page_num: int,
         render_image_pixels: bool = True,
+        text_block_dicts: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Extracts images on the page using visual viewport clipping.
-        This captures full color, alpha masks, vector diagrams, and annotations
-        without producing solid black rectangles.
-        When render_image_pixels=False, extracts bounding boxes and metadata without
-        heavy raster pixmap rendering.
+        - Enforces min_dimension=60 to eliminate tiny decoration artifacts.
+        - Perceptual & exact deduplication via SHA-256 + 64-bit dHash (Hamming distance <= 4).
+        - Heuristic classification: photo|ad|logo|face_grid|diagram|chart|table_image.
+        - Nearest caption pairing and cleaning.
+        - Deterministic asset naming via {sha256}.{ext} saved through pluggable StorageBackend.
         """
         images = []
+        page_w = page.rect.width
+        page_h = page.rect.height
+        text_blocks = text_block_dicts or []
+
         for img_idx, img_info in enumerate(page.get_images(full=True)):
             xref = img_info[0]
             try:
@@ -520,18 +588,25 @@ class TextbookPipeline:
                 if not rects:
                     continue
                 rect = rects[0]
-                # Filter out tiny decoration icons (<35x35)
-                if rect.width < 35 or rect.height < 35:
+
+                # Filter out tiny decoration icons (<60x60 points)
+                if rect.width < 60 or rect.height < 60:
                     continue
+
+                norm_bbox = normalize_bbox([rect.x0, rect.y0, rect.x1, rect.y1], page_w, page_h, origin="top_left")
+                caption = find_nearest_caption(norm_bbox, text_blocks)
 
                 if not render_image_pixels:
                     images.append({
                         "path": "",
                         "filename": f"page_{page_num}_fig_{img_idx + 1}.png",
                         "data": "",
-                        "bbox": list(rect),
+                        "bbox": norm_bbox,
                         "linked": False,
-                        "caption": "",
+                        "caption": caption,
+                        "classification": "diagram",
+                        "sha256": "",
+                        "dhash": "",
                     })
                     continue
 
@@ -552,24 +627,63 @@ class TextbookPipeline:
                     except Exception:
                         pass
 
+                sha256 = hashlib.sha256(image_bytes).hexdigest()
+
+                try:
+                    pil_img = Image.open(io.BytesIO(image_bytes))
+                    dhash_str = compute_dhash(pil_img, hash_size=8)
+                    classification = classify_image_heuristic(pil_img, norm_bbox, page_w, page_h)
+                except Exception:
+                    dhash_str = ""
+                    classification = "diagram"
+
+                # Deduplication check:
+                # 1. Exact match by SHA-256
+                if sha256 in self.seen_image_hashes:
+                    logger.debug(f"Skipping exact duplicate image {sha256[:8]} on page {page_num}")
+                    continue
+
+                # 2. Perceptual match by dHash (hamming distance <= 4)
+                is_duplicate = False
+                if dhash_str:
+                    for prev_dhash, _ in self.seen_perceptual_hashes:
+                        if hamming_distance(dhash_str, prev_dhash) <= 4:
+                            is_duplicate = True
+                            logger.debug(f"Skipping perceptual duplicate image on page {page_num}")
+                            break
+
+                if is_duplicate:
+                    continue
+
+                # Save / upload via pluggable storage backend
+                upload_res = self.storage_backend.upload_bytes(
+                    image_bytes,
+                    mime_type=f"image/{ext}",
+                    ext=ext,
+                )
+
                 b64_str = base64.b64encode(image_bytes).decode("utf-8")
                 image_data_uri = f"data:image/{ext};base64,{b64_str}"
 
-                filename = f"page_{page_num}_fig_{img_idx + 1}.{ext}"
-                filepath = os.path.join(self.media_dir, filename)
-
-                if not os.path.exists(filepath):
-                    with open(filepath, "wb") as f:
-                        f.write(image_bytes)
-
-                images.append({
-                    "path": filepath,
-                    "filename": filename,
+                img_record = {
+                    "path": upload_res.get("local_path", upload_res.get("url", "")),
+                    "filename": upload_res.get("filename", f"{sha256}.{ext}"),
                     "data": image_data_uri,
-                    "bbox": list(rect),
+                    "bbox": norm_bbox,
                     "linked": False,
-                    "caption": "",
-                })
+                    "caption": caption,
+                    "classification": classification,
+                    "sha256": sha256,
+                    "dhash": dhash_str,
+                }
+
+                # Register in seen caches
+                self.seen_image_hashes[sha256] = img_record
+                if dhash_str:
+                    self.seen_perceptual_hashes.append((dhash_str, img_record))
+
+                images.append(img_record)
+
             except Exception as err:
                 logger.warning(f"Error rendering image {img_idx} on page {page_num}: {err}")
                 continue

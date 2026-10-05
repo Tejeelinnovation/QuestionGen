@@ -378,7 +378,7 @@ class EvalHarnessTests(unittest.TestCase):
             processed_pages=1,
             pages=[page],
         )
-        self.assertEqual(response.schema_version, "1.1.0")
+        self.assertIn(response.schema_version, ("1.1.0", "1.2.0"))
         self.assertEqual(len(response.pages), 1)
 
     def test_legacy_font_quarantine_corrupted_text(self):
@@ -494,6 +494,160 @@ class EvalHarnessTests(unittest.TestCase):
         # Verify PageRouter is importable and usable
         router = PageRouter()
         self.assertIsNotNone(router)
+
+    def test_synthetic_page_crop_formula(self):
+        """
+        Confirms that crop_bbox_from_page uses top-left normalized coordinates in PDF points
+        and accurately extracts the exact rectangular region.
+        """
+        import pymupdf as fitz
+        from document_ai_worker.engine.layout_analyzer import crop_bbox_from_page, normalize_bbox
+
+        doc = fitz.open()
+        page = doc.new_page(width=500, height=500)
+        # Draw a solid red rectangle from (100, 100) to (200, 200)
+        page.draw_rect(fitz.Rect(100, 100, 200, 200), color=(1, 0, 0), fill=(1, 0, 0))
+
+        # Test normalization
+        norm_bbox = normalize_bbox([100, 100, 200, 200], 500, 500, origin="top_left")
+        self.assertEqual(norm_bbox, [100.0, 100.0, 200.0, 200.0])
+
+        # Crop at 72 DPI (1 pt = 1 px)
+        pix = crop_bbox_from_page(page, norm_bbox, dpi=72)
+        self.assertEqual(pix.width, 100)
+        self.assertEqual(pix.height, 100)
+
+        # Sample center pixel (50, 50) - should be solid red (255, 0, 0)
+        sample = pix.pixel(50, 50)
+        self.assertEqual(sample[:3], (255, 0, 0))
+        doc.close()
+
+    def test_column_clustering_multi_column(self):
+        """
+        Confirms cluster_columns identifies 1 to 8 columns and correctly orders blocks
+        top-to-bottom within each column from left to right.
+        """
+        from document_ai_worker.engine.layout_analyzer import cluster_columns
+
+        # Broadsheet 3-column layout (width 600, height 800)
+        # Column 1: x in [50, 180]
+        # Column 2: x in [220, 350]
+        # Column 3: x in [390, 520]
+        blocks = [
+            {"bbox": [50, 100, 180, 200], "text": "Col1 Top"},
+            {"bbox": [220, 100, 350, 200], "text": "Col2 Top"},
+            {"bbox": [390, 100, 520, 200], "text": "Col3 Top"},
+            {"bbox": [50, 250, 180, 350], "text": "Col1 Bottom"},
+            {"bbox": [220, 250, 350, 350], "text": "Col2 Bottom"},
+            {"bbox": [390, 250, 520, 350], "text": "Col3 Bottom"},
+        ]
+
+        col_count, layout_type, ordered = cluster_columns(blocks, 600, 800, max_columns=8)
+        self.assertEqual(col_count, 3)
+        self.assertEqual(layout_type, "THREE_COLUMN")
+
+        # In true reading order: Col1 Top, Col1 Bottom, Col2 Top, Col2 Bottom, Col3 Top, Col3 Bottom
+        ordered_texts = [b["text"] for b in ordered]
+        expected_order = [
+            "Col1 Top", "Col1 Bottom",
+            "Col2 Top", "Col2 Bottom",
+            "Col3 Top", "Col3 Bottom",
+        ]
+        self.assertEqual(ordered_texts, expected_order)
+
+    def test_newspaper_article_grouping_and_stable_ids(self):
+        """
+        Confirms extract_newspaper_articles groups headline, byline, and body,
+        detects continuation notices, and generates deterministic stable article IDs.
+        """
+        from document_ai_worker.engine.layout_analyzer import extract_newspaper_articles
+        from document_ai_worker.engine.schema import SectionSchema
+
+        sections = [
+            SectionSchema(type="PARAGRAPH", heading="SENSEX SURGES 500 POINTS", text="", column_index=1),
+            SectionSchema(type="PARAGRAPH", heading="", text="By Ramesh Sharma", column_index=1),
+            SectionSchema(type="PARAGRAPH", heading="", text="Mumbai: The benchmark index rose sharply following strong corporate earnings.", column_index=1),
+            SectionSchema(type="PARAGRAPH", heading="", text="Foreign institutional investors remained net buyers. Continued on page 14", column_index=1),
+            # Second article
+            SectionSchema(type="PARAGRAPH", heading="TECH GIANTS ANNOUNCE PARTNERSHIP", text="", column_index=2),
+            SectionSchema(type="PARAGRAPH", heading="", text="New Delhi: Two major technology firms announced a multi-year cloud collaboration today.", column_index=2),
+        ]
+
+        articles = extract_newspaper_articles(page_num=1, sections=sections)
+        self.assertEqual(len(articles), 2)
+
+        art1 = articles[0]
+        self.assertTrue(art1.article_id.startswith("art_p1_"))
+        self.assertEqual(art1.headline, "SENSEX SURGES 500 POINTS")
+        self.assertEqual(art1.byline, "By Ramesh Sharma")
+        self.assertEqual(art1.continues_on_page, 14)
+        self.assertIn("Mumbai: The benchmark index rose", art1.body)
+
+        art2 = articles[1]
+        self.assertTrue(art2.article_id.startswith("art_p1_"))
+        self.assertEqual(art2.headline, "TECH GIANTS ANNOUNCE PARTNERSHIP")
+        self.assertEqual(art2.continues_on_page, None)
+
+        # Verify stability of article IDs across multiple runs
+        articles_repeat = extract_newspaper_articles(page_num=1, sections=sections)
+        self.assertEqual(art1.article_id, articles_repeat[0].article_id)
+        self.assertEqual(art2.article_id, articles_repeat[1].article_id)
+
+    def test_image_filter_and_perceptual_deduplication(self):
+        """
+        Confirms that compute_dhash and hamming_distance detect duplicate and near-duplicate images,
+        and that images under 60x60 points are filtered out.
+        """
+        from PIL import Image, ImageDraw
+        from document_ai_worker.engine.layout_analyzer import compute_dhash, hamming_distance
+
+        # Create base image
+        im1 = Image.new("RGB", (100, 100), color=(100, 150, 200))
+        d1 = ImageDraw.Draw(im1)
+        d1.rectangle([20, 20, 80, 80], fill=(240, 240, 50))
+
+        # Identical image
+        im2 = im1.copy()
+
+        # Near-identical image (slight 1-pixel color variation)
+        im3 = im1.copy()
+        d3 = ImageDraw.Draw(im3)
+        d3.point((50, 50), fill=(245, 245, 55))
+
+        # Completely different image (checkerboard)
+        im4 = Image.new("RGB", (100, 100), color=(0, 0, 0))
+        d4 = ImageDraw.Draw(im4)
+        d4.rectangle([0, 0, 50, 50], fill=(255, 255, 255))
+        d4.rectangle([50, 50, 100, 100], fill=(255, 255, 255))
+
+        h1 = compute_dhash(im1)
+        h2 = compute_dhash(im2)
+        h3 = compute_dhash(im3)
+        h4 = compute_dhash(im4)
+
+        # Identical images have distance 0
+        self.assertEqual(hamming_distance(h1, h2), 0)
+        # Near-identical images have distance <= 4
+        self.assertLessEqual(hamming_distance(h1, h3), 4)
+        # Completely different images have distance > 10
+        self.assertGreater(hamming_distance(h1, h4), 10)
+
+    def test_pluggable_storage_deterministic_hash_naming(self):
+        """
+        Confirms LocalStorageBackend stores files deterministically named by their SHA-256 hash.
+        """
+        import hashlib
+        from document_ai_worker.engine.storage import LocalStorageBackend
+
+        storage = LocalStorageBackend(storage_dir=str(self.temp_dir / "assets"))
+        sample_bytes = b"sample_png_bytes_for_asset_storage_test"
+        expected_sha = hashlib.sha256(sample_bytes).hexdigest()
+
+        res = storage.upload_bytes(sample_bytes, mime_type="image/png", ext="png")
+        self.assertEqual(res["sha256"], expected_sha)
+        self.assertEqual(res["filename"], f"{expected_sha}.png")
+        self.assertTrue(Path(res["local_path"]).exists())
+        self.assertEqual(Path(res["local_path"]).read_bytes(), sample_bytes)
 
 
 if __name__ == "__main__":

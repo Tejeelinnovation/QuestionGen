@@ -193,26 +193,14 @@ class PageRouter:
         #   3. Explicit handwriting keyword in text OR no commercial font names
         is_newspaper_hw_letter = False
 
-        # Collect all font names used on this page
-        page_font_names: set = set()
-        try:
-            for b in page.get_text("dict").get("blocks", []):
-                for l in b.get("lines", []):
-                    for s in l.get("spans", []):
-                        fn = s.get("font", "")
-                        if fn:
-                            page_font_names.add(fn.lower())
-        except Exception:
-            pass
-
         # Commercial typesetting font name signatures (NOT handwriting)
         COMMERCIAL_FONT_SIGS = (
             "poynter", "nimrod", "griffith", "caslon", "times", "arial", "helvetica",
             "georgia", "garamond", "myriad", "minion", "franklin", "frutiger",
         )
         has_commercial_fonts = any(
-            any(sig in fn for sig in COMMERCIAL_FONT_SIGS)
-            for fn in page_font_names
+            any(sig in (f[3] if len(f) > 3 else "").lower() or sig in (f[4] if len(f) > 4 else "").lower() for sig in COMMERCIAL_FONT_SIGS)
+            for f in fonts
         )
 
         if (
