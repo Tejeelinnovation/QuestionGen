@@ -3,13 +3,15 @@
 Evaluation Harness for Document Ingestion & Extraction Pipeline.
 
 Runs the real document classifier and extraction pipeline against golden samples in eval/golden/.
+Supports:
+  --mode full|fast (default: fast)
 Measures:
   - Document-type classification accuracy & confidence
-  - TOC Precision & Recall
+  - TOC Precision & Recall (or explicit "correct: no TOC produced")
   - Chapter page-range accuracy
-  - Per-page garbage rate
+  - Per-page script-aware garbage rate (Devanagari, Gujarati, Latin)
   - Empty-page count
-  - Image count under 60px (width < 60 or height < 60)
+  - Output section tiny image count (<60px from final SectionSchema diagrams)
   - Needs-review rate
   - Runtime per document
 
@@ -22,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import difflib
-import glob
 import json
 import logging
 import os
@@ -45,15 +46,23 @@ logger = logging.getLogger("eval_harness")
 import pymupdf as fitz
 from document_ai_worker.engine.document_classifier import classify_document, DocumentClassificationResult
 from document_ai_worker.engine.textbook_pipeline import TextbookPipeline
+from document_ai_worker.engine.handwriting_pipeline import HandwritingPipeline
 
 
 # ---------------------------------------------------------------------------
 # Metric Calculations
 # ---------------------------------------------------------------------------
 
-def compute_garbage_metrics(text: str) -> Tuple[int, int, float]:
+def compute_script_aware_garbage(text: str) -> Tuple[int, int, float]:
     """
-    Measures character corruption and unprintable noise.
+    Measures character corruption and unprintable noise across Latin, Devanagari, and Gujarati.
+    Uses language-independent signals:
+      - Broken font markers (replacement char \\ufffd, unresolved cid:\\d+)
+      - Control & unprintable byte codes (<32 excluding \\n,\\t,\\r, and 127-159)
+      - Intra-word illegal symbols (|&[]{}*^~\\`$@=<>_)
+      - Mixed-script corruption within tokens (Latin + Indic letters)
+      - Single-character non-word fragment density
+      - Token-length anomalies (>55 characters without spacing)
     Returns (total_chars, garbage_chars, garbage_rate).
     """
     if not text:
@@ -62,45 +71,110 @@ def compute_garbage_metrics(text: str) -> Tuple[int, int, float]:
     total = len(text)
     garbage = 0
 
-    # Explicit broken tokens
+    # 1. Explicit replacement & CID markers
     garbage += text.count("\ufffd") * 3
     garbage += len(re.findall(r"cid:\d+", text)) * 5
 
+    # 2. Control characters & non-printable bytes
     for ch in text:
         code = ord(ch)
-        # Standard ASCII printable & common whitespace
-        if 32 <= code <= 126 or ch in ("\n", "\t", "\r"):
-            continue
-        # Latin-1 Supplement (accented characters, common symbols)
-        if 160 <= code <= 255:
-            continue
-        # Devanagari (Hindi, Sanskrit, Marathi)
-        if 0x0900 <= code <= 0x097F:
-            continue
-        # Gujarati
-        if 0x0A80 <= code <= 0x0AFF:
-            continue
-        # General Punctuation (curly quotes, dashes, bullets)
-        if 0x2000 <= code <= 0x206F:
-            continue
-        # Mathematical Operators
-        if 0x2200 <= code <= 0x22FF:
-            continue
-
-        # Out-of-alphabet or control characters
-        if code < 32 or (127 <= code < 160):
+        if (code < 32 and ch not in ("\n", "\t", "\r")) or (127 <= code < 160):
             garbage += 2
-        elif not ch.isalnum() and not ch.isspace():
-            garbage += 1
+
+    # 3. Token-level analysis
+    tokens = text.split()
+    valid_single_latin = {"a", "i", "A", "I"}
+    valid_single_devanagari = {"व", "०", "१", "२", "३", "४", "५", "६", "७", "८", "९"}
+    valid_single_gujarati = {"આ", "એ", "ઓ", "ઈ", "ઉ", "૦", "૧", "૨", "૩", "૪", "૫", "૬", "૭", "૮", "૯"}
+    intra_word_symbols = set("|&[]{}*^~\\`$@=<>_")
+
+    for token in tokens:
+        # Check token length (glued words without spacing)
+        if len(token) > 55:
+            garbage += len(token) // 2
+        elif len(token) == 1:
+            ch = token[0]
+            code = ord(ch)
+            if "A" <= ch <= "Z" or "a" <= ch <= "z":
+                if ch not in valid_single_latin:
+                    garbage += 1
+            elif 0x0900 <= code <= 0x097F:
+                if ch not in valid_single_devanagari:
+                    garbage += 1
+            elif 0x0A80 <= code <= 0x0AFF:
+                if ch not in valid_single_gujarati:
+                    garbage += 1
+
+        # Check intra-word symbols (corrupted legacy font / OCR noise)
+        sym_count = sum(1 for c in token if c in intra_word_symbols)
+        alpha_count = sum(1 for c in token if c.isalnum())
+        if sym_count > 0 and alpha_count > 0:
+            garbage += sym_count * 2
+
+        # Check mixed-script (Latin + Indic letters within same token)
+        has_latin = any(("A" <= c <= "Z" or "a" <= c <= "z") for c in token)
+        has_devanagari = any(0x0900 <= ord(c) <= 0x097F for c in token)
+        has_gujarati = any(0x0A80 <= ord(c) <= 0x0AFF for c in token)
+        if (has_latin and has_devanagari) or (has_latin and has_gujarati) or (has_devanagari and has_gujarati):
+            garbage += len(token)
 
     rate = min(1.0, garbage / max(total, 1))
     return total, garbage, rate
 
 
-def compute_tiny_images(doc: fitz.Document) -> int:
+# Backwards compatibility alias
+compute_garbage_metrics = compute_script_aware_garbage
+
+
+def compute_section_tiny_images(pages_schema: List[Any]) -> int:
     """
-    Counts embedded images where width < 60px or height < 60px.
+    Counts diagram/image sections in final output where width < 60px or height < 60px.
+    Inspects SectionSchema items in final pages_schema only (not raw PDF image streams).
     """
+    tiny_count = 0
+    for page in pages_schema:
+        sections = getattr(page, "sections", []) or []
+        for sec in sections:
+            sec_type = getattr(sec, "type", "")
+            img_path = getattr(sec, "image_path", "")
+            img_data = getattr(sec, "image_data", "")
+            meta = getattr(sec, "metadata", {}) or {}
+
+            is_diagram = (
+                sec_type in ("DIAGRAM", "FIGURE", "IMAGE")
+                or bool(img_path)
+                or bool(img_data)
+                or (isinstance(meta, dict) and "bbox" in meta and sec_type == "DIAGRAM")
+            )
+            if not is_diagram:
+                continue
+
+            w, h = 0.0, 0.0
+            bbox = meta.get("bbox") if isinstance(meta, dict) else None
+            if bbox and len(bbox) >= 4:
+                w = abs(bbox[2] - bbox[0])
+                h = abs(bbox[3] - bbox[1])
+            elif img_path and os.path.exists(img_path):
+                try:
+                    from PIL import Image
+                    with Image.open(img_path) as im:
+                        w, h = im.size
+                except Exception:
+                    pass
+
+            if (w > 0 and h > 0) and (w < 60 or h < 60):
+                tiny_count += 1
+
+    return tiny_count
+
+
+# Legacy alias
+def compute_tiny_images(doc: Any) -> int:
+    """
+    Deprecated raw PDF object counter retained for legacy test compatibility.
+    """
+    if not hasattr(doc, "get_page_images"):
+        return 0
     tiny_count = 0
     seen_xrefs = set()
     for p_idx in range(len(doc)):
@@ -123,20 +197,23 @@ def match_chapters(
     extracted_chapters: List[Dict[str, Any]],
     expected_chapters: List[Dict[str, Any]],
     total_pages: int,
-) -> Tuple[float, float, float]:
+) -> Tuple[Optional[float], Optional[float], Optional[float], str]:
     """
-    Calculates (precision, recall, page_range_accuracy).
+    Calculates (precision, recall, page_range_accuracy, toc_status).
+    When expected TOC is empty:
+      - None extracted: returns (None, None, None, "correct: no TOC produced")
+      - Extracted > 0: returns (0.0, None, 0.0, "false positive: N chapters produced")
     """
     if not expected_chapters and not extracted_chapters:
-        return 1.0, 1.0, 1.0
+        return None, None, None, "correct: no TOC produced"
 
     if not expected_chapters and extracted_chapters:
         # False positives (hallucinated TOC)
-        return 0.0, 1.0, 0.0
+        return 0.0, None, 0.0, f"false positive: {len(extracted_chapters)} chapters produced"
 
     if expected_chapters and not extracted_chapters:
         # Missed TOC
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, f"missed TOC: 0/{len(expected_chapters)} chapters extracted"
 
     # Both have chapters: perform fuzzy title and number matching
     matched_expected = set()
@@ -182,8 +259,9 @@ def match_chapters(
     precision = tp / max(len(extracted_chapters), 1)
     recall = tp / max(len(expected_chapters), 1)
     avg_range_acc = sum(range_accuracies) / max(len(range_accuracies), 1) if range_accuracies else 0.0
+    status_str = f"{tp}/{len(expected_chapters)} chapters matched ({len(extracted_chapters)} extracted)"
 
-    return precision, recall, avg_range_acc
+    return precision, recall, avg_range_acc, status_str
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +274,7 @@ class EvalRunner:
         self.results_dir = results_dir
         self.thresholds_path = thresholds_path
         self.thresholds = self._load_thresholds()
+        self.manifest = self._load_manifest()
 
     def _load_thresholds(self) -> Dict[str, Any]:
         if self.thresholds_path.exists():
@@ -213,9 +292,41 @@ class EvalRunner:
             "max_runtime_increase_pct": 0.50,
         }
 
-    def evaluate_sample(self, sample_dir: Path) -> Dict[str, Any]:
+    def _load_manifest(self) -> Dict[str, Any]:
+        manifest_path = self.golden_dir / "MANIFEST.json"
+        if manifest_path.exists():
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {}
+
+    def _resolve_pdf_path(self, sample_dir: Path) -> Optional[Path]:
         """
-        Runs the full evaluation pipeline for a single sample.
+        Locates the PDF for a sample, checking local sample folder and manifest expected paths.
+        """
+        pdf_candidates = list(sample_dir.glob("*.pdf"))
+        if pdf_candidates:
+            return pdf_candidates[0]
+
+        # Check MANIFEST.json fallback paths
+        sample_name = sample_dir.name
+        manifest_samples = self.manifest.get("samples", {})
+        if sample_name in manifest_samples:
+            expected_paths = manifest_samples[sample_name].get("expected_local_paths", [])
+            for cand in expected_paths:
+                p = Path(cand)
+                if not p.is_absolute():
+                    p = REPO_ROOT / p
+                if p.exists():
+                    return p
+
+        return None
+
+    def evaluate_sample(self, sample_dir: Path, mode: str = "fast") -> Dict[str, Any]:
+        """
+        Runs the full evaluation pipeline for a single sample using the REAL extraction path.
         """
         expected_file = sample_dir / "expected.json"
         if not expected_file.exists():
@@ -224,9 +335,8 @@ class EvalRunner:
         with open(expected_file, "r", encoding="utf-8") as f:
             expected = json.load(f)
 
-        # Find PDF file
-        pdf_candidates = list(sample_dir.glob("*.pdf"))
-        if not pdf_candidates:
+        pdf_path = self._resolve_pdf_path(sample_dir)
+        if not pdf_path or not pdf_path.exists():
             return {
                 "sample": sample_dir.name,
                 "status": "SKIPPED_NO_PDF",
@@ -234,8 +344,7 @@ class EvalRunner:
                 "expected": expected,
             }
 
-        pdf_path = pdf_candidates[0]
-        print(f"--> Evaluating {sample_dir.name} ({pdf_path.name})...", flush=True)
+        print(f"--> Evaluating {sample_dir.name} ({pdf_path.name}) [mode={mode}]...", flush=True)
         start_time = time.time()
 
         # 1. Document Classification
@@ -243,13 +352,41 @@ class EvalRunner:
         exp_doc_type = expected.get("doc_type", "UNKNOWN")
         doc_type_correct = (class_res.kind.upper() == exp_doc_type.upper())
 
-        # 2. Extract Document with Real Pipeline
+        # 2. Extract Document with Real Pipeline (Same routing as cli_extractor.py)
+        engine_name = "Rule-Based Pipeline"
+        media_temp = str(REPO_ROOT / "eval" / "temp_assets")
+
+        if class_res.kind == "HANDWRITTEN_NOTES":
+            gemini_key = os.environ.get("GEMINI_API_KEY", "")
+            pipeline_hw = HandwritingPipeline(media_dir=media_temp, gemini_api_key=gemini_key)
+            chapters_schema, pages_schema, granularity = pipeline_hw.process_pdf(str(pdf_path))
+            engine_name = "Gemini Flash AI (Handwriting)" if gemini_key else "Tesseract/EasyOCR (Handwriting)"
+        else:
+            use_docling = os.environ.get("USE_DOCLING", "1") == "1"
+            extracted_successfully = False
+            if use_docling:
+                try:
+                    from document_ai_worker.engine.docling_pipeline import DoclingPipeline
+                    docling_pipeline = DoclingPipeline(media_dir=media_temp)
+                    chapters_schema, pages_schema, granularity = docling_pipeline.process_pdf(str(pdf_path))
+                    extracted_successfully = True
+                    engine_name = "Docling AI (DocLayNet)"
+                except Exception:
+                    pass
+
+            if not extracted_successfully:
+                pipeline_tb = TextbookPipeline(media_dir=media_temp)
+                engine_name = "TextbookPipeline (Rule-Based Fallback)"
+                render_pixels = (mode == "full")
+                chapters_schema, pages_schema, granularity = pipeline_tb.process_pdf(
+                    str(pdf_path),
+                    extract_images=True,
+                    render_image_pixels=render_pixels,
+                )
+
         doc = fitz.open(str(pdf_path))
         total_pages = len(doc)
-
-        pipeline = TextbookPipeline(media_dir=str(REPO_ROOT / "eval" / "temp_assets"))
-        chapters_schema, pages_schema, granularity = pipeline.process_pdf(str(pdf_path), extract_images=False)
-
+        doc.close()
         runtime = time.time() - start_time
 
         # 3. Analyze TOC
@@ -263,9 +400,9 @@ class EvalRunner:
             for c in chapters_schema
         ]
         expected_chapters = expected.get("chapters", [])
-        toc_prec, toc_rec, range_acc = match_chapters(extracted_chapters, expected_chapters, total_pages)
+        toc_prec, toc_rec, range_acc, toc_status = match_chapters(extracted_chapters, expected_chapters, total_pages)
 
-        # 4. Analyze Per-Page Garbage & Empty Pages
+        # 4. Analyze Per-Page Script-Aware Garbage & Empty Pages
         empty_page_count = 0
         page_garbage_rates = []
         review_flagged_pages = 0
@@ -278,16 +415,15 @@ class EvalRunner:
                 page_garbage_rates.append(1.0)
                 continue
 
-            _, _, g_rate = compute_garbage_metrics(raw)
+            _, _, g_rate = compute_script_aware_garbage(raw)
             page_garbage_rates.append(g_rate)
             if g_rate > 0.20:
                 review_flagged_pages += 1
 
         avg_garbage_rate = sum(page_garbage_rates) / max(len(page_garbage_rates), 1)
 
-        # 5. Image Analysis (<60px)
-        tiny_image_count = compute_tiny_images(doc)
-        doc.close()
+        # 5. Image Analysis (<60px from final output SectionSchema diagrams)
+        tiny_image_count = compute_section_tiny_images(pages_schema)
 
         # 6. Needs Review Rate
         if class_res.confidence < 0.60:
@@ -297,6 +433,8 @@ class EvalRunner:
         return {
             "sample": sample_dir.name,
             "status": "COMPLETED",
+            "mode": mode,
+            "engine": engine_name,
             "pdf_name": pdf_path.name,
             "total_pages": total_pages,
             "doc_type_predicted": class_res.kind,
@@ -307,9 +445,10 @@ class EvalRunner:
             "has_toc_expected": expected.get("has_toc", False),
             "extracted_chapters_count": len(extracted_chapters),
             "expected_chapters_count": len(expected_chapters),
-            "toc_precision": round(toc_prec, 3),
-            "toc_recall": round(toc_rec, 3),
-            "page_range_accuracy": round(range_acc, 3),
+            "toc_precision": round(toc_prec, 3) if toc_prec is not None else None,
+            "toc_recall": round(toc_rec, 3) if toc_rec is not None else None,
+            "toc_status": toc_status,
+            "page_range_accuracy": round(range_acc, 3) if range_acc is not None else None,
             "garbage_rate": round(avg_garbage_rate, 4),
             "empty_page_count": empty_page_count,
             "tiny_image_count": tiny_image_count,
@@ -319,7 +458,7 @@ class EvalRunner:
             "notes": expected.get("notes", ""),
         }
 
-    def run_all(self, target_sample: Optional[str] = None) -> Dict[str, Any]:
+    def run_all(self, target_sample: Optional[str] = None, mode: str = "fast") -> Dict[str, Any]:
         """
         Runs evaluation on all golden sample folders or a specific targeted sample.
         """
@@ -333,17 +472,15 @@ class EvalRunner:
 
         results: Dict[str, Any] = {}
         for s_dir in sample_dirs:
-            res = self.evaluate_sample(s_dir)
+            res = self.evaluate_sample(s_dir, mode=mode)
             results[s_dir.name] = res
 
-        # Generate Confusion Matrix
         confusion_matrix = self._compute_confusion_matrix(results)
-
-        # Baseline extraction for newspaper
         newspaper_baseline = results.get("newspaper_36p")
 
         return {
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            "mode": mode,
             "samples": results,
             "confusion_matrix": confusion_matrix,
             "newspaper_baseline": newspaper_baseline,
@@ -363,32 +500,46 @@ class EvalRunner:
 
     def print_report(self, run_data: Dict[str, Any]) -> None:
         samples = run_data["samples"]
+        mode = run_data.get("mode", "fast")
 
-        print("\n" + "=" * 115)
-        print("DOCUMENT INGESTION & EXTRACTION PIPELINE EVALUATION HARNESS")
-        print("=" * 115)
+        print("\n" + "=" * 135)
+        print(f"DOCUMENT INGESTION & EXTRACTION PIPELINE EVALUATION HARNESS [MODE: {mode.upper()}]")
+        print("=" * 135)
 
-        # Table Header
         header = (
-            f"{'Sample Name':<22} | {'Doc-Type (Conf)':<20} | {'TOC P/R':<11} | {'Range Acc':<9} | "
-            f"{'Garbage':<8} | {'Empty':<5} | {'<60px':<5} | {'Review':<7} | {'Runtime':<7}"
+            f"{'Sample Name':<20} | {'Doc-Type (Conf)':<18} | {'Engine Used':<25} | "
+            f"{'TOC (P/R or Status)':<24} | {'Range Acc':<9} | {'Garbage':<8} | "
+            f"{'Empty':<5} | {'<60px':<5} | {'Review':<7} | {'Runtime':<7}"
         )
         print(header)
-        print("-" * 115)
+        print("-" * 135)
+
+        failures = []
 
         for name, r in samples.items():
             if r.get("status") == "SKIPPED_NO_PDF":
-                print(f"{name:<22} | {'[NO PDF - PLACEHOLDER]':<20} | {'-':<11} | {'-':<9} | {'-':<8} | {'-':<5} | {'-':<5} | {'-':<7} | {'-':<7}")
+                print(f"{name:<20} | {'[NO PDF - PLACEHOLDER]':<18} | {'-':<25} | {'-':<24} | {'-':<9} | {'-':<8} | {'-':<5} | {'-':<5} | {'-':<7} | {'-':<7}")
                 continue
 
             if r.get("status") != "COMPLETED":
-                print(f"{name:<22} | {r.get('error', 'ERROR'):<20} | {'-':<11} | {'-':<9} | {'-':<8} | {'-':<5} | {'-':<5} | {'-':<7} | {'-':<7}")
+                print(f"{name:<20} | {r.get('error', 'ERROR'):<18} | {'-':<25} | {'-':<24} | {'-':<9} | {'-':<8} | {'-':<5} | {'-':<5} | {'-':<7} | {'-':<7}")
                 continue
 
-            match_sym = "Y" if r["doc_type_correct"] else "N"
-            doc_type_str = f"{match_sym} {r['doc_type_predicted'][:9]} ({r['confidence']:.2f})"
-            toc_str = f"{r['toc_precision']:.2f}/{r['toc_recall']:.2f}"
-            range_str = f"{r['page_range_accuracy'] * 100:.1f}%"
+            if not r["doc_type_correct"]:
+                failures.append((name, r["doc_type_expected"], r["doc_type_predicted"], r["confidence"]))
+                match_sym = "[FAIL]"
+            else:
+                match_sym = "[OK]"
+
+            doc_type_str = f"{match_sym} {r['doc_type_predicted'][:8]} ({r['confidence']:.2f})"
+            engine_str = r.get("engine", "Pipeline")[:25]
+
+            if r["toc_precision"] is None:
+                toc_str = "n/a (no TOC)"
+            else:
+                toc_str = f"{r['toc_precision']:.2f}/{r['toc_recall']:.2f}"
+
+            range_str = "n/a" if r["page_range_accuracy"] is None else f"{r['page_range_accuracy'] * 100:.1f}%"
             garbage_str = f"{r['garbage_rate'] * 100:.2f}%"
             empty_str = str(r["empty_page_count"])
             tiny_str = str(r["tiny_image_count"])
@@ -396,22 +547,28 @@ class EvalRunner:
             runtime_str = f"{r['runtime_seconds']:.1f}s"
 
             print(
-                f"{name:<22} | {doc_type_str:<20} | {toc_str:<11} | {range_str:<9} | "
-                f"{garbage_str:<8} | {empty_str:<5} | {tiny_str:<5} | {review_str:<7} | {runtime_str:<7}"
+                f"{name:<20} | {doc_type_str:<18} | {engine_str:<25} | {toc_str:<24} | "
+                f"{range_str:<9} | {garbage_str:<8} | {empty_str:<5} | {tiny_str:<5} | "
+                f"{review_str:<7} | {runtime_str:<7}"
             )
 
-        print("-" * 115)
+        print("-" * 135)
+
+        if failures:
+            print("\n[CLASSIFICATION FAILURES DETECTED]")
+            for f_name, f_exp, f_pred, f_conf in failures:
+                print(f"  [FAIL] Sample '{f_name}': Expected {f_exp}, Got {f_pred} (confidence: {f_conf:.2f})")
 
         # Confusion Matrix
         cm = run_data.get("confusion_matrix", {})
         print("\n--- CONFUSION MATRIX (Expected vs Predicted) ---")
         if cm:
             all_preds = sorted({p for preds in cm.values() for p in preds.keys()})
-            cm_header = f"{'Expected \\ Pred':<20} | " + " | ".join(f"{p:<12}" for p in all_preds)
+            cm_header = f"{'Expected \\ Pred':<20} | " + " | ".join(f"{p:<14}" for p in all_preds)
             print(cm_header)
             print("-" * len(cm_header))
             for exp, preds in cm.items():
-                row_str = f"{exp:<20} | " + " | ".join(f"{preds.get(p, 0):<12}" for p in all_preds)
+                row_str = f"{exp:<20} | " + " | ".join(f"{preds.get(p, 0):<14}" for p in all_preds)
                 print(row_str)
         else:
             print("No completed samples to populate confusion matrix.")
@@ -419,21 +576,22 @@ class EvalRunner:
         # Baseline Report for Newspaper
         nb = run_data.get("newspaper_baseline")
         if nb and nb.get("status") == "COMPLETED":
-            print("\n" + "=" * 70)
-            print("NEWSPAPER BASELINE REPORT (Times of India 36-page Broadsheet)")
-            print("=" * 70)
+            print("\n" + "=" * 75)
+            print(f"NEWSPAPER BASELINE REPORT (Times of India 36-page Broadsheet) [MODE: {mode.upper()}]")
+            print("=" * 75)
             print(f"Sample Name:             {nb['sample']}")
+            print(f"Extraction Engine:       {nb['engine']}")
             print(f"Total Pages:             {nb['total_pages']}")
             print(f"Predicted Kind:          {nb['doc_type_predicted']} (Expected: {nb['doc_type_expected']})")
             print(f"Classification Score:    {nb['confidence']} (Correct: {nb['doc_type_correct']})")
             print(f"Per-Page Garbage Rate:   {nb['garbage_rate'] * 100:.2f}%")
             print(f"Empty Page Count:        {nb['empty_page_count']}")
-            print(f"Tiny Images (<60px):     {nb['tiny_image_count']}")
-            print(f"Extracted TOC Entries:   {nb['extracted_chapters_count']} (Expected: {nb['expected_chapters_count']})")
+            print(f"Tiny Images (<60px):     {nb['tiny_image_count']} (from final output section diagrams)")
+            print(f"Extracted TOC Status:    {nb['toc_status']}")
             print(f"Needs-Review Rate:       {nb['needs_review_rate'] * 100:.1f}%")
             print(f"Total Extraction Time:   {nb['runtime_seconds']:.2f}s")
             print(f"Evidence:                {nb['evidence']}")
-            print("=" * 70)
+            print("=" * 75)
 
     def save_and_check_regression(self, run_data: Dict[str, Any]) -> int:
         """
@@ -446,7 +604,6 @@ class EvalRunner:
 
         # Find previous runs
         past_files = sorted(self.results_dir.glob("*.json"))
-        # Exclude current file if it already exists
         past_files = [f for f in past_files if f.name != current_file.name]
 
         # Save current run
@@ -484,48 +641,56 @@ class EvalRunner:
                     f"Sample '{name}': doc_type accuracy regressed from {prev['doc_type_predicted']} to {curr['doc_type_predicted']}"
                 )
 
-            # 2. TOC precision / recall drop
-            toc_prec_drop = prev["toc_precision"] - curr["toc_precision"]
-            if toc_prec_drop > self.thresholds.get("max_toc_precision_drop", 0.05):
-                regressions.append(
-                    f"Sample '{name}': TOC precision dropped by {toc_prec_drop:.3f} (tolerance: {self.thresholds['max_toc_precision_drop']})"
-                )
+            # 2. TOC precision drop / false positive regression
+            if prev.get("toc_precision") is not None and curr.get("toc_precision") is not None:
+                toc_prec_drop = prev["toc_precision"] - curr["toc_precision"]
+                if toc_prec_drop > self.thresholds.get("max_toc_precision_drop", 0.05):
+                    regressions.append(
+                        f"Sample '{name}': TOC precision dropped by {toc_prec_drop:.3f} (tolerance: {self.thresholds['max_toc_precision_drop']})"
+                    )
+            elif curr.get("expected_chapters_count", 0) == 0:
+                if curr.get("extracted_chapters_count", 0) > 0 and prev.get("extracted_chapters_count", 0) == 0:
+                    regressions.append(
+                        f"Sample '{name}': Hallucinated {curr['extracted_chapters_count']} chapters when none were expected."
+                    )
 
-            toc_rec_drop = prev["toc_recall"] - curr["toc_recall"]
-            if toc_rec_drop > self.thresholds.get("max_toc_recall_drop", 0.05):
-                regressions.append(
-                    f"Sample '{name}': TOC recall dropped by {toc_rec_drop:.3f} (tolerance: {self.thresholds['max_toc_recall_drop']})"
-                )
+            # 3. TOC recall drop
+            if prev.get("toc_recall") is not None and curr.get("toc_recall") is not None:
+                toc_rec_drop = prev["toc_recall"] - curr["toc_recall"]
+                if toc_rec_drop > self.thresholds.get("max_toc_recall_drop", 0.05):
+                    regressions.append(
+                        f"Sample '{name}': TOC recall dropped by {toc_rec_drop:.3f} (tolerance: {self.thresholds['max_toc_recall_drop']})"
+                    )
 
-            # 3. Garbage rate increase
+            # 4. Garbage rate increase
             garbage_inc = curr["garbage_rate"] - prev["garbage_rate"]
             if garbage_inc > self.thresholds.get("max_garbage_rate_increase", 0.03):
                 regressions.append(
                     f"Sample '{name}': Garbage rate worsened by +{garbage_inc:.3f} (tolerance: +{self.thresholds['max_garbage_rate_increase']})"
                 )
 
-            # 4. Empty page count increase
+            # 5. Empty page count increase
             empty_inc = curr["empty_page_count"] - prev["empty_page_count"]
             if empty_inc > self.thresholds.get("max_empty_page_count_increase", 0):
                 regressions.append(
                     f"Sample '{name}': Empty page count increased by +{empty_inc} (tolerance: +{self.thresholds['max_empty_page_count_increase']})"
                 )
 
-            # 5. Tiny image noise increase
+            # 6. Tiny image noise increase
             tiny_inc = curr["tiny_image_count"] - prev["tiny_image_count"]
             if tiny_inc > self.thresholds.get("max_tiny_image_count_increase", 5):
                 regressions.append(
                     f"Sample '{name}': Tiny image count (<60px) increased by +{tiny_inc} (tolerance: +{self.thresholds['max_tiny_image_count_increase']})"
                 )
 
-            # 6. Needs review rate increase
+            # 7. Needs review rate increase
             review_inc = curr["needs_review_rate"] - prev["needs_review_rate"]
             if review_inc > self.thresholds.get("max_needs_review_rate_increase", 0.05):
                 regressions.append(
                     f"Sample '{name}': Needs-review rate worsened by +{review_inc:.3f} (tolerance: +{self.thresholds['max_needs_review_rate_increase']})"
                 )
 
-            # 7. Runtime regression
+            # 8. Runtime regression
             prev_runtime = max(prev.get("runtime_seconds", 1.0), 0.5)
             runtime_ratio = (curr["runtime_seconds"] - prev_runtime) / prev_runtime
             if runtime_ratio > self.thresholds.get("max_runtime_increase_pct", 0.50):
@@ -554,6 +719,7 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8")
 
     parser = argparse.ArgumentParser(description="Document Pipeline Evaluation Harness")
+    parser.add_argument("--mode", type=str, choices=["fast", "full"], default="fast", help="Extraction mode (fast: metadata diagrams; full: full raster visual generation)")
     parser.add_argument("--sample", type=str, default=None, help="Name of specific sample folder in eval/golden to run")
     parser.add_argument("--no-save", action="store_true", help="Do not save result to eval/results")
     args = parser.parse_args()
@@ -563,7 +729,7 @@ def main():
     thresholds_path = REPO_ROOT / "eval" / "thresholds.json"
 
     runner = EvalRunner(golden_dir=golden_dir, results_dir=results_dir, thresholds_path=thresholds_path)
-    run_data = runner.run_all(target_sample=args.sample)
+    run_data = runner.run_all(target_sample=args.sample, mode=args.mode)
     runner.print_report(run_data)
 
     if args.no_save:

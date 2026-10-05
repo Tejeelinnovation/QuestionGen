@@ -1,0 +1,97 @@
+{
+  "_version": "1.0",
+  "_description": "Evaluation golden samples manifest. Large PDF binaries are excluded from Git to prevent repository bloat. To run the evaluation harness locally, place the PDF files at the expected local paths or run eval/run.py, which automatically checks candidate locations.",
+  "samples": {
+    "newspaper_36p": {
+      "filename": "Times of India_TOIDelhiBS-Delhi_20261001.pdf",
+      "sha256": "5a6d7486b2070eb952bb6753bbb4914eeb07b9b377a68d220aad12a4eecad2a5",
+      "expected_local_paths": [
+        "eval/golden/newspaper_36p/sample.pdf",
+        "D:\\PDFS_For the Testing\\NewsPaper\\Times of India_TOIDelhiBS-Delhi_20261001.pdf"
+      ],
+      "doc_type": "NEWSPAPER",
+      "page_count": 36,
+      "size_bytes": 50198933,
+      "notes": "Times of India Delhi broadsheet edition (2026-10-01)"
+    },
+    "single_chapter": {
+      "filename": "kesy101.pdf",
+      "sha256": "426c13fca655cac86c3822ade4c77a32aa453b9572489f4a20ad8339aa08d60b",
+      "expected_local_paths": [
+        "eval/golden/single_chapter/sample.pdf",
+        "D:\\PDFS_For the Testing\\SOCIOLOGY\\kesy101.pdf"
+      ],
+      "doc_type": "SINGLE_CHAPTER",
+      "page_count": 20,
+      "size_bytes": 4474983,
+      "notes": "NCERT Class 11 Sociology Chapter 1 (Sociology and Society)"
+    },
+    "hindi_gujarati_book": {
+      "filename": "khat101.pdf",
+      "sha256": "499384d9f5a5e1831a90271adf5682be3376600b150a18784da547f47948b395",
+      "expected_local_paths": [
+        "eval/golden/hindi_gujarati_book/sample.pdf",
+        "D:\\PDFS_For the Testing\\Hindi\\khat101.pdf"
+      ],
+      "doc_type": "SINGLE_CHAPTER",
+      "page_count": 22,
+      "size_bytes": 2057301,
+      "notes": "NCERT Class 11 Hindi Antara Chapter 1 (Premchand)"
+    },
+    "clean_textbook": {
+      "filename": "clean_textbook.pdf",
+      "sha256": null,
+      "expected_local_paths": [
+        "eval/golden/clean_textbook/sample.pdf"
+      ],
+      "doc_type": "FULL_BOOK",
+      "page_count": null,
+      "size_bytes": null,
+      "notes": "Placeholder awaiting user-supplied full textbook with multi-chapter TOC"
+    },
+    "worksheet": {
+      "filename": "worksheet_sample.pdf",
+      "sha256": null,
+      "expected_local_paths": [
+        "eval/golden/worksheet/sample.pdf"
+      ],
+      "doc_type": "WORKSHEET_OR_EXAM",
+      "page_count": null,
+      "size_bytes": null,
+      "notes": "Placeholder awaiting user-supplied exam paper or worksheet"
+    },
+    "scanned_book": {
+      "filename": "scanned_book_sample.pdf",
+      "sha256": null,
+      "expected_local_paths": [
+        "eval/golden/scanned_book/sample.pdf"
+      ],
+      "doc_type": "FULL_BOOK",
+      "page_count": null,
+      "size_bytes": null,
+      "notes": "Placeholder awaiting user-supplied scanned book PDF"
+    },
+    "handwritten_sheet": {
+      "filename": "handwritten_notes_sample.pdf",
+      "sha256": null,
+      "expected_local_paths": [
+        "eval/golden/handwritten_sheet/sample.pdf"
+      ],
+      "doc_type": "HANDWRITTEN_NOTES",
+      "page_count": null,
+      "size_bytes": null,
+      "notes": "Placeholder awaiting user-supplied handwritten notes PDF"
+    },
+    "magazine": {
+      "filename": "magazine_sample.pdf",
+      "sha256": null,
+      "expected_local_paths": [
+        "eval/golden/magazine/sample.pdf"
+      ],
+      "doc_type": "MAGAZINE",
+      "page_count": null,
+      "size_bytes": null,
+      "notes": "Placeholder awaiting user-supplied magazine PDF"
+    }
+  }
+}

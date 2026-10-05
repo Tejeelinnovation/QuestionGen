@@ -53,6 +53,7 @@ class TextbookPipeline:
         max_pages: Optional[int] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
         extract_images: bool = True,
+        render_image_pixels: bool = True,
     ) -> Tuple[List[ChapterSchema], List[PageSchema], str]:
         """
         Executes full textbook extraction:
@@ -73,7 +74,13 @@ class TextbookPipeline:
         pages: List[PageSchema] = []
         for p_idx in range(pages_to_process):
             page_num = p_idx + 1
-            page_schema = self._extract_single_page(doc, page_num, toc_entries, extract_images=extract_images)
+            page_schema = self._extract_single_page(
+                doc,
+                page_num,
+                toc_entries,
+                extract_images=extract_images,
+                render_image_pixels=render_image_pixels,
+            )
             pages.append(page_schema)
             if progress_callback:
                 progress_callback(page_num, pages_to_process, f"Extracting page {page_num} of {pages_to_process} (layout & LaTeX)...")
@@ -164,6 +171,7 @@ class TextbookPipeline:
         page_num: int,
         toc_entries: List[ChapterSchema],
         extract_images: bool = True,
+        render_image_pixels: bool = True,
     ) -> PageSchema:
         """
         Parses a single page preserving columns, LaTeX, diagrams, and activities.
@@ -179,7 +187,11 @@ class TextbookPipeline:
                 break
 
         # 2. Extract Embedded Images
-        extracted_images = self._extract_page_images(doc, page, page_num) if extract_images else []
+        extracted_images = (
+            self._extract_page_images(doc, page, page_num, render_image_pixels=render_image_pixels)
+            if extract_images
+            else []
+        )
 
         # 3. Analyze Column Layout & Sort Blocks
         raw_blocks = page.get_text("blocks")
@@ -372,11 +384,19 @@ class TextbookPipeline:
 
         return bool(formulas), formulas
 
-    def _extract_page_images(self, doc: fitz.Document, page: fitz.Page, page_num: int) -> List[Dict[str, Any]]:
+    def _extract_page_images(
+        self,
+        doc: fitz.Document,
+        page: fitz.Page,
+        page_num: int,
+        render_image_pixels: bool = True,
+    ) -> List[Dict[str, Any]]:
         """
         Extracts images on the page using visual viewport clipping.
         This captures full color, alpha masks, vector diagrams, and annotations
         without producing solid black rectangles.
+        When render_image_pixels=False, extracts bounding boxes and metadata without
+        heavy raster pixmap rendering.
         """
         images = []
         for img_idx, img_info in enumerate(page.get_images(full=True)):
@@ -388,6 +408,17 @@ class TextbookPipeline:
                 rect = rects[0]
                 # Filter out tiny decoration icons (<35x35)
                 if rect.width < 35 or rect.height < 35:
+                    continue
+
+                if not render_image_pixels:
+                    images.append({
+                        "path": "",
+                        "filename": f"page_{page_num}_fig_{img_idx + 1}.png",
+                        "data": "",
+                        "bbox": list(rect),
+                        "linked": False,
+                        "caption": "",
+                    })
                     continue
 
                 # Visual viewport clipping directly from the page at 200 DPI
