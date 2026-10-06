@@ -463,10 +463,6 @@ def _process_docling_chunk_worker(
     except Exception:
         pass
 
-    import pymupdf as fitz
-    import tempfile
-    import uuid
-    import os
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
