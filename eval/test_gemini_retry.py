@@ -23,6 +23,23 @@ class TestGeminiRetry(unittest.TestCase):
     def setUpClass(cls):
         # Golden PDF path for rendering a test page
         cls.pdf_path = str(Path("eval/golden/single_chapter/sample.pdf"))
+        if not Path(cls.pdf_path).exists():
+            import tempfile, fitz
+            cls._tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+            doc = fitz.open()
+            page = doc.new_page(width=300, height=300)
+            page.insert_text((50, 50), "Test Chapter Page Content")
+            doc.save(cls._tmp.name)
+            doc.close()
+            cls.pdf_path = cls._tmp.name
+
+    @classmethod
+    def tearDownClass(cls):
+        if hasattr(cls, "_tmp"):
+            try:
+                Path(cls._tmp.name).unlink(missing_ok=True)
+            except Exception:
+                pass
 
     @patch("requests.post")
     def test_gemini_retry_success(self, mock_post):
