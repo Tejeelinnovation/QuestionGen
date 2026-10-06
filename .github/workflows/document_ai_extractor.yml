@@ -101,22 +101,22 @@ jobs:
           if [ -n "$CALLBACK_URL" ]; then
             echo "Notifying Django backend of runner failure: $CALLBACK_URL"
             python -c "
-import hashlib, hmac, json, os, requests, time
-url = os.environ.get('CALLBACK_URL', '')
-job_id = os.environ.get('JOB_ID', '')
-secret = os.environ.get('WEBHOOK_SECRET', '')
-payload = {'job_id': job_id, 'status': 'FAILED', 'error_message': 'GitHub Actions runner workflow failed during extraction. Check GitHub Actions workflow run logs for full details.'}
-raw = json.dumps(payload).encode('utf-8')
-headers = {'Content-Type': 'application/json'}
-if secret:
-    ts_str = str(int(time.time()))
-    to_sign = f'{ts_str}.'.encode('utf-8') + raw
-    sig = hmac.new(secret.encode('utf-8'), to_sign, hashlib.sha256).hexdigest()
-    headers['X-Ingestion-Timestamp'] = ts_str
-    headers['X-Ingestion-Signature'] = f'sha256={sig}'
-try:
-    requests.post(url, data=raw, headers=headers, timeout=15)
-except Exception as e:
-    print('Failed notifying webhook:', e)
-" || true
+          import hashlib, hmac, json, os, requests, time
+          url = os.environ.get('CALLBACK_URL', '')
+          job_id = os.environ.get('JOB_ID', '')
+          secret = os.environ.get('WEBHOOK_SECRET', '')
+          payload = {'job_id': job_id, 'status': 'FAILED', 'error_message': 'GitHub Actions runner workflow failed during extraction. Check GitHub Actions workflow run logs for full details.'}
+          raw = json.dumps(payload).encode('utf-8')
+          headers = {'Content-Type': 'application/json'}
+          if secret:
+              ts_str = str(int(time.time()))
+              to_sign = f'{ts_str}.'.encode('utf-8') + raw
+              sig = hmac.new(secret.encode('utf-8'), to_sign, hashlib.sha256).hexdigest()
+              headers['X-Ingestion-Timestamp'] = ts_str
+              headers['X-Ingestion-Signature'] = f'sha256={sig}'
+          try:
+              requests.post(url, data=raw, headers=headers, timeout=15)
+          except Exception as e:
+              print('Failed notifying webhook:', e)
+          " || true
           fi
