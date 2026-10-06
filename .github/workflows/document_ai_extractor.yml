@@ -81,6 +81,9 @@ jobs:
           DRIVE_TOKEN_JSON: ${{ github.event.client_payload.drive_token_json || secrets.GOOGLE_DRIVE_USER_TOKEN_JSON || '' }}
           DRIVE_FOLDER_ID: ${{ github.event.client_payload.drive_folder_id || secrets.GOOGLE_DRIVE_FOLDER_ID || '' }}
           GEMINI_API_KEY: ${{ github.event.client_payload.gemini_api_key || secrets.GEMINI_API_KEY || '' }}
+          OMP_NUM_THREADS: "4"
+          MKL_NUM_THREADS: "4"
+          OPENBLAS_NUM_THREADS: "4"
         run: |
           echo "Starting Document AI Worker for Job #$JOB_ID..."
           PYTHONPATH=.:document_ai_worker python document_ai_worker/cli_extractor.py \

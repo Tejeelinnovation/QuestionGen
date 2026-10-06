@@ -63,6 +63,63 @@ VALID_SHORT_LABELS: Set[str] = {
     "सं.", "क्र.", "पृ.", "रु.", "कि.", "मी.", "डॉ.", "श्री", "श्रीमती",
 }
 
+# Shifted markers typical of NCERT InDesign subset TrueType fonts shifted by +3 ASCII
+SHIFTED_FONT_MARKERS = {
+    "wkh", "tkh", "dqg", "ri", "iurp", "wklv", "tklv", "zlwk", "zklfk", "wr", "lq", "lv", "duh", "xqlw", "kdvehhq"
+}
+
+def detect_caesar_shift(text: str) -> bool:
+    """
+    Detects unmapped +3 ASCII Caesar font shifts commonly found in NCERT/state board PDFs
+    where embedded TrueType subset fonts lack standard /ToUnicode CMaps.
+    """
+    if not text or len(text) < 25:
+        return False
+    tokens = [t.lower() for t in re.findall(r"[A-Za-z\\\[\]]{2,}", text)]
+    if not tokens:
+        return False
+    match_count = sum(1 for t in tokens if t in SHIFTED_FONT_MARKERS)
+    return match_count >= 2
+
+def unshift_char(c: str) -> str:
+    code = ord(c)
+    if 68 <= code <= 90:  # 'D'-'Z' -> 'A'-'W'
+        return chr(code - 3)
+    elif 65 <= code <= 67:  # 'A'-'C' -> 'X'-'Z'
+        return chr(code - 3 + 26)
+    elif code == 91:  # '[' -> 'X'
+        return 'X'
+    elif code == 92:  # '\' -> 'Y'
+        return 'Y'
+    elif code == 93:  # ']' -> 'Z'
+        return 'Z'
+    elif 100 <= code <= 122:  # 'd'-'z' -> 'a'-'w'
+        return chr(code - 3)
+    elif 97 <= code <= 99:  # 'a'-'c' -> 'x'-'z'
+        return chr(code - 3 + 26)
+    return c
+
+def unshift_ncert_token(token: str) -> str:
+    if len(token) > 1 and token[0].islower() and token[1].isupper():
+        # TitleCased word whose first letter was preserved:
+        # e.g. 'tKH' -> 'The', 'pUXVVLDQ' -> 'Prussian', 'oUJDQLF' -> 'Organic'
+        first_letter = token[0].upper()
+        rest = "".join(unshift_char(c).lower() for c in token[1:])
+        return first_letter + rest
+    if token.isupper() and len(token) > 1:
+        # All-caps shifted word, e.g. 'FRQFHQWUDWHG' -> 'concentrated'
+        return "".join(unshift_char(c).lower() for c in token)
+    return "".join(unshift_char(c) for c in token)
+
+def unshift_ncert_text(text: str) -> str:
+    """
+    Deterministically unshifts +3 Caesar cipher font encoding in sub-millisecond time.
+    """
+    if not text:
+        return text
+    return re.sub(r"[A-Za-z\\\[\]]+", lambda m: unshift_ncert_token(m.group(0)), text)
+
+
 # Common auxiliaries and prepositions that indicate glued words when suffix-attached
 # ---------------------------------------------------------------------------
 # Hindi wordlist-based quality ratio (A2)
@@ -492,6 +549,12 @@ def clean_page_text(
     flags: List[str] = []
     stats: Dict[str, int] = {}
     current_text = text
+
+    # Step 0: Detect and decode NCERT / InDesign +3 Caesar font encoding shift
+    if detect_caesar_shift(current_text):
+        current_text = unshift_ncert_text(current_text)
+        flags.append("caesar_font_unshifted")
+        stats["caesar_font_unshifted"] = 1
 
     # Step 1: Rebuild from PyMuPDF word positions if glued words are suspected
     initial_glued = detect_glued_words(current_text)

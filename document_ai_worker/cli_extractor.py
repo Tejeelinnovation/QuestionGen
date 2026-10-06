@@ -509,85 +509,99 @@ def main():
                     elif not gemini_key:
                         p.quality_flags.append("needs_review_no_gemini_key")
 
-        # 3. Direct Google Drive Diagram Uploading from 16GB runner
+        # 3. Direct Google Drive Diagram Uploading from 16GB runner (Parallel Multi-threaded)
         drive_uploader = WorkerGoogleDriveUploader()
         is_drive_active = drive_uploader.is_configured()
         logger.info(f"Worker Google Drive Uploader active: {is_drive_active}")
 
-        diagram_targets = []
+        diagram_items = []
         for p in pages:
             for s_idx, sec in enumerate(p.sections):
                 raw_b64 = getattr(sec, "image_data", "")
                 img_p = getattr(sec, "image_path", "")
-                if (raw_b64 and raw_b64.startswith("data:image/")) or (img_p and os.path.exists(img_p)):
-                    diagram_targets.append((p, s_idx, sec))
+                raw_bytes = b""
+                ext = "png"
+                mime = "image/png"
 
-        total_diagrams = len(diagram_targets)
+                if raw_b64 and raw_b64.startswith("data:image/"):
+                    header, encoded = raw_b64.split(",", 1)
+                    if "jpeg" in header or "jpg" in header:
+                        ext = "jpg"
+                        mime = "image/jpeg"
+                    try:
+                        raw_bytes = base64.b64decode(encoded)
+                    except Exception:
+                        pass
+                elif img_p and os.path.exists(img_p):
+                    ext = img_p.split(".")[-1].lower()
+                    mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
+                    try:
+                        with open(img_p, "rb") as imf:
+                            raw_bytes = imf.read()
+                    except Exception as read_err:
+                        logger.warning(f"Could not read image file {img_p}: {read_err}")
+
+                # Filter out micro decorative icons/bullets (< 400 bytes)
+                if raw_bytes and len(raw_bytes) >= 400:
+                    filename = f"job_{args.job_id}_p{p.page_number}_fig_{s_idx + 1}.{ext}"
+                    diagram_items.append((sec, raw_bytes, filename, mime))
+
+                # Strip heavy raw image_data so webhook payload stays tiny (<50KB)
+                sec.image_data = ""
+
+        total_diagrams = len(diagram_items)
+        uploaded_diagram_count = 0
+
         if total_diagrams > 0 and is_drive_active:
             send_progress(
                 args.callback_url,
                 args.job_id,
                 len(pages),
                 len(pages),
-                f"Pages structured. Uploading {total_diagrams} diagrams to Google Drive...",
+                f"Pages structured. Uploading {total_diagrams} diagrams to Google Drive (12 parallel threads)...",
                 secret=args.webhook_secret,
             )
 
-        uploaded_diagram_count = 0
-        last_diagram_progress = time.time()
-        for p, s_idx, sec in diagram_targets:
-            raw_b64 = getattr(sec, "image_data", "")
-            img_p = getattr(sec, "image_path", "")
-            raw_bytes = b""
-            ext = "png"
-            mime = "image/png"
+            import concurrent.futures
 
-            if raw_b64 and raw_b64.startswith("data:image/"):
-                header, encoded = raw_b64.split(",", 1)
-                if "jpeg" in header or "jpg" in header:
-                    ext = "jpg"
-                    mime = "image/jpeg"
-                raw_bytes = base64.b64decode(encoded)
-            elif img_p and os.path.exists(img_p):
-                ext = img_p.split(".")[-1].lower()
-                mime = "image/jpeg" if ext in ("jpg", "jpeg") else "image/png"
+            def _upload_single_diagram(item):
+                target_sec, data, fname, mtype = item
                 try:
-                    with open(img_p, "rb") as imf:
-                        raw_bytes = imf.read()
-                except Exception as read_err:
-                    logger.warning(f"Could not read image file {img_p}: {read_err}")
-
-            if is_drive_active and raw_bytes:
-                try:
-                    filename = f"job_{args.job_id}_p{p.page_number}_fig_{s_idx + 1}.{ext}"
-                    direct_url = drive_uploader.upload_bytes(
-                        raw_bytes,
-                        destination_name=filename,
-                        mime_type=mime,
+                    url = drive_uploader.upload_bytes(
+                        data,
+                        destination_name=fname,
+                        mime_type=mtype,
                         subfolder_name="Extracted-Diagrams",
                     )
-                    if direct_url:
-                        sec.image_path = direct_url
-                        uploaded_diagram_count += 1
+                    if url:
+                        target_sec.image_path = url
+                        return True
                 except Exception as up_err:
-                    logger.warning(f"Could not upload diagram to Drive: {up_err}")
+                    logger.warning(f"Could not upload diagram {fname} to Drive: {up_err}")
+                return False
 
-            # Strip heavy raw image_data so webhook payload stays tiny (<50KB)
-            sec.image_data = ""
+            max_workers = min(12, total_diagrams)
+            last_diagram_progress = time.time()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_item = {executor.submit(_upload_single_diagram, item): item for item in diagram_items}
+                for future in concurrent.futures.as_completed(future_to_item):
+                    if future.result():
+                        uploaded_diagram_count += 1
+                    now = time.time()
+                    if (now - last_diagram_progress) >= 2.0 or uploaded_diagram_count == total_diagrams:
+                        last_diagram_progress = now
+                        send_progress(
+                            args.callback_url,
+                            args.job_id,
+                            len(pages),
+                            len(pages),
+                            f"Uploaded {uploaded_diagram_count} of {total_diagrams} diagrams to Google Drive...",
+                            secret=args.webhook_secret,
+                        )
 
-            now = time.time()
-            if (now - last_diagram_progress) >= 2.0 or uploaded_diagram_count == total_diagrams:
-                last_diagram_progress = now
-                send_progress(
-                    args.callback_url,
-                    args.job_id,
-                    len(pages),
-                    len(pages),
-                    f"Uploaded {uploaded_diagram_count} of {total_diagrams} diagrams to Google Drive...",
-                    secret=args.webhook_secret,
-                )
-
-        logger.info(f"Direct Drive upload complete: {uploaded_diagram_count} diagrams saved to Google Drive.")
+            logger.info(f"Direct Drive upload complete: {uploaded_diagram_count}/{total_diagrams} diagrams saved to Google Drive.")
+        elif total_diagrams > 0:
+            logger.info(f"Drive not configured. Retaining local paths for {total_diagrams} diagrams.")
 
         # Checkpoint pages in batches to ensure progress is safely persisted
         if len(pages) > 10:

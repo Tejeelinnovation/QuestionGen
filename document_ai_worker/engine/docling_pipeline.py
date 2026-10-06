@@ -101,41 +101,72 @@ class DoclingPipeline:
         force_ocr_env = os.environ.get("DOCLING_FORCE_FULL_PAGE_OCR", "").lower() in ("1", "true", "yes")
         enable_full_page = has_legacy_fonts or force_ocr_env
 
+        # Probe if document has abundant digital text (> 120 chars/page)
+        sample_chars = 0
+        probe_pages = min(total_pages, 5)
+        for p_i in range(probe_pages):
+            sample_chars += len(fitz_doc[p_i].get_text())
+        avg_chars_per_page = sample_chars / max(1, probe_pages)
+        is_digital_pdf = avg_chars_per_page > 120
+
+        # Run OCR only if legacy fonts detected, user forced OCR, or document is scanned
+        do_ocr = has_legacy_fonts or force_ocr_env or (not is_digital_pdf)
+
         logger.info(
-            f"Docling OCR Configuration: do_ocr=True, force_full_page_ocr={enable_full_page} "
-            f"(legacy_font_detected={has_legacy_fonts}, env_override={force_ocr_env})"
+            f"Docling OCR Configuration: do_ocr={do_ocr}, force_full_page_ocr={enable_full_page} "
+            f"(is_digital_pdf={is_digital_pdf}, avg_chars_per_page={avg_chars_per_page:.0f}, legacy_font_detected={has_legacy_fonts}, env_override={force_ocr_env})"
         )
 
         pipeline_options = PdfPipelineOptions()
-        pipeline_options.do_ocr = True
+        pipeline_options.do_ocr = do_ocr
 
-        # Configure Google Tesseract OCR for ultra-fast, lightweight C++ conversion (~0.5s per page)
-        ocr_langs = ["hin", "eng"]
-        env_langs = os.environ.get("TESSERACT_LANGS", "")
-        if env_langs:
-            ocr_langs = [l.strip() for l in env_langs.split(",") if l.strip()]
+        if do_ocr:
+            # Configure Google Tesseract OCR for ultra-fast, lightweight C++ conversion (~0.5s per page)
+            ocr_langs = ["hin", "eng"]
+            env_langs = os.environ.get("TESSERACT_LANGS", "")
+            if env_langs:
+                ocr_langs = [l.strip() for l in env_langs.split(",") if l.strip()]
 
-        try:
-            from docling.datamodel.pipeline_options import TesseractCliOcrOptions
-            pipeline_options.ocr_options = TesseractCliOcrOptions(
-                force_full_page_ocr=enable_full_page,
-                lang=ocr_langs,
-            )
-            logger.info(f"Initialized Google Tesseract CLI OCR (langs={ocr_langs}, force_full_page={enable_full_page})")
-        except Exception as tesseract_err:
-            logger.warning(f"TesseractCliOcrOptions not available: {tesseract_err}. Falling back to EasyOcrOptions...")
             try:
-                from docling.datamodel.pipeline_options import EasyOcrOptions
-                pipeline_options.ocr_options = EasyOcrOptions(
+                from docling.datamodel.pipeline_options import TesseractCliOcrOptions
+                pipeline_options.ocr_options = TesseractCliOcrOptions(
                     force_full_page_ocr=enable_full_page,
-                    lang=["hi", "en"],
-                    use_gpu=False,
+                    lang=ocr_langs,
                 )
-            except Exception as easy_err:
-                logger.warning(f"EasyOCR fallback also failed: {easy_err}. Using default OCR.")
+                logger.info(f"Initialized Google Tesseract CLI OCR (langs={ocr_langs}, force_full_page={enable_full_page})")
+            except Exception as tesseract_err:
+                logger.warning(f"TesseractCliOcrOptions not available: {tesseract_err}. Falling back to EasyOcrOptions...")
+                try:
+                    from docling.datamodel.pipeline_options import EasyOcrOptions
+                    pipeline_options.ocr_options = EasyOcrOptions(
+                        force_full_page_ocr=enable_full_page,
+                        lang=["hi", "en"],
+                        use_gpu=False,
+                    )
+                except Exception as easy_err:
+                    logger.warning(f"EasyOCR fallback also failed: {easy_err}. Using default OCR.")
 
         pipeline_options.generate_picture_images = True
-        pipeline_options.images_scale = 2.0  # Crisp 200+ DPI images for diagrams
+        pipeline_options.images_scale = 1.0  # Crisp 1:1 scale in Docling; PyMuPDF clips at 200 DPI for figures
+
+        # Maximize 4-core CPU utilization on 16GB runner
+        try:
+            import torch
+            num_cpus = min(4, os.cpu_count() or 4)
+            torch.set_num_threads(num_cpus)
+            if hasattr(torch, "set_num_interop_threads"):
+                torch.set_num_interop_threads(num_cpus)
+        except Exception:
+            pass
+
+        try:
+            from docling.datamodel.pipeline_options import AcceleratorOptions, AcceleratorDevice
+            pipeline_options.accelerator_options = AcceleratorOptions(
+                num_threads=min(4, os.cpu_count() or 4),
+                device=AcceleratorDevice.CPU,
+            )
+        except Exception:
+            pass
 
         doc_converter = DocumentConverter(
             format_options={
@@ -258,6 +289,9 @@ class DoclingPipeline:
 
                 raw_text = getattr(item, "text", "") or ""
                 clean_text = raw_text.strip()
+                from .text_cleaner import detect_caesar_shift, unshift_ncert_text
+                if detect_caesar_shift(clean_text):
+                    clean_text = unshift_ncert_text(clean_text)
 
                 bbox = []
                 if hasattr(item, "prov") and item.prov:
@@ -303,11 +337,8 @@ class DoclingPipeline:
 
                 # A. Picture / Diagram items
                 if isinstance(item, PictureItem) or "PICTURE" in label_str:
-                    pic_idx += 1
                     img_data = ""
                     direct_path = ""
-                    image_filename = f"docling_p{page_num}_fig_{pic_idx}.png"
-                    img_dest_path = os.path.join(self.media_dir, image_filename)
 
                     # Method 1: Get PIL Image directly generated by Docling
                     pil_img = None
@@ -319,6 +350,10 @@ class DoclingPipeline:
                     except Exception as img_err:
                         logger.debug(f"Docling direct image extraction error: {img_err}")
 
+                    # Ignore micro decorative icons, single dots, bullets (< 45x45 px)
+                    if pil_img is not None and (pil_img.width < 45 or pil_img.height < 45):
+                        pil_img = None
+
                     # Method 2: High-DPI Visual Viewport Clipping fallback from PDF page
                     if pil_img is None and fitz_page and bbox and len(bbox) == 4:
                         try:
@@ -326,22 +361,40 @@ class DoclingPipeline:
                             x0, y0, x1, y1 = bbox
                             page_h = fitz_page.rect.height
                             rect = fitz.Rect(min(x0, x1), min(page_h - max(y0, y1), min(y0, y1)), max(x0, x1), max(page_h - min(y0, y1), max(y0, y1)))
-                            if rect.width > 20 and rect.height > 20:
+                            if rect.width >= 45 and rect.height >= 45:
+                                candidate_filename = f"docling_p{page_num}_fig_{pic_idx + 1}.png"
+                                candidate_path = os.path.join(self.media_dir, candidate_filename)
                                 pix = fitz_page.get_pixmap(clip=rect, dpi=200)
-                                pix.save(img_dest_path)
-                                direct_path = img_dest_path
-                                with open(img_dest_path, "rb") as imf:
-                                    b64 = base64.b64encode(imf.read()).decode("utf-8")
-                                    img_data = f"data:image/png;base64,{b64}"
+                                pix.save(candidate_path)
+                                if os.path.exists(candidate_path) and os.path.getsize(candidate_path) >= 400:
+                                    pic_idx += 1
+                                    direct_path = candidate_path
+                                    with open(candidate_path, "rb") as imf:
+                                        b64 = base64.b64encode(imf.read()).decode("utf-8")
+                                        img_data = f"data:image/png;base64,{b64}"
+                                else:
+                                    if os.path.exists(candidate_path):
+                                        os.remove(candidate_path)
                         except Exception as clip_err:
                             logger.debug(f"PyMuPDF visual clipping fallback error: {clip_err}")
 
                     if pil_img is not None:
-                        pil_img.save(img_dest_path, format="PNG")
-                        direct_path = img_dest_path
-                        with open(img_dest_path, "rb") as imf:
-                            b64 = base64.b64encode(imf.read()).decode("utf-8")
-                            img_data = f"data:image/png;base64,{b64}"
+                        candidate_filename = f"docling_p{page_num}_fig_{pic_idx + 1}.png"
+                        candidate_path = os.path.join(self.media_dir, candidate_filename)
+                        pil_img.save(candidate_path, format="PNG")
+                        if os.path.exists(candidate_path) and os.path.getsize(candidate_path) >= 400:
+                            pic_idx += 1
+                            direct_path = candidate_path
+                            with open(candidate_path, "rb") as imf:
+                                b64 = base64.b64encode(imf.read()).decode("utf-8")
+                                img_data = f"data:image/png;base64,{b64}"
+                        else:
+                            if os.path.exists(candidate_path):
+                                os.remove(candidate_path)
+
+                    if not direct_path and not img_data:
+                        # Skip micro-elements or empty images
+                        continue
 
                     # Comprehensive caption & description extraction
                     caption_candidates = []

@@ -107,3 +107,9 @@ eval/golden/**/*.pdf
 eval/temp_assets/
 eval/results/
 eval/scratch_media/
+
+# ---- Generated Architecture & PDF Documentation ----
+PDF_Extraction_Architecture_Guide.html
+QuestionGen_PDF_Extraction_Architecture_Guide.pdf
+generate_architecture_pdf.py
+

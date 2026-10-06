@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,26 @@ class WorkerGoogleDriveUploader:
 
     def is_configured(self) -> bool:
         return self.get_credentials() is not None
+
+    _local = threading.local()
+
+    def get_service(self) -> Optional[Any]:
+        """
+        Thread-safe Google Drive service getter.
+        Uses threading.local to ensure each worker thread has its own discovery client
+        instance without connection collision.
+        """
+        if not hasattr(self._local, "service") or self._local.service is None:
+            creds = self.get_credentials()
+            if not creds:
+                return None
+            try:
+                from googleapiclient.discovery import build
+                self._local.service = build("drive", "v3", credentials=creds, cache_discovery=False)
+            except Exception as e:
+                logger.warning(f"Could not build Google Drive service: {e}")
+                return None
+        return self._local.service
 
     def get_or_create_subfolder(self, service: Any, subfolder_name: str = "Extracted-Diagrams") -> Optional[str]:
         cache_key = f"{self.folder_id}_{subfolder_name}"
@@ -111,16 +132,14 @@ class WorkerGoogleDriveUploader:
         Uploads in-memory image bytes directly to Google Drive.
         Returns the direct public thumbnail URL.
         """
-        creds = self.get_credentials()
-        if not creds:
+        service = self.get_service()
+        if not service:
             return ""
 
         try:
-            from googleapiclient.discovery import build
             from googleapiclient.http import MediaIoBaseUpload
             import io
 
-            service = build("drive", "v3", credentials=creds)
             target_folder_id = self.get_or_create_subfolder(service, subfolder_name)
 
             file_metadata = {"name": destination_name}
@@ -131,22 +150,17 @@ class WorkerGoogleDriveUploader:
             uploaded = service.files().create(
                 body=file_metadata,
                 media_body=media,
-                fields="id, webViewLink",
+                fields="id",
                 supportsAllDrives=True,
             ).execute()
 
             file_id = uploaded.get("id", "")
-            try:
-                service.permissions().create(
-                    fileId=file_id,
-                    body={"role": "reader", "type": "anyone"},
-                    supportsAllDrives=True,
-                ).execute()
-            except Exception:
-                pass
+            if not file_id:
+                return ""
 
             direct_url = f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
             return direct_url
         except Exception as e:
             logger.warning(f"Runner Google Drive upload failed for {destination_name}: {e}")
             return ""
+
