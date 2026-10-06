@@ -707,8 +707,12 @@ class IngestionJobWebhookView(APIView):
                 job.total_pages = data["total_pages"]
             if "current_stage" in data:
                 job.current_stage = data["current_stage"]
+            if "elapsed_seconds" in data:
+                if not job.metadata or not isinstance(job.metadata, dict):
+                    job.metadata = {}
+                job.metadata["elapsed_seconds"] = data["elapsed_seconds"]
             job.updated_at = timezone.now()
-            job.save(update_fields=["status", "processed_pages", "total_pages", "current_stage", "updated_at"])
+            job.save(update_fields=["status", "processed_pages", "total_pages", "current_stage", "updated_at", "metadata"])
             existing_pages = list(job.pages.order_by("page_number").values_list("page_number", flat=True))
             return Response(
                 {
@@ -985,6 +989,8 @@ class IngestionJobWebhookView(APIView):
                 if not job.metadata or not isinstance(job.metadata, dict):
                     job.metadata = {}
                 job.metadata["extraction_engine"] = engine
+                if "duration_seconds" in data and data["duration_seconds"] is not None:
+                    job.metadata["duration_seconds"] = data["duration_seconds"]
 
                 if idempotency_key:
                     job.metadata["idempotency_key"] = idempotency_key

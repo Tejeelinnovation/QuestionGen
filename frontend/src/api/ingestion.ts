@@ -16,6 +16,8 @@ export interface IngestionJobSummary {
   progress_percentage: number;
   current_stage: string;
   queue_position?: number | null;
+  duration_seconds?: number | null;
+  duration_formatted?: string | null;
   error_message?: string;
   google_drive_file_id?: string;
   google_drive_url: string;

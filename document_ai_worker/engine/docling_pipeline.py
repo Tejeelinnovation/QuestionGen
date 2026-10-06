@@ -14,6 +14,8 @@ import base64
 import logging
 import os
 import re
+import threading
+import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pymupdf as fitz
@@ -22,6 +24,27 @@ from PIL import Image
 from .schema import ChapterSchema, PageSchema, SectionSchema
 
 logger = logging.getLogger(__name__)
+
+
+class DoclingLogInterceptor(logging.Handler):
+    """
+    Intercepts Docling and Tesseract log messages in real-time to track active page conversion.
+    """
+    def __init__(self, on_page_detected: Callable[[int], None]):
+        super().__init__()
+        self.on_page_detected = on_page_detected
+        self.pattern = re.compile(r"page:\s*(\d+)", re.IGNORECASE)
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            msg = record.getMessage()
+            match = self.pattern.search(msg)
+            if match:
+                # 0-indexed page in docling log, convert to 1-indexed
+                page_idx = int(match.group(1)) + 1
+                self.on_page_detected(page_idx)
+        except Exception:
+            pass
 
 
 class DoclingPipeline:
@@ -121,10 +144,64 @@ class DoclingPipeline:
         )
 
         logger.info(f"Running Docling conversion on {pdf_path} (max_pages={pages_to_process})...")
-        if max_pages:
-            conv_res = doc_converter.convert(pdf_path, max_num_pages=max_pages)
-        else:
-            conv_res = doc_converter.convert(pdf_path)
+
+        # Setup real-time progress monitor during doc_converter.convert()
+        latest_page = [0]
+        stop_monitor = threading.Event()
+
+        def update_latest_page(p_num: int):
+            if p_num > latest_page[0]:
+                latest_page[0] = min(p_num, pages_to_process)
+
+        log_handler = DoclingLogInterceptor(update_latest_page)
+        logging.getLogger().addHandler(log_handler)
+
+        def progress_worker():
+            start_time = time.time()
+            last_sent_page = 0
+            while not stop_monitor.wait(2.5):
+                cur_p = latest_page[0]
+                elapsed = time.time() - start_time
+                if cur_p == 0:
+                    # Initial warmup / model loading (~10-20s)
+                    sim_p = min(max(1, int(elapsed / 7.0)), max(1, pages_to_process - 1))
+                    if progress_callback:
+                        progress_callback(
+                            sim_p,
+                            pages_to_process,
+                            f"Docling AI warming up models & analyzing layout (page ~{sim_p} of {pages_to_process})...",
+                        )
+                elif cur_p > last_sent_page:
+                    last_sent_page = cur_p
+                    if progress_callback:
+                        progress_callback(
+                            cur_p,
+                            pages_to_process,
+                            f"Docling AI processing page {cur_p} of {pages_to_process} (DocLayNet & OCR)...",
+                        )
+                else:
+                    if progress_callback and cur_p > 0:
+                        progress_callback(
+                            cur_p,
+                            pages_to_process,
+                            f"Docling AI processing page {cur_p} of {pages_to_process} (DocLayNet & OCR)...",
+                        )
+
+        monitor_thread = threading.Thread(target=progress_worker, daemon=True)
+        monitor_thread.start()
+
+        try:
+            if max_pages:
+                conv_res = doc_converter.convert(pdf_path, max_num_pages=max_pages)
+            else:
+                conv_res = doc_converter.convert(pdf_path)
+        finally:
+            stop_monitor.set()
+            monitor_thread.join(timeout=1.0)
+            try:
+                logging.getLogger().removeHandler(log_handler)
+            except Exception:
+                pass
 
         doc = conv_res.document
         logger.info("Docling document model parsing complete. Converting to application schema...")

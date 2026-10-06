@@ -26,6 +26,11 @@ import {
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
 import { SkeletonIngestionList } from '../../components/ui/skeleton';
+import {
+  formatJobDuration,
+  LiveTimer,
+  JobDurationBadge,
+} from '../../components/ui/JobDurationTimer';
 
 export const DatasetIngestionPageMobile: React.FC = () => {
   const { user, hasCapability } = useAuth();
@@ -309,6 +314,9 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                         Document AI
                       </span>
                     ) : null}
+
+                    {/* Total Extraction Duration Timer Badge */}
+                    <JobDurationBadge job={job} />
                   </div>
 
                   {/* Title */}
@@ -330,9 +338,24 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                         )}
                         {job.current_stage || `${job.processed_pages}/${job.total_pages} pages`}
                       </span>
-                      <span className="font-bold">
-                        {job.status === 'EXTRACTING' && job.progress_percentage === 0 ? (
-                          <span className="text-emerald-700 font-semibold animate-pulse">Starting...</span>
+                      <span className="font-bold flex items-center gap-1.5 shrink-0">
+                        {job.status === 'EXTRACTING' ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded border border-blue-200">
+                            <LiveTimer createdAt={job.created_at} />
+                            <span className="text-blue-300">·</span>
+                            <span>{job.progress_percentage === 0 ? 'Starting...' : `${job.progress_percentage}%`}</span>
+                          </span>
+                        ) : job.status === 'COMPLETED' ? (
+                          <span className="inline-flex items-center gap-1">
+                            {formatJobDuration(job) && (
+                              <span className="text-[9px] font-normal text-ink/50 flex items-center gap-0.5" title="Total time taken">
+                                <Clock className="w-2.5 h-2.5 text-ink/40" />
+                                <span>{formatJobDuration(job)}</span>
+                                <span className="mx-0.5 text-ink/30">·</span>
+                              </span>
+                            )}
+                            <span>100%</span>
+                          </span>
                         ) : (
                           `${job.progress_percentage}%`
                         )}
@@ -340,7 +363,7 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                     </div>
                     <div className="w-full h-1.5 rounded-full bg-surface-muted overflow-hidden">
                       <div
-                        className={`h-full transition-all duration-500 ease-out ${
+                        className={`h-full transition-all duration-700 ease-out ${
                           job.status === 'COMPLETED'
                             ? 'bg-forest'
                             : job.status === 'FAILED'
@@ -351,8 +374,10 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                         }`}
                         style={{
                           width: `${
-                            job.status === 'EXTRACTING'
-                              ? Math.max(job.progress_percentage, 5)
+                            job.status === 'COMPLETED'
+                              ? 100
+                              : job.status === 'EXTRACTING'
+                              ? Math.max(job.progress_percentage, 8)
                               : job.progress_percentage
                           }%`,
                         }}

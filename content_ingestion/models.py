@@ -12,6 +12,8 @@ Design Principles:
 - Non-destructive & fully traceable back to the source PDF and Google Drive storage.
 """
 
+from typing import Optional
+
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -191,6 +193,34 @@ class IngestionJob(TimestampedModel):
         if not self.total_pages:
             return 0
         return int((self.processed_pages / self.total_pages) * 100)
+
+    @property
+    def duration_seconds(self) -> Optional[float]:
+        """Returns total extraction time in seconds."""
+        if self.metadata and isinstance(self.metadata, dict):
+            sec = self.metadata.get("duration_seconds")
+            if sec is not None:
+                try:
+                    return round(float(sec), 1)
+                except (ValueError, TypeError):
+                    pass
+        if self.status in (JobStatus.COMPLETED, JobStatus.FAILED) and self.created_at and self.updated_at:
+            delta = (self.updated_at - self.created_at).total_seconds()
+            return round(max(0.0, delta), 1)
+        return None
+
+    @property
+    def duration_formatted(self) -> str:
+        """Returns human-readable duration, e.g. '2m 14s' or '45s'."""
+        sec = self.duration_seconds
+        if sec is None or sec <= 0:
+            return ""
+        total_sec = int(round(sec))
+        mins = total_sec // 60
+        rem_sec = total_sec % 60
+        if mins > 0:
+            return f"{mins}m {rem_sec:02d}s" if rem_sec > 0 else f"{mins}m"
+        return f"{total_sec}s"
 
     @property
     def is_educational(self) -> bool:

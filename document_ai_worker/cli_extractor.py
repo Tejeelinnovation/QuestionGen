@@ -193,6 +193,7 @@ def send_progress(
     total_pages: int,
     stage: str,
     secret: str = "",
+    elapsed_seconds: Optional[float] = None,
 ) -> Optional[dict]:
     """
     Sends non-blocking progress updates to the Django backend.
@@ -207,6 +208,8 @@ def send_progress(
         "total_pages": total_pages,
         "current_stage": stage,
     }
+    if elapsed_seconds is not None:
+        payload["elapsed_seconds"] = elapsed_seconds
     raw_bytes = json.dumps(payload, default=str).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if secret:
@@ -400,6 +403,7 @@ def main():
             now = time.time()
             if processed == 0 or processed == total or (now - last_progress_time[0]) >= 1.5:
                 last_progress_time[0] = now
+                elapsed = round(now - job_start_time, 1)
                 send_progress(
                     args.callback_url,
                     args.job_id,
@@ -407,6 +411,7 @@ def main():
                     total,
                     stage_text,
                     secret=args.webhook_secret,
+                    elapsed_seconds=elapsed,
                 )
 
         # Document Classification using multi-modal evidence
@@ -597,11 +602,13 @@ def main():
                     secret=args.webhook_secret,
                     idempotency_key=f"{idempotency_key}_batch_{i // batch_size}",
                 )
+        duration_seconds = round(time.time() - job_start_time, 1)
         payload = {
             "schema_version": "1.1.0",
             "job_id": args.job_id,
             "idempotency_key": idempotency_key,
             "status": "COMPLETED",
+            "duration_seconds": duration_seconds,
             "document_kind": effective_kind,
             "classification_confidence": classification_res.confidence,
             "classification_evidence": classification_res.evidence,
@@ -619,6 +626,7 @@ def main():
             len(pages),
             f"Delivering structured dataset ({len(pages)} pages, {uploaded_diagram_count} diagrams) to backend...",
             secret=args.webhook_secret,
+            elapsed_seconds=duration_seconds,
         )
 
         # 5. Dispatch back to Django Webhook with auto-retry
@@ -628,16 +636,18 @@ def main():
             secret=args.webhook_secret,
             idempotency_key=idempotency_key,
         )
-        logger.info(f"[SUCCESS] IngestionJob #{args.job_id} successfully extracted and delivered!")
+        logger.info(f"[SUCCESS] IngestionJob #{args.job_id} successfully extracted and delivered in {duration_seconds}s!")
 
     except Exception as exc:
         logger.error(f"[ERROR] Failed during extraction of Job #{args.job_id}: {exc}", exc_info=True)
         # Notify Django backend of failure with retry so UI updates immediately
         try:
+            failed_duration = round(time.time() - job_start_time, 1) if "job_start_time" in locals() else None
             error_payload = {
                 "job_id": args.job_id,
                 "idempotency_key": idempotency_key if "idempotency_key" in locals() else "",
                 "status": "FAILED",
+                "duration_seconds": failed_duration,
                 "error_message": f"Worker extraction error: {str(exc)}",
                 "error": str(exc),
             }

@@ -116,6 +116,8 @@ class ExtractedPageSerializer(serializers.ModelSerializer):
 class IngestionJobListSerializer(serializers.ModelSerializer):
     progress_percentage = serializers.ReadOnlyField()
     queue_position = serializers.SerializerMethodField()
+    duration_seconds = serializers.ReadOnlyField()
+    duration_formatted = serializers.ReadOnlyField()
 
     class Meta:
         model = IngestionJob
@@ -135,6 +137,8 @@ class IngestionJobListSerializer(serializers.ModelSerializer):
             "progress_percentage",
             "current_stage",
             "queue_position",
+            "duration_seconds",
+            "duration_formatted",
             "error_message",
             "google_drive_file_id",
             "google_drive_url",
@@ -152,6 +156,8 @@ class IngestionJobDetailSerializer(serializers.ModelSerializer):
     progress_percentage = serializers.ReadOnlyField()
     items_count = serializers.SerializerMethodField()
     queue_position = serializers.SerializerMethodField()
+    duration_seconds = serializers.ReadOnlyField()
+    duration_formatted = serializers.ReadOnlyField()
 
     class Meta:
         model = IngestionJob
@@ -171,6 +177,8 @@ class IngestionJobDetailSerializer(serializers.ModelSerializer):
             "progress_percentage",
             "current_stage",
             "queue_position",
+            "duration_seconds",
+            "duration_formatted",
             "google_drive_file_id",
             "google_drive_url",
             "error_message",

@@ -30,6 +30,7 @@ import {
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
 import { SkeletonIngestionList } from '../../components/ui/skeleton';
+import { JobDurationBadge, LiveTimer, formatJobDuration } from '../../components/ui/JobDurationTimer';
 
 export const DatasetIngestionPageDesktop: React.FC = () => {
   const { user, hasCapability } = useAuth();
@@ -379,6 +380,9 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                             Document AI Engine
                           </span>
                         ) : null}
+
+                        {/* Total Extraction Duration Timer Badge */}
+                        <JobDurationBadge job={job} />
                       </div>
                       <h3 className="text-sm font-heading font-bold text-ink">{job.title}</h3>
                     </div>
@@ -470,7 +474,7 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                   {isSuperAdmin && (
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center justify-between text-[11px] text-ink/60">
-                        <span className="font-mono flex items-center gap-1.5 truncate max-w-[80%]">
+                        <span className="font-mono flex items-center gap-1.5 truncate max-w-[75%]">
                           {job.current_stage?.includes('Google Drive') && (
                             <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
                           )}
@@ -479,17 +483,32 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                           )}
                           {job.current_stage || `${job.processed_pages} of ${job.total_pages} pages processed`}
                         </span>
-                        <span className="font-mono font-bold text-ink">
-                          {job.status === 'EXTRACTING' && job.progress_percentage === 0 ? (
-                            <span className="text-emerald-700 font-semibold animate-pulse">Starting...</span>
+                        <span className="font-mono font-bold text-ink flex items-center gap-1.5 shrink-0">
+                          {job.status === 'EXTRACTING' ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                              <LiveTimer createdAt={job.created_at} />
+                              <span className="text-blue-300">·</span>
+                              <span>{job.progress_percentage === 0 ? 'Starting...' : `${job.progress_percentage}%`}</span>
+                            </span>
+                          ) : job.status === 'COMPLETED' ? (
+                            <span className="inline-flex items-center gap-1">
+                              {formatJobDuration(job) && (
+                                <span className="text-[10px] font-normal text-ink/50 flex items-center gap-0.5" title="Total time taken">
+                                  <Clock className="w-2.5 h-2.5 text-ink/40" />
+                                  <span>{formatJobDuration(job)}</span>
+                                  <span className="mx-0.5 text-ink/30">·</span>
+                                </span>
+                              )}
+                              <span>100%</span>
+                            </span>
                           ) : (
                             `${job.progress_percentage}%`
                           )}
                         </span>
                       </div>
-                      <div className="w-full h-2 rounded-full bg-surface-muted overflow-hidden border border-border/50">
+                      <div className="w-full h-2 rounded-full bg-surface-muted overflow-hidden border border-border/50 shadow-2xs">
                         <div
-                          className={`h-full transition-all duration-500 ease-out ${
+                          className={`h-full transition-all duration-700 ease-out ${
                             job.status === 'COMPLETED'
                               ? 'bg-forest'
                               : job.status === 'FAILED'
@@ -500,8 +519,10 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                           }`}
                           style={{
                             width: `${
-                              job.status === 'EXTRACTING'
-                                ? Math.max(job.progress_percentage, 5)
+                              job.status === 'COMPLETED'
+                                ? 100
+                                : job.status === 'EXTRACTING'
+                                ? Math.max(job.progress_percentage, 8)
                                 : job.progress_percentage
                             }%`,
                           }}
