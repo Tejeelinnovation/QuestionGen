@@ -323,6 +323,15 @@ class TextbookPipeline:
 
         p_flags: List[str] = []
 
+        # Legacy font safety check (Item 4: LEGACY_REVIEW_REQUIRED default True)
+        legacy_review_req = os.environ.get("LEGACY_REVIEW_REQUIRED", "true").lower() in ("true", "1", "yes")
+        if p_legacy and legacy_review_req:
+            p_review = True
+            p_flags.append("converted_from_legacy_font")
+            p_meta["converted_from_legacy_font"] = True
+            p_meta["legacy_review_marker"] = "converted from old font, please verify"
+
+
         # Handle full-page image / advertisement pages
         if p_kind == "image_only":
             raw_text = ""
@@ -603,12 +612,13 @@ class TextbookPipeline:
                     continue
                 rect = rects[0]
 
-                # Filter out tiny decoration icons (<60x60 points)
-                if rect.width < 60 or rect.height < 60:
-                    continue
-
                 norm_bbox = normalize_bbox([rect.x0, rect.y0, rect.x1, rect.y1], page_w, page_h, origin="top_left")
                 caption = find_nearest_caption(norm_bbox, text_blocks)
+
+                # Filter out tiny decoration icons (<60 points) unless a caption was found
+                if (rect.width < 60 or rect.height < 60) and not caption:
+                    continue
+
 
                 if not render_image_pixels:
                     images.append({

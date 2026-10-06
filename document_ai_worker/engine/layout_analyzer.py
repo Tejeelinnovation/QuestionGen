@@ -239,6 +239,24 @@ def extract_newspaper_articles(
             h_slug = hashlib.sha256(f"p{page_num}_{headline_text}".encode()).hexdigest()[:8]
             art_id = f"art_p{page_num}_{h_slug}"
 
+            # Compute enclosing bbox from member sections
+            art_bbox = None
+            for s_idx in current_sec_indices:
+                s = sections[s_idx]
+                sb = s.bbox or (s.metadata.get("bbox") if s.metadata else None)
+                if sb and len(sb) >= 4:
+                    if art_bbox is None:
+                        art_bbox = [sb[0], sb[1], sb[2], sb[3]]
+                    else:
+                        art_bbox[0] = min(art_bbox[0], sb[0])
+                        art_bbox[1] = min(art_bbox[1], sb[1])
+                        art_bbox[2] = max(art_bbox[2], sb[2])
+                        art_bbox[3] = max(art_bbox[3], sb[3])
+
+            meta = {}
+            if art_bbox:
+                meta["bbox"] = art_bbox
+
             articles.append(ArticleSchema(
                 article_id=art_id,
                 headline=headline_text,
@@ -248,6 +266,7 @@ def extract_newspaper_articles(
                 page_number=page_num,
                 continues_on_page=current_target_page,
                 section_indices=list(current_sec_indices),
+                metadata=meta,
             ))
 
         current_headline = ""
@@ -272,15 +291,6 @@ def extract_newspaper_articles(
                 except ValueError:
                     pass
 
-        # Check if section represents a new headline
-        is_new_headline = False
-        if heading and len(heading.split()) >= 2:
-            is_new_headline = True
-        elif text and len(text) < 120 and (text.isupper() or len(text.split()) <= 10) and not text.endswith("."):
-            # Short prominent headline line
-            if not current_headline:
-                is_new_headline = True
-
         # Check for byline pattern
         byline_match = None
         for bpat in BYLINE_PATTERNS:
@@ -289,9 +299,19 @@ def extract_newspaper_articles(
                 byline_match = bm.group(0).strip()
                 break
 
-        if is_new_headline and current_headline and current_body_parts:
-            # We already have an active article with body -> flush and start new
+        # Check if section represents a new headline
+        is_new_headline = False
+        if heading and len(heading.split()) >= 2:
+            is_new_headline = True
+        elif text and 5 <= len(text) < 140 and (text.isupper() or len(text.split()) <= 10) and not text.endswith((".", ":", ";")):
+            # Don't treat continuation notices or lines ending with page numbers as headlines
+            if not any(pat.search(text) for pat in CONTINUES_PATTERNS) and (not current_headline or text.isupper()):
+                is_new_headline = True
+
+        # Flush active article if a new headline or byline is encountered
+        if (byline_match or is_new_headline) and current_headline and current_body_parts:
             _flush_article()
+
 
         if is_new_headline and not current_headline:
             current_headline = heading or text
@@ -302,7 +322,6 @@ def extract_newspaper_articles(
         elif byline_match and not current_byline:
             current_byline = byline_match
             current_sec_indices.append(idx)
-            # Remove byline from body text if embedded
             rem = text[len(byline_match):].strip(" -|,\n")
             if rem:
                 current_body_parts.append(rem)

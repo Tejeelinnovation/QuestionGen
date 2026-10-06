@@ -26,6 +26,11 @@ import time
 import urllib.request
 import uuid
 import requests
+from pathlib import Path
+
+WORKER_DIR = Path(__file__).resolve().parent
+if str(WORKER_DIR) not in sys.path:
+    sys.path.insert(0, str(WORKER_DIR))
 
 from engine.docling_pipeline import DoclingPipeline
 from engine.drive_uploader import WorkerGoogleDriveUploader
@@ -271,12 +276,16 @@ def send_webhook(
     secret: str = "",
     max_retries: int = 8,
     idempotency_key: str = "",
-) -> None:
+    retries: Optional[int] = None,
+) -> bool:
     """
     Posts the extraction result back to the Django backend with automatic retry.
     Tolerates Render free tier spin-up delays (~60 seconds) using progressive delays.
     Signs payload with HMAC-SHA256 bound to timestamp (X-Ingestion-Signature, X-Ingestion-Timestamp).
     """
+    if retries is not None:
+        max_retries = retries
+
     raw_bytes = json.dumps(payload, default=str).encode("utf-8")
     payload_kb = len(raw_bytes) // 1024
     logger.info(f"Delivering extraction results to Webhook: {callback_url} (Payload size: ~{payload_kb} KB)")
@@ -308,7 +317,7 @@ def send_webhook(
             if res.status_code >= 400:
                 logger.error(f"Webhook error response: {res.text}")
                 res.raise_for_status()
-            return
+            return True
         except requests.exceptions.RequestException as exc:
             if attempt < max_retries:
                 wait_sec = delays[min(attempt - 1, len(delays) - 1)]
@@ -317,6 +326,8 @@ def send_webhook(
             else:
                 logger.error(f"All {max_retries} webhook delivery attempts failed.")
                 raise
+    return False
+
 
 
 def main():

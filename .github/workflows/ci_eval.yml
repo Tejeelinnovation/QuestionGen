@@ -5,22 +5,33 @@ on:
     branches: [staging, main]
   pull_request:
     branches: [staging, main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Evaluation Mode (fast or full)'
+        required: false
+        default: 'fast'
+        type: choice
+        options:
+          - fast
+          - full
 
 jobs:
   test_and_eval:
     name: Unit Tests & Regression Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
+
 
       - name: Install System Libraries & Google Tesseract OCR
         run: |
@@ -40,6 +51,9 @@ jobs:
         run: |
           python -m unittest eval.test_harness eval.test_legacy_font_lines eval.test_gemini_retry eval.test_toc_v2 eval.test_gemini_hardening
 
-      - name: Run Fast Mode Eval (Fails on Metric Regression)
+      - name: Run Document AI Evaluation Harness (Fails on Metric Regression)
         run: |
-          python -m eval.run --mode fast
+          EVAL_MODE="${{ inputs.mode || 'fast' }}"
+          echo "Running eval harness in $EVAL_MODE mode..."
+          python -m eval.run --mode "$EVAL_MODE"
+

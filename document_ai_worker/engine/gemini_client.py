@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 
 
+
 class GeminiClient:
     """
     Singleton shared Gemini client with exponential backoff, rate limiting,

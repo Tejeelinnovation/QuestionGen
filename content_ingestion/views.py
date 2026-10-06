@@ -736,6 +736,15 @@ class IngestionJobWebhookView(APIView):
                 for p_data in batch_pages:
                     p_num = p_data.get("page_number", 1)
                     raw_sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
+                    is_legacy = bool(p_data.get("legacy_font_encoding") or p_data.get("metadata", {}).get("legacy_font_encoding") or p_data.get("metadata", {}).get("converted_from_legacy_font"))
+                    if is_legacy and raw_sections:
+                        for s in raw_sections:
+                            if "metadata" not in s or not isinstance(s["metadata"], dict):
+                                s["metadata"] = {}
+                            s["metadata"]["legacy_font_encoding"] = True
+                            s["metadata"]["legacy_review_marker"] = "converted from old font, please verify"
+                            if getattr(settings, "LEGACY_REVIEW_REQUIRED", True):
+                                s["metadata"]["needs_review"] = True
                     page_obj, _ = ExtractedPage.objects.update_or_create(
                         job=job,
                         page_number=p_num,
@@ -745,6 +754,7 @@ class IngestionJobWebhookView(APIView):
                             "structured_content": raw_sections,
                         },
                     )
+
                     # Sync items for this page
                     job.items.filter(page=page_obj).delete()
                     for sec in raw_sections:
@@ -855,13 +865,18 @@ class IngestionJobWebhookView(APIView):
                         f"Dataset extraction completed normally; downstream question generation is not blocked."
                     )
 
-                # Safe clean delete-and-recreate in explicit reverse-dependency order:
-                # 1. ExtractedItem (child of page and job)
-                job.items.all().delete()
-                # 2. ExtractedPage (child of chapter and job)
-                job.pages.all().delete()
-                # 3. ExtractedChapter (child of job)
-                job.chapters.all().delete()
+                if pages_data or toc_entries:
+                    # Safe clean delete-and-recreate in explicit reverse-dependency order:
+                    # 1. ExtractedItem (child of page and job)
+                    job.items.all().delete()
+                    # 2. ExtractedPage (child of chapter and job)
+                    job.pages.all().delete()
+                    # 3. ExtractedChapter (child of job)
+                    job.chapters.all().delete()
+                else:
+                    # Checkpointed batch pages already saved: sync total count and finalize
+                    job.processed_pages = job.pages.count()
+
 
                 # Re-create chapters
                 chapter_map = {}
@@ -915,6 +930,17 @@ class IngestionJobWebhookView(APIView):
                         sec_dict["text"] = text_val
                         sec_dict["image_path"] = image_path
                         processed_sections.append(sec_dict)
+
+                    is_legacy = bool(p_data.get("legacy_font_encoding") or p_data.get("metadata", {}).get("legacy_font_encoding") or p_data.get("metadata", {}).get("converted_from_legacy_font"))
+                    if is_legacy:
+                        for s in processed_sections:
+                            if "metadata" not in s or not isinstance(s["metadata"], dict):
+                                s["metadata"] = {}
+                            s["metadata"]["legacy_font_encoding"] = True
+                            s["metadata"]["legacy_review_marker"] = "converted from old font, please verify"
+                            if getattr(settings, "LEGACY_REVIEW_REQUIRED", True):
+                                s["metadata"]["needs_review"] = True
+
 
                     pages_to_create.append(
                         ExtractedPage(

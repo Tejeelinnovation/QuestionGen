@@ -282,11 +282,17 @@ FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
 DOCUMENT_AI_MICROSERVICE_URL = env("DOCUMENT_AI_MICROSERVICE_URL", default="")
 GITHUB_DISPATCH_TOKEN = env("GITHUB_DISPATCH_TOKEN", default="")
 GITHUB_DISPATCH_REPO = env("GITHUB_DISPATCH_REPO", default="queraai/QuestionGen")
-BACKEND_BASE_URL = env("BACKEND_BASE_URL", default="http://localhost:8000")
+# Standardized BACKEND_BASE_URL (reconciled with RENDER_BACKEND_URL fallback)
+BACKEND_BASE_URL = env("BACKEND_BASE_URL", default=env("RENDER_BACKEND_URL", default="http://localhost:8000"))
 INGESTION_WEBHOOK_SECRET = env("INGESTION_WEBHOOK_SECRET", default="")
 # A7: DISPATCH_REF controls which branch the GitHub Actions workflow_dispatch uses.
 # Set to "staging" on the staging Render service, "main" on production.
 DISPATCH_REF = env("DISPATCH_REF", default="main")
+
+# Quality & Safety Configuration
+LEGACY_REVIEW_REQUIRED = env.bool("LEGACY_REVIEW_REQUIRED", default=True)
+TOC_V2_ENABLED = env.bool("TOC_V2_ENABLED", default=False)
+
 
 
 # Support large extracted textbook payloads and multi-page diagrams

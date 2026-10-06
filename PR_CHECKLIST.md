@@ -38,13 +38,20 @@ Before creating or approving the pull request, verify each of the following:
   ```
   Expected: Zero regressions across all golden samples within tolerance thresholds.
 - [ ] **Feature Flag Kept Safe**: Verify `TOC_V2_ENABLED` is set to `false` in production settings until real multi-chapter textbook PDFs are provided and validated.
+- [ ] **Back up the Neon Database Before Merging**:
+  1. Open Neon Console: `https://console.neon.tech` → Select your project.
+  2. Navigate to the **Branches** tab.
+  3. Click **+ Create Branch**.
+     - Branch name: `pre_merge_backup`
+     - Parent branch: `main` (Production)
+  4. This provides an instantaneous, point-in-time snapshot of production data before any new migrations run.
 
 ---
 
 ## 3. How to Create the Pull Request on GitHub
 
-1. Open your browser and navigate to your GitHub repository:
-   `https://github.com/<your-org>/question-generation-system`
+1. Open your browser and navigate to the GitHub repository:
+   `https://github.com/queraai/QuestionGen`
 2. Click on the **Pull requests** tab.
 3. Click the green **New pull request** button.
 4. Set the branches:
@@ -57,60 +64,83 @@ Before creating or approving the pull request, verify each of the following:
 
 ---
 
-## 4. Required Secrets to Set Before Running in Cloud
+## 4. Required Secrets & Environment Variables (Authoritative List)
 
-Set the following secrets in your hosting environments:
+Set the following variables in their respective locations (names only, values configured via dashboards):
 
-### In GitHub Repository Secrets (`Settings > Secrets and variables > Actions`):
-| Secret Name | Purpose |
-|---|---|
-| `GEMINI_API_KEY` | Google AI Studio API key for Gemini OCR / TOC fallback |
-| `INGESTION_WEBHOOK_SECRET` | Shared HMAC secret for worker-to-backend webhook security |
-| `RENDER_BACKEND_URL` | Base URL of your Django backend (e.g., `https://qgs-backend.onrender.com`) |
+### A. Render Web Service Environment (`Render Dashboard > Environment`)
+| Variable Name | Required / Optional | Purpose |
+|---|:---:|---|
+| `DATABASE_URL` | **Required** | Neon PostgreSQL connection string (use separate `staging` branch for staging) |
+| `SECRET_KEY` | **Required** | Django cryptographic signing secret |
+| `DJANGO_SETTINGS_MODULE` | **Required** | Set to `question_generation_system.settings.production` |
+| `ALLOWED_HOSTS` | **Required** | Your Render service domain (e.g. `questiongen-staging.onrender.com`) |
+| `BACKEND_BASE_URL` | **Required** | Public HTTPS root domain of the backend (reconciled; code also supports `RENDER_BACKEND_URL` fallback) |
+| `INGESTION_WEBHOOK_SECRET` | **Required** | Shared HMAC secret for verifying incoming worker extraction webhooks |
+| `GITHUB_DISPATCH_TOKEN` | Optional | GitHub Personal Access Token (PAT) with `repo` / `workflow` scope to trigger Actions runners |
+| `GITHUB_DISPATCH_REPO` | Optional | GitHub repository path (`queraai/QuestionGen`, defaults to this repo) |
+| `DISPATCH_REF` | Optional | Branch to dispatch (`staging` on staging service, `main` on production) |
+| `MAX_CONCURRENT_DISPATCHES`| Optional | Cap on parallel Actions runners (default `2`, protects free-tier minutes) |
+| `TOC_V2_ENABLED` | Optional | Kept `false` until physical multi-chapter books are verified |
+| `LEGACY_REVIEW_REQUIRED` | Optional | Default `true`: flags all legacy-font converted pages for human verification in UI |
+| `GEMINI_CALL_CAP` | Optional | Default `20`: caps Gemini vision AI calls per document |
+| `GOOGLE_DRIVE_FOLDER_ID` | Optional | Google Drive folder ID for external PDF cloud storage |
+| `GOOGLE_DRIVE_USER_TOKEN_FILE` | Optional | Path to OAuth2 user credentials file for Google Drive API |
 
-### In Render Environment Variables (`Render Dashboard > Environment`):
-| Variable Name | Value | Purpose |
-|---|---|---|
-| `INGESTION_WEBHOOK_SECRET` | *(Same secret as above)* | Verifies signatures on incoming worker webhooks |
-| `MAX_CONCURRENT_DISPATCHES` | `2` | Guards Actions monthly quota |
-| `TOC_V2_ENABLED` | `false` | Keeps unverified TOC v2 feature flag disabled |
-| `GEMINI_CALL_CAP` | `20` | Caps external AI calls per document |
+### B. GitHub Actions Secrets (`Settings > Secrets and variables > Actions > Secrets`)
+| Secret Name | Required / Optional | Purpose |
+|---|:---:|---|
+| `INGESTION_WEBHOOK_SECRET` | **Required** | Shared HMAC secret used by runner to sign callback webhooks |
+| `GEMINI_API_KEY` | Optional | Google Gemini API key for handwritten notes & TOC vision fallback |
+| `GOOGLE_DRIVE_USER_TOKEN_JSON` | Optional | Base64 or JSON string of OAuth2 credentials for Google Drive downloads |
+| `GOOGLE_DRIVE_FOLDER_ID` | Optional | Google Drive destination folder ID |
 
 ---
 
 ## 5. Staging Deployment & Smoke Testing
 
-1. In GitHub, push or merge to the `staging` branch (already tracking `company/staging`).
-2. Render will automatically detect the push and trigger a build on your staging service.
+1. In GitHub, push changes to the `staging` branch (`git push company staging`).
+2. Render automatically detects the push and triggers a build on the staging service.
 3. Once the build completes:
-   - Log into the staging application as a Teacher (`teacher1` / `password123`).
+   - Log into the staging application using your authorized school administrative or teacher account (demo accounts with fixed passwords are automatically blocked in production environments).
    - Upload a test single-chapter PDF or NCERT Hindi sample.
-   - Confirm that the job transitions from `PENDING` → `PROCESSING` → `COMPLETED`.
-   - Review extracted sections and images in the UI.
+   - Confirm that the job transitions from `PENDING` → `EXTRACTING` → `COMPLETED`.
+   - Review extracted sections, reading blocks, and images in the Dataset Inspection UI.
+   - Confirm that pages converted from old fonts display the visible `"converted from old font, please verify"` warning banner.
 
 ---
 
-## 6. Production Deployment Steps (When Ready)
+## 6. Production Deployment & Database Migrations
 
-1. Return to the GitHub Pull Request (`staging` → `main`).
-2. Confirm the green checkmark: all CI tests (`CI Evaluation Harness` and Django test suites) must be **PASSING**.
-3. Click **Merge pull request** → **Confirm merge**.
-4. Render will trigger the production build automatically.
-5. In Render, verify that the latest deployment log shows `Deployment successful`.
+1. **Do Database Migrations Run Automatically on Render?**
+   - **Yes, when using `build.sh`**: If your Render service Build Command is configured as `./build.sh` (or `bash build.sh`), line 12 explicitly executes `python manage.py migrate` automatically upon deployment.
+   - **If using a custom build command**: Verify that `python manage.py migrate` is included (e.g. `pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate`).
+2. In GitHub, open the Pull Request (`staging` → `main`).
+3. Confirm that all automated checks show green passing checkmarks.
+4. Click **Merge pull request** → **Confirm merge**.
+5. Render will trigger the production build and run migrations automatically.
+6. Verify in Render Deploy Logs that `Applying content_ingestion.0003_geminiresultcache... OK` appears and status is `Deployment successful`.
 
 ---
 
-## 7. Emergency Rollback Plan
+## 7. Emergency Rollback Plan & Database Schema Compatibility
 
 If an unexpected regression or issue occurs in production:
 
 1. **Option A: Revert PR via GitHub UI (Recommended)**:
-   - Go to the merged PR on GitHub.
+   - Go to the merged PR on GitHub (`https://github.com/queraai/QuestionGen/pulls`).
    - Click the **Revert** button at the top right of the PR page.
-   - This creates a new pull request reverting the changes.
-   - Click **Merge pull request** to immediately restore `main` to its prior state.
+   - This opens a new pull request reverting the commit to `main`.
+   - Merge the revert PR; Render will rebuild and redeploy the previous code.
 2. **Option B: Render Instant Rollback**:
-   - In your Render Dashboard, go to your backend web service.
-   - Click **Deploys** in the left sidebar.
-   - Find the previous successful deployment before the merge.
-   - Click the three dots (`...`) next to it and select **Rollback to this deploy**.
+   - In Render Dashboard → Select your Web Service → Click **Deploys**.
+   - Find the previous successful deployment and select **Rollback to this deploy**.
+
+> ### Critical Note on Migrations During Rollback:
+> **Rolling back code does NOT roll back database migrations!**
+> When you revert code in Git or Render, the PostgreSQL database remains at its latest migration state.
+> - **Schema Compatibility**: The only migration added in this release is `content_ingestion/migrations/0003_geminiresultcache.py`, which creates a new standalone table `GeminiResultCache`.
+> - **Zero-Downtime Safe**: This migration does NOT modify, drop, or rename any pre-existing tables or columns.
+> - **Compatibility Guarantee**: The previous code on `main` does not query `GeminiResultCache` and will continue operating normally with 100% backwards compatibility if the code is rolled back.
+> - If you ever need to restore the database to its exact pre-merge state, point Render's `DATABASE_URL` to the `pre_merge_backup` Neon branch created in Step 2.
+
