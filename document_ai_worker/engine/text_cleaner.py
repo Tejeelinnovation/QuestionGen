@@ -409,6 +409,69 @@ def detect_glued_words(text: str) -> List[str]:
     return list(dict.fromkeys(glued_candidates))  # Deduplicate preserving order
 
 
+def compute_script_aware_garbage(text: str) -> Tuple[int, int, float]:
+    """
+    Computes script-aware garbage characters and garbage rate for a text block.
+    Penalizes broken font markers, control bytes, intra-word symbols, and mixed scripts.
+    Returns (total_chars, garbage_chars, garbage_rate).
+    """
+    if not text:
+        return 0, 0, 0.0
+
+    total = len(text)
+    garbage = 0
+
+    # 1. Explicit replacement & CID markers
+    garbage += text.count("\ufffd") * 3
+    garbage += len(re.findall(r"cid:\d+", text)) * 5
+
+    # 2. Control characters & non-printable bytes
+    for ch in text:
+        code = ord(ch)
+        if (code < 32 and ch not in ("\n", "\t", "\r")) or (127 <= code < 160):
+            garbage += 2
+
+    # 3. Token-level analysis
+    tokens = text.split()
+    valid_single_latin = {"a", "i", "A", "I"}
+    valid_single_devanagari = {"व", "०", "१", "२", "३", "४", "५", "६", "७", "८", "९"}
+    valid_single_gujarati = {"આ", "એ", "ઓ", "ઈ", "ઉ", "૦", "૧", "૨", "૩", "૪", "૫", "૬", "૭", "૮", "૯"}
+    intra_word_symbols = set("|&[]{}*^~\\`$@=<>_")
+
+    for token in tokens:
+        # Check token length (glued words without spacing)
+        if len(token) > 55:
+            garbage += len(token) // 2
+        elif len(token) == 1:
+            ch = token[0]
+            code = ord(ch)
+            if "A" <= ch <= "Z" or "a" <= ch <= "z":
+                if ch not in valid_single_latin:
+                    garbage += 1
+            elif 0x0900 <= code <= 0x097F:
+                if ch not in valid_single_devanagari:
+                    garbage += 1
+            elif 0x0A80 <= code <= 0x0AFF:
+                if ch not in valid_single_gujarati:
+                    garbage += 1
+
+        # Check intra-word symbols (corrupted legacy font / OCR noise)
+        sym_count = sum(1 for c in token if c in intra_word_symbols)
+        alpha_count = sum(1 for c in token if c.isalnum())
+        if sym_count > 0 and alpha_count > 0:
+            garbage += sym_count * 2
+
+        # Check mixed-script (Latin + Indic letters within same token)
+        has_latin = any(("A" <= c <= "Z" or "a" <= c <= "z") for c in token)
+        has_devanagari = any(0x0900 <= ord(c) <= 0x097F for c in token)
+        has_gujarati = any(0x0A80 <= ord(c) <= 0x0AFF for c in token)
+        if (has_latin and has_devanagari) or (has_latin and has_gujarati) or (has_devanagari and has_gujarati):
+            garbage += len(token)
+
+    rate = min(1.0, garbage / max(total, 1))
+    return total, garbage, rate
+
+
 def clean_page_text(
     text: str,
     fitz_page: Optional[Any] = None,
@@ -469,7 +532,6 @@ def clean_page_text(
         stats["glued_words_count"] = len(remaining_glued)
 
     # Step 7: Quality score calculation
-    from eval.run import compute_script_aware_garbage
     _, _, garbage_rate = compute_script_aware_garbage(current_text)
 
     # Base quality score

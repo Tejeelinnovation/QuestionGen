@@ -83,7 +83,7 @@ jobs:
           GEMINI_API_KEY: ${{ github.event.client_payload.gemini_api_key || secrets.GEMINI_API_KEY || '' }}
         run: |
           echo "Starting Document AI Worker for Job #$JOB_ID..."
-          PYTHONPATH=document_ai_worker python document_ai_worker/cli_extractor.py \
+          PYTHONPATH=.:document_ai_worker python document_ai_worker/cli_extractor.py \
             --job-id "$JOB_ID" \
             --pdf-url "$PDF_URL" \
             --callback-url "$CALLBACK_URL" \

@@ -363,7 +363,7 @@ class TextbookPipeline:
                 remapped_text, has_unmapped = res, False
             has_dev = bool(remapped_text and any("\u0900" <= c <= "\u097f" for c in remapped_text))
 
-            from eval.run import compute_script_aware_garbage
+            from .text_cleaner import compute_script_aware_garbage
             _, _, remap_garbage = compute_script_aware_garbage(remapped_text or "")
 
             if has_dev and not has_unmapped and remap_garbage < 0.15:
