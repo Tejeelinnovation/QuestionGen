@@ -1,0 +1,226 @@
+{
+  "timestamp": "20261006_092621",
+  "mode": "fast",
+  "samples": {
+    "clean_textbook": {
+      "sample": "clean_textbook",
+      "status": "SKIPPED_NO_PDF",
+      "notes": "Placeholder: Clean complete textbook with front-matter, multi-chapter TOC, and pedagogical exercises. Waiting for user-supplied PDF.",
+      "expected": {
+        "doc_type": "FULL_BOOK",
+        "has_toc": true,
+        "chapters": [
+          {
+            "number": 1,
+            "title": "Real Numbers",
+            "start_page": 1,
+            "end_page": 18
+          },
+          {
+            "number": 2,
+            "title": "Polynomials",
+            "start_page": 19,
+            "end_page": 36
+          }
+        ],
+        "page_kinds": {
+          "1": "COVER",
+          "2": "PREFACE",
+          "3": "TABLE_OF_CONTENTS"
+        },
+        "notes": "Placeholder: Clean complete textbook with front-matter, multi-chapter TOC, and pedagogical exercises. Waiting for user-supplied PDF."
+      }
+    },
+    "handwritten_sheet": {
+      "sample": "handwritten_sheet",
+      "status": "SKIPPED_NO_PDF",
+      "notes": "Placeholder: Handwritten teacher notes, student equations, or sketches requiring Vision AI OCR track. Waiting for user-supplied PDF.",
+      "expected": {
+        "doc_type": "HANDWRITTEN_NOTES",
+        "has_toc": false,
+        "chapters": [],
+        "page_kinds": {
+          "1": "HANDWRITTEN_NOTES"
+        },
+        "notes": "Placeholder: Handwritten teacher notes, student equations, or sketches requiring Vision AI OCR track. Waiting for user-supplied PDF."
+      }
+    },
+    "hindi_gujarati_book": {
+      "sample": "hindi_gujarati_book",
+      "status": "COMPLETED",
+      "mode": "fast",
+      "engine": "TextbookPipeline (Rule-Based Fallback)",
+      "pdf_name": "sample.pdf",
+      "total_pages": 22,
+      "doc_type_predicted": "SINGLE_CHAPTER",
+      "doc_type_expected": "SINGLE_CHAPTER",
+      "doc_type_correct": true,
+      "confidence": 0.96,
+      "evidence": "Found 14 textbook publication markers (NCERT/reprint/TOC); Detected prominent chapter-opener title heading; Detected textbook running headers/footers with page/title division; Document length (22 pages) matches standard single chapter unit",
+      "has_toc_expected": false,
+      "extracted_chapters_count": 0,
+      "expected_chapters_count": 0,
+      "toc_precision": null,
+      "toc_recall": null,
+      "toc_status": "correct: no TOC produced",
+      "page_range_accuracy": null,
+      "garbage_rate": 0.0015,
+      "empty_page_count": 0,
+      "tiny_image_count": 49,
+      "needs_review_rate": 0.0,
+      "runtime_seconds": 8.39,
+      "memory_mb": 94.7,
+      "page_kinds": {
+        "digital_text": 22
+      },
+      "granularity": "UNKNOWN",
+      "notes": "NCERT Class 10 Hindi Sparsh / Kshitij Chapter (Premchand). Indic Devanagari text requiring Indic language processing and OCR."
+    },
+    "magazine": {
+      "sample": "magazine",
+      "status": "SKIPPED_NO_PDF",
+      "notes": "Placeholder: Periodical or magazine publication with multi-column sidebars, rich media, and feature articles. Waiting for user-supplied PDF.",
+      "expected": {
+        "doc_type": "MAGAZINE",
+        "has_toc": true,
+        "chapters": [],
+        "page_kinds": {
+          "1": "COVER",
+          "2": "TABLE_OF_CONTENTS",
+          "3": "FEATURE_ARTICLE"
+        },
+        "notes": "Placeholder: Periodical or magazine publication with multi-column sidebars, rich media, and feature articles. Waiting for user-supplied PDF."
+      }
+    },
+    "newspaper_36p": {
+      "sample": "newspaper_36p",
+      "status": "COMPLETED",
+      "mode": "fast",
+      "engine": "TextbookPipeline (Rule-Based Fallback)",
+      "pdf_name": "sample.pdf",
+      "total_pages": 36,
+      "doc_type_predicted": "NEWSPAPER",
+      "doc_type_expected": "NEWSPAPER",
+      "doc_type_correct": true,
+      "confidence": 0.96,
+      "evidence": "Page 1 contains masthead 'navbharat times'; Explicit newspaper branding ('largest english newspaper' / 'epaper'); Broadsheet page dimensions (large print layout); Found newspaper dateline (Day, Month Date format); Found volume/issue publication stamp; Found 13 newspaper keywords (edition/reporters/sections); Detected textbook running headers/footers with page/title division; Found 2 educational pedagogy markers (exercises/activities); Document length (36 pages) matches standard single chapter unit",
+      "has_toc_expected": false,
+      "extracted_chapters_count": 0,
+      "expected_chapters_count": 0,
+      "toc_precision": null,
+      "toc_recall": null,
+      "toc_status": "correct: no TOC produced",
+      "page_range_accuracy": null,
+      "garbage_rate": 0.0068,
+      "empty_page_count": 0,
+      "tiny_image_count": 3726,
+      "needs_review_rate": 0.028,
+      "runtime_seconds": 23.52,
+      "memory_mb": 363.6,
+      "page_kinds": {
+        "digital_text": 29,
+        "image_only": 7
+      },
+      "granularity": "UNKNOWN",
+      "notes": "Times of India Delhi 36-page broadsheet edition, October 1, 2026. Broadsheet dimensions (990x1545 pt) with multi-column news layout."
+    },
+    "scanned_book": {
+      "sample": "scanned_book",
+      "status": "SKIPPED_NO_PDF",
+      "notes": "Placeholder: Scanned legacy textbook or physical book scan with skew, grain, or OCR degradation. Waiting for user-supplied PDF.",
+      "expected": {
+        "doc_type": "FULL_BOOK",
+        "has_toc": true,
+        "chapters": [],
+        "page_kinds": {},
+        "notes": "Placeholder: Scanned legacy textbook or physical book scan with skew, grain, or OCR degradation. Waiting for user-supplied PDF."
+      }
+    },
+    "single_chapter": {
+      "sample": "single_chapter",
+      "status": "COMPLETED",
+      "mode": "fast",
+      "engine": "TextbookPipeline (Rule-Based Fallback)",
+      "pdf_name": "sample.pdf",
+      "total_pages": 23,
+      "doc_type_predicted": "SINGLE_CHAPTER",
+      "doc_type_expected": "SINGLE_CHAPTER",
+      "doc_type_correct": true,
+      "confidence": 0.96,
+      "evidence": "Found 3 newspaper keywords (edition/reporters/sections); Found 16 textbook publication markers (NCERT/reprint/TOC); Found multilingual chapter terms (1 occurrences); Detected prominent chapter-opener title heading; Found 2 educational pedagogy markers (exercises/activities); Document length (23 pages) matches standard single chapter unit",
+      "has_toc_expected": false,
+      "extracted_chapters_count": 0,
+      "expected_chapters_count": 0,
+      "toc_precision": null,
+      "toc_recall": null,
+      "toc_status": "correct: no TOC produced",
+      "page_range_accuracy": null,
+      "garbage_rate": 0.0,
+      "empty_page_count": 0,
+      "tiny_image_count": 0,
+      "needs_review_rate": 0.0,
+      "runtime_seconds": 3.38,
+      "memory_mb": 374.5,
+      "page_kinds": {
+        "digital_text": 23
+      },
+      "granularity": "UNKNOWN",
+      "notes": "NCERT Class 11 Sociology Chapter 1 (Sociology and Society). Single chapter unit with pedagogical discussions and end-of-chapter questions."
+    },
+    "worksheet": {
+      "sample": "worksheet",
+      "status": "SKIPPED_NO_PDF",
+      "notes": "Placeholder: Assessment paper or student practice worksheet with max marks, time limit, and structured question items. Waiting for user-supplied PDF.",
+      "expected": {
+        "doc_type": "WORKSHEET_OR_EXAM",
+        "has_toc": false,
+        "chapters": [],
+        "page_kinds": {
+          "1": "QUESTION_PAPER_FRONT",
+          "2": "SECTION_B_QUESTIONS"
+        },
+        "notes": "Placeholder: Assessment paper or student practice worksheet with max marks, time limit, and structured question items. Waiting for user-supplied PDF."
+      }
+    }
+  },
+  "confusion_matrix": {
+    "SINGLE_CHAPTER": {
+      "SINGLE_CHAPTER": 2
+    },
+    "NEWSPAPER": {
+      "NEWSPAPER": 1
+    }
+  },
+  "newspaper_baseline": {
+    "sample": "newspaper_36p",
+    "status": "COMPLETED",
+    "mode": "fast",
+    "engine": "TextbookPipeline (Rule-Based Fallback)",
+    "pdf_name": "sample.pdf",
+    "total_pages": 36,
+    "doc_type_predicted": "NEWSPAPER",
+    "doc_type_expected": "NEWSPAPER",
+    "doc_type_correct": true,
+    "confidence": 0.96,
+    "evidence": "Page 1 contains masthead 'navbharat times'; Explicit newspaper branding ('largest english newspaper' / 'epaper'); Broadsheet page dimensions (large print layout); Found newspaper dateline (Day, Month Date format); Found volume/issue publication stamp; Found 13 newspaper keywords (edition/reporters/sections); Detected textbook running headers/footers with page/title division; Found 2 educational pedagogy markers (exercises/activities); Document length (36 pages) matches standard single chapter unit",
+    "has_toc_expected": false,
+    "extracted_chapters_count": 0,
+    "expected_chapters_count": 0,
+    "toc_precision": null,
+    "toc_recall": null,
+    "toc_status": "correct: no TOC produced",
+    "page_range_accuracy": null,
+    "garbage_rate": 0.0068,
+    "empty_page_count": 0,
+    "tiny_image_count": 3726,
+    "needs_review_rate": 0.028,
+    "runtime_seconds": 23.52,
+    "memory_mb": 363.6,
+    "page_kinds": {
+      "digital_text": 29,
+      "image_only": 7
+    },
+    "granularity": "UNKNOWN",
+    "notes": "Times of India Delhi 36-page broadsheet edition, October 1, 2026. Broadsheet dimensions (990x1545 pt) with multi-column news layout."
+  }
+}

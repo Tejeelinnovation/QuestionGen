@@ -70,7 +70,12 @@ export interface ExtractedPage {
   chapter_title: string;
   is_verified: boolean;
   items_count: number;
+  needs_review?: boolean;
+  quality_score?: number;
+  legacy_font_encoding?: boolean;
+  legacy_review_marker?: string;
 }
+
 
 export const fetchIngestionJobs = async (): Promise<IngestionJobSummary[]> => {
   const response = await apiClient.get<IngestionJobSummary[]>('/api/ingest/jobs/');

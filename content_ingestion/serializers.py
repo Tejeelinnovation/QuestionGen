@@ -46,6 +46,10 @@ class ExtractedItemSerializer(serializers.ModelSerializer):
 class ExtractedPageSerializer(serializers.ModelSerializer):
     items_count = serializers.SerializerMethodField()
     chapter_title = serializers.CharField(source="chapter.title", read_only=True, default="")
+    needs_review = serializers.SerializerMethodField()
+    quality_score = serializers.SerializerMethodField()
+    legacy_font_encoding = serializers.SerializerMethodField()
+    legacy_review_marker = serializers.SerializerMethodField()
 
     class Meta:
         model = ExtractedPage
@@ -59,12 +63,53 @@ class ExtractedPageSerializer(serializers.ModelSerializer):
             "chapter_title",
             "is_verified",
             "items_count",
+            "needs_review",
+            "quality_score",
+            "legacy_font_encoding",
+            "legacy_review_marker",
         ]
 
     def get_items_count(self, obj) -> int:
         if obj.structured_content and isinstance(obj.structured_content, list):
             return len(obj.structured_content)
         return 0
+
+    def get_legacy_font_encoding(self, obj) -> bool:
+        if obj.structured_content and isinstance(obj.structured_content, list):
+            for sec in obj.structured_content:
+                if isinstance(sec, dict):
+                    meta = sec.get("metadata", {})
+                    if meta.get("legacy_font_encoding") or meta.get("converted_from_legacy_font"):
+                        return True
+        return False
+
+    def get_legacy_review_marker(self, obj) -> str:
+        if self.get_legacy_font_encoding(obj):
+            return "converted from old font, please verify"
+        return ""
+
+    def get_needs_review(self, obj) -> bool:
+        if obj.is_verified:
+            return False
+        # Check LEGACY_REVIEW_REQUIRED config
+        if getattr(settings, "LEGACY_REVIEW_REQUIRED", True) and self.get_legacy_font_encoding(obj):
+            return True
+        # Check structured content metadata
+        if obj.structured_content and isinstance(obj.structured_content, list):
+            for sec in obj.structured_content:
+                if isinstance(sec, dict) and sec.get("metadata", {}).get("needs_review"):
+                    return True
+        if not obj.raw_text.strip() and obj.layout_type not in ("IMAGE_ONLY", "FULL_PAGE_IMAGE"):
+            return True
+        return False
+
+    def get_quality_score(self, obj) -> float:
+        if obj.structured_content and isinstance(obj.structured_content, list):
+            for sec in obj.structured_content:
+                if isinstance(sec, dict) and "quality_score" in sec.get("metadata", {}):
+                    return round(float(sec["metadata"]["quality_score"]), 2)
+        return 1.0 if obj.is_verified else 0.88
+
 
 
 class IngestionJobListSerializer(serializers.ModelSerializer):

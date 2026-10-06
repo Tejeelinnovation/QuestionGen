@@ -144,6 +144,11 @@ class DoclingPipeline:
                 page_items_map[page_no].append((item, level))
 
         # 4. Construct ChapterSchema and PageSchema
+        from .page_router import PageRouter
+        router = PageRouter()
+        page_decisions = router.probe_document(fitz_doc)
+        decisions_by_page = {d.page_num: d for d in page_decisions}
+
         chapters: List[ChapterSchema] = []
         pages: List[PageSchema] = []
         current_chapter_num = 1
@@ -324,13 +329,64 @@ class DoclingPipeline:
                     ))
                     page_text_pieces.append(clean_text)
 
+            dec = decisions_by_page.get(page_num)
+            p_kind = getattr(dec, "page_kind", "digital_text") if dec else "digital_text"
+            p_engine = getattr(dec, "engine", "Docling AI (DocLayNet)") if dec else "Docling AI (DocLayNet)"
+            p_reason = getattr(dec, "route_reason", "Docling layout and block analysis") if dec else "Docling layout and block analysis"
+            p_script = getattr(dec, "detected_script", "latin") if dec else "latin"
+            p_ocr_lang = getattr(dec, "ocr_language", None) if dec else None
+            p_legacy = getattr(dec, "legacy_font_encoding", False) if dec else False
+            p_review = getattr(dec, "needs_review", False) if dec else False
+            p_quality = getattr(dec, "quality_score", 1.0) if dec else 1.0
+            p_meta = dict(getattr(dec, "metadata", {})) if dec else {}
+
+            p_flags: List[str] = []
+            page_raw_text = "\n\n".join(page_text_pieces)
+
+            if p_kind != "blank" and page_raw_text:
+                from .text_cleaner import clean_page_text
+                clean_res = clean_page_text(page_raw_text, fitz_page=fitz_page)
+                page_raw_text = clean_res.text
+                p_flags.extend(clean_res.flags)
+                if clean_res.glued_words:
+                    p_meta["glued_words"] = clean_res.glued_words
+                p_quality = round(min(p_quality, clean_res.quality_score), 3)
+                if p_quality < 0.70:
+                    p_review = True
+
+                for sec in sections:
+                    if sec.type != "DIAGRAM" and sec.text:
+                        sec.text = clean_page_text(sec.text).text
+
+            if p_legacy:
+                has_devanagari = any("\u0900" <= c <= "\u097f" for c in page_raw_text)
+                if not has_devanagari:
+                    p_review = True
+                    p_quality = 0.50
+                    p_meta["raw_text_unreliable"] = page_raw_text
+                    p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
+                    page_raw_text = ""
+                    for sec in sections:
+                        if sec.type != "DIAGRAM":
+                            sec.text = ""
+
             pages.append(PageSchema(
                 page_number=page_num,
                 layout_type="SINGLE_COLUMN",
-                raw_text="\n\n".join(page_text_pieces),
+                raw_text=page_raw_text,
                 chapter_number=current_chapter_num,
                 chapter_title=current_chapter_title,
                 sections=sections,
+                page_kind=p_kind,
+                engine=p_engine,
+                route_reason=p_reason,
+                detected_script=p_script,
+                ocr_language=p_ocr_lang,
+                legacy_font_encoding=p_legacy,
+                needs_review=p_review,
+                quality_score=p_quality,
+                quality_flags=p_flags,
+                metadata=p_meta,
             ))
 
         fitz_doc.close()

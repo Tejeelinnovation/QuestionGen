@@ -132,11 +132,31 @@ class IngestionService:
             job.save(update_fields=["status", "error_message"])
             return job
 
+        MAX_FILE_SIZE_BYTES = int(os.environ.get("MAX_FILE_SIZE_BYTES", str(100 * 1024 * 1024)))  # 100 MB limit
+        MAX_PAGES = int(os.environ.get("MAX_PAGES", "250"))  # 250 pages limit
+
         job.file_size_bytes = os.path.getsize(file_path)
+        if job.file_size_bytes > MAX_FILE_SIZE_BYTES:
+            size_mb = job.file_size_bytes / (1024 * 1024)
+            job.status = JobStatus.FAILED
+            job.error_message = f"Uploaded file ({size_mb:.1f} MB) exceeds maximum allowed size of 100 MB."
+            job.current_stage = "Upload rejected: file size exceeds 100MB limit."
+            job.save(update_fields=["status", "error_message", "current_stage", "file_size_bytes"])
+            return job
 
         try:
             doc = fitz.open(file_path)
             job.total_pages = len(doc)
+            if job.total_pages > MAX_PAGES:
+                doc.close()
+                job.status = JobStatus.FAILED
+                job.error_message = (
+                    f"Document has {job.total_pages} pages, which exceeds the limit of {MAX_PAGES} pages. "
+                    "Please split large books into individual chapters for optimal processing."
+                )
+                job.current_stage = f"Document rejected: exceeds maximum length of {MAX_PAGES} pages."
+                job.save(update_fields=["status", "error_message", "current_stage", "total_pages"])
+                return job
 
             # Analyze document TOC and granularity
             granularity, toc_entries = self.toc_detector.analyze_document(doc)

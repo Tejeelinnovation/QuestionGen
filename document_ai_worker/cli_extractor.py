@@ -26,6 +26,11 @@ import time
 import urllib.request
 import uuid
 import requests
+from pathlib import Path
+
+WORKER_DIR = Path(__file__).resolve().parent
+if str(WORKER_DIR) not in sys.path:
+    sys.path.insert(0, str(WORKER_DIR))
 
 from engine.docling_pipeline import DoclingPipeline
 from engine.drive_uploader import WorkerGoogleDriveUploader
@@ -86,6 +91,10 @@ def download_file(url: str, dest_path: str) -> None:
     size_mb = os.path.getsize(dest_path) / (1024 * 1024)
     logger.info(f"Downloaded file: {size_mb:.2f} MB saved to {dest_path}")
 
+    # Maximum file size guard (100 MB)
+    if size_mb > 100.0:
+        raise ValueError(f"Downloaded file size ({size_mb:.2f} MB) exceeds maximum allowed limit of 100 MB.")
+
     # Validate PDF Magic Bytes (%PDF-)
     with open(dest_path, "rb") as f:
         magic = f.read(5)
@@ -123,6 +132,60 @@ def auto_detect_document_kind(
         )
 
 
+def retry_page_with_gemini(
+    local_pdf: str,
+    page_num: int,
+    gemini_api_key: str,
+    timeout: int = 45,
+    max_retries: int = 2,
+    retry_delay: float = 1.0,
+    file_hash: str = "doc",
+) -> Optional[str]:
+    """
+    Renders low-quality page and calls unified GeminiClient to perform
+    optical transcription with temperature 0, exponential backoff, and Neon/disk caching.
+    """
+    if not gemini_api_key:
+        return None
+
+    import pymupdf as fitz
+    try:
+        from engine.gemini_client import get_shared_gemini_client
+    except ImportError:
+        from document_ai_worker.engine.gemini_client import get_shared_gemini_client
+
+    client = get_shared_gemini_client(api_key=gemini_api_key)
+    if not client.is_configured:
+        return None
+
+    try:
+        doc = fitz.open(local_pdf)
+        if page_num < 1 or page_num > len(doc):
+            doc.close()
+            return None
+        page = doc[page_num - 1]
+        prompt = (
+            "Transcribe all text, formulas, headings, tables, and notes from this page accurately in natural reading order. "
+            "Output clear, clean text without optical character artifacts or corrupted tokens. "
+            "Preserve formatting and line hierarchy."
+        )
+        result = client.transcribe_page_image(
+            page=page,
+            prompt=prompt,
+            page_num=page_num,
+            file_hash=file_hash,
+            dpi=150,
+            timeout=timeout,
+            max_attempts=max_retries,
+            retry_delay=retry_delay,
+        )
+        doc.close()
+        return result
+    except Exception as render_err:
+        logger.warning(f"[Gemini Quality Gate] Page render/transcription error on page {page_num}: {render_err}")
+        return None
+
+
 def send_progress(
     callback_url: str,
     job_id: int,
@@ -130,11 +193,12 @@ def send_progress(
     total_pages: int,
     stage: str,
     secret: str = "",
-) -> None:
+) -> Optional[dict]:
     """
     Sends non-blocking progress updates to the Django backend.
     Catches any network hiccups so extraction is never aborted due to a progress ping.
     Signs payload with HMAC-SHA256 if secret is provided.
+    Returns backend response dict if successful (including stored_pages for resumption).
     """
     payload = {
         "job_id": job_id,
@@ -155,23 +219,73 @@ def send_progress(
     pct = int((processed_pages / total_pages * 100) if total_pages else 0)
     logger.info(f"[Progress] {processed_pages}/{total_pages} ({pct}%) - {stage}")
     try:
-        requests.post(callback_url, data=raw_bytes, headers=headers, timeout=5)
+        res = requests.post(callback_url, data=raw_bytes, headers=headers, timeout=10)
+        if res.status_code == 200:
+            return res.json()
     except Exception as p_err:
         logger.debug(f"[Progress] Heartbeat delivery notice: {p_err}")
+    return None
+
+
+def send_page_batch(
+    callback_url: str,
+    job_id: int,
+    pages_batch: list,
+    total_pages: int,
+    secret: str = "",
+    idempotency_key: str = "",
+) -> list[int]:
+    """
+    Sends an intermediate batch of structured pages to the Django backend to
+    checkpoint extraction progress. Returns the list of stored page numbers acknowledged.
+    """
+    payload = {
+        "job_id": job_id,
+        "status": "BATCH_PAGES",
+        "idempotency_key": idempotency_key,
+        "pages": [p.model_dump() if hasattr(p, "model_dump") else p for p in pages_batch],
+        "total_pages": total_pages,
+    }
+    raw_bytes = json.dumps(payload, default=str).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if idempotency_key:
+        headers["X-Idempotency-Key"] = idempotency_key
+    if secret:
+        ts_str = str(int(time.time()))
+        to_sign = f"{ts_str}.".encode("utf-8") + raw_bytes
+        sig = hmac.new(secret.encode("utf-8"), to_sign, hashlib.sha256).hexdigest()
+        headers["X-Ingestion-Timestamp"] = ts_str
+        headers["X-Ingestion-Signature"] = f"sha256={sig}"
+
+    for attempt in range(1, 4):
+        try:
+            res = requests.post(callback_url, data=raw_bytes, headers=headers, timeout=30)
+            if res.status_code == 200:
+                data = res.json()
+                logger.info(f"[Batch Checkpoint] Checkpointed {len(pages_batch)} pages with backend.")
+                return data.get("stored_pages", [])
+        except Exception as err:
+            logger.warning(f"[Batch Checkpoint] Attempt {attempt} failed: {err}")
+            time.sleep(2)
+    return []
 
 
 def send_webhook(
     callback_url: str,
     payload: dict,
     secret: str = "",
-    max_retries: int = 5,
+    max_retries: int = 8,
     idempotency_key: str = "",
-) -> None:
+    retries: Optional[int] = None,
+) -> bool:
     """
-    Posts the extraction result back to the Django backend with automatic retry
-    if the backend returns 502/503/504 or encounters temporary connection drops.
+    Posts the extraction result back to the Django backend with automatic retry.
+    Tolerates Render free tier spin-up delays (~60 seconds) using progressive delays.
     Signs payload with HMAC-SHA256 bound to timestamp (X-Ingestion-Signature, X-Ingestion-Timestamp).
     """
+    if retries is not None:
+        max_retries = retries
+
     raw_bytes = json.dumps(payload, default=str).encode("utf-8")
     payload_kb = len(raw_bytes) // 1024
     logger.info(f"Delivering extraction results to Webhook: {callback_url} (Payload size: ~{payload_kb} KB)")
@@ -185,28 +299,35 @@ def send_webhook(
         headers["X-Ingestion-Timestamp"] = ts_str
         headers["X-Ingestion-Signature"] = f"sha256={sig}"
 
+    # Progressive retry delays: 5s, 10s, 15s, 20s, 25s, 30s, 30s, 30s (~165s max wait)
+    delays = [5, 10, 15, 20, 25, 30, 30, 30]
+
     for attempt in range(1, max_retries + 1):
         try:
             res = requests.post(callback_url, data=raw_bytes, headers=headers, timeout=60)
             logger.info(f"Webhook attempt #{attempt} status code: {res.status_code}")
             if res.status_code in (502, 503, 504) and attempt < max_retries:
+                wait_sec = delays[min(attempt - 1, len(delays) - 1)]
                 logger.warning(
-                    f"Backend returned HTTP {res.status_code} (likely restarting or deploying). "
-                    f"Waiting 10s before retry #{attempt + 1}..."
+                    f"Backend returned HTTP {res.status_code} (Render free instance may be waking). "
+                    f"Waiting {wait_sec}s before retry #{attempt + 1}..."
                 )
-                time.sleep(10)
+                time.sleep(wait_sec)
                 continue
             if res.status_code >= 400:
                 logger.error(f"Webhook error response: {res.text}")
                 res.raise_for_status()
-            return
+            return True
         except requests.exceptions.RequestException as exc:
             if attempt < max_retries:
-                logger.warning(f"Webhook connection attempt #{attempt} failed: {exc}. Retrying in 10s...")
-                time.sleep(10)
+                wait_sec = delays[min(attempt - 1, len(delays) - 1)]
+                logger.warning(f"Webhook connection attempt #{attempt} failed: {exc}. Retrying in {wait_sec}s...")
+                time.sleep(wait_sec)
             else:
                 logger.error(f"All {max_retries} webhook delivery attempts failed.")
                 raise
+    return False
+
 
 
 def main():
@@ -239,7 +360,28 @@ def main():
         except Exception:
             detected_total_pages = 0
 
-        send_progress(
+        # Maximum page count guard (250 pages)
+        if detected_total_pages > 250:
+            raise ValueError(
+                f"Document has {detected_total_pages} pages, which exceeds the limit of 250 pages. "
+                "Please split large books into individual chapters for optimal processing."
+            )
+
+        # Gemini model verification at startup
+        gemini_key = args.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
+        if gemini_key:
+            try:
+                from engine.gemini_client import get_shared_gemini_client
+            except ImportError:
+                from document_ai_worker.engine.gemini_client import get_shared_gemini_client
+            g_client = get_shared_gemini_client(api_key=gemini_key)
+            g_client.verify_at_startup()
+
+        # Job runtime guard
+        job_start_time = time.time()
+        MAX_JOB_SECONDS = 1800  # 30 minutes timeout
+
+        init_res = send_progress(
             args.callback_url,
             args.job_id,
             0,
@@ -247,6 +389,9 @@ def main():
             f"PDF downloaded ({detected_total_pages} pages). Initializing AI extractor...",
             secret=args.webhook_secret,
         )
+        stored_pages = set((init_res or {}).get("stored_pages", []))
+        if stored_pages:
+            logger.info(f"[Resumption] Found {len(stored_pages)} previously stored pages in database.")
 
         # 2. Select appropriate extraction pipeline with throttled progress reporting
         last_progress_time = [0.0]
@@ -301,13 +446,63 @@ def main():
             if not extracted_successfully:
                 logger.info("Initializing Textbook & Pedagogical Pipeline (Enhanced Fallback)...")
                 pipeline = TextbookPipeline(media_dir=os.path.join(temp_dir, "assets"))
-                chapters, pages, granularity = pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
+                chapters, pages, granularity = pipeline.process_pdf(
+                    local_pdf,
+                    progress_callback=on_pipeline_progress,
+                    document_kind=args.document_kind,
+                )
                 engine_name = "Rule-Based Engine"
 
         logger.info(
             f"Extraction complete! Found {len(chapters)} chapters and {len(pages)} pages. "
             f"Granularity: {granularity}"
         )
+
+        # 2b. Quality Gate & Single-Page Retry
+        gemini_key = args.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
+        call_cap = int(os.environ.get("GEMINI_CALL_CAP", "20"))
+        gemini_calls_made = 0
+
+        for p in pages:
+            if p.page_kind in ("image_only", "blank"):
+                continue
+
+            # Quality threshold: quality_score < 0.70 or explicit review flag
+            if p.quality_score < 0.70 or p.needs_review:
+                if gemini_key and gemini_calls_made < call_cap:
+                    logger.info(
+                        f"[Quality Gate] Page {p.page_number} scored {p.quality_score:.2f} (needs_review={p.needs_review}). "
+                        f"Retrying with Gemini Vision (call {gemini_calls_made + 1}/{call_cap})..."
+                    )
+                    transcribed = retry_page_with_gemini(local_pdf, p.page_number, gemini_key)
+                    gemini_calls_made += 1
+                    if transcribed:
+                        try:
+                            from engine.text_cleaner import clean_page_text
+                        except ImportError:
+                            from document_ai_worker.engine.text_cleaner import clean_page_text
+                        clean_res = clean_page_text(transcribed)
+                        p.raw_text = clean_res.text
+                        p.quality_score = clean_res.quality_score
+                        p.quality_flags.append("retried_with_gemini")
+                        p.quality_flags.extend(clean_res.flags)
+                        if p.quality_score >= 0.70:
+                            p.needs_review = False
+                            p.route_reason = f"{p.route_reason}; Transcribed and verified via Gemini Vision"
+                            logger.info(f"[Quality Gate] Page {p.page_number} successfully recovered (score={p.quality_score:.2f})")
+                        else:
+                            p.needs_review = True
+                            p.quality_flags.append("low_quality_post_retry")
+                    else:
+                        p.needs_review = True
+                        p.quality_flags.append("gemini_retry_failed")
+                else:
+                    p.needs_review = True
+                    if gemini_calls_made >= call_cap:
+                        p.quality_flags.append("gemini_call_cap_exhausted")
+                        logger.info(f"[Quality Gate] Page {p.page_number} capped (GEMINI_CALL_CAP={call_cap} reached). Set needs_review=True.")
+                    elif not gemini_key:
+                        p.quality_flags.append("needs_review_no_gemini_key")
 
         # 3. Direct Google Drive Diagram Uploading from 16GB runner
         drive_uploader = WorkerGoogleDriveUploader()
@@ -389,8 +584,21 @@ def main():
 
         logger.info(f"Direct Drive upload complete: {uploaded_diagram_count} diagrams saved to Google Drive.")
 
-        # 4. Assemble lightweight JSON Payload matching Django IngestionJobWebhookView
+        # Checkpoint pages in batches to ensure progress is safely persisted
+        if len(pages) > 10:
+            batch_size = 15
+            for i in range(0, len(pages), batch_size):
+                batch_slice = pages[i : i + batch_size]
+                send_page_batch(
+                    args.callback_url,
+                    args.job_id,
+                    batch_slice,
+                    len(pages),
+                    secret=args.webhook_secret,
+                    idempotency_key=f"{idempotency_key}_batch_{i // batch_size}",
+                )
         payload = {
+            "schema_version": "1.1.0",
             "job_id": args.job_id,
             "idempotency_key": idempotency_key,
             "status": "COMPLETED",

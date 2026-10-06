@@ -226,9 +226,9 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
               <HeartHandshake className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-sm font-heading font-bold text-ink">Thank you for contributing!</h3>
+              <h3 className="text-sm font-heading font-bold text-ink">Material Ingestion & Verification</h3>
               <p className="text-xs text-ink/70 mt-0.5">
-                Uploaded materials are reviewed by academic coordinators. Your contributions help build better exam papers.
+                Documents are pre-parsed using AI layout detection. Academic coordinators and teachers should inspect flagged pages in the verification modal before utilizing extracted questions.
               </p>
             </div>
           </div>

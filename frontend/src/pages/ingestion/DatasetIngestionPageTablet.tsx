@@ -211,7 +211,7 @@ export const DatasetIngestionPageTablet: React.FC = () => {
         <div className="p-4 rounded-xl border border-forest/20 bg-forest/5 flex items-center gap-3">
           <HeartHandshake className="w-6 h-6 text-forest shrink-0" />
           <p className="text-xs text-ink/80 leading-relaxed font-body">
-            Thank you for contributing! Your uploaded materials are reviewed by academic coordinators to expand test banks.
+            Documents are pre-parsed using AI layout detection. Academic coordinators and teachers should inspect flagged pages in the verification modal before utilizing extracted questions.
           </p>
         </div>
       )}

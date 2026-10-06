@@ -11,6 +11,7 @@ import {
   Lightbulb,
   Download,
   AlertTriangle,
+  CheckCircle,
 } from 'lucide-react';
 import { fetchJobPages, exportJobJson, type ExtractedPage, type StructuredSection } from '../../api/ingestion';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -389,14 +390,39 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                   <div className="flex items-center gap-2 truncate">
                     <Layout className="w-3.5 h-3.5 opacity-60 shrink-0" />
                     <span className="truncate">Page {p.page_number}</span>
+                    {p.needs_review && (
+                      <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Needs Human Review" />
+                    )}
                   </div>
-                  <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${
-                      selectedPageIndex === idx ? 'bg-white/20 text-white' : 'bg-surface-muted text-ink/60'
-                    }`}
-                  >
-                    {p.layout_type.replace('_COLUMN', '')}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    {p.legacy_font_encoding && (
+                      <span
+                        className={`text-[9px] font-mono px-1 py-0.2 rounded font-bold ${
+                          selectedPageIndex === idx ? 'bg-orange-400/30 text-orange-200' : 'bg-orange-500/10 text-orange-700 border border-orange-500/20'
+                        }`}
+                        title="Converted from old font"
+                      >
+                        OLD FONT
+                      </span>
+                    )}
+                    {p.needs_review && (
+                      <span
+                        className={`text-[9px] font-mono px-1 py-0.2 rounded font-bold ${
+                          selectedPageIndex === idx ? 'bg-amber-400/30 text-amber-200' : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'
+                        }`}
+                      >
+                        REVIEW
+                      </span>
+                    )}
+
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${
+                        selectedPageIndex === idx ? 'bg-white/20 text-white' : 'bg-surface-muted text-ink/60'
+                      }`}
+                    >
+                      {p.layout_type.replace('_COLUMN', '')}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -415,6 +441,24 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                           — {currentPage.chapter_title}
                         </span>
                       )}
+                      {currentPage.legacy_review_marker && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-orange-500/15 text-orange-800 border border-orange-500/30 flex items-center gap-1 font-semibold">
+                          <AlertTriangle className="w-3 h-3 text-orange-600" />
+                          converted from old font, please verify
+                        </span>
+                      )}
+                      {currentPage.needs_review ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-amber-500/10 text-amber-700 border border-amber-500/30 flex items-center gap-1 font-semibold">
+                          <AlertTriangle className="w-3 h-3 text-amber-600" />
+                          Needs Review
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-forest/10 text-forest border border-forest/20 flex items-center gap-1 font-semibold">
+                          <CheckCircle className="w-3 h-3 text-forest" />
+                          Verified
+                        </span>
+                      )}
+
                     </div>
                     <span className="self-start xs:self-auto px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-forest/10 text-forest border border-forest/20 shrink-0">
                       Layout: {currentPage.layout_type}

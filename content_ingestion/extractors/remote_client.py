@@ -105,7 +105,14 @@ class RemoteAiMicroserviceExtractor:
                     "Please add BACKEND_BASE_URL=https://<your-render-app>.onrender.com to your Render Environment variables."
                 )
 
-            dispatch_url = f"https://api.github.com/repos/{self.github_repo}/dispatches"
+            # A7: Use workflow_dispatch (not repository_dispatch) so that staging backends can
+            # trigger the worker from the staging branch. repository_dispatch only works from
+            # the repository's default branch (main). workflow_dispatch accepts a ref parameter.
+            dispatch_ref = getattr(settings, "DISPATCH_REF", "main")
+            dispatch_url = (
+                f"https://api.github.com/repos/{self.github_repo}"
+                f"/actions/workflows/document_ai_extractor.yml/dispatches"
+            )
             headers = {
                 "Authorization": f"Bearer {self.github_token}",
                 "Accept": "application/vnd.github+json",
@@ -123,28 +130,49 @@ class RemoteAiMicroserviceExtractor:
 
             drive_folder_id = getattr(settings, "GOOGLE_DRIVE_FOLDER_ID", "")
 
+            # workflow_dispatch payload: "ref" is the branch to check out; "inputs" are the workflow inputs
             payload = {
-                "event_type": "extract_document",
-                "client_payload": {
-                    "job_id": job.pk,
-                    "title": job.title,
-                    "document_kind": job.document_kind or "AUTO",
+                "ref": dispatch_ref,
+                "inputs": {
+                    "job_id": str(job.pk),
                     "pdf_url": pdf_url,
                     "callback_url": callback_url,
-                    "drive_token_json": drive_token_json,
-                    "drive_folder_id": drive_folder_id,
-                    "gemini_api_key": getattr(settings, "GEMINI_API_KEY", "") or os.getenv("GEMINI_API_KEY", ""),
+                    "document_kind": job.document_kind or "AUTO",
                 },
             }
-            logger.info(f"Triggering GitHub Actions runner on {self.github_repo} for Job #{job.pk}...")
+            logger.info(
+                f"Triggering workflow_dispatch on {self.github_repo}@{dispatch_ref} for Job #{job.pk}..."
+            )
             res = requests.post(dispatch_url, json=payload, headers=headers, timeout=20)
+            if res.status_code == 422 and "workflow_dispatch" in res.text:
+                logger.warning(
+                    f"GitHub workflow_dispatch returned 422. Falling back to repository_dispatch on {self.github_repo}..."
+                )
+                repo_dispatch_url = f"https://api.github.com/repos/{self.github_repo}/dispatches"
+                repo_payload = {
+                    "event_type": "extract_document",
+                    "client_payload": {
+                        "job_id": str(job.pk),
+                        "pdf_url": pdf_url,
+                        "callback_url": callback_url,
+                        "document_kind": job.document_kind or "AUTO",
+                    },
+                }
+                res = requests.post(repo_dispatch_url, json=repo_payload, headers=headers, timeout=20)
+
             if res.status_code not in (200, 204):
                 logger.error(f"GitHub dispatch failed ({res.status_code}): {res.text}")
                 res.raise_for_status()
 
-            job.current_stage = "Launched 16GB RAM GitHub Actions runner in cloud..."
+            job.current_stage = f"Launched GitHub Actions runner ({dispatch_ref} branch)..."
             job.save(update_fields=["current_stage"])
-            return {"status": "DISPATCHED_TO_GITHUB_ACTIONS", "repo": self.github_repo, "job_id": job.pk}
+            return {
+                "status": "DISPATCHED_TO_GITHUB_ACTIONS",
+                "repo": self.github_repo,
+                "ref": dispatch_ref,
+                "job_id": job.pk,
+            }
+
 
         # 2. Dispatch to Direct Microservice URL
         payload = {

@@ -350,3 +350,25 @@ class ExtractedItem(TimestampedModel):
 
     def __str__(self) -> str:
         return f"[{self.item_type}] Page {self.page.page_number}: {self.heading or self.content[:50]}..."
+
+
+class GeminiResultCache(TimestampedModel):
+    """
+    Persisted cache for Gemini multimodal and text API responses in Neon PostgreSQL.
+    Keyed by SHA256 of file_hash + page_number + prompt_version to ensure ephemeral runners
+    never waste API quota or repeat identical calls across restarts.
+    """
+
+    cache_key = models.CharField(max_length=64, unique=True, db_index=True)
+    file_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    page_number = models.PositiveIntegerField(default=1)
+    prompt_version = models.CharField(max_length=32, default="v1")
+    response_data = models.JSONField(default=dict)
+
+    class Meta:
+        verbose_name = "Gemini Result Cache"
+        verbose_name_plural = "Gemini Result Caches"
+
+    def __str__(self) -> str:
+        return f"GeminiCache {self.cache_key[:12]} (p{self.page_number}, {self.prompt_version})"
+

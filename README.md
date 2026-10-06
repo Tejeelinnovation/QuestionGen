@@ -717,4 +717,37 @@ curl http://127.0.0.1:8000/api/questions/101/validation-history/ \
   -H "Authorization: Bearer <token>"
 ```
 
-Just checking that i can push into both repo at once so old repo also keeps updated with new changes.
+---
+
+## Document Ingestion & Document AI Worker Subsystem
+
+The Document Ingestion subsystem enables automated parsing, classification, and structured extraction of educational materials (textbooks, single chapters, and newspapers) into structured learning sections and diagrams.
+
+### Key Capabilities
+
+- **Intelligent Classification**: Automatically distinguishes between `FULL_BOOK`, `SINGLE_CHAPTER`, `NEWSPAPER`, `HANDWRITTEN_NOTES`, `WORKSHEET_OR_EXAM`, and `MAGAZINE`.
+- **Legacy Indic Font Normalization**: Accurately repairs legacy pre-Unicode fonts (Walkman-Chanakya and KrutiDev 010) into clean UTF-8 Devanagari Hindi, fixing nukta forms (ज़, फ़, ख़), conjunct consonants, and misplaced matras.
+- **Artifact-Free Layout & Diagram Extraction**: Identifies and extracts meaningful figures, illustrations, and equations while suppressing tiny icon artifacts (<60px), decorative dividers, and repetitive headers/footers.
+- **Resilient Webhook & Resumption Architecture**: Ephemeral workers stream extracted pages in batches of 15 (`BATCH_PAGES`) to the backend. Workers resume from the last completed page upon restart without duplicating effort.
+- **Render Free Tier Cold-Start Resilience**: Webhook requests retry up to 8 times with progressive backoff (delays: 5s, 10s, 15s, 20s, 25s, 30s, 30s, 30s = ~165s max tolerance) to smoothly handle Render free-tier cold starts (~60s).
+- **GitHub Actions Guard**: `MAX_CONCURRENT_DISPATCHES = 2` guards against quota exhaustion by holding excess jobs in `PENDING` status.
+- **Table of Contents Engine (v2)**: Multi-stage TOC extraction (PDF bookmarks → Gemini LLM → Multilingual regex fallback) with printed-to-physical page offset calibration. Shipped behind `TOC_V2_ENABLED=false` until physical multi-chapter textbook samples are supplied.
+- **Hardened Gemini Client**: Strict temperature 0, schema enforcement, rate-limiter (2 req/s), exponential backoff on 429/5xx, per-job cap (`GEMINI_CALL_CAP=20`), and persistent caching in PostgreSQL (Neon) via API.
+
+> **Privacy Notice**: On Google's free API tier (`gemini-3.8-flash`), Google terms of service permit the use of submitted prompts and outputs for model training. Administrators and teachers should be informed prior to uploading student-identifiable or sensitive materials.
+
+### Running Evaluation & Tests
+
+```bash
+# 1. Run Django Backend & Ingestion Unit Tests
+python manage.py test content_ingestion
+
+# 2. Run Document AI Worker Unit Tests (43 tests across 5 test suites)
+python -m unittest discover -s eval -p "test_*.py"
+
+# 3. Run Golden Samples Regression Harness (Fast mode)
+python -m eval.run --mode fast
+
+# 4. Run Golden Samples Regression Harness (Full raster mode)
+python -m eval.run --mode full
+```

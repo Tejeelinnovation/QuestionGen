@@ -918,3 +918,214 @@ class NullMetadataAndFilteringTests(APITestCase):
         self.assertEqual(drafts[0].question_text, "What is a test question?")
 
 
+class GeminiCacheAndBatchReliabilityTests(APITestCase):
+    """
+    Tests for Phase 8 Neon Database Gemini result caching and
+    Phase 9 batch page checkpointing and resumption.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.school = School.objects.create(name="Cache Test School")
+        self.user = User.objects.create_user(
+            username="cacheteacher",
+            email="cacheteacher@school.org",
+            password="testpassword",
+            school=self.school,
+            role="CONTRIBUTOR",
+        )
+        self.job = IngestionJob.objects.create(
+            uploaded_by=self.user,
+            school=self.school,
+            title="Batch Reliability Book",
+            status=JobStatus.PENDING,
+            total_pages=20,
+            processed_pages=0,
+        )
+
+    def test_gemini_cache_endpoint(self):
+        """Tests GET and POST /api/ingest/cache/gemini/."""
+        cache_key = "test_neon_cache_key_999"
+
+        # Initially 404
+        get_res = self.client.get(f"/api/ingest/cache/gemini/?key={cache_key}")
+        self.assertEqual(get_res.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Store cache entry
+        post_data = {
+            "cache_key": cache_key,
+            "file_hash": "hash_123",
+            "page_number": 5,
+            "prompt_version": "v1",
+            "response_data": {"extracted_notes": "Sample physics notes"},
+        }
+        post_res = self.client.post("/api/ingest/cache/gemini/", data=post_data, format="json")
+        self.assertEqual(post_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(post_res.data.get("status"), "CACHED")
+
+        # Now GET returns cached entry
+        get_res2 = self.client.get(f"/api/ingest/cache/gemini/?key={cache_key}")
+        self.assertEqual(get_res2.status_code, status.HTTP_200_OK)
+        self.assertTrue(get_res2.data.get("found"))
+        self.assertEqual(get_res2.data.get("response_data"), {"extracted_notes": "Sample physics notes"})
+
+    @override_settings(INGESTION_WEBHOOK_SECRET="test_batch_secret_123", DEBUG=False)
+    def test_batch_pages_checkpointing_and_resumption(self):
+        """Tests sending intermediate BATCH_PAGES and retrieving GET_RESUME_STATE."""
+        secret = "test_batch_secret_123"
+
+        def _make_signed_post(url, payload):
+            raw_bytes = json.dumps(payload).encode("utf-8")
+            ts = int(time.time())
+            sig = hmac.new(secret.encode("utf-8"), f"{ts}.".encode("utf-8") + raw_bytes, hashlib.sha256).hexdigest()
+            return self.client.post(
+                url,
+                data=raw_bytes,
+                content_type="application/json",
+                HTTP_X_INGESTION_TIMESTAMP=str(ts),
+                HTTP_X_INGESTION_SIGNATURE=f"sha256={sig}",
+            )
+
+        # 1. Send batch for pages 1 to 3
+        batch_payload = {
+            "status": "BATCH_PAGES",
+            "total_pages": 20,
+            "pages": [
+                {"page_number": 1, "raw_text": "Page 1 intro", "sections": [{"type": "PARAGRAPH", "text": "Intro text"}]},
+                {"page_number": 2, "raw_text": "Page 2 content", "sections": [{"type": "DEFINITION", "text": "Newton law"}]},
+                {"page_number": 3, "raw_text": "Page 3 exercises", "sections": [{"type": "EXERCISE_QUESTION", "text": "Solve for x"}]},
+            ],
+        }
+        res = _make_signed_post(f"/api/ingest/jobs/{self.job.pk}/webhook/", batch_payload)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data.get("status"), "BATCH_SAVED")
+        self.assertEqual(res.data.get("stored_pages"), [1, 2, 3])
+
+        # Verify pages exist in database
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.pages.count(), 3)
+        self.assertEqual(self.job.processed_pages, 3)
+
+        # 2. Check resume state
+        resume_res = _make_signed_post(f"/api/ingest/jobs/{self.job.pk}/webhook/", {"status": "GET_RESUME_STATE"})
+        self.assertEqual(resume_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(resume_res.data.get("stored_pages"), [1, 2, 3])
+        self.assertEqual(resume_res.data.get("processed_pages"), 3)
+
+    @override_settings(INGESTION_WEBHOOK_SECRET="test_crash_resume_secret_456", DEBUG=False)
+    def test_job_killed_halfway_resumes_without_redoing_stored_pages(self):
+        """
+        Item 8: Demonstrates a job killed halfway (after 5 of 10 pages)
+        and resumed by a new worker which fetches stored_pages and only processes pages 6-10.
+        """
+        secret = "test_crash_resume_secret_456"
+
+        def _make_signed_post(url, payload):
+            raw_bytes = json.dumps(payload).encode("utf-8")
+            ts = int(time.time())
+            sig = hmac.new(secret.encode("utf-8"), f"{ts}.".encode("utf-8") + raw_bytes, hashlib.sha256).hexdigest()
+            return self.client.post(
+                url,
+                data=raw_bytes,
+                content_type="application/json",
+                HTTP_X_INGESTION_TIMESTAMP=str(ts),
+                HTTP_X_INGESTION_SIGNATURE=f"sha256={sig}",
+            )
+
+        # Worker 1 starts: processes pages 1 to 5, saves batch, then dies (killed)
+        worker1_pages = [{"page_number": p, "raw_text": f"Text on page {p}", "sections": []} for p in range(1, 6)]
+        res1 = _make_signed_post(f"/api/ingest/jobs/{self.job.pk}/webhook/", {
+            "status": "BATCH_PAGES",
+            "total_pages": 10,
+            "pages": worker1_pages,
+        })
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        self.assertEqual(res1.data.get("stored_pages"), [1, 2, 3, 4, 5])
+
+        # Simulate Worker 1 crashing: database has 5 pages saved, job is EXTRACTING
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, "EXTRACTING")
+        self.assertEqual(self.job.processed_pages, 5)
+        self.assertEqual(set(self.job.pages.values_list("page_number", flat=True)), {1, 2, 3, 4, 5})
+
+        # Worker 2 spawns: queries GET_RESUME_STATE before doing any work
+        resume_res = _make_signed_post(f"/api/ingest/jobs/{self.job.pk}/webhook/", {"status": "GET_RESUME_STATE"})
+        self.assertEqual(resume_res.status_code, status.HTTP_200_OK)
+        already_stored = set(resume_res.data.get("stored_pages", []))
+        self.assertEqual(already_stored, {1, 2, 3, 4, 5})
+
+        # Worker 2 computes remaining pages: only 6 to 10
+        total_pages = 10
+        remaining_pages = [p for p in range(1, total_pages + 1) if p not in already_stored]
+        self.assertEqual(remaining_pages, [6, 7, 8, 9, 10])
+
+        # Worker 2 extracts only remaining pages and streams batch
+        worker2_pages = [{"page_number": p, "raw_text": f"Text on page {p}", "sections": []} for p in remaining_pages]
+        res2 = _make_signed_post(f"/api/ingest/jobs/{self.job.pk}/webhook/", {
+            "status": "BATCH_PAGES",
+            "total_pages": 10,
+            "pages": worker2_pages,
+        })
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        self.assertEqual(res2.data.get("stored_pages"), list(range(1, 11)))
+
+        # Worker 2 completes job
+        complete_res = _make_signed_post(f"/api/ingest/jobs/{self.job.pk}/webhook/", {
+            "status": "COMPLETED",
+            "total_pages": 10,
+            "processed_pages": 10,
+            "document_kind": "SINGLE_CHAPTER",
+        })
+        self.assertEqual(complete_res.status_code, status.HTTP_200_OK)
+
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, "COMPLETED")
+        self.assertEqual(self.job.processed_pages, 10)
+        self.assertEqual(self.job.pages.count(), 10)
+
+    def test_webhook_retry_after_simulated_60s_backend_sleep(self):
+        """
+        Item 8: Tests worker webhook retry loop surviving Render free-tier cold starts
+        (e.g., connection timeouts or 503 sleeping instances for ~60s before waking).
+        """
+        from unittest.mock import patch, MagicMock
+        from document_ai_worker.cli_extractor import send_webhook
+        import requests
+
+        attempt_count = 0
+
+        def simulated_render_cold_start(*args, **kwargs):
+            nonlocal attempt_count
+            attempt_count += 1
+            if attempt_count < 4:
+                # First 3 attempts fail while Render instance is spinning up (~60s sleep)
+                mock_resp = MagicMock()
+                mock_resp.status_code = 503
+                mock_resp.text = "Service Unavailable - Instance waking up"
+                mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_resp)
+                return mock_resp
+            # 4th attempt: backend is awake and returns success
+            success_resp = MagicMock()
+            success_resp.status_code = 200
+            success_resp.json.return_value = {"status": "BATCH_SAVED", "stored_pages": [1, 2, 3]}
+            success_resp.text = '{"status": "BATCH_SAVED"}'
+            return success_resp
+
+        # Patch requests.post and sleep (to avoid delaying unit test suite)
+        with patch("requests.post", side_effect=simulated_render_cold_start) as mock_post, \
+             patch("time.sleep", return_value=None) as mock_sleep:
+            res = send_webhook(
+                callback_url="https://questiongen-staging.onrender.com/api/ingest/jobs/99/webhook/",
+                secret="secret_abc",
+                payload={"status": "BATCH_PAGES", "pages": [{"page_number": 1}]},
+                retries=6,
+            )
+            self.assertTrue(res)
+            self.assertEqual(attempt_count, 4)
+            self.assertEqual(mock_sleep.call_count, 3)
+            # Confirm progressive backoff was called
+            delays = [call[0][0] for call in mock_sleep.call_args_list]
+            self.assertEqual(delays, [5, 10, 15])
+
+
+

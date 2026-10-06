@@ -677,7 +677,24 @@ class IngestionJobWebhookView(APIView):
 
         data = request.data
 
-        # 3. Handle PROGRESS and FAILED heartbeats
+        # 3. Handle GET_RESUME_STATE, PROGRESS, and BATCH_PAGES
+        if data.get("status") == "GET_RESUME_STATE":
+            try:
+                job = IngestionJob.objects.get(pk=pk)
+            except IngestionJob.DoesNotExist:
+                return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+            existing_pages = list(job.pages.order_by("page_number").values_list("page_number", flat=True))
+            return Response(
+                {
+                    "status": "RESUME_STATE",
+                    "job_id": job.pk,
+                    "processed_pages": job.processed_pages,
+                    "total_pages": job.total_pages,
+                    "stored_pages": existing_pages,
+                },
+                status=status.HTTP_200_OK,
+            )
+
         if data.get("status") == "PROGRESS":
             try:
                 job = IngestionJob.objects.get(pk=pk)
@@ -692,12 +709,81 @@ class IngestionJobWebhookView(APIView):
                 job.current_stage = data["current_stage"]
             job.updated_at = timezone.now()
             job.save(update_fields=["status", "processed_pages", "total_pages", "current_stage", "updated_at"])
+            existing_pages = list(job.pages.order_by("page_number").values_list("page_number", flat=True))
             return Response(
                 {
                     "status": "PROGRESS_UPDATED",
                     "processed_pages": job.processed_pages,
                     "total_pages": job.total_pages,
                     "progress_percentage": job.progress_percentage,
+                    "stored_pages": existing_pages,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        if data.get("status") == "BATCH_PAGES":
+            try:
+                job = IngestionJob.objects.get(pk=pk)
+            except IngestionJob.DoesNotExist:
+                return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            batch_pages = data.get("pages", [])
+            with transaction.atomic():
+                job.status = JobStatus.EXTRACTING
+                if "total_pages" in data and data["total_pages"]:
+                    job.total_pages = data["total_pages"]
+
+                for p_data in batch_pages:
+                    p_num = p_data.get("page_number", 1)
+                    raw_sections = [s if isinstance(s, dict) else s.model_dump() for s in p_data.get("sections", [])]
+                    is_legacy = bool(p_data.get("legacy_font_encoding") or p_data.get("metadata", {}).get("legacy_font_encoding") or p_data.get("metadata", {}).get("converted_from_legacy_font"))
+                    if is_legacy and raw_sections:
+                        for s in raw_sections:
+                            if "metadata" not in s or not isinstance(s["metadata"], dict):
+                                s["metadata"] = {}
+                            s["metadata"]["legacy_font_encoding"] = True
+                            s["metadata"]["legacy_review_marker"] = "converted from old font, please verify"
+                            if getattr(settings, "LEGACY_REVIEW_REQUIRED", True):
+                                s["metadata"]["needs_review"] = True
+                    page_obj, _ = ExtractedPage.objects.update_or_create(
+                        job=job,
+                        page_number=p_num,
+                        defaults={
+                            "layout_type": p_data.get("layout_type", "SINGLE_COLUMN"),
+                            "raw_text": p_data.get("raw_text", ""),
+                            "structured_content": raw_sections,
+                        },
+                    )
+
+                    # Sync items for this page
+                    job.items.filter(page=page_obj).delete()
+                    for sec in raw_sections:
+                        raw_type = sec.get("type", "PARAGRAPH")
+                        item_type = raw_type if raw_type in ItemType.values else ItemType.PARAGRAPH
+                        ExtractedItem.objects.create(
+                            job=job,
+                            page=page_obj,
+                            item_type=item_type,
+                            heading=sec.get("heading", ""),
+                            content=sec.get("text", ""),
+                            latex_equations=sec.get("latex_equations", []),
+                            image_path=sec.get("image_path", ""),
+                            image_caption=sec.get("image_caption", ""),
+                            metadata=sec.get("metadata", {}),
+                        )
+
+                current_max = max([p.get("page_number", 0) for p in batch_pages], default=job.processed_pages)
+                job.processed_pages = max(job.processed_pages, current_max)
+                job.current_stage = f"Stored batch of {len(batch_pages)} pages (checkpoint at p{job.processed_pages})."
+                job.updated_at = timezone.now()
+                job.save(update_fields=["status", "processed_pages", "total_pages", "current_stage", "updated_at"])
+
+            stored_pages = list(job.pages.order_by("page_number").values_list("page_number", flat=True))
+            return Response(
+                {
+                    "status": "BATCH_SAVED",
+                    "processed_pages": job.processed_pages,
+                    "stored_pages": stored_pages,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -779,13 +865,18 @@ class IngestionJobWebhookView(APIView):
                         f"Dataset extraction completed normally; downstream question generation is not blocked."
                     )
 
-                # Safe clean delete-and-recreate in explicit reverse-dependency order:
-                # 1. ExtractedItem (child of page and job)
-                job.items.all().delete()
-                # 2. ExtractedPage (child of chapter and job)
-                job.pages.all().delete()
-                # 3. ExtractedChapter (child of job)
-                job.chapters.all().delete()
+                if pages_data or toc_entries:
+                    # Safe clean delete-and-recreate in explicit reverse-dependency order:
+                    # 1. ExtractedItem (child of page and job)
+                    job.items.all().delete()
+                    # 2. ExtractedPage (child of chapter and job)
+                    job.pages.all().delete()
+                    # 3. ExtractedChapter (child of job)
+                    job.chapters.all().delete()
+                else:
+                    # Checkpointed batch pages already saved: sync total count and finalize
+                    job.processed_pages = job.pages.count()
+
 
                 # Re-create chapters
                 chapter_map = {}
@@ -839,6 +930,17 @@ class IngestionJobWebhookView(APIView):
                         sec_dict["text"] = text_val
                         sec_dict["image_path"] = image_path
                         processed_sections.append(sec_dict)
+
+                    is_legacy = bool(p_data.get("legacy_font_encoding") or p_data.get("metadata", {}).get("legacy_font_encoding") or p_data.get("metadata", {}).get("converted_from_legacy_font"))
+                    if is_legacy:
+                        for s in processed_sections:
+                            if "metadata" not in s or not isinstance(s["metadata"], dict):
+                                s["metadata"] = {}
+                            s["metadata"]["legacy_font_encoding"] = True
+                            s["metadata"]["legacy_review_marker"] = "converted from old font, please verify"
+                            if getattr(settings, "LEGACY_REVIEW_REQUIRED", True):
+                                s["metadata"]["needs_review"] = True
+
 
                     pages_to_create.append(
                         ExtractedPage(
@@ -944,3 +1046,56 @@ class IngestionJobWebhookView(APIView):
             job.save(update_fields=["status", "error_message", "updated_at"])
             logger.error(f"[Webhook Error] Failed processing Job #{job.pk}: {e}", exc_info=True)
             return Response({"status": "ERROR", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class GeminiCacheView(APIView):
+    """
+    Persisted cache endpoint for Gemini API responses in Neon PostgreSQL.
+    Allows ephemeral GitHub Actions and cloud workers to check and store
+    model outputs without duplicate Gemini calls.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        from .models import GeminiResultCache
+        cache_key = request.query_params.get("key", "").strip()
+        if not cache_key:
+            return Response({"detail": "Missing 'key' query parameter."}, status=status.HTTP_400_BAD_REQUEST)
+
+        entry = GeminiResultCache.objects.filter(cache_key=cache_key).first()
+        if not entry:
+            return Response({"found": False, "cache_key": cache_key}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            "found": True,
+            "cache_key": cache_key,
+            "file_hash": entry.file_hash,
+            "page_number": entry.page_number,
+            "prompt_version": entry.prompt_version,
+            "response_data": entry.response_data,
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        from .models import GeminiResultCache
+        data = request.data
+        cache_key = data.get("cache_key", "").strip()
+        if not cache_key:
+            return Response({"detail": "Missing 'cache_key'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        obj, created = GeminiResultCache.objects.update_or_create(
+            cache_key=cache_key,
+            defaults={
+                "file_hash": data.get("file_hash", ""),
+                "page_number": data.get("page_number", 1),
+                "prompt_version": data.get("prompt_version", "v1"),
+                "response_data": data.get("response_data", {}),
+            },
+        )
+        return Response({
+            "status": "CACHED",
+            "cache_key": cache_key,
+            "created": created,
+        }, status=status.HTTP_200_OK)
+

@@ -40,10 +40,26 @@ class Command(BaseCommand):
             action="store_true",
             help="Delete existing demo users before recreating them.",
         )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force seeding demo accounts even in production (DEBUG=False).",
+        )
 
     def handle(self, *args, **options):
+        from django.conf import settings
+        from django.core.management.base import CommandError
+
+        if not settings.DEBUG and not options.get("force"):
+            raise CommandError(
+                "SAFETY GUARD BLOCKED: Refusing to seed demo accounts in production (DEBUG=False). "
+                "Demo accounts with default passwords must NEVER be created in production environments. "
+                "If this is an isolated staging environment, supply --force."
+            )
+
         clear = options["clear"]
         demo_usernames = ["superadmin", "schooladmin1", "teacher1", "student1", "student2", "qbm1"]
+
 
         if clear:
             self.stdout.write("Clearing existing demo users...")
