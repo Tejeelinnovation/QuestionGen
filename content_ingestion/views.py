@@ -768,14 +768,14 @@ class IngestionJobWebhookView(APIView):
                             job=job,
                             page=page_obj,
                             item_type=item_type,
-                            heading=sec.get("heading", ""),
-                            content=sec.get("text", "") or sec.get("image_description", ""),
-                            latex_equations=sec.get("latex_equations", []),
-                            image_path=sec.get("image_path", ""),
-                            image_caption=sec.get("image_caption", ""),
-                            image_label=sec.get("image_label", ""),
-                            image_description=sec.get("image_description", ""),
-                            metadata=sec.get("metadata", {}),
+                            heading=sec.get("heading") or "",
+                            content=(sec.get("text") or sec.get("image_description") or ""),
+                            latex_equations=sec.get("latex_equations") or [],
+                            image_path=sec.get("image_path") or "",
+                            image_caption=sec.get("image_caption") or "",
+                            image_label=sec.get("image_label") or "",
+                            image_description=sec.get("image_description") or "",
+                            metadata=sec.get("metadata") or {},
                         )
 
                 current_max = max([p.get("page_number", 0) for p in batch_pages], default=job.processed_pages)
@@ -932,12 +932,12 @@ class IngestionJobWebhookView(APIView):
                             except Exception:
                                 image_path = image_data
 
-                        sec_dict["heading"] = heading
-                        sec_dict["text"] = text_val
-                        sec_dict["image_path"] = image_path
-                        sec_dict["image_caption"] = sec_dict.get("image_caption", "")
-                        sec_dict["image_label"] = sec_dict.get("image_label", "")
-                        sec_dict["image_description"] = sec_dict.get("image_description", "")
+                        sec_dict["heading"] = heading or ""
+                        sec_dict["text"] = text_val or ""
+                        sec_dict["image_path"] = image_path or ""
+                        sec_dict["image_caption"] = sec_dict.get("image_caption") or ""
+                        sec_dict["image_label"] = sec_dict.get("image_label") or ""
+                        sec_dict["image_description"] = sec_dict.get("image_description") or ""
                         processed_sections.append(sec_dict)
 
                     is_legacy = bool(p_data.get("legacy_font_encoding") or p_data.get("metadata", {}).get("legacy_font_encoding") or p_data.get("metadata", {}).get("converted_from_legacy_font"))
@@ -978,14 +978,14 @@ class IngestionJobWebhookView(APIView):
                                 page=page_obj,
                                 chapter=page_obj.chapter,
                                 item_type=item_type,
-                                heading=sec_dict.get("heading", ""),
-                                content=sec_dict.get("text", "") or sec_dict.get("image_description", ""),
-                                latex_equations=sec_dict.get("latex_equations", []),
-                                image_path=sec_dict.get("image_path", ""),
-                                image_caption=sec_dict.get("image_caption", ""),
-                                image_label=sec_dict.get("image_label", ""),
-                                image_description=sec_dict.get("image_description", ""),
-                                metadata=sec_dict.get("metadata", {}),
+                                heading=sec_dict.get("heading") or "",
+                                content=(sec_dict.get("text") or sec_dict.get("image_description") or ""),
+                                latex_equations=sec_dict.get("latex_equations") or [],
+                                image_path=sec_dict.get("image_path") or "",
+                                image_caption=sec_dict.get("image_caption") or "",
+                                image_label=sec_dict.get("image_label") or "",
+                                image_description=sec_dict.get("image_description") or "",
+                                metadata=sec_dict.get("metadata") or {},
                             )
                         )
 

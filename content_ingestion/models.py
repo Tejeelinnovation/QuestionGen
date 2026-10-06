@@ -364,17 +364,20 @@ class ExtractedItem(TimestampedModel):
     )
     image_caption = models.TextField(
         blank=True,
+        null=True,
         default="",
         help_text="Associated figure/diagram caption.",
     )
     image_label = models.CharField(
         max_length=255,
         blank=True,
+        null=True,
         default="",
         help_text="Figure/Diagram label or identifier (e.g. Figure 1.1, चित्र 2.1).",
     )
     image_description = models.TextField(
         blank=True,
+        null=True,
         default="",
         help_text="Detailed description or context for the image.",
     )

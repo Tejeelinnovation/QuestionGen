@@ -341,14 +341,14 @@ class IngestionService:
                                 page=page_obj,
                                 chapter=matched_chapter,
                                 item_type=sec_type,
-                                heading=sec.get("heading", ""),
-                                content=sec.get("text", "") or sec.get("image_description", ""),
-                                latex_equations=sec.get("latex_equations", []),
-                                image_path=sec.get("image_path", ""),
-                                image_caption=sec.get("image_caption", ""),
-                                image_label=sec.get("image_label", ""),
-                                image_description=sec.get("image_description", ""),
-                                metadata=sec.get("metadata", {}),
+                                heading=sec.get("heading") or "",
+                                content=(sec.get("text") or sec.get("image_description") or ""),
+                                latex_equations=sec.get("latex_equations") or [],
+                                image_path=sec.get("image_path") or "",
+                                image_caption=sec.get("image_caption") or "",
+                                image_label=sec.get("image_label") or "",
+                                image_description=sec.get("image_description") or "",
+                                metadata=sec.get("metadata") or {},
                             )
                         )
 
