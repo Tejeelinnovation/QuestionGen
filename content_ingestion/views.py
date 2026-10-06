@@ -769,10 +769,12 @@ class IngestionJobWebhookView(APIView):
                             page=page_obj,
                             item_type=item_type,
                             heading=sec.get("heading", ""),
-                            content=sec.get("text", ""),
+                            content=sec.get("text", "") or sec.get("image_description", ""),
                             latex_equations=sec.get("latex_equations", []),
                             image_path=sec.get("image_path", ""),
                             image_caption=sec.get("image_caption", ""),
+                            image_label=sec.get("image_label", ""),
+                            image_description=sec.get("image_description", ""),
                             metadata=sec.get("metadata", {}),
                         )
 
@@ -933,6 +935,9 @@ class IngestionJobWebhookView(APIView):
                         sec_dict["heading"] = heading
                         sec_dict["text"] = text_val
                         sec_dict["image_path"] = image_path
+                        sec_dict["image_caption"] = sec_dict.get("image_caption", "")
+                        sec_dict["image_label"] = sec_dict.get("image_label", "")
+                        sec_dict["image_description"] = sec_dict.get("image_description", "")
                         processed_sections.append(sec_dict)
 
                     is_legacy = bool(p_data.get("legacy_font_encoding") or p_data.get("metadata", {}).get("legacy_font_encoding") or p_data.get("metadata", {}).get("converted_from_legacy_font"))
@@ -974,10 +979,12 @@ class IngestionJobWebhookView(APIView):
                                 chapter=page_obj.chapter,
                                 item_type=item_type,
                                 heading=sec_dict.get("heading", ""),
-                                content=sec_dict.get("text", ""),
+                                content=sec_dict.get("text", "") or sec_dict.get("image_description", ""),
                                 latex_equations=sec_dict.get("latex_equations", []),
                                 image_path=sec_dict.get("image_path", ""),
                                 image_caption=sec_dict.get("image_caption", ""),
+                                image_label=sec_dict.get("image_label", ""),
+                                image_description=sec_dict.get("image_description", ""),
                                 metadata=sec_dict.get("metadata", {}),
                             )
                         )

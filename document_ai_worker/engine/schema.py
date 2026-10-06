@@ -75,6 +75,8 @@ class SectionSchema(BaseModel):
     image_path: str = ""
     image_data: Optional[str] = ""
     image_caption: str = ""
+    image_label: str = ""
+    image_description: str = ""
     image_classification: Optional[str] = Field(
         default=None,
         description="photo | ad | logo | face_grid | diagram | chart | table_image",

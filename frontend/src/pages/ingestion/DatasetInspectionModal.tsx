@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { fetchJobPages, exportJobJson, type ExtractedPage, type StructuredSection } from '../../api/ingestion';
 import { Skeleton } from '../../components/ui/skeleton';
+import { VisualDiagramCard } from '../../components/ui/VisualDiagramCard';
 import 'katex/dist/katex.min.css';
 import katex from 'katex';
 
@@ -507,36 +508,7 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                           )}
 
                           {(sec.image_path || sec.type === 'DIAGRAM') && (
-                            <div className="my-3 p-3 bg-white rounded-xl border border-border/80 shadow-xs flex flex-col items-center">
-                              {sec.image_path ? (
-                                <img
-                                  src={
-                                    sec.image_path.startsWith('http') || sec.image_path.startsWith('data:')
-                                      ? sec.image_path
-                                      : `${import.meta.env.VITE_API_URL || ''}${sec.image_path}`
-                                  }
-                                  alt={sec.image_caption || 'Diagram'}
-                                  className="max-h-80 w-auto object-contain rounded-lg border border-border/40 shadow-xs transition-transform hover:scale-[1.01]"
-                                  onError={(e) => {
-                                    const target = e.currentTarget;
-                                    if (!target.src.includes('media') && !target.src.startsWith('data:')) {
-                                      target.src = `/media/${sec.image_path?.replace(/^\/+/, '')}`;
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <div className="w-full h-28 bg-surface-muted/60 border border-dashed border-border rounded-lg flex flex-col items-center justify-center text-ink/40 gap-1.5">
-                                  <ImageIcon className="w-5 h-5 opacity-40" />
-                                  <span className="text-[11px]">Diagram detected in document</span>
-                                </div>
-                              )}
-                              {sec.image_caption && (
-                                <p className="mt-2 text-xs font-heading font-medium text-ink/70 italic text-center flex items-center gap-1.5">
-                                  <ImageIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                                  <span>{sec.image_caption}</span>
-                                </p>
-                              )}
-                            </div>
+                            <VisualDiagramCard section={sec} pageNumber={currentPage.page_number} />
                           )}
                         </div>
                       ))

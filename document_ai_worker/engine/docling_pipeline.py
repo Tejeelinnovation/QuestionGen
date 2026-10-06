@@ -247,7 +247,12 @@ class DoclingPipeline:
             fitz_page = fitz_doc[page_num - 1] if page_num - 1 < len(fitz_doc) else None
 
             pic_idx = 0
-            for item, level in items_on_page:
+            consumed_item_ids = set()
+
+            for item_idx, (item, level) in enumerate(items_on_page):
+                if id(item) in consumed_item_ids:
+                    continue
+
                 label = getattr(item, "label", None)
                 label_str = str(label.name if hasattr(label, "name") else label).upper()
 
@@ -280,6 +285,21 @@ class DoclingPipeline:
                             ))
                         except ValueError:
                             pass
+
+                # If this item is a CAPTION following a DIAGRAM, attach it directly
+                if "CAPTION" in label_str and sections and sections[-1].type == "DIAGRAM":
+                    diag = sections[-1]
+                    if not diag.image_caption or diag.image_caption.startswith("Figure "):
+                        diag.image_caption = clean_text
+                        fig_m = re.match(r"^\s*((?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+)(?:[\s:\.\-—]+(.*))?$", clean_text, re.IGNORECASE)
+                        if fig_m:
+                            diag.image_label = fig_m.group(1).strip()
+                            diag.heading = diag.image_label
+                            if fig_m.group(2) and fig_m.group(2).strip():
+                                diag.image_description = fig_m.group(2).strip()
+                        else:
+                            diag.image_description = clean_text
+                    continue
 
                 # A. Picture / Diagram items
                 if isinstance(item, PictureItem) or "PICTURE" in label_str:
@@ -323,16 +343,80 @@ class DoclingPipeline:
                             b64 = base64.b64encode(imf.read()).decode("utf-8")
                             img_data = f"data:image/png;base64,{b64}"
 
-                    caption = clean_text or getattr(item, "caption", "") or f"Figure {pic_idx}"
+                    # Comprehensive caption & description extraction
+                    caption_candidates = []
+                    if hasattr(item, "captions") and item.captions:
+                        for cap_ref in item.captions:
+                            try:
+                                if hasattr(cap_ref, "text") and cap_ref.text:
+                                    caption_candidates.append(cap_ref.text.strip())
+                                elif hasattr(cap_ref, "resolve"):
+                                    res = cap_ref.resolve(doc)
+                                    if hasattr(res, "text") and res.text:
+                                        caption_candidates.append(res.text.strip())
+                            except Exception:
+                                pass
+
+                    if hasattr(item, "caption_text"):
+                        try:
+                            ct = item.caption_text(doc)
+                            if ct and ct.strip():
+                                caption_candidates.append(ct.strip())
+                        except Exception:
+                            pass
+
+                    if clean_text:
+                        caption_candidates.append(clean_text)
+
+                    # Lookahead: Check if next item on the page is a caption
+                    if item_idx + 1 < len(items_on_page):
+                        next_item, _ = items_on_page[item_idx + 1]
+                        next_label = str(getattr(next_item, "label", "")).upper()
+                        next_txt = (getattr(next_item, "text", "") or "").strip()
+                        if "CAPTION" in next_label or re.match(r"^\s*(?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+", next_txt, re.IGNORECASE):
+                            caption_candidates.append(next_txt)
+                            consumed_item_ids.add(id(next_item))
+
+                    description_candidates = []
+                    if hasattr(item, "annotations") and item.annotations:
+                        for ann in item.annotations:
+                            try:
+                                t = getattr(ann, "text", "") or getattr(ann, "description", "")
+                                if t and t.strip():
+                                    description_candidates.append(t.strip())
+                            except Exception:
+                                pass
+
+                    chosen_caption = ""
+                    for c in caption_candidates:
+                        if c and c.strip():
+                            chosen_caption = c.strip()
+                            break
+
+                    fig_pat = r"^\s*((?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+)(?:[\s:\.\-—]+(.*))?$"
+                    fig_match = re.match(fig_pat, chosen_caption, re.IGNORECASE) if chosen_caption else None
+
+                    if fig_match:
+                        image_label = fig_match.group(1).strip()
+                        desc_text = (fig_match.group(2) or "").strip()
+                        image_caption = chosen_caption
+                        image_description = desc_text or ("\n".join(description_candidates) if description_candidates else chosen_caption)
+                    else:
+                        image_label = f"Figure {pic_idx}"
+                        image_caption = chosen_caption or f"Figure {pic_idx}"
+                        image_description = chosen_caption or ("\n".join(description_candidates) if description_candidates else "")
+
                     sections.append(SectionSchema(
                         type="DIAGRAM",
-                        heading=caption[:60],
-                        text=clean_text,
+                        heading=image_label or image_caption[:60],
+                        text=image_description or clean_text,
                         column_index=0,
                         image_path=direct_path,
                         image_data=img_data,
-                        image_caption=caption,
-                        metadata={"bbox": bbox},
+                        image_caption=image_caption,
+                        image_label=image_label,
+                        image_description=image_description,
+                        metadata={"bbox": bbox, "image_label": image_label, "image_description": image_description},
                     ))
 
                 # B. Table items

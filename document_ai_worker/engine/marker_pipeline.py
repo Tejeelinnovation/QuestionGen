@@ -207,15 +207,26 @@ class MarkerPipeline:
                                 img_data = f"data:image/png;base64,{b64}"
 
                     caption = clean_text or "Figure"
+                    fig_pat = r"^\s*((?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+)(?:[\s:\.\-—]+(.*))?$"
+                    fig_match = re.match(fig_pat, caption, re.IGNORECASE) if caption else None
+                    if fig_match:
+                        image_label = fig_match.group(1).strip()
+                        image_description = (fig_match.group(2) or "").strip() or caption
+                    else:
+                        image_label = "Figure"
+                        image_description = caption
+
                     sections.append(SectionSchema(
                         type="DIAGRAM",
-                        heading=caption[:60],
-                        text=clean_text,
+                        heading=image_label or caption[:60],
+                        text=image_description or clean_text,
                         column_index=0,
                         image_path=direct_path,
                         image_data=img_data,
                         image_caption=caption,
-                        metadata={"bbox": bbox},
+                        image_label=image_label,
+                        image_description=image_description,
+                        metadata={"bbox": bbox, "image_label": image_label, "image_description": image_description},
                     ))
 
                 elif b_type == "Section-header":

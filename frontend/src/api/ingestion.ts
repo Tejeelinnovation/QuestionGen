@@ -59,6 +59,8 @@ export interface StructuredSection {
   latex_equations?: string[];
   image_path?: string;
   image_caption?: string;
+  image_label?: string;
+  image_description?: string;
   metadata?: Record<string, any>;
 }
 

@@ -37,6 +37,8 @@ class ExtractedItemSerializer(serializers.ModelSerializer):
             "latex_equations",
             "image_path",
             "image_caption",
+            "image_label",
+            "image_description",
             "page_number",
             "chapter_title",
             "metadata",
