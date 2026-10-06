@@ -14,6 +14,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { fetchJobPages, exportJobJson, type ExtractedPage, type StructuredSection } from '../../api/ingestion';
+import { useToast } from '../../context/ToastContext';
 import { Skeleton } from '../../components/ui/skeleton';
 import { VisualDiagramCard } from '../../components/ui/VisualDiagramCard';
 import 'katex/dist/katex.min.css';
@@ -53,6 +54,7 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const toast = useToast();
   const [pages, setPages] = useState<ExtractedPage[]>([]);
   const [selectedPageIndex, setSelectedPageIndex] = useState<number>(0);
   const [viewMode, setViewMode] = useState<'BLOCKS' | 'RAW_JSON'>('BLOCKS');
@@ -115,8 +117,9 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      toast.success(`Exported dataset JSON for "${jobTitle}".`);
     } catch (e) {
-      alert('Failed to download JSON dataset.');
+      toast.error('Failed to download JSON dataset.');
     } finally {
       setIsExporting(false);
     }

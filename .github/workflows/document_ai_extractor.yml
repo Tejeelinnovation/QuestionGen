@@ -37,8 +37,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
-
 
       - name: Cache Hugging Face, Docling & EasyOCR Models
         uses: actions/cache@v4
@@ -51,21 +49,42 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-document-ai-models-
 
+      - name: Cache Python Virtual Environment
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/venv
+          key: ${{ runner.os }}-doc-ai-venv-v1-${{ hashFiles('document_ai_worker/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-doc-ai-venv-v1-
+
+      - name: Add Virtualenv to Environment PATH
+        run: |
+          if [ -d "/home/runner/venv/bin" ]; then
+            echo "/home/runner/venv/bin" >> $GITHUB_PATH
+          fi
+
       - name: Install System Libraries & Google Tesseract OCR
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            libgl1 libglib2.0-0 \
-            tesseract-ocr \
-            tesseract-ocr-hin \
-            tesseract-ocr-ben \
-            tesseract-ocr-guj \
-            tesseract-ocr-mar \
-            tesseract-ocr-tam \
-            tesseract-ocr-tel
+          if ! command -v tesseract &> /dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends \
+              libgl1 libglib2.0-0 \
+              tesseract-ocr \
+              tesseract-ocr-hin \
+              tesseract-ocr-ben \
+              tesseract-ocr-guj \
+              tesseract-ocr-mar \
+              tesseract-ocr-tam \
+              tesseract-ocr-tel
+          fi
 
       - name: Install Dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: |
+          python -m venv /home/runner/venv
+          echo "/home/runner/venv/bin" >> $GITHUB_PATH
+          source /home/runner/venv/bin/activate
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install opencv-python-headless
@@ -81,10 +100,14 @@ jobs:
           DRIVE_TOKEN_JSON: ${{ github.event.client_payload.drive_token_json || secrets.GOOGLE_DRIVE_USER_TOKEN_JSON || '' }}
           DRIVE_FOLDER_ID: ${{ github.event.client_payload.drive_folder_id || secrets.GOOGLE_DRIVE_FOLDER_ID || '' }}
           GEMINI_API_KEY: ${{ github.event.client_payload.gemini_api_key || secrets.GEMINI_API_KEY || '' }}
+          DOCLING_MAX_WORKERS: "4"
           OMP_NUM_THREADS: "4"
           MKL_NUM_THREADS: "4"
           OPENBLAS_NUM_THREADS: "4"
         run: |
+          if [ -d "/home/runner/venv" ]; then
+            source /home/runner/venv/bin/activate
+          fi
           echo "Starting Document AI Worker for Job #$JOB_ID..."
           PYTHONPATH=.:document_ai_worker python document_ai_worker/cli_extractor.py \
             --job-id "$JOB_ID" \
@@ -101,6 +124,9 @@ jobs:
           CALLBACK_URL: ${{ github.event.client_payload.callback_url || inputs.callback_url }}
           WEBHOOK_SECRET: ${{ secrets.INGESTION_WEBHOOK_SECRET || '' }}
         run: |
+          if [ -d "/home/runner/venv" ]; then
+            source /home/runner/venv/bin/activate
+          fi
           if [ -n "$CALLBACK_URL" ]; then
             echo "Notifying Django backend of runner failure: $CALLBACK_URL"
             python -c "

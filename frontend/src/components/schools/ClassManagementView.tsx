@@ -21,6 +21,8 @@ import {
   Search,
 } from 'lucide-react';
 import { SkeletonTable } from '../ui/skeleton';
+import { useToast } from '../../context/ToastContext';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
 interface ClassManagementViewProps {
   schoolId?: number | null;
@@ -34,10 +36,16 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
   schoolId,
   faculty: initialFaculty,
 }) => {
+  const toast = useToast();
   const [classes, setClasses] = useState<ClassSection[]>([]);
   const [faculty, setFaculty] = useState<User[]>(initialFaculty || []);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Custom Delete Class Modal State
+  const [classToDelete, setClassToDelete] = useState<ClassSection | null>(null);
+  const [isDeletingClass, setIsDeletingClass] = useState(false);
+  const [deleteClassError, setDeleteClassError] = useState<string | null>(null);
 
   // Add / Edit Class Modal State
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
@@ -168,18 +176,29 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
     }
   };
 
-  const handleDeleteClass = async (cls: ClassSection) => {
-    if (!window.confirm(`Are you sure you want to delete Class ${cls.name}? This will unassign its students.`)) {
-      return;
-    }
+  const handleDeleteClassClick = (cls: ClassSection) => {
+    setClassToDelete(cls);
+    setDeleteClassError(null);
+  };
+
+  const handleConfirmDeleteClass = async () => {
+    if (!classToDelete) return;
+    setIsDeletingClass(true);
+    setDeleteClassError(null);
     try {
-      await classesApi.deleteClass(cls.id);
-      setClasses((prev) => prev.filter((c) => c.id !== cls.id));
-      if (selectedClassDetail?.id === cls.id) {
+      await classesApi.deleteClass(classToDelete.id);
+      setClasses((prev) => prev.filter((c) => c.id !== classToDelete.id));
+      if (selectedClassDetail?.id === classToDelete.id) {
         setSelectedClassDetail(null);
       }
+      toast.success(`Class ${classToDelete.name} deleted successfully.`);
+      setClassToDelete(null);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to delete class.');
+      const msg = err.response?.data?.detail || 'Failed to delete class.';
+      setDeleteClassError(msg);
+      toast.error(msg);
+    } finally {
+      setIsDeletingClass(false);
     }
   };
 
@@ -231,8 +250,9 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
         const updated = await classesApi.getClass(selectedClassDetail.id);
         setSelectedClassDetail(updated);
       }
+      toast.success(`Removed teacher for ${subject}.`);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to remove subject teacher.');
+      toast.error(err.response?.data?.detail || 'Failed to remove subject teacher.');
     }
   };
 
@@ -289,7 +309,7 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => handleDeleteClass(cls)}
+                onClick={() => handleDeleteClassClick(cls)}
                 className="p-1.5 rounded-pill text-ink/50 hover:text-ember hover:bg-ember/10 transition-colors cursor-pointer shrink-0"
                 title="Delete Class"
               >
@@ -684,7 +704,7 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteClass(cls)}
+                            onClick={() => handleDeleteClassClick(cls)}
                             className="p-1.5 rounded-sm text-ink/60 hover:text-ember hover:bg-ember/10 transition-colors cursor-pointer"
                             title="Delete Class"
                           >
@@ -1133,6 +1153,25 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Delete Class Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={classToDelete !== null}
+        onClose={() => {
+          if (!isDeletingClass) {
+            setClassToDelete(null);
+            setDeleteClassError(null);
+          }
+        }}
+        onConfirm={handleConfirmDeleteClass}
+        isDeleting={isDeletingClass}
+        error={deleteClassError}
+        title="Delete Class"
+        itemName={classToDelete ? `Class ${classToDelete.name}` : undefined}
+        description={`Are you sure you want to delete Class ${classToDelete?.name}? This will unassign its students and subject teachers.`}
+        confirmText="Delete Class"
+        warningNote="Students enrolled in this class section will be unassigned."
+      />
     </div>
   );
 };

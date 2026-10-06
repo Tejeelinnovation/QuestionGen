@@ -3,19 +3,23 @@ IBM Docling Document Pipeline for Educational Textbooks & Complex Documents.
 
 Combines:
 - IBM Docling (DocLayNet for lightweight CNN layout analysis, reading order, and table parsing)
+- Multi-Process Page Chunking across 4 vCPUs & 12 GB RAM for fast parallel execution
+- Accurate legacy font detection avoiding false-positive triggers on standard typography
 - Native PIL Picture Extraction with PyMuPDF High-DPI Visual Clipping fallback
 - LaTeX formula detection
-- Fast CPU-optimized execution (< 1-2s per page)
 """
 
 from __future__ import annotations
 
 import base64
+import concurrent.futures
 import logging
 import os
 import re
+import tempfile
 import threading
 import time
+import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pymupdf as fitz
@@ -47,10 +51,491 @@ class DoclingLogInterceptor(logging.Handler):
             pass
 
 
+def _parse_docling_document(
+    doc: Any,
+    fitz_doc: Any,
+    pages_to_process: int,
+    media_dir: str,
+    start_page_offset: int = 0,
+    progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    total_doc_pages: Optional[int] = None,
+) -> Tuple[List[ChapterSchema], List[PageSchema]]:
+    """
+    Parses a converted Docling document model into application ChapterSchema and PageSchema.
+    Supports global page number offsetting for parallel chunk processing.
+    """
+    from docling_core.types.doc import DocItemLabel, PictureItem, TableItem
+    from .page_router import PageRouter
+    from .text_cleaner import detect_caesar_shift, unshift_ncert_text, clean_page_text
+
+    page_items_map: Dict[int, List[Any]] = {p: [] for p in range(1, pages_to_process + 1)}
+
+    for item, level in doc.iterate_items():
+        page_no = 1
+        if hasattr(item, "prov") and item.prov:
+            page_no = getattr(item.prov[0], "page_no", 1)
+        elif hasattr(item, "page_no"):
+            page_no = getattr(item.page_no, "page_no", 1)
+
+        if 1 <= page_no <= pages_to_process:
+            page_items_map[page_no].append((item, level))
+
+    router = PageRouter()
+    page_decisions = router.probe_document(fitz_doc)
+    decisions_by_page = {d.page_num: d for d in page_decisions}
+
+    chapters: List[ChapterSchema] = []
+    pages: List[PageSchema] = []
+    current_chapter_num = 1
+    current_chapter_title = "Chapter 1"
+
+    for page_num in range(1, pages_to_process + 1):
+        global_page_num = page_num + start_page_offset
+        if progress_callback:
+            tot = total_doc_pages or pages_to_process
+            progress_callback(
+                global_page_num,
+                tot,
+                f"Structuring page {global_page_num} of {tot} with Docling AI...",
+            )
+
+        items_on_page = page_items_map.get(page_num, [])
+        sections: List[SectionSchema] = []
+        page_text_pieces: List[str] = []
+
+        fitz_page = fitz_doc[page_num - 1] if page_num - 1 < len(fitz_doc) else None
+
+        pic_idx = 0
+        consumed_item_ids = set()
+
+        for item_idx, (item, level) in enumerate(items_on_page):
+            if id(item) in consumed_item_ids:
+                continue
+
+            label = getattr(item, "label", None)
+            label_str = str(label.name if hasattr(label, "name") else label).upper()
+
+            raw_text = getattr(item, "text", "") or ""
+            clean_text = raw_text.strip()
+            if detect_caesar_shift(clean_text):
+                clean_text = unshift_ncert_text(clean_text)
+
+            bbox = []
+            if hasattr(item, "prov") and item.prov:
+                prov_bbox = getattr(item.prov[0], "bbox", None)
+                if prov_bbox:
+                    bbox = [
+                        getattr(prov_bbox, "l", 0.0),
+                        getattr(prov_bbox, "t", 0.0),
+                        getattr(prov_bbox, "r", 0.0),
+                        getattr(prov_bbox, "b", 0.0),
+                    ]
+
+            # Check for chapter title
+            if "TITLE" in label_str or "HEADER" in label_str:
+                ch_match = re.search(r"(?:अध्याय|Chapter|Unit)\s*([0-9]+)", clean_text, re.IGNORECASE)
+                if ch_match:
+                    try:
+                        current_chapter_num = int(ch_match.group(1))
+                        current_chapter_title = clean_text[:200]
+                        chapters.append(ChapterSchema(
+                            chapter_number=current_chapter_num,
+                            title=current_chapter_title,
+                            start_page=global_page_num,
+                            end_page=global_page_num,
+                        ))
+                    except ValueError:
+                        pass
+
+            # If this item is a CAPTION following a DIAGRAM, attach it directly
+            if "CAPTION" in label_str and sections and sections[-1].type == "DIAGRAM":
+                diag = sections[-1]
+                if not diag.image_caption or diag.image_caption.startswith("Figure "):
+                    diag.image_caption = clean_text
+                    fig_m = re.match(r"^\s*((?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+)(?:[\s:\.\-—]+(.*))?$", clean_text, re.IGNORECASE)
+                    if fig_m:
+                        diag.image_label = fig_m.group(1).strip()
+                        diag.heading = diag.image_label
+                        if fig_m.group(2) and fig_m.group(2).strip():
+                            diag.image_description = fig_m.group(2).strip()
+                    else:
+                        diag.image_description = clean_text
+                continue
+
+            # A. Picture / Diagram items
+            if isinstance(item, PictureItem) or "PICTURE" in label_str:
+                img_data = ""
+                direct_path = ""
+
+                # Method 1: Get PIL Image directly generated by Docling
+                pil_img = None
+                try:
+                    if hasattr(item, "get_image"):
+                        pil_img = item.get_image(doc)
+                    elif hasattr(item, "image") and getattr(item.image, "pil_image", None):
+                        pil_img = item.image.pil_image
+                except Exception as img_err:
+                    logger.debug(f"Docling direct image extraction error: {img_err}")
+
+                # Ignore micro decorative icons, single dots, bullets (< 45x45 px)
+                if pil_img is not None and (pil_img.width < 45 or pil_img.height < 45):
+                    pil_img = None
+
+                # Method 2: High-DPI Visual Viewport Clipping fallback from PDF page
+                if pil_img is None and fitz_page and bbox and len(bbox) == 4:
+                    try:
+                        x0, y0, x1, y1 = bbox
+                        page_h = fitz_page.rect.height
+                        rect = fitz.Rect(min(x0, x1), min(page_h - max(y0, y1), min(y0, y1)), max(x0, x1), max(page_h - min(y0, y1), max(y0, y1)))
+                        if rect.width >= 45 and rect.height >= 45:
+                            candidate_filename = f"docling_p{global_page_num}_fig_{pic_idx + 1}.png"
+                            candidate_path = os.path.join(media_dir, candidate_filename)
+                            pix = fitz_page.get_pixmap(clip=rect, dpi=200)
+                            pix.save(candidate_path)
+                            if os.path.exists(candidate_path) and os.path.getsize(candidate_path) >= 400:
+                                pic_idx += 1
+                                direct_path = candidate_path
+                                with open(candidate_path, "rb") as imf:
+                                    b64 = base64.b64encode(imf.read()).decode("utf-8")
+                                    img_data = f"data:image/png;base64,{b64}"
+                            else:
+                                if os.path.exists(candidate_path):
+                                    os.remove(candidate_path)
+                    except Exception as clip_err:
+                        logger.debug(f"PyMuPDF visual clipping fallback error: {clip_err}")
+
+                if pil_img is not None:
+                    candidate_filename = f"docling_p{global_page_num}_fig_{pic_idx + 1}.png"
+                    candidate_path = os.path.join(media_dir, candidate_filename)
+                    pil_img.save(candidate_path, format="PNG")
+                    if os.path.exists(candidate_path) and os.path.getsize(candidate_path) >= 400:
+                        pic_idx += 1
+                        direct_path = candidate_path
+                        with open(candidate_path, "rb") as imf:
+                            b64 = base64.b64encode(imf.read()).decode("utf-8")
+                            img_data = f"data:image/png;base64,{b64}"
+                    else:
+                        if os.path.exists(candidate_path):
+                            os.remove(candidate_path)
+
+                if not direct_path and not img_data:
+                    continue
+
+                caption_candidates = []
+                if hasattr(item, "captions") and item.captions:
+                    for cap_ref in item.captions:
+                        try:
+                            if hasattr(cap_ref, "text") and cap_ref.text:
+                                caption_candidates.append(cap_ref.text.strip())
+                            elif hasattr(cap_ref, "resolve"):
+                                res = cap_ref.resolve(doc)
+                                if hasattr(res, "text") and res.text:
+                                    caption_candidates.append(res.text.strip())
+                        except Exception:
+                            pass
+
+                if hasattr(item, "caption_text"):
+                    try:
+                        ct = item.caption_text(doc)
+                        if ct and ct.strip():
+                            caption_candidates.append(ct.strip())
+                    except Exception:
+                        pass
+
+                if clean_text:
+                    caption_candidates.append(clean_text)
+
+                if item_idx + 1 < len(items_on_page):
+                    next_item, _ = items_on_page[item_idx + 1]
+                    next_label = str(getattr(next_item, "label", "")).upper()
+                    next_txt = (getattr(next_item, "text", "") or "").strip()
+                    if "CAPTION" in next_label or re.match(r"^\s*(?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+", next_txt, re.IGNORECASE):
+                        caption_candidates.append(next_txt)
+                        consumed_item_ids.add(id(next_item))
+
+                description_candidates = []
+                if hasattr(item, "annotations") and item.annotations:
+                    for ann in item.annotations:
+                        try:
+                            t = getattr(ann, "text", "") or getattr(ann, "description", "")
+                            if t and t.strip():
+                                description_candidates.append(t.strip())
+                        except Exception:
+                            pass
+
+                chosen_caption = ""
+                for c in caption_candidates:
+                    if c and c.strip():
+                        chosen_caption = c.strip()
+                        break
+
+                fig_pat = r"^\s*((?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+)(?:[\s:\.\-—]+(.*))?$"
+                fig_match = re.match(fig_pat, chosen_caption, re.IGNORECASE) if chosen_caption else None
+
+                if fig_match:
+                    image_label = fig_match.group(1).strip()
+                    desc_text = (fig_match.group(2) or "").strip()
+                    image_caption = chosen_caption
+                    image_description = desc_text or ("\n".join(description_candidates) if description_candidates else chosen_caption)
+                else:
+                    image_label = f"Figure {pic_idx}"
+                    image_caption = chosen_caption or f"Figure {pic_idx}"
+                    image_description = chosen_caption or ("\n".join(description_candidates) if description_candidates else "")
+
+                sections.append(SectionSchema(
+                    type="DIAGRAM",
+                    heading=image_label or image_caption[:60],
+                    text=image_description or clean_text,
+                    column_index=0,
+                    image_path=direct_path,
+                    image_data=img_data,
+                    image_caption=image_caption,
+                    image_label=image_label,
+                    image_description=image_description,
+                    metadata={"bbox": bbox, "image_label": image_label, "image_description": image_description},
+                ))
+
+            # B. Table items
+            elif isinstance(item, TableItem) or "TABLE" in label_str:
+                table_md = ""
+                try:
+                    table_md = item.export_to_markdown()
+                except Exception:
+                    table_md = clean_text
+
+                sections.append(SectionSchema(
+                    type="PARAGRAPH",
+                    heading=clean_text[:50] if clean_text else "Table",
+                    text=table_md or clean_text,
+                    column_index=0,
+                    metadata={"bbox": bbox, "is_table": True},
+                ))
+                page_text_pieces.append(table_md or clean_text)
+
+            # C. Formula items
+            elif "FORMULA" in label_str or "EQUATION" in label_str or "MATH" in label_str:
+                latex_str = clean_text
+                sections.append(SectionSchema(
+                    type="FORMULA",
+                    heading="Formula",
+                    text=latex_str,
+                    column_index=0,
+                    latex_equations=[latex_str],
+                    metadata={"bbox": bbox},
+                ))
+                page_text_pieces.append(clean_text)
+
+            # D. Section Headers & Paragraphs
+            elif "HEADER" in label_str or "TITLE" in label_str:
+                if clean_text:
+                    sections.append(SectionSchema(
+                        type="PARAGRAPH",
+                        heading=clean_text[:250],
+                        text=clean_text,
+                        column_index=0,
+                        metadata={"bbox": bbox, "is_header": True},
+                    ))
+                    page_text_pieces.append(clean_text)
+
+            else:
+                if not clean_text:
+                    continue
+
+                p_type = "PARAGRAPH"
+                heading = ""
+                if re.match(r"^\s*(उदाहरण|Example|Solved Example)\b", clean_text, re.IGNORECASE):
+                    p_type = "SOLVED_EXAMPLE"
+                    heading = clean_text[:40]
+                elif re.match(r"^\s*(प्रश्नावली|अभ्यास|Exercise|Question)\b", clean_text, re.IGNORECASE):
+                    p_type = "EXERCISE_QUESTION"
+                    heading = clean_text[:40]
+                elif re.match(r"^\s*(परिभाषा|प्रमेय|Definition|Theorem)\b", clean_text, re.IGNORECASE):
+                    p_type = "DEFINITION"
+                    heading = clean_text[:40]
+                elif re.match(r"^\s*(सारांश|Summary)\b", clean_text, re.IGNORECASE):
+                    p_type = "SUMMARY"
+                    heading = clean_text[:40]
+
+                sections.append(SectionSchema(
+                    type=p_type,
+                    heading=heading,
+                    text=clean_text,
+                    column_index=0,
+                    metadata={"bbox": bbox},
+                ))
+                page_text_pieces.append(clean_text)
+
+        dec = decisions_by_page.get(page_num)
+        p_kind = getattr(dec, "page_kind", "digital_text") if dec else "digital_text"
+        p_engine = getattr(dec, "engine", "Docling AI (DocLayNet)") if dec else "Docling AI (DocLayNet)"
+        p_reason = getattr(dec, "route_reason", "Docling layout and block analysis") if dec else "Docling layout and block analysis"
+        p_script = getattr(dec, "detected_script", "latin") if dec else "latin"
+        p_ocr_lang = getattr(dec, "ocr_language", None) if dec else None
+        p_legacy = getattr(dec, "legacy_font_encoding", False) if dec else False
+        p_review = getattr(dec, "needs_review", False) if dec else False
+        p_quality = getattr(dec, "quality_score", 1.0) if dec else 1.0
+        p_meta = dict(getattr(dec, "metadata", {})) if dec else {}
+
+        p_flags: List[str] = []
+        page_raw_text = "\n\n".join(page_text_pieces)
+
+        if p_kind != "blank" and page_raw_text:
+            clean_res = clean_page_text(page_raw_text, fitz_page=fitz_page)
+            page_raw_text = clean_res.text
+            p_flags.extend(clean_res.flags)
+            if clean_res.glued_words:
+                p_meta["glued_words"] = clean_res.glued_words
+            p_quality = round(min(p_quality, clean_res.quality_score), 3)
+            if p_quality < 0.70:
+                p_review = True
+
+            for sec in sections:
+                if sec.type != "DIAGRAM" and sec.text:
+                    sec.text = clean_page_text(sec.text).text
+
+        if p_legacy:
+            has_devanagari = any("\u0900" <= c <= "\u097f" for c in page_raw_text)
+            if not has_devanagari:
+                p_review = True
+                p_quality = 0.50
+                p_meta["raw_text_unreliable"] = page_raw_text
+                p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
+                page_raw_text = ""
+                for sec in sections:
+                    if sec.type != "DIAGRAM":
+                        sec.text = ""
+
+        pages.append(PageSchema(
+            page_number=global_page_num,
+            layout_type="SINGLE_COLUMN",
+            raw_text=page_raw_text,
+            chapter_number=current_chapter_num,
+            chapter_title=current_chapter_title,
+            sections=sections,
+            page_kind=p_kind,
+            engine=p_engine,
+            route_reason=p_reason,
+            detected_script=p_script,
+            ocr_language=p_ocr_lang,
+            legacy_font_encoding=p_legacy,
+            needs_review=p_review,
+            quality_score=p_quality,
+            quality_flags=p_flags,
+            metadata=p_meta,
+        ))
+
+    return chapters, pages
+
+
+def _process_docling_chunk_worker(
+    chunk_args: Tuple[int, str, int, int, str, bool, bool, List[str]]
+) -> Tuple[int, List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """
+    Independent worker process for parallel PDF chunk extraction.
+    Runs in its own OS process utilizing ~2.5 GB RAM and 1 dedicated CPU core.
+    """
+    (
+        chunk_idx,
+        pdf_path,
+        start_page,
+        end_page,
+        media_dir,
+        do_ocr,
+        enable_full_page,
+        ocr_langs,
+    ) = chunk_args
+
+    t_worker_start = time.time()
+    logger.info(
+        f"[Process {chunk_idx + 1}] Worker started for pages {start_page}–{end_page} "
+        f"({end_page - start_page + 1} pages, Core {chunk_idx + 1}, ~2.5 GB RAM, do_ocr={do_ocr})..."
+    )
+
+    # Limit torch & BLAS threads to 1 per worker so 4 processes map 1:1 to 4 CPU cores
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    try:
+        import torch
+        torch.set_num_threads(1)
+        if hasattr(torch, "set_num_interop_threads"):
+            torch.set_num_interop_threads(1)
+    except Exception:
+        pass
+
+    import pymupdf as fitz
+    import tempfile
+    import uuid
+    import os
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+
+    # 1. Create slice PDF on disk for [start_page, end_page]
+    src_doc = fitz.open(pdf_path)
+    chunk_doc = fitz.open()
+    chunk_doc.insert_pdf(src_doc, from_page=start_page - 1, to_page=end_page - 1)
+    temp_dir = tempfile.gettempdir()
+    chunk_pdf_path = os.path.join(temp_dir, f"chunk_{uuid.uuid4().hex[:8]}_p{start_page}_p{end_page}.pdf")
+    chunk_doc.save(chunk_pdf_path)
+    chunk_doc.close()
+    src_doc.close()
+
+    pipeline_options = PdfPipelineOptions()
+    pipeline_options.do_ocr = do_ocr
+    if do_ocr:
+        try:
+            from docling.datamodel.pipeline_options import TesseractCliOcrOptions
+            pipeline_options.ocr_options = TesseractCliOcrOptions(
+                force_full_page_ocr=enable_full_page,
+                lang=ocr_langs,
+            )
+        except Exception:
+            pass
+
+    pipeline_options.generate_picture_images = True
+    pipeline_options.images_scale = 1.0
+
+    doc_converter = DocumentConverter(
+        format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
+    )
+
+    try:
+        conv_res = doc_converter.convert(chunk_pdf_path)
+        chunk_fitz_doc = fitz.open(chunk_pdf_path)
+        pages_in_chunk = end_page - start_page + 1
+        chunk_chapters, chunk_pages = _parse_docling_document(
+            doc=conv_res.document,
+            fitz_doc=chunk_fitz_doc,
+            pages_to_process=pages_in_chunk,
+            media_dir=media_dir,
+            start_page_offset=start_page - 1,
+        )
+        chunk_fitz_doc.close()
+
+        t_elapsed = round(time.time() - t_worker_start, 1)
+        logger.info(
+            f"[Process {chunk_idx + 1}] Worker completed pages {start_page}–{end_page} in {t_elapsed}s. "
+            f"Extracted {len(chunk_pages)} pages."
+        )
+
+        return (
+            chunk_idx,
+            [ch.model_dump() for ch in chunk_chapters],
+            [p.model_dump() for p in chunk_pages],
+        )
+    finally:
+        if os.path.exists(chunk_pdf_path):
+            try:
+                os.remove(chunk_pdf_path)
+            except Exception:
+                pass
+
+
 class DoclingPipeline:
     """
-    Executes lightweight, fast deep-learning Document AI extraction using IBM Docling.
-    Runs in seconds on CPU without needing llama-server or external GPU processes.
+    Executes deep-learning Document AI extraction using IBM Docling.
+    Supports multi-process chunking across 4 vCPUs and ~10-12 GB RAM for fast parallel execution.
     """
 
     def __init__(self, media_dir: str = "/tmp/extracted_assets"):
@@ -70,7 +555,6 @@ class DoclingPipeline:
         from docling.datamodel.base_models import InputFormat
         from docling.datamodel.pipeline_options import PdfPipelineOptions
         from docling.document_converter import DocumentConverter, PdfFormatOption
-        from docling_core.types.doc import DocItemLabel, PictureItem, TableItem
 
         # 1. Determine total pages
         fitz_doc = fitz.open(pdf_path)
@@ -84,13 +568,18 @@ class DoclingPipeline:
                 f"Starting IBM Docling AI (DocLayNet Layout + Tables) for {pages_to_process} pages...",
             )
 
-        # 2. Inspect document to detect legacy non-Unicode fonts (Walkman-Chanakya, KrutiDev, DevLys, etc.)
+        # 2. Inspect document to detect legacy non-Unicode fonts (Walkman-Chanakya, KrutiDev, DevLys, APS, etc.)
+        # Excludes standard English typography fonts ending in 'Caps', 'Maps', 'PostScript'
         has_legacy_fonts = False
+        LEGACY_FONT_KEYWORDS = (
+            "chanakya", "kruti", "devlys", "walkman", "shree-dev", "shreedev", "shree",
+            "shivaji", "bilingual", "akruti", "kundli", "aps-", "aps_", "apsdv", "dv-", "dv_"
+        )
         try:
             for p_i in range(min(total_pages, 5)):
                 for font_tuple in fitz_doc[p_i].get_fonts():
                     fname = (font_tuple[3] if len(font_tuple) > 3 else "").lower()
-                    if any(f in fname for f in ("chanakya", "kruti", "devlys", "walkman", "shree", "shivaji", "bilingual", "aps", "akruti", "kundli")):
+                    if any(k in fname for k in LEGACY_FONT_KEYWORDS) or ("aps" in fname and "caps" not in fname and "maps" not in fname and "gaps" not in fname):
                         has_legacy_fonts = True
                         break
                 if has_legacy_fonts:
@@ -117,16 +606,126 @@ class DoclingPipeline:
             f"(is_digital_pdf={is_digital_pdf}, avg_chars_per_page={avg_chars_per_page:.0f}, legacy_font_detected={has_legacy_fonts}, env_override={force_ocr_env})"
         )
 
+        ocr_langs = ["hin", "eng"]
+        env_langs = os.environ.get("TESSERACT_LANGS", "")
+        if env_langs:
+            ocr_langs = [l.strip() for l in env_langs.split(",") if l.strip()]
+
+        # 3. Multi-Process Page Chunking across 4 vCPUs & ~10-12 GB RAM for documents > 15 pages
+        max_workers_env = os.environ.get("DOCLING_MAX_WORKERS")
+        if max_workers_env and max_workers_env.isdigit():
+            num_workers = max(1, int(max_workers_env))
+        else:
+            num_workers = 4
+
+        if pages_to_process > 15 and num_workers >= 2:
+            base_chunk = pages_to_process // num_workers
+            rem = pages_to_process % num_workers
+            chunk_ranges: List[Tuple[int, int]] = []
+            cur_p = 1
+            for i in range(num_workers):
+                c_len = base_chunk + (1 if i < rem else 0)
+                if c_len <= 0:
+                    break
+                next_p = min(pages_to_process, cur_p + c_len - 1)
+                chunk_ranges.append((cur_p, next_p))
+                cur_p = next_p + 1
+
+            logger.info(
+                f"[Multi-Process AI] Multi-process chunking activated: {len(chunk_ranges)} chunks across {num_workers} processes "
+                f"(Utilizing ~10-11 GB RAM on 4 vCPUs): {chunk_ranges}"
+            )
+
+            if progress_callback:
+                progress_callback(
+                    0,
+                    pages_to_process,
+                    f"Spawning {len(chunk_ranges)} parallel Docling AI processes across 4 cores (10-11 GB RAM active)...",
+                )
+
+            tasks = [
+                (
+                    idx,
+                    pdf_path,
+                    start_p,
+                    end_p,
+                    self.media_dir,
+                    do_ocr,
+                    enable_full_page,
+                    ocr_langs,
+                )
+                for idx, (start_p, end_p) in enumerate(chunk_ranges)
+            ]
+
+            chunk_results: List[Optional[Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]]] = [None] * len(tasks)
+            try:
+                with concurrent.futures.ProcessPoolExecutor(max_workers=len(tasks)) as executor:
+                    futures = {executor.submit(_process_docling_chunk_worker, t): t[0] for t in tasks}
+                    completed_count = 0
+                    for future in concurrent.futures.as_completed(futures):
+                        c_idx, ch_dumps, p_dumps = future.result()
+                        chunk_results[c_idx] = (ch_dumps, p_dumps)
+                        completed_count += 1
+                        if progress_callback:
+                            est_p = min(pages_to_process, int((completed_count / len(tasks)) * pages_to_process))
+                            progress_callback(
+                                est_p,
+                                pages_to_process,
+                                f"Parallel Docling: {completed_count}/{len(tasks)} chunks processed ({est_p}/{pages_to_process} pages)...",
+                            )
+
+                # Merge chunk results in original page sequence
+                all_pages: List[PageSchema] = []
+                all_chapters: List[ChapterSchema] = []
+                for res in chunk_results:
+                    if res:
+                        ch_dumps, p_dumps = res
+                        for p_d in p_dumps:
+                            all_pages.append(PageSchema.model_validate(p_d))
+                        for ch_d in ch_dumps:
+                            all_chapters.append(ChapterSchema.model_validate(ch_d))
+
+                all_pages.sort(key=lambda p: p.page_number)
+                fitz_doc.close()
+
+                if not all_chapters:
+                    all_chapters = []
+                    granularity = "UNKNOWN"
+                else:
+                    unique_chapters = {}
+                    for ch in all_chapters:
+                        if ch.chapter_number not in unique_chapters:
+                            unique_chapters[ch.chapter_number] = ch
+                        elif ch.start_page < unique_chapters[ch.chapter_number].start_page:
+                            unique_chapters[ch.chapter_number] = ch
+                    all_chapters = sorted(unique_chapters.values(), key=lambda ch: ch.start_page)
+
+                    for i in range(len(all_chapters) - 1):
+                        all_chapters[i].end_page = max(all_chapters[i].start_page, all_chapters[i + 1].start_page - 1)
+                    all_chapters[-1].end_page = len(all_pages)
+                    granularity = "WHOLE_BOOK" if len(all_chapters) > 1 else "CHAPTER"
+
+                    # Synchronize page chapter metadata with unified chapter ranges
+                    for page in all_pages:
+                        matching_ch = next(
+                            (ch for ch in all_chapters if ch.start_page <= page.page_number <= ch.end_page),
+                            None
+                        )
+                        if matching_ch:
+                            page.chapter_number = matching_ch.chapter_number
+                            page.chapter_title = matching_ch.title
+
+                logger.info(f"[Multi-Process AI] Successfully merged {len(all_pages)} pages from {len(chunk_ranges)} chunks.")
+                return all_chapters, all_pages, granularity
+
+            except Exception as mp_err:
+                logger.warning(f"Multi-process parallel chunking encountered note: {mp_err}. Falling back to standard pipeline...")
+
+        # 4. Standard Single-Process Path (for documents <= 15 pages or fallback)
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_ocr = do_ocr
 
         if do_ocr:
-            # Configure Google Tesseract OCR for ultra-fast, lightweight C++ conversion (~0.5s per page)
-            ocr_langs = ["hin", "eng"]
-            env_langs = os.environ.get("TESSERACT_LANGS", "")
-            if env_langs:
-                ocr_langs = [l.strip() for l in env_langs.split(",") if l.strip()]
-
             try:
                 from docling.datamodel.pipeline_options import TesseractCliOcrOptions
                 pipeline_options.ocr_options = TesseractCliOcrOptions(
@@ -147,9 +746,9 @@ class DoclingPipeline:
                     logger.warning(f"EasyOCR fallback also failed: {easy_err}. Using default OCR.")
 
         pipeline_options.generate_picture_images = True
-        pipeline_options.images_scale = 1.0  # Crisp 1:1 scale in Docling; PyMuPDF clips at 200 DPI for figures
+        pipeline_options.images_scale = 1.0
 
-        # Maximize 4-core CPU utilization on 16GB runner
+        # Maximize CPU utilization on runner
         try:
             import torch
             num_cpus = min(4, os.cpu_count() or 4)
@@ -176,7 +775,6 @@ class DoclingPipeline:
 
         logger.info(f"Running Docling conversion on {pdf_path} (max_pages={pages_to_process})...")
 
-        # Setup real-time progress monitor during doc_converter.convert()
         latest_page = [0]
         stop_monitor = threading.Event()
 
@@ -194,7 +792,6 @@ class DoclingPipeline:
                 cur_p = latest_page[0]
                 elapsed = time.time() - start_time
                 if cur_p == 0:
-                    # Initial warmup / model loading (~10-20s)
                     sim_p = min(max(1, int(elapsed / 7.0)), max(1, pages_to_process - 1))
                     if progress_callback:
                         progress_callback(
@@ -237,371 +834,15 @@ class DoclingPipeline:
         doc = conv_res.document
         logger.info("Docling document model parsing complete. Converting to application schema...")
 
-        # 3. Organize items by page
-        # Map page_number (1-indexed) -> list of Docling items
-        page_items_map: Dict[int, List[Any]] = {p: [] for p in range(1, pages_to_process + 1)}
-
-        for item, level in doc.iterate_items():
-            page_no = 1
-            if hasattr(item, "prov") and item.prov:
-                page_no = getattr(item.prov[0], "page_no", 1)
-            elif hasattr(item, "page_no"):
-                page_no = getattr(item, "page_no", 1)
-
-            if 1 <= page_no <= pages_to_process:
-                page_items_map[page_no].append((item, level))
-
-        # 4. Construct ChapterSchema and PageSchema
-        from .page_router import PageRouter
-        router = PageRouter()
-        page_decisions = router.probe_document(fitz_doc)
-        decisions_by_page = {d.page_num: d for d in page_decisions}
-
-        chapters: List[ChapterSchema] = []
-        pages: List[PageSchema] = []
-        current_chapter_num = 1
-        current_chapter_title = "Chapter 1"
-
-        for page_num in range(1, pages_to_process + 1):
-            if progress_callback:
-                progress_callback(
-                    page_num,
-                    pages_to_process,
-                    f"Structuring page {page_num} of {pages_to_process} with Docling AI...",
-                )
-
-            items_on_page = page_items_map.get(page_num, [])
-            sections: List[SectionSchema] = []
-            page_text_pieces: List[str] = []
-
-            # Open PyMuPDF page as visual crop backup for diagrams
-            fitz_page = fitz_doc[page_num - 1] if page_num - 1 < len(fitz_doc) else None
-
-            pic_idx = 0
-            consumed_item_ids = set()
-
-            for item_idx, (item, level) in enumerate(items_on_page):
-                if id(item) in consumed_item_ids:
-                    continue
-
-                label = getattr(item, "label", None)
-                label_str = str(label.name if hasattr(label, "name") else label).upper()
-
-                raw_text = getattr(item, "text", "") or ""
-                clean_text = raw_text.strip()
-                from .text_cleaner import detect_caesar_shift, unshift_ncert_text
-                if detect_caesar_shift(clean_text):
-                    clean_text = unshift_ncert_text(clean_text)
-
-                bbox = []
-                if hasattr(item, "prov") and item.prov:
-                    prov_bbox = getattr(item.prov[0], "bbox", None)
-                    if prov_bbox:
-                        bbox = [
-                            getattr(prov_bbox, "l", 0.0),
-                            getattr(prov_bbox, "t", 0.0),
-                            getattr(prov_bbox, "r", 0.0),
-                            getattr(prov_bbox, "b", 0.0),
-                        ]
-
-                # Check for chapter title
-                if "TITLE" in label_str or "HEADER" in label_str:
-                    ch_match = re.search(r"(?:अध्याय|Chapter|Unit)\s*([0-9]+)", clean_text, re.IGNORECASE)
-                    if ch_match:
-                        try:
-                            current_chapter_num = int(ch_match.group(1))
-                            current_chapter_title = clean_text[:200]
-                            chapters.append(ChapterSchema(
-                                chapter_number=current_chapter_num,
-                                title=current_chapter_title,
-                                start_page=page_num,
-                                end_page=page_num,
-                            ))
-                        except ValueError:
-                            pass
-
-                # If this item is a CAPTION following a DIAGRAM, attach it directly
-                if "CAPTION" in label_str and sections and sections[-1].type == "DIAGRAM":
-                    diag = sections[-1]
-                    if not diag.image_caption or diag.image_caption.startswith("Figure "):
-                        diag.image_caption = clean_text
-                        fig_m = re.match(r"^\s*((?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+)(?:[\s:\.\-—]+(.*))?$", clean_text, re.IGNORECASE)
-                        if fig_m:
-                            diag.image_label = fig_m.group(1).strip()
-                            diag.heading = diag.image_label
-                            if fig_m.group(2) and fig_m.group(2).strip():
-                                diag.image_description = fig_m.group(2).strip()
-                        else:
-                            diag.image_description = clean_text
-                    continue
-
-                # A. Picture / Diagram items
-                if isinstance(item, PictureItem) or "PICTURE" in label_str:
-                    img_data = ""
-                    direct_path = ""
-
-                    # Method 1: Get PIL Image directly generated by Docling
-                    pil_img = None
-                    try:
-                        if hasattr(item, "get_image"):
-                            pil_img = item.get_image(doc)
-                        elif hasattr(item, "image") and getattr(item.image, "pil_image", None):
-                            pil_img = item.image.pil_image
-                    except Exception as img_err:
-                        logger.debug(f"Docling direct image extraction error: {img_err}")
-
-                    # Ignore micro decorative icons, single dots, bullets (< 45x45 px)
-                    if pil_img is not None and (pil_img.width < 45 or pil_img.height < 45):
-                        pil_img = None
-
-                    # Method 2: High-DPI Visual Viewport Clipping fallback from PDF page
-                    if pil_img is None and fitz_page and bbox and len(bbox) == 4:
-                        try:
-                            # Docling uses bottom-left or top-left depending on coordinate space
-                            x0, y0, x1, y1 = bbox
-                            page_h = fitz_page.rect.height
-                            rect = fitz.Rect(min(x0, x1), min(page_h - max(y0, y1), min(y0, y1)), max(x0, x1), max(page_h - min(y0, y1), max(y0, y1)))
-                            if rect.width >= 45 and rect.height >= 45:
-                                candidate_filename = f"docling_p{page_num}_fig_{pic_idx + 1}.png"
-                                candidate_path = os.path.join(self.media_dir, candidate_filename)
-                                pix = fitz_page.get_pixmap(clip=rect, dpi=200)
-                                pix.save(candidate_path)
-                                if os.path.exists(candidate_path) and os.path.getsize(candidate_path) >= 400:
-                                    pic_idx += 1
-                                    direct_path = candidate_path
-                                    with open(candidate_path, "rb") as imf:
-                                        b64 = base64.b64encode(imf.read()).decode("utf-8")
-                                        img_data = f"data:image/png;base64,{b64}"
-                                else:
-                                    if os.path.exists(candidate_path):
-                                        os.remove(candidate_path)
-                        except Exception as clip_err:
-                            logger.debug(f"PyMuPDF visual clipping fallback error: {clip_err}")
-
-                    if pil_img is not None:
-                        candidate_filename = f"docling_p{page_num}_fig_{pic_idx + 1}.png"
-                        candidate_path = os.path.join(self.media_dir, candidate_filename)
-                        pil_img.save(candidate_path, format="PNG")
-                        if os.path.exists(candidate_path) and os.path.getsize(candidate_path) >= 400:
-                            pic_idx += 1
-                            direct_path = candidate_path
-                            with open(candidate_path, "rb") as imf:
-                                b64 = base64.b64encode(imf.read()).decode("utf-8")
-                                img_data = f"data:image/png;base64,{b64}"
-                        else:
-                            if os.path.exists(candidate_path):
-                                os.remove(candidate_path)
-
-                    if not direct_path and not img_data:
-                        # Skip micro-elements or empty images
-                        continue
-
-                    # Comprehensive caption & description extraction
-                    caption_candidates = []
-                    if hasattr(item, "captions") and item.captions:
-                        for cap_ref in item.captions:
-                            try:
-                                if hasattr(cap_ref, "text") and cap_ref.text:
-                                    caption_candidates.append(cap_ref.text.strip())
-                                elif hasattr(cap_ref, "resolve"):
-                                    res = cap_ref.resolve(doc)
-                                    if hasattr(res, "text") and res.text:
-                                        caption_candidates.append(res.text.strip())
-                            except Exception:
-                                pass
-
-                    if hasattr(item, "caption_text"):
-                        try:
-                            ct = item.caption_text(doc)
-                            if ct and ct.strip():
-                                caption_candidates.append(ct.strip())
-                        except Exception:
-                            pass
-
-                    if clean_text:
-                        caption_candidates.append(clean_text)
-
-                    # Lookahead: Check if next item on the page is a caption
-                    if item_idx + 1 < len(items_on_page):
-                        next_item, _ = items_on_page[item_idx + 1]
-                        next_label = str(getattr(next_item, "label", "")).upper()
-                        next_txt = (getattr(next_item, "text", "") or "").strip()
-                        if "CAPTION" in next_label or re.match(r"^\s*(?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+", next_txt, re.IGNORECASE):
-                            caption_candidates.append(next_txt)
-                            consumed_item_ids.add(id(next_item))
-
-                    description_candidates = []
-                    if hasattr(item, "annotations") and item.annotations:
-                        for ann in item.annotations:
-                            try:
-                                t = getattr(ann, "text", "") or getattr(ann, "description", "")
-                                if t and t.strip():
-                                    description_candidates.append(t.strip())
-                            except Exception:
-                                pass
-
-                    chosen_caption = ""
-                    for c in caption_candidates:
-                        if c and c.strip():
-                            chosen_caption = c.strip()
-                            break
-
-                    fig_pat = r"^\s*((?:Figure|Fig\.?|Image|Photo|Diagram|चित्र|आकृति|ग्राफ)\s*[\d\.\-\w]+)(?:[\s:\.\-—]+(.*))?$"
-                    fig_match = re.match(fig_pat, chosen_caption, re.IGNORECASE) if chosen_caption else None
-
-                    if fig_match:
-                        image_label = fig_match.group(1).strip()
-                        desc_text = (fig_match.group(2) or "").strip()
-                        image_caption = chosen_caption
-                        image_description = desc_text or ("\n".join(description_candidates) if description_candidates else chosen_caption)
-                    else:
-                        image_label = f"Figure {pic_idx}"
-                        image_caption = chosen_caption or f"Figure {pic_idx}"
-                        image_description = chosen_caption or ("\n".join(description_candidates) if description_candidates else "")
-
-                    sections.append(SectionSchema(
-                        type="DIAGRAM",
-                        heading=image_label or image_caption[:60],
-                        text=image_description or clean_text,
-                        column_index=0,
-                        image_path=direct_path,
-                        image_data=img_data,
-                        image_caption=image_caption,
-                        image_label=image_label,
-                        image_description=image_description,
-                        metadata={"bbox": bbox, "image_label": image_label, "image_description": image_description},
-                    ))
-
-                # B. Table items
-                elif isinstance(item, TableItem) or "TABLE" in label_str:
-                    table_md = ""
-                    try:
-                        table_md = item.export_to_markdown()
-                    except Exception:
-                        table_md = clean_text
-
-                    sections.append(SectionSchema(
-                        type="PARAGRAPH",
-                        heading=clean_text[:50] if clean_text else "Table",
-                        text=table_md or clean_text,
-                        column_index=0,
-                        metadata={"bbox": bbox, "is_table": True},
-                    ))
-                    page_text_pieces.append(table_md or clean_text)
-
-                # C. Formula items
-                elif "FORMULA" in label_str or "EQUATION" in label_str:
-                    latex_str = f"${clean_text}$" if not clean_text.startswith("$") else clean_text
-                    sections.append(SectionSchema(
-                        type="FORMULA",
-                        heading="",
-                        text=clean_text,
-                        column_index=0,
-                        latex_equations=[latex_str],
-                        metadata={"bbox": bbox},
-                    ))
-                    page_text_pieces.append(clean_text)
-
-                # D. Section Headers & Paragraphs
-                elif "HEADER" in label_str or "TITLE" in label_str:
-                    if clean_text:
-                        sections.append(SectionSchema(
-                            type="PARAGRAPH",
-                            heading=clean_text[:250],
-                            text=clean_text,
-                            column_index=0,
-                            metadata={"bbox": bbox, "is_header": True},
-                        ))
-                        page_text_pieces.append(clean_text)
-
-                else:
-                    if not clean_text:
-                        continue
-
-                    # Pedagogical classification
-                    p_type = "PARAGRAPH"
-                    heading = ""
-                    if re.match(r"^\s*(उदाहरण|Example|Solved Example)\b", clean_text, re.IGNORECASE):
-                        p_type = "SOLVED_EXAMPLE"
-                        heading = clean_text[:40]
-                    elif re.match(r"^\s*(प्रश्नावली|अभ्यास|Exercise|Question)\b", clean_text, re.IGNORECASE):
-                        p_type = "EXERCISE_QUESTION"
-                        heading = clean_text[:40]
-                    elif re.match(r"^\s*(परिभाषा|प्रमेय|Definition|Theorem)\b", clean_text, re.IGNORECASE):
-                        p_type = "DEFINITION"
-                        heading = clean_text[:40]
-                    elif re.match(r"^\s*(सारांश|Summary)\b", clean_text, re.IGNORECASE):
-                        p_type = "SUMMARY"
-                        heading = clean_text[:40]
-
-                    sections.append(SectionSchema(
-                        type=p_type,
-                        heading=heading,
-                        text=clean_text,
-                        column_index=0,
-                        metadata={"bbox": bbox},
-                    ))
-                    page_text_pieces.append(clean_text)
-
-            dec = decisions_by_page.get(page_num)
-            p_kind = getattr(dec, "page_kind", "digital_text") if dec else "digital_text"
-            p_engine = getattr(dec, "engine", "Docling AI (DocLayNet)") if dec else "Docling AI (DocLayNet)"
-            p_reason = getattr(dec, "route_reason", "Docling layout and block analysis") if dec else "Docling layout and block analysis"
-            p_script = getattr(dec, "detected_script", "latin") if dec else "latin"
-            p_ocr_lang = getattr(dec, "ocr_language", None) if dec else None
-            p_legacy = getattr(dec, "legacy_font_encoding", False) if dec else False
-            p_review = getattr(dec, "needs_review", False) if dec else False
-            p_quality = getattr(dec, "quality_score", 1.0) if dec else 1.0
-            p_meta = dict(getattr(dec, "metadata", {})) if dec else {}
-
-            p_flags: List[str] = []
-            page_raw_text = "\n\n".join(page_text_pieces)
-
-            if p_kind != "blank" and page_raw_text:
-                from .text_cleaner import clean_page_text
-                clean_res = clean_page_text(page_raw_text, fitz_page=fitz_page)
-                page_raw_text = clean_res.text
-                p_flags.extend(clean_res.flags)
-                if clean_res.glued_words:
-                    p_meta["glued_words"] = clean_res.glued_words
-                p_quality = round(min(p_quality, clean_res.quality_score), 3)
-                if p_quality < 0.70:
-                    p_review = True
-
-                for sec in sections:
-                    if sec.type != "DIAGRAM" and sec.text:
-                        sec.text = clean_page_text(sec.text).text
-
-            if p_legacy:
-                has_devanagari = any("\u0900" <= c <= "\u097f" for c in page_raw_text)
-                if not has_devanagari:
-                    p_review = True
-                    p_quality = 0.50
-                    p_meta["raw_text_unreliable"] = page_raw_text
-                    p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
-                    page_raw_text = ""
-                    for sec in sections:
-                        if sec.type != "DIAGRAM":
-                            sec.text = ""
-
-            pages.append(PageSchema(
-                page_number=page_num,
-                layout_type="SINGLE_COLUMN",
-                raw_text=page_raw_text,
-                chapter_number=current_chapter_num,
-                chapter_title=current_chapter_title,
-                sections=sections,
-                page_kind=p_kind,
-                engine=p_engine,
-                route_reason=p_reason,
-                detected_script=p_script,
-                ocr_language=p_ocr_lang,
-                legacy_font_encoding=p_legacy,
-                needs_review=p_review,
-                quality_score=p_quality,
-                quality_flags=p_flags,
-                metadata=p_meta,
-            ))
+        chapters, pages = _parse_docling_document(
+            doc=doc,
+            fitz_doc=fitz_doc,
+            pages_to_process=pages_to_process,
+            media_dir=self.media_dir,
+            start_page_offset=0,
+            progress_callback=progress_callback,
+            total_doc_pages=pages_to_process,
+        )
 
         fitz_doc.close()
 
@@ -609,7 +850,6 @@ class DoclingPipeline:
             chapters = []
             granularity = "UNKNOWN"
         else:
-            # Calculate chapter end pages
             for i in range(len(chapters) - 1):
                 chapters[i].end_page = max(chapters[i].start_page, chapters[i + 1].start_page - 1)
             chapters[-1].end_page = len(pages)

@@ -18,6 +18,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import {
   fetchIngestionJobs,
   enqueueJob,
@@ -29,11 +30,13 @@ import {
 } from '../../api/ingestion';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
+import { ConfirmDeleteModal } from '../../components/ui/ConfirmDeleteModal';
 import { SkeletonIngestionList } from '../../components/ui/skeleton';
 import { JobDurationBadge, LiveTimer, formatJobDuration } from '../../components/ui/JobDurationTimer';
 
 export const DatasetIngestionPageDesktop: React.FC = () => {
   const { user, hasCapability } = useAuth();
+  const toast = useToast();
   const isSuperAdmin = hasCapability('CREATE_SCHOOL') || !user?.school;
 
   const [jobs, setJobs] = useState<IngestionJobSummary[]>([]);
@@ -43,6 +46,11 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
   const [processingJobIds, setProcessingJobIds] = useState<Set<number>>(new Set());
   const [resettingJobIds, setResettingJobIds] = useState<Set<number>>(new Set());
   const [isBulkEnqueuing, setIsBulkEnqueuing] = useState(false);
+
+  // Custom Delete Confirmation Modal state
+  const [jobToDelete, setJobToDelete] = useState<IngestionJobSummary | null>(null);
+  const [isDeletingJob, setIsDeletingJob] = useState(false);
+  const [deleteJobError, setDeleteJobError] = useState<string | null>(null);
 
   const loadJobs = async () => {
     try {
@@ -130,20 +138,32 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      toast.success(`Exported dataset JSON for "${job.title}".`);
     } catch (err) {
-      alert('Failed to export dataset JSON.');
+      toast.error('Failed to export dataset JSON.');
     }
   };
 
-  const handleDeleteJob = async (jobId: number) => {
-    if (!window.confirm('Are you sure you want to remove this submission?')) {
-      return;
-    }
+  const handleDeleteClick = (job: IngestionJobSummary) => {
+    setJobToDelete(job);
+    setDeleteJobError(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!jobToDelete) return;
+    setIsDeletingJob(true);
+    setDeleteJobError(null);
     try {
-      await deleteIngestionJob(jobId);
-      setJobs((prev) => prev.filter((j) => j.id !== jobId));
-    } catch (err) {
-      alert('Failed to delete job.');
+      await deleteIngestionJob(jobToDelete.id);
+      setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
+      toast.success(`Submission "${jobToDelete.title}" removed successfully.`);
+      setJobToDelete(null);
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || 'Failed to delete submission.';
+      setDeleteJobError(msg);
+      toast.error(msg);
+    } finally {
+      setIsDeletingJob(false);
     }
   };
 
@@ -461,8 +481,8 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                       )}
 
                       <button
-                        onClick={() => handleDeleteJob(job.id)}
-                        className="p-2 rounded-xl border border-border hover:bg-red-50 text-ink/40 hover:text-red-600 transition-all shadow-xs"
+                        onClick={() => handleDeleteClick(job)}
+                        className="p-2 rounded-xl border border-border hover:bg-red-50 text-ink/40 hover:text-red-600 transition-all shadow-xs cursor-pointer"
                         title="Remove submission"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -562,6 +582,22 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onSuccess={() => loadJobs()}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={jobToDelete !== null}
+        onClose={() => {
+          if (!isDeletingJob) {
+            setJobToDelete(null);
+            setDeleteJobError(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeletingJob}
+        error={deleteJobError}
+        title="Remove Submission"
+        itemName={jobToDelete?.title}
+        description={`Are you sure you want to permanently remove "${jobToDelete?.title}"? All extracted chapters, formulas, diagrams, and AI-generated question datasets will be deleted.`}
       />
 
       {isSuperAdmin && inspectionJob && (

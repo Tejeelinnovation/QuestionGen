@@ -288,7 +288,11 @@ LEGACY_FONT_SUBSTRINGS = (
     "bilingual",
     "akruti",
     "kundli",
-    "aps",
+    "aps-",
+    "aps_",
+    "apsdv",
+    "dv-",
+    "dv_",
 )
 
 
@@ -296,7 +300,11 @@ def is_legacy_font(font_name: str) -> bool:
     if not font_name:
         return False
     lower = font_name.lower()
-    return any(sub in lower for sub in LEGACY_FONT_SUBSTRINGS)
+    if any(sub in lower for sub in LEGACY_FONT_SUBSTRINGS):
+        return True
+    if "aps" in lower and not any(ex in lower for ex in ("caps", "maps", "gaps")):
+        return True
+    return False
 
 
 def remap_legacy_text(text: str) -> Tuple[str, bool]:
