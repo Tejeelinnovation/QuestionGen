@@ -105,3 +105,5 @@ deploy.ps1
 # ---- Evaluation Harness ----
 eval/golden/**/*.pdf
 eval/temp_assets/
+eval/results/
+eval/scratch_media/
