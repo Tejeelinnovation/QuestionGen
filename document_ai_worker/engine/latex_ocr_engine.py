@@ -13,11 +13,48 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 from typing import Any, List, Optional, Tuple, Union
 
+import numpy as np
 from PIL import Image
 
 logger = logging.getLogger(__name__)
+
+
+def is_valid_latex(s: str) -> bool:
+    """
+    Validates that an OCR-extracted LaTeX string is mathematically sound and
+    not a runaway autoregressive Transformer hallucination loop (e.g. from Hindi text).
+    """
+    if not s or not s.strip():
+        return False
+    s = s.strip()
+
+    # 1. Unescaped curly brace balance check (unescaped { must match })
+    clean_braces = re.sub(r"\\(\{|\})", "", s)
+    if clean_braces.count("{") != clean_braces.count("}"):
+        return False
+
+    # 2. Runaway repetitive hallucinations from ViT decoder loop
+    if s.count(r"\tilde") > 4:
+        return False
+    if s.count(r"\mp") > 4:
+        return False
+    if s.count(r"\lambda") > 5:
+        return False
+    if s.count("~") > 6:
+        return False
+    if s.count(r"\Gamma") > 5:
+        return False
+    if s.count(r"\Psi") > 5:
+        return False
+    if "{{{{{" in s or "}}}}}" in s:
+        return False
+    if re.search(r"(\\_\s*){4,}", s):
+        return False
+
+    return True
 
 
 class LatexOCREngine:
@@ -52,10 +89,15 @@ class LatexOCREngine:
 
         self._initialized = True
         try:
+            import os
+            # Avoid CPU thread thrashing across parallel worker processes
+            os.environ["OMP_NUM_THREADS"] = "1"
+            os.environ["ORT_INTRA_OP_NUM_THREADS"] = "1"
+
             from rapid_latex_ocr import LaTeXOCR
             self._model = LaTeXOCR()
             self._available = True
-            logger.info("[LatexOCR] RapidLaTeXOCR ONNX engine loaded successfully.")
+            logger.info("[LatexOCR] RapidLaTeXOCR ONNX engine loaded successfully (thread limit=1).")
         except ImportError as imp_err:
             logger.info(f"[LatexOCR] rapid_latex_ocr import notice ({imp_err}). Formula extraction will use digital text fallback.")
             self._available = False
@@ -114,6 +156,12 @@ class LatexOCREngine:
 
             # Clean LaTeX output: remove markdown wrappers or duplicate delimiters
             latex_clean = latex_res.strip().strip("$").strip()
+
+            # Reject hallucinated / broken LaTeX outputs (e.g. from Hindi script inside math boxes)
+            if not is_valid_latex(latex_clean):
+                logger.debug(f"[LatexOCR] Rejected hallucinated/invalid LaTeX: {latex_clean[:50]}...")
+                return None
+
             return latex_clean if latex_clean else None
 
         except Exception as ocr_err:
@@ -129,7 +177,7 @@ class LatexOCREngine:
         """
         Clips a formula bounding box directly from a PyMuPDF page and extracts LaTeX.
         bbox format: [x0, y0, x1, y1] (Docling coordinates or standard PDF coordinates).
-        Automatically detects TOPLEFT vs BOTTOMLEFT origin.
+        Uses bottom-left origin coordinate mapping.
         """
         if not self.is_available() or fitz_page is None or not bbox or len(bbox) < 4:
             return None
@@ -143,10 +191,16 @@ class LatexOCREngine:
 
             x_left = min(l, r)
             x_right = max(l, r)
+            bbox_w = x_right - x_left
+            bbox_h = abs(t - b)
 
-            # Auto-detect coordinate origin:
-            # In TOPLEFT origin: t (top) < b (bottom) -> y_top = t, y_bot = b
-            # In BOTTOMLEFT origin: t (top) > b (bottom) -> y_top = page_h - t, y_bot = page_h - b
+            # Skip microscopic fragments or misclassified full-page blocks/tables
+            if bbox_w < 12 or bbox_h < 6:
+                return None
+            if bbox_h > 140 or (bbox_w > 340 and bbox_h > 90):
+                return None
+
+            # Docling coordinates are origin-bottom-left (t > b)
             if t <= b:
                 y_top = t
                 y_bot = b
@@ -157,7 +211,7 @@ class LatexOCREngine:
             if y_top > y_bot:
                 y_top, y_bot = y_bot, y_top
 
-            # Add 4pt horizontal and 3pt vertical padding for radicals, integral signs, and fraction bars
+            # Add 4pt horizontal and 3pt vertical padding
             rect = fitz.Rect(
                 max(0.0, x_left - 4.0),
                 max(0.0, y_top - 3.0),
@@ -167,26 +221,7 @@ class LatexOCREngine:
 
             if rect.width >= 10 and rect.height >= 6:
                 pix = fitz_page.get_pixmap(clip=rect, dpi=dpi)
-                res = self.extract_latex_from_image(pix.tobytes("png"))
-                if res:
-                    return res
-
-            # Dual-origin fallback: in case coordinates were explicitly inverted
-            inv_y_top = page_h - y_bot
-            inv_y_bot = page_h - y_top
-            if inv_y_top > inv_y_bot:
-                inv_y_top, inv_y_bot = inv_y_bot, inv_y_top
-
-            inv_rect = fitz.Rect(
-                max(0.0, x_left - 4.0),
-                max(0.0, inv_y_top - 3.0),
-                min(page_w, x_right + 4.0),
-                min(page_h, inv_y_bot + 3.0),
-            ) & fitz_page.rect
-
-            if inv_rect.width >= 10 and inv_rect.height >= 6:
-                inv_pix = fitz_page.get_pixmap(clip=inv_rect, dpi=dpi)
-                return self.extract_latex_from_image(inv_pix.tobytes("png"))
+                return self.extract_latex_from_image(pix.tobytes("png"))
 
             return None
 

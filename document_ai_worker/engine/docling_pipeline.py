@@ -359,15 +359,50 @@ def _parse_docling_document(
                     except Exception as ocr_err:
                         logger.debug(f"LatexOCR formula extraction error: {ocr_err}")
 
-                display_formula = f"${latex_str}$" if (latex_str and not latex_str.startswith("$")) else latex_str
+                # Method 3: Fallback to clipping text layer from PDF for mixed Hindi-math formulas
+                if not latex_str and fitz_page is not None and bbox and len(bbox) >= 4:
+                    try:
+                        l, t, r, b = bbox[:4]
+                        page_h = fitz_page.rect.height
+                        y_top = min(page_h - max(t, b), min(t, b))
+                        y_bot = max(page_h - min(t, b), max(t, b))
+                        box_rect = fitz.Rect(min(l, r), y_top, max(l, r), y_bot) & fitz_page.rect
+                        clip_text = (fitz_page.get_text("text", clip=box_rect) or "").strip()
+                        if clip_text:
+                            if detect_caesar_shift(clip_text):
+                                clip_text = unshift_ncert_text(clip_text)
+                            elif p_legacy:
+                                from .legacy_font_converter import remap_legacy_text
+                                r_lines = []
+                                for line in clip_text.splitlines():
+                                    rl, _ = remap_legacy_text(line.strip())
+                                    if rl and rl.strip():
+                                        r_lines.append(rl.strip())
+                                if r_lines:
+                                    clip_text = " ".join(r_lines)
+                            latex_str = clip_text
+                    except Exception:
+                        pass
+
+                # If formula contains Hindi/Devanagari characters, render as text without forcing $ math delimiters
+                has_devanagari = any("\u0900" <= c <= "\u097f" for c in (latex_str or ""))
+                if has_devanagari:
+                    display_formula = latex_str
+                else:
+                    display_formula = f"${latex_str}$" if (latex_str and not latex_str.startswith("$")) else latex_str
+
                 formula_body = display_formula if (display_formula and display_formula.strip() not in ("$$", "$Formula$", "$formula$")) else ""
+                
+                # Formula needs review if empty or has Devanagari mixed text
+                formula_needs_review = bool(not formula_body or has_devanagari)
+
                 sections.append(SectionSchema(
                     type="FORMULA",
                     heading="Formula",
                     text=formula_body,
                     column_index=0,
-                    latex_equations=[latex_str] if (latex_str and latex_str.strip().lower() not in ("formula", "equation", "math")) else [],
-                    metadata={"bbox": bbox},
+                    latex_equations=[latex_str] if (latex_str and not has_devanagari and latex_str.strip().lower() not in ("formula", "equation", "math")) else [],
+                    metadata={"bbox": bbox, "needs_review": formula_needs_review},
                 ))
                 if formula_body:
                     page_text_pieces.append(formula_body)

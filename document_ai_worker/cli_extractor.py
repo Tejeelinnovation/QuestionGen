@@ -532,21 +532,23 @@ def main():
                                     ))
                                 p.sections = p_sections
                             else:
-                                # Backfill any remaining empty FORMULA sections from Gemini's transcribed equations
-                                empty_formula_indices = [
+                                # Backfill any remaining empty or needs_review FORMULA sections from Gemini's transcribed equations
+                                formula_indices = [
                                     idx for idx, s in enumerate(p.sections)
-                                    if s.type == "FORMULA" and not (s.text or "").strip() and not s.latex_equations
+                                    if s.type == "FORMULA" and (not (s.text or "").strip() or s.metadata.get("needs_review"))
                                 ]
-                                if empty_formula_indices:
+                                if formula_indices:
                                     gemini_eqs = [
                                         b.strip() for b in transcribed.split("\n\n")
                                         if b.strip() and ("$" in b or "\\frac" in b or "\\lim" in b or "\\sum" in b)
                                     ]
-                                    for i, f_idx in enumerate(empty_formula_indices):
+                                    for i, f_idx in enumerate(formula_indices):
                                         if i < len(gemini_eqs):
                                             eq_val = gemini_eqs[i]
                                             p.sections[f_idx].text = eq_val
                                             p.sections[f_idx].latex_equations = [eq_val]
+                                            if hasattr(p.sections[f_idx], "metadata") and isinstance(p.sections[f_idx].metadata, dict):
+                                                p.sections[f_idx].metadata["needs_review"] = False
 
                             logger.info(f"[Quality Gate] Page {p.page_number} successfully recovered via Gemini Vision (score={p.quality_score:.2f})")
                         else:
