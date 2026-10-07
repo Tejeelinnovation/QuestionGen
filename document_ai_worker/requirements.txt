@@ -12,3 +12,5 @@ docling[easyocr]>=2.0.0
 pillow>=10.0.0
 easyocr>=1.7.1
 opencv-python-headless>=4.8.0
+rapid-latex-ocr>=0.0.4
+onnxruntime>=1.17.0

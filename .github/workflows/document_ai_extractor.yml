@@ -45,7 +45,8 @@ jobs:
             ~/.cache/huggingface
             ~/.cache/docling
             ~/.EasyOCR
-          key: ${{ runner.os }}-document-ai-models-v1
+            ~/.cache/rapid_latex_ocr
+          key: ${{ runner.os }}-document-ai-models-v2
           restore-keys: |
             ${{ runner.os }}-document-ai-models-
 
@@ -74,6 +75,19 @@ jobs:
         run: |
           uv pip install --system torch torchvision --index-url https://download.pytorch.org/whl/cpu
           uv pip install --system opencv-python-headless -r document_ai_worker/requirements.txt
+
+      - name: Pre-warm & Cache RapidLaTeXOCR Models
+        run: |
+          MODELS_DIR=$(python -c "import rapid_latex_ocr, pathlib; print(pathlib.Path(rapid_latex_ocr.__file__).parent / 'models')" 2>/dev/null || true)
+          if [ -n "$MODELS_DIR" ]; then
+            mkdir -p "$MODELS_DIR" ~/.cache/rapid_latex_ocr
+            if [ -f ~/.cache/rapid_latex_ocr/encoder.onnx ]; then
+              echo "Restoring RapidLaTeXOCR models from cache..."
+              cp -r ~/.cache/rapid_latex_ocr/* "$MODELS_DIR/" 2>/dev/null || true
+            fi
+            python -c "from rapid_latex_ocr import LaTeXOCR; model = LaTeXOCR(); print('RapidLaTeXOCR initialized successfully!')" || echo "RapidLaTeXOCR download notice: will proceed with digital text"
+            cp -r "$MODELS_DIR"/* ~/.cache/rapid_latex_ocr/ 2>/dev/null || true
+          fi
 
       - name: Execute Document AI Extraction
         env:

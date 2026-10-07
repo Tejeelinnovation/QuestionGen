@@ -322,15 +322,34 @@ def _parse_docling_document(
             # C. Formula items
             elif "FORMULA" in label_str or "EQUATION" in label_str or "MATH" in label_str:
                 latex_str = clean_text
+
+                # If digital text is empty or lacks LaTeX mathematical syntax, extract visually via RapidLaTeXOCR
+                if fitz_page is not None and bbox and len(bbox) == 4:
+                    has_latex_tokens = any(sym in (latex_str or "") for sym in ("\\", "{", "^", "_", "=", "∫", "∑", "√", "±"))
+                    if not latex_str or not has_latex_tokens or len(latex_str.strip()) < 3:
+                        try:
+                            from .latex_ocr_engine import LatexOCREngine
+                            ocr_engine = LatexOCREngine.get_instance()
+                            if ocr_engine.is_available():
+                                extracted_latex = ocr_engine.extract_latex_from_bbox(fitz_page, bbox)
+                                if extracted_latex:
+                                    latex_str = extracted_latex
+                        except Exception as ocr_err:
+                            logger.debug(f"LatexOCR formula extraction error: {ocr_err}")
+
+                display_formula = f"${latex_str}$" if (latex_str and not latex_str.startswith("$")) else latex_str
                 sections.append(SectionSchema(
                     type="FORMULA",
                     heading="Formula",
-                    text=latex_str,
+                    text=display_formula or latex_str or clean_text,
                     column_index=0,
-                    latex_equations=[latex_str],
+                    latex_equations=[latex_str] if latex_str else [],
                     metadata={"bbox": bbox},
                 ))
-                page_text_pieces.append(clean_text)
+                if display_formula:
+                    page_text_pieces.append(display_formula)
+                elif clean_text:
+                    page_text_pieces.append(clean_text)
 
             # D. Section Headers & Paragraphs
             elif "HEADER" in label_str or "TITLE" in label_str:

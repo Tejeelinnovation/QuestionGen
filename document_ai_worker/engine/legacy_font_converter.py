@@ -310,7 +310,7 @@ def is_legacy_font(font_name: str) -> bool:
 def remap_legacy_text(text: str) -> Tuple[str, bool]:
     """
     Converts 8-bit ASCII legacy font text (KrutiDev, Chanakya, Walkman)
-    into standard Unicode Devanagari.
+    into standard Unicode Devanagari using the AST Grammar-Based Font Engine.
     
     Returns (converted_text, has_unmapped_bytes).
     If any raw Latin characters or replacement bytes remain, has_unmapped_bytes is True.
@@ -321,6 +321,12 @@ def remap_legacy_text(text: str) -> Tuple[str, bool]:
     # If text already contains valid Devanagari, don't corrupt it
     if any("\u0900" <= c <= "\u097f" for c in text):
         return text, False
+
+    try:
+        from .ast_font_engine import ASTFontEngine
+        return ASTFontEngine.get_instance().convert_text(text)
+    except Exception:
+        pass
 
     converted = text
 
