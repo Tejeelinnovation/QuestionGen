@@ -329,18 +329,35 @@ def _parse_docling_document(
                     latex_str = raw_formula
 
                 # If digital text is empty or lacks LaTeX mathematical syntax, extract visually via RapidLaTeXOCR
-                if fitz_page is not None and bbox and len(bbox) == 4:
-                    has_latex_tokens = any(sym in (latex_str or "") for sym in ("\\", "{", "^", "_", "=", "∫", "∑", "√", "±"))
-                    if not latex_str or not has_latex_tokens or len(latex_str.strip()) < 3:
-                        try:
-                            from .latex_ocr_engine import LatexOCREngine
-                            ocr_engine = LatexOCREngine.get_instance()
-                            if ocr_engine.is_available():
+                has_latex_tokens = any(sym in (latex_str or "") for sym in ("\\", "{", "^", "_", "=", "∫", "∑", "√", "±"))
+                if not latex_str or not has_latex_tokens or len(latex_str.strip()) < 3:
+                    try:
+                        from .latex_ocr_engine import LatexOCREngine
+                        ocr_engine = LatexOCREngine.get_instance()
+                        if ocr_engine.is_available():
+                            extracted_latex = None
+
+                            # Method 1: High-fidelity native Docling image crop directly from document
+                            formula_img = None
+                            if hasattr(item, "get_image"):
+                                try:
+                                    formula_img = item.get_image(doc)
+                                except Exception:
+                                    pass
+                            elif hasattr(item, "image") and getattr(item.image, "pil_image", None):
+                                formula_img = item.image.pil_image
+
+                            if formula_img is not None:
+                                extracted_latex = ocr_engine.extract_latex_from_image(formula_img)
+
+                            # Method 2: Origin-aware PyMuPDF high-DPI viewport clipping fallback
+                            if not extracted_latex and fitz_page is not None and bbox and len(bbox) >= 4:
                                 extracted_latex = ocr_engine.extract_latex_from_bbox(fitz_page, bbox)
-                                if extracted_latex:
-                                    latex_str = extracted_latex
-                        except Exception as ocr_err:
-                            logger.debug(f"LatexOCR formula extraction error: {ocr_err}")
+
+                            if extracted_latex:
+                                latex_str = extracted_latex
+                    except Exception as ocr_err:
+                        logger.debug(f"LatexOCR formula extraction error: {ocr_err}")
 
                 display_formula = f"${latex_str}$" if (latex_str and not latex_str.startswith("$")) else latex_str
                 formula_body = display_formula if (display_formula and display_formula.strip() not in ("$$", "$Formula$", "$formula$")) else ""

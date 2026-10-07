@@ -118,40 +118,66 @@ class LatexOCREngine:
         """
         Clips a formula bounding box directly from a PyMuPDF page and extracts LaTeX.
         bbox format: [x0, y0, x1, y1] (Docling coordinates or standard PDF coordinates).
+        Automatically detects TOPLEFT vs BOTTOMLEFT origin.
         """
-        if not self.is_available() or fitz_page is None or not bbox or len(bbox) != 4:
+        if not self.is_available() or fitz_page is None or not bbox or len(bbox) < 4:
             return None
 
         try:
             import pymupdf as fitz
 
-            l, t, r, b = bbox
+            l, t, r, b = bbox[:4]
             page_h = fitz_page.rect.height
             page_w = fitz_page.rect.width
 
-            # Convert Docling bbox coordinates to PyMuPDF top-left viewport
-            # Standard Docling PDF coordinates use BOTTOMLEFT origin
-            y_top = page_h - max(t, b) if max(t, b) <= page_h else min(t, b)
-            y_bot = page_h - min(t, b) if max(t, b) <= page_h else max(t, b)
             x_left = min(l, r)
             x_right = max(l, r)
 
-            # Add 3pt padding to preserve full integral signs, fraction bars, and radicals
+            # Auto-detect coordinate origin:
+            # In TOPLEFT origin: t (top) < b (bottom) -> y_top = t, y_bot = b
+            # In BOTTOMLEFT origin: t (top) > b (bottom) -> y_top = page_h - t, y_bot = page_h - b
+            if t <= b:
+                y_top = t
+                y_bot = b
+            else:
+                y_top = page_h - t
+                y_bot = page_h - b
+
+            if y_top > y_bot:
+                y_top, y_bot = y_bot, y_top
+
+            # Add 4pt horizontal and 3pt vertical padding for radicals, integral signs, and fraction bars
             rect = fitz.Rect(
-                max(0.0, x_left - 3.0),
+                max(0.0, x_left - 4.0),
                 max(0.0, y_top - 3.0),
-                min(page_w, x_right + 3.0),
+                min(page_w, x_right + 4.0),
                 min(page_h, y_bot + 3.0),
-            )
+            ) & fitz_page.rect
 
-            # Ensure minimum viable dimensions and intersect with page rect
-            rect = rect & fitz_page.rect
-            if rect.width < 12 or rect.height < 8:
-                return None
+            if rect.width >= 10 and rect.height >= 6:
+                pix = fitz_page.get_pixmap(clip=rect, dpi=dpi)
+                res = self.extract_latex_from_image(pix.tobytes("png"))
+                if res:
+                    return res
 
-            pix = fitz_page.get_pixmap(clip=rect, dpi=dpi)
-            img_bytes = pix.tobytes("png")
-            return self.extract_latex_from_image(img_bytes)
+            # Dual-origin fallback: in case coordinates were explicitly inverted
+            inv_y_top = page_h - y_bot
+            inv_y_bot = page_h - y_top
+            if inv_y_top > inv_y_bot:
+                inv_y_top, inv_y_bot = inv_y_bot, inv_y_top
+
+            inv_rect = fitz.Rect(
+                max(0.0, x_left - 4.0),
+                max(0.0, inv_y_top - 3.0),
+                min(page_w, x_right + 4.0),
+                min(page_h, inv_y_bot + 3.0),
+            ) & fitz_page.rect
+
+            if inv_rect.width >= 10 and inv_rect.height >= 6:
+                inv_pix = fitz_page.get_pixmap(clip=inv_rect, dpi=dpi)
+                return self.extract_latex_from_image(inv_pix.tobytes("png"))
+
+            return None
 
         except Exception as clip_err:
             logger.debug(f"[LatexOCR] Viewport clip error for bbox {bbox}: {clip_err}")
