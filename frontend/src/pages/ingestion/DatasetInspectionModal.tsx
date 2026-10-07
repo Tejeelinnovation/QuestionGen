@@ -11,7 +11,6 @@ import {
   Lightbulb,
   Download,
   AlertTriangle,
-  CheckCircle,
 } from 'lucide-react';
 import { fetchJobPages, exportJobJson, type ExtractedPage, type StructuredSection } from '../../api/ingestion';
 import { useToast } from '../../context/ToastContext';
@@ -31,13 +30,49 @@ const MathFormula: React.FC<{ math: string }> = ({ math }) => {
   }, [clean]);
 
   if (!html) {
-    return <code className="text-xs font-mono text-purple-800">{math}</code>;
+    return <code className="text-xs font-mono text-purple-800">{clean}</code>;
   }
   return (
     <div
       className="my-1.5 py-1 px-3 bg-white/95 rounded-lg border border-purple-200/80 shadow-2xs overflow-x-auto text-center"
       dangerouslySetInnerHTML={{ __html: html }}
     />
+  );
+};
+
+const InlineMathText: React.FC<{ text: string }> = ({ text }) => {
+  if (!text || !text.includes('$')) {
+    return <span className="whitespace-pre-line">{text}</span>;
+  }
+
+  // Split by $...$ inline math delimiters
+  const parts = text.split(/(\$[^\$]+\$)/g);
+
+  return (
+    <span className="whitespace-pre-line">
+      {parts.map((part, idx) => {
+        if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
+          const rawMath = part.slice(1, -1).trim();
+          try {
+            const html = katex.renderToString(rawMath, { throwOnError: false, displayMode: false });
+            return (
+              <span
+                key={idx}
+                className="inline-block px-1 py-0.5 mx-0.5 rounded bg-purple-500/10 text-purple-900 border border-purple-500/20 align-baseline text-[11px] sm:text-xs font-mono font-medium shadow-2xs"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            );
+          } catch {
+            return (
+              <span key={idx} className="font-mono text-purple-800">
+                {rawMath}
+              </span>
+            );
+          }
+        }
+        return <React.Fragment key={idx}>{part}</React.Fragment>;
+      })}
+    </span>
   );
 };
 
@@ -102,6 +137,15 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
     }
     return raw;
   }, [fullJson, pages.length]);
+
+  const docHasLegacyFont = useMemo(
+    () => pages.some((p) => p.legacy_font_encoding || p.legacy_review_marker),
+    [pages]
+  );
+  const docNeedsReviewCount = useMemo(
+    () => pages.filter((p) => p.needs_review).length,
+    [pages]
+  );
 
   const handleDownloadFullJson = async () => {
     setIsExporting(true);
@@ -335,139 +379,116 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-            {/* Mobile Page Navigator Bar (Visible on < 768px, replaces the crushing sidebar) */}
-            <div className="md:hidden flex items-center justify-between gap-2 px-3 py-2 bg-surface-muted/70 border-b border-border shrink-0">
-              <button
-                onClick={() => setSelectedPageIndex((prev) => Math.max(0, prev - 1))}
-                disabled={selectedPageIndex === 0 || pages.length === 0}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink disabled:opacity-30 cursor-pointer shrink-0 active:scale-95"
-              >
-                ← Prev
-              </button>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Universal Document-Level Warning Banner (Single clean warning banner instead of per-page clutter) */}
+            {(docHasLegacyFont || docNeedsReviewCount > 0) && (
+              <div className="px-3.5 py-2 sm:px-6 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between gap-3 text-xs text-amber-900 shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="font-heading font-medium truncate">
+                    {docHasLegacyFont
+                      ? 'Document converted from legacy font encoding (KrutiDev/Chanakya). Text and equations preserved.'
+                      : 'Some pages in this document have been flagged for human verification.'}
+                  </span>
+                </div>
+                {docNeedsReviewCount > 0 && (
+                  <span className="font-mono text-[10px] sm:text-[11px] bg-amber-500/20 text-amber-900 px-2 py-0.5 rounded-full font-bold shrink-0">
+                    {docNeedsReviewCount} of {pages.length} pages flagged
+                  </span>
+                )}
+              </div>
+            )}
 
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-xs font-heading font-semibold text-ink/70 shrink-0">Page</span>
-                <select
-                  value={selectedPageIndex}
-                  onChange={(e) => setSelectedPageIndex(Number(e.target.value))}
-                  disabled={pages.length === 0}
-                  className="px-2 py-1 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink focus:outline-none focus:border-forest max-w-[120px] xs:max-w-[150px] truncate"
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+              {/* Mobile Page Navigator Bar (Visible on < 768px, replaces the crushing sidebar) */}
+              <div className="md:hidden flex items-center justify-between gap-2 px-3 py-2 bg-surface-muted/70 border-b border-border shrink-0">
+                <button
+                  onClick={() => setSelectedPageIndex((prev) => Math.max(0, prev - 1))}
+                  disabled={selectedPageIndex === 0 || pages.length === 0}
+                  className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink disabled:opacity-30 cursor-pointer shrink-0 active:scale-95"
                 >
-                  {pages.length === 0 ? (
-                    <option value={0}>0</option>
-                  ) : (
-                    pages.map((p, idx) => (
-                      <option key={p.id} value={idx}>
-                        {p.page_number} ({p.layout_type.replace('_COLUMN', '')})
-                      </option>
-                    ))
-                  )}
-                </select>
-                <span className="text-xs text-ink/50 shrink-0">of {pages.length}</span>
+                  ← Prev
+                </button>
+
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-xs font-heading font-semibold text-ink/70 shrink-0">Page</span>
+                  <select
+                    value={selectedPageIndex}
+                    onChange={(e) => setSelectedPageIndex(Number(e.target.value))}
+                    disabled={pages.length === 0}
+                    className="px-2 py-1 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink focus:outline-none focus:border-forest max-w-[120px] xs:max-w-[150px] truncate"
+                  >
+                    {pages.length === 0 ? (
+                      <option value={0}>0</option>
+                    ) : (
+                      pages.map((p, idx) => (
+                        <option key={p.id} value={idx}>
+                          {p.page_number} ({p.layout_type.replace('_COLUMN', '')})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <span className="text-xs text-ink/50 shrink-0">of {pages.length}</span>
+                </div>
+
+                <button
+                  onClick={() => setSelectedPageIndex((prev) => Math.min(pages.length - 1, prev + 1))}
+                  disabled={selectedPageIndex >= pages.length - 1 || pages.length === 0}
+                  className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink disabled:opacity-30 cursor-pointer shrink-0 active:scale-95"
+                >
+                  Next →
+                </button>
               </div>
 
-              <button
-                onClick={() => setSelectedPageIndex((prev) => Math.min(pages.length - 1, prev + 1))}
-                disabled={selectedPageIndex >= pages.length - 1 || pages.length === 0}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs font-heading font-bold text-ink disabled:opacity-30 cursor-pointer shrink-0 active:scale-95"
-              >
-                Next →
-              </button>
-            </div>
-
-            {/* Desktop & Tablet Left Sidebar (Hidden on mobile, visible on md: 768px+) */}
-            <div className="hidden md:block w-56 border-r border-border bg-surface-muted/30 overflow-y-auto p-3 space-y-1.5 shrink-0">
-              <p className="text-[11px] font-heading font-bold text-ink/50 uppercase tracking-wider px-2 mb-2">
-                Pages ({pages.length})
-              </p>
-              {pages.map((p, idx) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedPageIndex(idx)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-heading font-semibold flex items-center justify-between transition-all cursor-pointer ${
-                    selectedPageIndex === idx
-                      ? 'bg-ink text-white shadow-xs'
-                      : 'hover:bg-surface text-ink/70 hover:text-ink border border-transparent hover:border-border'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <Layout className="w-3.5 h-3.5 opacity-60 shrink-0" />
-                    <span className="truncate">Page {p.page_number}</span>
-                    {p.needs_review && (
-                      <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" title="Needs Human Review" />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {p.legacy_font_encoding && (
-                      <span
-                        className={`text-[9px] font-mono px-1 py-0.2 rounded font-bold ${
-                          selectedPageIndex === idx ? 'bg-orange-400/30 text-orange-200' : 'bg-orange-500/10 text-orange-700 border border-orange-500/20'
-                        }`}
-                        title="Converted from old font"
-                      >
-                        OLD FONT
-                      </span>
-                    )}
-                    {p.needs_review && (
-                      <span
-                        className={`text-[9px] font-mono px-1 py-0.2 rounded font-bold ${
-                          selectedPageIndex === idx ? 'bg-amber-400/30 text-amber-200' : 'bg-amber-500/10 text-amber-700 border border-amber-500/20'
-                        }`}
-                      >
-                        REVIEW
-                      </span>
-                    )}
-
+              {/* Desktop & Tablet Left Sidebar (Hidden on mobile, visible on md: 768px+) */}
+              <div className="hidden md:block w-56 border-r border-border bg-surface-muted/30 overflow-y-auto p-3 space-y-1.5 shrink-0">
+                <p className="text-[11px] font-heading font-bold text-ink/50 uppercase tracking-wider px-2 mb-2">
+                  Pages ({pages.length})
+                </p>
+                {pages.map((p, idx) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedPageIndex(idx)}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-heading font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                      selectedPageIndex === idx
+                        ? 'bg-ink text-white shadow-xs'
+                        : 'hover:bg-surface text-ink/70 hover:text-ink border border-transparent hover:border-border'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Layout className="w-3.5 h-3.5 opacity-60 shrink-0" />
+                      <span className="truncate">Page {p.page_number}</span>
+                    </div>
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded shrink-0 ${
+                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${
                         selectedPageIndex === idx ? 'bg-white/20 text-white' : 'bg-surface-muted text-ink/60'
                       }`}
                     >
                       {p.layout_type.replace('_COLUMN', '')}
                     </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
 
-            {/* Right Content Pane (Takes 100% width on mobile, flex-1 on tablet/desktop) */}
-            <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 bg-surface">
-              {currentPage ? (
-                <>
-                  <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1.5 pb-3 border-b border-border">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-heading font-bold text-sm text-ink">
-                        Page {currentPage.page_number}
+              {/* Right Content Pane (Takes 100% width on mobile, flex-1 on tablet/desktop) */}
+              <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 bg-surface">
+                {currentPage ? (
+                  <>
+                    <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1.5 pb-3 border-b border-border">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="font-heading font-bold text-sm text-ink shrink-0">
+                          Page {currentPage.page_number}
+                        </span>
+                        {currentPage.chapter_title && (
+                          <span className="text-xs text-ink/60 truncate max-w-xs sm:max-w-md">
+                            — {currentPage.chapter_title}
+                          </span>
+                        )}
+                      </div>
+                      <span className="self-start xs:self-auto px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-forest/10 text-forest border border-forest/20 shrink-0">
+                        Layout: {currentPage.layout_type.replace('_COLUMN', '')}
                       </span>
-                      {currentPage.chapter_title && (
-                        <span className="text-xs text-ink/60 truncate max-w-xs">
-                          — {currentPage.chapter_title}
-                        </span>
-                      )}
-                      {currentPage.legacy_review_marker && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-orange-500/15 text-orange-800 border border-orange-500/30 flex items-center gap-1 font-semibold">
-                          <AlertTriangle className="w-3 h-3 text-orange-600" />
-                          converted from old font, please verify
-                        </span>
-                      )}
-                      {currentPage.needs_review ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-amber-500/10 text-amber-700 border border-amber-500/30 flex items-center gap-1 font-semibold">
-                          <AlertTriangle className="w-3 h-3 text-amber-600" />
-                          Needs Review
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-forest/10 text-forest border border-forest/20 flex items-center gap-1 font-semibold">
-                          <CheckCircle className="w-3 h-3 text-forest" />
-                          Verified
-                        </span>
-                      )}
-
                     </div>
-                    <span className="self-start xs:self-auto px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono bg-forest/10 text-forest border border-forest/20 shrink-0">
-                      Layout: {currentPage.layout_type}
-                    </span>
-                  </div>
 
                   <div className="space-y-3">
                     {currentPage.structured_content && currentPage.structured_content.length > 0 ? (
@@ -481,7 +502,7 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                               {getSectionBadge(sec.type)}
                               {sec.heading && (
                                 <span className="text-xs font-heading font-bold text-ink">
-                                  {sec.heading}
+                                  <InlineMathText text={sec.heading} />
                                 </span>
                               )}
                             </div>
@@ -493,8 +514,8 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                           </div>
 
                           {sec.text && (
-                            <p className="text-xs text-ink/80 leading-relaxed font-body whitespace-pre-line">
-                              {sec.text}
+                            <p className="text-xs text-ink/80 leading-relaxed font-body">
+                              <InlineMathText text={sec.text} />
                             </p>
                           )}
 
@@ -529,8 +550,9 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
 };
