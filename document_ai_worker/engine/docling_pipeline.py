@@ -104,6 +104,8 @@ def _parse_docling_document(
         page_text_pieces: List[str] = []
 
         fitz_page = fitz_doc[page_num - 1] if page_num - 1 < len(fitz_doc) else None
+        dec = decisions_by_page.get(page_num)
+        p_legacy = getattr(dec, "legacy_font_encoding", False) if dec else False
 
         pic_idx = 0
         consumed_item_ids = set()
@@ -119,6 +121,11 @@ def _parse_docling_document(
             clean_text = raw_text.strip()
             if detect_caesar_shift(clean_text):
                 clean_text = unshift_ncert_text(clean_text)
+            elif p_legacy and clean_text and not any("\u0900" <= c <= "\u097f" for c in clean_text):
+                from .legacy_font_converter import remap_legacy_text
+                r_txt, _ = remap_legacy_text(clean_text)
+                if any("\u0900" <= c <= "\u097f" for c in r_txt):
+                    clean_text = r_txt
 
             bbox = []
             if hasattr(item, "prov") and item.prov:
@@ -393,17 +400,33 @@ def _parse_docling_document(
                 if sec.type != "DIAGRAM" and sec.text:
                     sec.text = clean_page_text(sec.text).text
 
-        if p_legacy:
-            has_devanagari = any("\u0900" <= c <= "\u097f" for c in page_raw_text)
-            if not has_devanagari:
-                p_review = True
-                p_quality = 0.50
-                p_meta["raw_text_unreliable"] = page_raw_text
-                p_reason = f"{p_reason}; OCR unavailable or pending; corrupted text quarantined to metadata"
-                page_raw_text = ""
+        # Multi-span legacy font conversion fallback using PyMuPDF font spans
+        if p_legacy and fitz_page is not None:
+            from .legacy_font_converter import convert_page_spans_to_unicode, remap_legacy_text
+            rebuilt_text, _ = convert_page_spans_to_unicode(fitz_page)
+            if rebuilt_text and any("\u0900" <= c <= "\u097f" for c in rebuilt_text):
+                page_raw_text = rebuilt_text
+                p_flags.append("legacy_font_spans_remapped")
+                p_meta["legacy_font_remapped"] = True
                 for sec in sections:
                     if sec.type != "DIAGRAM":
-                        sec.text = ""
+                        if sec.text and not any("\u0900" <= c <= "\u097f" for c in sec.text):
+                            r_sec, _ = remap_legacy_text(sec.text)
+                            if any("\u0900" <= c <= "\u097f" for c in r_sec):
+                                sec.text = r_sec
+                        if sec.heading and not any("\u0900" <= c <= "\u097f" for c in sec.heading):
+                            r_h, _ = remap_legacy_text(sec.heading)
+                            if any("\u0900" <= c <= "\u097f" for c in r_h):
+                                sec.heading = r_h
+
+        # Quality scoring & rescue flag: never erase text, flag for AI rescue if needed
+        if p_legacy:
+            has_devanagari = any("\u0900" <= c <= "\u097f" for c in page_raw_text)
+            if not has_devanagari or not page_raw_text.strip():
+                p_review = True
+                p_quality = 0.50
+                p_flags.append("legacy_font_unresolved")
+                p_reason = f"{p_reason}; Legacy font detected requiring visual AI rescue"
 
         pages.append(PageSchema(
             page_number=global_page_num,

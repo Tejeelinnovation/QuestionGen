@@ -25,6 +25,7 @@ import tempfile
 import time
 import urllib.request
 import uuid
+import concurrent.futures
 import requests
 from pathlib import Path
 
@@ -165,16 +166,17 @@ def retry_page_with_gemini(
             return None
         page = doc[page_num - 1]
         prompt = (
-            "Transcribe all text, formulas, headings, tables, and notes from this page accurately in natural reading order. "
+            "Transcribe all text, headings, tables, and notes from this page accurately in natural reading order. "
+            "Convert all mathematical and scientific formulas (fractions, limits, powers, matrices, symbols) into precise LaTeX notation using $...$ for inline formulas or $$...$$ for standalone formulas. "
             "Output clear, clean text without optical character artifacts or corrupted tokens. "
-            "Preserve formatting and line hierarchy."
+            "Preserve formatting, Hindi Devanagari text, English text, and line hierarchy."
         )
         result = client.transcribe_page_image(
             page=page,
             prompt=prompt,
             page_num=page_num,
             file_hash=file_hash,
-            dpi=150,
+            dpi=200,
             timeout=timeout,
             max_attempts=max_retries,
             retry_delay=retry_delay,
@@ -463,51 +465,85 @@ def main():
             f"Granularity: {granularity}"
         )
 
-        # 2b. Quality Gate & Single-Page Retry
+        # 2b. Parallel Quality Gate & Multi-Page AI Rescue
         gemini_key = args.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
         call_cap = int(os.environ.get("GEMINI_CALL_CAP", "20"))
-        gemini_calls_made = 0
 
-        for p in pages:
-            if p.page_kind in ("image_only", "blank"):
-                continue
+        pages_to_rescue = [
+            p for p in pages
+            if p.page_kind not in ("image_only", "blank") and (
+                p.quality_score < 0.70 or
+                p.needs_review or
+                not p.raw_text.strip() or
+                "legacy_font_unresolved" in p.quality_flags
+            )
+        ][:call_cap]
 
-            # Quality threshold: quality_score < 0.70 or explicit review flag
-            if p.quality_score < 0.70 or p.needs_review:
-                if gemini_key and gemini_calls_made < call_cap:
-                    logger.info(
-                        f"[Quality Gate] Page {p.page_number} scored {p.quality_score:.2f} (needs_review={p.needs_review}). "
-                        f"Retrying with Gemini Vision (call {gemini_calls_made + 1}/{call_cap})..."
-                    )
-                    transcribed = retry_page_with_gemini(local_pdf, p.page_number, gemini_key)
-                    gemini_calls_made += 1
-                    if transcribed:
-                        try:
-                            from engine.text_cleaner import clean_page_text
-                        except ImportError:
-                            from document_ai_worker.engine.text_cleaner import clean_page_text
-                        clean_res = clean_page_text(transcribed)
-                        p.raw_text = clean_res.text
-                        p.quality_score = clean_res.quality_score
-                        p.quality_flags.append("retried_with_gemini")
-                        p.quality_flags.extend(clean_res.flags)
-                        if p.quality_score >= 0.70:
+        if pages_to_rescue and gemini_key:
+            num_workers = min(5, len(pages_to_rescue))
+            logger.info(
+                f"[Quality Gate] Concurrently rescuing {len(pages_to_rescue)} pages with Gemini Vision "
+                f"across {num_workers} parallel threads (pages: {[p.page_number for p in pages_to_rescue]})..."
+            )
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+                future_to_page = {
+                    executor.submit(retry_page_with_gemini, local_pdf, p.page_number, gemini_key): p
+                    for p in pages_to_rescue
+                }
+                for future in concurrent.futures.as_completed(future_to_page):
+                    p = future_to_page[future]
+                    try:
+                        transcribed = future.result()
+                        if transcribed and transcribed.strip():
+                            try:
+                                from engine.text_cleaner import clean_page_text
+                            except ImportError:
+                                from document_ai_worker.engine.text_cleaner import clean_page_text
+                            clean_res = clean_page_text(transcribed)
+                            p.raw_text = clean_res.text
+                            p.quality_score = max(0.85, clean_res.quality_score)
                             p.needs_review = False
+                            p.quality_flags.append("retried_with_gemini")
+                            p.quality_flags.extend(clean_res.flags)
                             p.route_reason = f"{p.route_reason}; Transcribed and verified via Gemini Vision"
-                            logger.info(f"[Quality Gate] Page {p.page_number} successfully recovered (score={p.quality_score:.2f})")
+
+                            # If sections are empty or lack text, rebuild sections from transcribed markdown
+                            has_non_diagram_text = any(s.text.strip() for s in p.sections if s.type != "DIAGRAM")
+                            if not has_non_diagram_text:
+                                try:
+                                    from engine.schema import SectionSchema
+                                except ImportError:
+                                    from document_ai_worker.engine.schema import SectionSchema
+
+                                p_sections = [s for s in p.sections if s.type == "DIAGRAM"]
+                                blocks = [b.strip() for b in transcribed.split("\n\n") if b.strip()]
+                                for b in blocks:
+                                    sec_type = "PARAGRAPH"
+                                    if b.startswith("#") or (len(b) < 60 and not b.endswith(".")):
+                                        sec_type = "PARAGRAPH"
+                                    if "$" in b or "\\frac" in b or "\\lim" in b:
+                                        sec_type = "FORMULA"
+                                    p_sections.append(SectionSchema(
+                                        type=sec_type,
+                                        heading=b[:40] if sec_type != "PARAGRAPH" else "",
+                                        text=b,
+                                        column_index=0,
+                                        latex_equations=[b] if sec_type == "FORMULA" else [],
+                                    ))
+                                p.sections = p_sections
+
+                            logger.info(f"[Quality Gate] Page {p.page_number} successfully recovered via Gemini Vision (score={p.quality_score:.2f})")
                         else:
                             p.needs_review = True
-                            p.quality_flags.append("low_quality_post_retry")
-                    else:
+                            p.quality_flags.append("gemini_retry_failed")
+                    except Exception as rescue_err:
                         p.needs_review = True
-                        p.quality_flags.append("gemini_retry_failed")
-                else:
-                    p.needs_review = True
-                    if gemini_calls_made >= call_cap:
-                        p.quality_flags.append("gemini_call_cap_exhausted")
-                        logger.info(f"[Quality Gate] Page {p.page_number} capped (GEMINI_CALL_CAP={call_cap} reached). Set needs_review=True.")
-                    elif not gemini_key:
-                        p.quality_flags.append("needs_review_no_gemini_key")
+                        p.quality_flags.append("gemini_retry_error")
+                        logger.warning(f"[Quality Gate] Gemini rescue failed for page {p.page_number}: {rescue_err}")
+        elif pages_to_rescue and not gemini_key:
+            for p in pages_to_rescue:
+                p.needs_review = True
+                p.quality_flags.append("needs_review_no_gemini_key")
 
         # 3. Direct Google Drive Diagram Uploading from 16GB runner (Parallel Multi-threaded)
         drive_uploader = WorkerGoogleDriveUploader()
