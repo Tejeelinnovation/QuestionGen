@@ -72,10 +72,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv pip install --system \
-            --extra-index-url https://download.pytorch.org/whl/cpu \
-            torch torchvision opencv-python-headless \
-            -r document_ai_worker/requirements.txt
+          uv pip install --system torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          uv pip install --system opencv-python-headless -r document_ai_worker/requirements.txt
 
       - name: Execute Document AI Extraction
         env:
