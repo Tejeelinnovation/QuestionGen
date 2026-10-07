@@ -25,7 +25,7 @@ import tempfile
 import time
 import urllib.request
 import uuid
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from pathlib import Path
 
@@ -485,12 +485,12 @@ def main():
                 f"[Quality Gate] Concurrently rescuing {len(pages_to_rescue)} pages with Gemini Vision "
                 f"across {num_workers} parallel threads (pages: {[p.page_number for p in pages_to_rescue]})..."
             )
-            with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+            with ThreadPoolExecutor(max_workers=num_workers) as executor:
                 future_to_page = {
                     executor.submit(retry_page_with_gemini, local_pdf, p.page_number, gemini_key): p
                     for p in pages_to_rescue
                 }
-                for future in concurrent.futures.as_completed(future_to_page):
+                for future in as_completed(future_to_page):
                     p = future_to_page[future]
                     try:
                         transcribed = future.result()
@@ -598,8 +598,6 @@ def main():
                 secret=args.webhook_secret,
             )
 
-            import concurrent.futures
-
             def _upload_single_diagram(item):
                 target_sec, data, fname, mtype = item
                 try:
@@ -618,9 +616,9 @@ def main():
 
             max_workers = min(12, total_diagrams)
             last_diagram_progress = time.time()
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 future_to_item = {executor.submit(_upload_single_diagram, item): item for item in diagram_items}
-                for future in concurrent.futures.as_completed(future_to_item):
+                for future in as_completed(future_to_item):
                     if future.result():
                         uploaded_diagram_count += 1
                     now = time.time()
