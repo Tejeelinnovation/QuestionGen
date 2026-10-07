@@ -584,7 +584,6 @@ class DoclingPipeline:
             logger.debug(f"Document font probe note: {probe_err}")
 
         force_ocr_env = os.environ.get("DOCLING_FORCE_FULL_PAGE_OCR", "").lower() in ("1", "true", "yes")
-        enable_full_page = has_legacy_fonts or force_ocr_env
 
         # Probe if document has abundant digital text (> 120 chars/page)
         sample_chars = 0
@@ -594,8 +593,11 @@ class DoclingPipeline:
         avg_chars_per_page = sample_chars / max(1, probe_pages)
         is_digital_pdf = avg_chars_per_page > 120
 
-        # Run OCR only if legacy fonts detected, user forced OCR, or document is scanned
-        do_ocr = has_legacy_fonts or force_ocr_env or (not is_digital_pdf)
+        # Run OCR ONLY if document is genuinely scanned/image-only or explicitly forced by env variable.
+        # Digital PDFs with selectable text (including legacy fonts) bypass slow Tesseract OCR completely.
+        # Any legacy fonts present are decoded in sub-milliseconds by our native converter in post-processing.
+        do_ocr = force_ocr_env or (not is_digital_pdf)
+        enable_full_page = force_ocr_env or (not is_digital_pdf)
 
         logger.info(
             f"Docling OCR Configuration: do_ocr={do_ocr}, force_full_page_ocr={enable_full_page} "
