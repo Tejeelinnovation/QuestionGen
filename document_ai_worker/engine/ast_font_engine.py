@@ -330,19 +330,18 @@ def tokenize_legacy_string(text: str) -> List[Token]:
     n = len(norm_text)
 
     while i < n:
-
         matched = False
         # Check against glyph mapping
         for prefix, ttype, val in _GLYPH_TABLE:
             plen = len(prefix)
-            if i + plen <= n and text[i:i+plen] == prefix:
+            if i + plen <= n and norm_text[i:i+plen] == prefix:
                 tokens.append(Token(ttype, val, prefix))
                 i += plen
                 matched = True
                 break
 
         if not matched:
-            c = text[i]
+            c = norm_text[i]
             if c.isspace():
                 tokens.append(Token(TokenType.WHITESPACE, c, c))
             else:
@@ -457,6 +456,28 @@ def parse_and_reorder_tokens(tokens: List[Token]) -> str:
     return unicodedata.normalize("NFC", result)
 
 
+_MATH_VAR = r"(?:\b[a-zA-Z](?:\s*\d+)?\b)"
+_MATH_FUNC = r"(?:\b(?:sin|cos|tan|cot|sec|cosec|log|ln|exp|lim|sqrt)\b)"
+_MATH_NUM = r"(?:\b\d+(?:\.\d+)?\b)"
+_MATH_OP = r"(?:[\+\-\*\/\^\=\(\)\[\]\,])"
+
+_MATH_TOKEN = rf"(?:{_MATH_VAR}|{_MATH_FUNC}|{_MATH_NUM}|{_MATH_OP})"
+_EQ_PAT = rf"(?:{_MATH_VAR}\s*=\s*(?:{_MATH_TOKEN}|\s+)*{_MATH_TOKEN})"
+_PAREN_PAT = rf"\(\s*{_MATH_VAR}\s*[\+\-\*\/]\s*{_MATH_VAR}\s*\)"
+_VAR_PAT = r"\b[a-zA-Z]\s*\d+\b"
+
+_COMBINED_MATH_RE = re.compile(rf"({_EQ_PAT}|{_PAREN_PAT}|{_VAR_PAT})")
+
+
+def _format_latex_math(expr: str) -> str:
+    formatted = re.sub(r"\b([a-zA-Z])\s*(\d+)\b", r"\g<1>_{\g<2>}", expr.strip())
+    formatted = re.sub(r"\s*([\+\-\*\/=])\s*", r" \1 ", formatted)
+    formatted = re.sub(r"\s+", " ", formatted).strip()
+    formatted = re.sub(r"\(\s+", "(", formatted)
+    formatted = re.sub(r"\s+\)", ")", formatted)
+    return f"${formatted}$"
+
+
 class ASTFontEngine:
     """
     Singleton AST Grammar Engine for converting legacy Indian font text
@@ -474,6 +495,8 @@ class ASTFontEngine:
     def convert_text(self, text: str) -> Tuple[str, bool]:
         """
         Converts legacy font text to Unicode.
+        Preserves and formats mathematical variables and equations into LaTeX ($...$),
+        preventing them from being corrupted into Hindi consonants (e.g. t -> ज, = -> त्र).
         Returns (unicode_text, has_unmapped_bytes).
         """
         if not text:
@@ -483,9 +506,32 @@ class ASTFontEngine:
         if any("\u0900" <= c <= "\u097f" for c in text):
             return text, False
 
-        tokens = tokenize_legacy_string(text)
-        converted = parse_and_reorder_tokens(tokens)
+        # Pre-pass: detect and segment mathematical expressions
+        matches = list(_COMBINED_MATH_RE.finditer(text))
+        if not matches:
+            tokens = tokenize_legacy_string(text)
+            converted = parse_and_reorder_tokens(tokens)
+            has_unmapped_bytes = bool(re.search(r"[a-zA-Z\ufffd]", converted))
+            return converted, has_unmapped_bytes
 
-        # Detect if any unmapped residual ASCII letters remain
-        has_unmapped_bytes = bool(re.search(r"[a-zA-Z\ufffd]", converted))
+        parts: List[str] = []
+        last_idx = 0
+        for m in matches:
+            start, end = m.span()
+            if start > last_idx:
+                chunk = text[last_idx:start]
+                toks = tokenize_legacy_string(chunk)
+                parts.append(parse_and_reorder_tokens(toks))
+            parts.append(_format_latex_math(m.group(0)))
+            last_idx = end
+
+        if last_idx < len(text):
+            chunk = text[last_idx:]
+            toks = tokenize_legacy_string(chunk)
+            parts.append(parse_and_reorder_tokens(toks))
+
+        converted = "".join(parts)
+        # Check unmapped bytes outside of LaTeX math blocks ($...$)
+        check_text = re.sub(r"\$[^\$]+\$", "", converted)
+        has_unmapped_bytes = bool(re.search(r"[a-zA-Z\ufffd]", check_text))
         return converted, has_unmapped_bytes

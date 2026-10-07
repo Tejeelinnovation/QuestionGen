@@ -321,7 +321,12 @@ def _parse_docling_document(
 
             # C. Formula items
             elif "FORMULA" in label_str or "EQUATION" in label_str or "MATH" in label_str:
-                latex_str = clean_text
+                raw_formula = (clean_text or "").strip()
+                # If Docling extracted generic category labels instead of math characters, clear it
+                if raw_formula.lower() in ("formula", "equation", "math", "सूत्र", "चित्र", "figure", "table", "सारणी"):
+                    latex_str = ""
+                else:
+                    latex_str = raw_formula
 
                 # If digital text is empty or lacks LaTeX mathematical syntax, extract visually via RapidLaTeXOCR
                 if fitz_page is not None and bbox and len(bbox) == 4:
@@ -338,18 +343,17 @@ def _parse_docling_document(
                             logger.debug(f"LatexOCR formula extraction error: {ocr_err}")
 
                 display_formula = f"${latex_str}$" if (latex_str and not latex_str.startswith("$")) else latex_str
+                formula_body = display_formula if (display_formula and display_formula.strip() not in ("$$", "$Formula$", "$formula$")) else ""
                 sections.append(SectionSchema(
                     type="FORMULA",
                     heading="Formula",
-                    text=display_formula or latex_str or clean_text,
+                    text=formula_body,
                     column_index=0,
-                    latex_equations=[latex_str] if latex_str else [],
+                    latex_equations=[latex_str] if (latex_str and latex_str.strip().lower() not in ("formula", "equation", "math")) else [],
                     metadata={"bbox": bbox},
                 ))
-                if display_formula:
-                    page_text_pieces.append(display_formula)
-                elif clean_text:
-                    page_text_pieces.append(clean_text)
+                if formula_body:
+                    page_text_pieces.append(formula_body)
 
             # D. Section Headers & Paragraphs
             elif "HEADER" in label_str or "TITLE" in label_str:
@@ -428,15 +432,39 @@ def _parse_docling_document(
                 p_flags.append("legacy_font_spans_remapped")
                 p_meta["legacy_font_remapped"] = True
                 for sec in sections:
-                    if sec.type != "DIAGRAM":
+                    if sec.type not in ("DIAGRAM", "FORMULA"):
                         if sec.text and not any("\u0900" <= c <= "\u097f" for c in sec.text):
                             r_sec, _ = remap_legacy_text(sec.text)
                             if any("\u0900" <= c <= "\u097f" for c in r_sec):
                                 sec.text = r_sec
                         if sec.heading and not any("\u0900" <= c <= "\u097f" for c in sec.heading):
-                            r_h, _ = remap_legacy_text(sec.heading)
-                            if any("\u0900" <= c <= "\u097f" for c in r_h):
-                                sec.heading = r_h
+                            if sec.heading.lower() not in ("formula", "equation", "math", "table", "figure", "diagram"):
+                                r_h, _ = remap_legacy_text(sec.heading)
+                                if any("\u0900" <= c <= "\u097f" for c in r_h):
+                                    sec.heading = r_h
+                    elif sec.type == "DIAGRAM":
+                        # Remap legacy font diagram labels, captions, and descriptions (e.g. lkj.kh 12.1 -> सारणी 12.1)
+                        if sec.image_caption and not any("\u0900" <= c <= "\u097f" for c in sec.image_caption):
+                            r_cap, _ = remap_legacy_text(sec.image_caption)
+                            if any("\u0900" <= c <= "\u097f" for c in r_cap):
+                                sec.image_caption = r_cap
+                        if sec.image_label and not any("\u0900" <= c <= "\u097f" for c in sec.image_label):
+                            r_lbl, _ = remap_legacy_text(sec.image_label)
+                            if any("\u0900" <= c <= "\u097f" for c in r_lbl):
+                                sec.image_label = r_lbl
+                        if sec.image_description and not any("\u0900" <= c <= "\u097f" for c in sec.image_description):
+                            r_desc, _ = remap_legacy_text(sec.image_description)
+                            if any("\u0900" <= c <= "\u097f" for c in r_desc):
+                                sec.image_description = r_desc
+                        if sec.heading and not any("\u0900" <= c <= "\u097f" for c in sec.heading):
+                            if not re.match(r"^Figure\s+\d+", sec.heading, re.IGNORECASE):
+                                r_h, _ = remap_legacy_text(sec.heading)
+                                if any("\u0900" <= c <= "\u097f" for c in r_h):
+                                    sec.heading = r_h
+                        if sec.text and not any("\u0900" <= c <= "\u097f" for c in sec.text):
+                            r_txt, _ = remap_legacy_text(sec.text)
+                            if any("\u0900" <= c <= "\u097f" for c in r_txt):
+                                sec.text = r_txt
 
         # Quality scoring & rescue flag: never erase text, flag for AI rescue if needed
         if p_legacy:

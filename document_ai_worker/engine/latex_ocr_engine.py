@@ -56,11 +56,11 @@ class LatexOCREngine:
             self._model = LaTeXOCR()
             self._available = True
             logger.info("[LatexOCR] RapidLaTeXOCR ONNX engine loaded successfully.")
-        except ImportError:
-            logger.info("[LatexOCR] rapid_latex_ocr not installed. Formula extraction will use digital text fallback.")
+        except ImportError as imp_err:
+            logger.info(f"[LatexOCR] rapid_latex_ocr import notice ({imp_err}). Formula extraction will use digital text fallback.")
             self._available = False
         except Exception as init_err:
-            logger.warning(f"[LatexOCR] Failed to initialize RapidLaTeXOCR: {init_err}")
+            logger.warning(f"[LatexOCR] Failed to initialize RapidLaTeXOCR: {init_err}", exc_info=True)
             self._available = False
 
     def extract_latex_from_image(self, img: Union[Image.Image, bytes]) -> Optional[str]:

@@ -339,6 +339,58 @@ def strip_leaked_symbol_glyphs(text: str) -> Tuple[str, int]:
     return cleaned, strip_count
 
 
+_MATH_VAR_RE = r"(?:\b[a-zA-Z](?:\s*\d+)?\b)"
+_MATH_FUNC_RE = r"(?:\b(?:sin|cos|tan|cot|sec|cosec|log|ln|exp|lim|sqrt)\b)"
+_MATH_NUM_RE = r"(?:\b\d+(?:\.\d+)?\b)"
+_MATH_OP_RE = r"(?:[\+\-\*\/\^\=\(\)\[\]\,])"
+
+_MATH_TOKEN_RE = rf"(?:{_MATH_VAR_RE}|{_MATH_FUNC_RE}|{_MATH_NUM_RE}|{_MATH_OP_RE})"
+_EQ_PAT_RE = rf"(?:{_MATH_VAR_RE}\s*=\s*(?:{_MATH_TOKEN_RE}|\s+)*{_MATH_TOKEN_RE})"
+_PAREN_PAT_RE = rf"\(\s*{_MATH_VAR_RE}\s*[\+\-\*\/]\s*{_MATH_VAR_RE}\s*\)"
+_VAR_PAT_RE = r"\b[a-zA-Z]\s*\d+\b"
+
+_TEXT_MATH_RE = re.compile(rf"({_EQ_PAT_RE}|{_PAREN_PAT_RE}|{_VAR_PAT_RE})")
+
+
+def normalize_math_in_text(text: str) -> Tuple[str, int]:
+    """
+    Detects math equations, variables with subscripts, and parenthesized math operations
+    in paragraph text, formatting them into standard LaTeX inline math ($...$).
+    Example:
+      'माना समय t 1 पर' -> 'माना समय $t_{1}$ पर'
+      'समयांतराल (t 2 - t 1)' -> 'समयांतराल $(t_{2} - t_{1})$'
+    """
+    if not text:
+        return text, 0
+
+    saved_blocks: Dict[str, str] = {}
+    def _hide_existing(m: re.Match) -> str:
+        k = f"__SAVED_LATEX_BLK_{len(saved_blocks)}__"
+        saved_blocks[k] = m.group(0)
+        return k
+
+    hidden_text = re.sub(r"\$[^\$]+\$", _hide_existing, text)
+    count = 0
+
+    def _format_match(m: re.Match) -> str:
+        nonlocal count
+        count += 1
+        expr = m.group(0).strip()
+        formatted = re.sub(r"\b([a-zA-Z])\s*(\d+)\b", r"\g<1>_{\g<2>}", expr)
+        formatted = re.sub(r"\s*([\+\-\*\/=])\s*", r" \1 ", formatted)
+        formatted = re.sub(r"\s+", " ", formatted).strip()
+        formatted = re.sub(r"\(\s+", "(", formatted)
+        formatted = re.sub(r"\s+\)", ")", formatted)
+        return f"${formatted}$"
+
+    normalized = _TEXT_MATH_RE.sub(_format_match, hidden_text)
+
+    for k, v in saved_blocks.items():
+        normalized = normalized.replace(k, v)
+
+    return normalized, count
+
+
 def drop_short_fragments(text: str, min_chars: int = 4) -> Tuple[str, int]:
     """
     Drops isolated short unattached fragments (< 4 chars) such as printer marks
@@ -382,6 +434,11 @@ def drop_short_fragments(text: str, min_chars: int = 4) -> Tuple[str, int]:
         # 3. Valid labels, units, or roman numerals
         lower_token = stripped.lower()
         if lower_token in VALID_SHORT_LABELS:
+            cleaned_lines.append(line)
+            continue
+
+        # 4. LaTeX math expressions (e.g. "$x$", "$t_1$")
+        if stripped.startswith("$") or "$" in stripped:
             cleaned_lines.append(line)
             continue
 
@@ -518,12 +575,14 @@ def compute_script_aware_garbage(text: str) -> Tuple[int, int, float]:
         if sym_count > 0 and alpha_count > 0:
             garbage += sym_count * 2
 
-        # Check mixed-script (Latin + Indic letters within same token)
-        has_latin = any(("A" <= c <= "Z" or "a" <= c <= "z") for c in token)
-        has_devanagari = any(0x0900 <= ord(c) <= 0x097F for c in token)
-        has_gujarati = any(0x0A80 <= ord(c) <= 0x0AFF for c in token)
-        if (has_latin and has_devanagari) or (has_latin and has_gujarati) or (has_devanagari and has_gujarati):
-            garbage += len(token)
+        # Check mixed-script (Latin + Indic letters within same token, excluding LaTeX math expressions)
+        token_clean = re.sub(r"\$[^\$]+\$", "", token)
+        if token_clean:
+            has_latin = any(("A" <= c <= "Z" or "a" <= c <= "z") for c in token_clean)
+            has_devanagari = any(0x0900 <= ord(c) <= 0x097F for c in token_clean)
+            has_gujarati = any(0x0A80 <= ord(c) <= 0x0AFF for c in token_clean)
+            if (has_latin and has_devanagari) or (has_latin and has_gujarati) or (has_devanagari and has_gujarati):
+                garbage += len(token_clean)
 
     rate = min(1.0, garbage / max(total, 1))
     return total, garbage, rate
@@ -587,6 +646,12 @@ def clean_page_text(
     if frag_count > 0:
         flags.append("fragments_dropped")
         stats["fragments_dropped"] = frag_count
+
+    # Step 5.5: Normalize math variables and equations into LaTeX ($...$)
+    current_text, math_count = normalize_math_in_text(current_text)
+    if math_count > 0:
+        flags.append("math_normalized")
+        stats["math_normalized"] = math_count
 
     # Step 6: Non-destructive glued words detection & flagging
     remaining_glued = detect_glued_words(current_text)

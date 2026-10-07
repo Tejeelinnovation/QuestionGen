@@ -137,6 +137,27 @@ class TestLegacyFontLines(unittest.TestCase):
         self.assertFalse(is_legacy_font("Times-Roman"))
         self.assertFalse(is_legacy_font("Mangal"))
 
+    def test_math_variable_preservation_in_legacy_text(self):
+        """Verifies that math equations and variables are formatted to LaTeX and not mangled to Hindi consonants."""
+        raw_text = "ekuk le; t 1 ij fLFkfr x 1 rFkk t 2 ij fLFkfr x 2 gS rks le;kUrjky (t 2 - t 1) esa vkSlr osx v = (x 2 - x 1) / (t 2 - t 1) gksxkA"
+        converted, unmapped = remap_legacy_text(raw_text)
+        self.assertFalse(unmapped, "Should not flag math variables as unmapped bytes")
+        self.assertIn("$t_{1}$", converted)
+        self.assertIn("$x_{1}$", converted)
+        self.assertIn("$t_{2}$", converted)
+        self.assertIn("$x_{2}$", converted)
+        self.assertIn("$(t_{2} - t_{1})$", converted)
+        self.assertIn("$v = (x_{2} - x_{1}) / (t_{2} - t_{1})$", converted)
+        self.assertNotIn("ज 1", converted)
+        self.assertNotIn("ज 2", converted)
+
+    def test_table_figure_caption_remapping(self):
+        """Verifies that table and figure labels like lkj.kh 12.1 become सारणी 12.1."""
+        raw = "lkj.kh 12.1"
+        converted, unmapped = remap_legacy_text(raw)
+        self.assertFalse(unmapped)
+        self.assertEqual(unicodedata.normalize("NFC", converted), "सारणी 12.1")
+
 
 if __name__ == "__main__":
     unittest.main()

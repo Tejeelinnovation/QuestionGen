@@ -13,6 +13,7 @@ from document_ai_worker.engine.text_cleaner import (
     detect_glued_words,
     drop_short_fragments,
     merge_drop_caps,
+    normalize_math_in_text,
     rebuild_text_from_pymupdf_words,
     rejoin_hyphenated_line_breaks,
     strip_leaked_symbol_glyphs,
@@ -147,6 +148,15 @@ class TextCleanerUnitTests(unittest.TestCase):
         self.assertIn("command", rebuilt)
         self.assertIn("has", rebuilt)
         doc.close()
+
+    def test_normalize_math_in_text(self):
+        sample = "माना समय t 1 पर स्थिति x 1 तथा समयांतराल (t 2 - t 1) में वेग v = (x 2 - x 1) / (t 2 - t 1) होगा।"
+        norm, count = normalize_math_in_text(sample)
+        self.assertGreaterEqual(count, 4)
+        self.assertIn("$t_{1}$", norm)
+        self.assertIn("$x_{1}$", norm)
+        self.assertIn("$(t_{2} - t_{1})$", norm)
+        self.assertIn("$v = (x_{2} - x_{1}) / (t_{2} - t_{1})$", norm)
 
     def test_clean_page_text_composite_pipeline(self):
         raw = (
