@@ -32,7 +32,7 @@ import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
 import { ConfirmDeleteModal } from '../../components/ui/ConfirmDeleteModal';
 import { SkeletonIngestionList } from '../../components/ui/skeleton';
-import { JobDurationBadge, LiveTimer, formatJobDuration } from '../../components/ui/JobDurationTimer';
+import { JobDurationBadge } from '../../components/ui/JobDurationTimer';
 
 export const DatasetIngestionPageDesktop: React.FC = () => {
   const { user, hasCapability } = useAuth();
@@ -408,7 +408,7 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       {/* Super Admin Exclusive Controls */}
                       {isSuperAdmin && (
                         <>
@@ -493,36 +493,34 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
                   {/* Progress Bar & Detailed Error Card */}
                   {isSuperAdmin && (
                     <div className="space-y-1.5 pt-1">
-                      <div className="flex items-center justify-between text-[11px] text-ink/60">
-                        <span className="font-mono flex items-center gap-1.5 truncate max-w-[75%]">
+                      <div className="flex items-center justify-between text-[11px] text-ink/60 gap-3">
+                        <span
+                          className="font-mono flex items-center gap-1.5 min-w-0 flex-1 truncate"
+                          title={job.current_stage || `${job.processed_pages} of ${job.total_pages} pages processed`}
+                        >
                           {job.current_stage?.includes('Google Drive') && (
                             <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
                           )}
                           {job.status === 'EXTRACTING' && !job.current_stage?.includes('Google Drive') && (
                             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                           )}
-                          {job.current_stage || `${job.processed_pages} of ${job.total_pages} pages processed`}
+                          <span className="truncate">
+                            {job.current_stage || `${job.processed_pages} of ${job.total_pages} pages processed`}
+                          </span>
                         </span>
                         <span className="font-mono font-bold text-ink flex items-center gap-1.5 shrink-0">
                           {job.status === 'EXTRACTING' ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                              <LiveTimer createdAt={job.created_at} />
-                              <span className="text-blue-300">·</span>
-                              <span>{job.progress_percentage === 0 ? 'Starting...' : `${job.progress_percentage}%`}</span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 shrink-0">
+                              {job.progress_percentage === 0 ? 'Starting...' : `${job.progress_percentage}%`}
                             </span>
                           ) : job.status === 'COMPLETED' ? (
-                            <span className="inline-flex items-center gap-1">
-                              {formatJobDuration(job) && (
-                                <span className="text-[10px] font-normal text-ink/50 flex items-center gap-0.5" title="Total time taken">
-                                  <Clock className="w-2.5 h-2.5 text-ink/40" />
-                                  <span>{formatJobDuration(job)}</span>
-                                  <span className="mx-0.5 text-ink/30">·</span>
-                                </span>
-                              )}
-                              <span>100%</span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 shrink-0">
+                              100%
                             </span>
                           ) : (
-                            `${job.progress_percentage}%`
+                            <span className="text-[10px] font-mono font-bold text-ink/70 shrink-0">
+                              {job.progress_percentage}%
+                            </span>
                           )}
                         </span>
                       </div>

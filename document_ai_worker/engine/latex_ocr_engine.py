@@ -84,12 +84,23 @@ class LatexOCREngine:
             if pil_img.width < 10 or pil_img.height < 8:
                 return None
 
+            import numpy as np
+
             # Pad with 6px white margin to improve tokenization accuracy
             padded = Image.new("RGB", (pil_img.width + 12, pil_img.height + 12), (255, 255, 255))
             padded.paste(pil_img, (6, 6))
 
             # Run ONNX inference
-            raw_res = self._model(padded)
+            # RapidLaTeXOCR expects numpy.ndarray, bytes, or file path (not PIL.Image.Image)
+            img_arr = np.array(padded)
+            try:
+                raw_res = self._model(img_arr)
+            except Exception as model_err:
+                # Secondary fallback using PNG byte buffer
+                logger.debug(f"[LatexOCR] Numpy array call fallback to bytes: {model_err}")
+                buf = io.BytesIO()
+                padded.save(buf, format="PNG")
+                raw_res = self._model(buf.getvalue())
 
             # RapidLaTeXOCR returns (latex_str, elapse) or just latex_str
             latex_res = ""
@@ -106,7 +117,7 @@ class LatexOCREngine:
             return latex_clean if latex_clean else None
 
         except Exception as ocr_err:
-            logger.debug(f"[LatexOCR] Inference error on formula crop: {ocr_err}")
+            logger.warning(f"[LatexOCR] Inference error on formula crop: {ocr_err}")
             return None
 
     def extract_latex_from_bbox(

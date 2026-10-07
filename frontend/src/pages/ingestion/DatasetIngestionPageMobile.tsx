@@ -28,11 +28,7 @@ import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
 import { ConfirmDeleteModal } from '../../components/ui/ConfirmDeleteModal';
 import { SkeletonIngestionList } from '../../components/ui/skeleton';
-import {
-  formatJobDuration,
-  LiveTimer,
-  JobDurationBadge,
-} from '../../components/ui/JobDurationTimer';
+import { JobDurationBadge } from '../../components/ui/JobDurationTimer';
 
 export const DatasetIngestionPageMobile: React.FC = () => {
   const { user, hasCapability } = useAuth();
@@ -264,52 +260,52 @@ export const DatasetIngestionPageMobile: React.FC = () => {
             return (
               <div
                 key={job.id}
-                className="p-3.5 rounded-xl border border-border bg-surface shadow-2xs space-y-3"
+                className="p-3.5 rounded-xl border border-border bg-surface shadow-2xs space-y-3 overflow-hidden"
               >
                 {/* Badges & Meta */}
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-forest/10 text-forest border border-forest/20">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-forest/10 text-forest border border-forest/20">
                       {job.board || 'Not specified'} {job.standard ? `· Class ${job.standard}` : ''}
                     </span>
-                    <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-surface-muted text-ink/70">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-muted text-ink/70 border border-border/60">
                       {job.subject || 'General'}
                     </span>
                     {job.document_kind && (
-                      <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-surface-muted text-ink/70 border border-border">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-muted text-ink/70 border border-border/60">
                         {job.document_kind}
                       </span>
                     )}
                     {isSuperAdmin && (
                       job.status === 'COMPLETED' ? (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-700">
-                          Completed
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Completed
                         </span>
                       ) : job.status === 'EXTRACTING' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-500/10 text-blue-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-700 border border-blue-500/20">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Extracting
                         </span>
                       ) : job.status === 'PENDING' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/10 text-amber-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-700 border border-amber-500/20">
                           <Clock className="w-2.5 h-2.5" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Queued'}
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-red-500/10 text-red-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-500/10 text-red-700 border border-red-500/20">
                           Failed
                         </span>
                       )
                     )}
                     {!isSuperAdmin && (
                       job.status === 'COMPLETED' ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-emerald-500/10 text-emerald-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
                           <CheckCircle2 className="w-2.5 h-2.5" /> Accepted
                         </span>
                       ) : job.status === 'EXTRACTING' ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-blue-500/10 text-blue-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-700 border border-blue-500/20">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Processing...
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold bg-amber-500/10 text-amber-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-700 border border-amber-500/20">
                           <Clock className="w-2.5 h-2.5" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Under Review'}
                         </span>
                       )
@@ -317,22 +313,22 @@ export const DatasetIngestionPageMobile: React.FC = () => {
 
                     {/* Extraction Engine Tag */}
                     {job.metadata?.extraction_engine ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
                         <Sparkles className="w-2.5 h-2.5 text-purple-600" />
                         {job.metadata.extraction_engine}
                       </span>
                     ) : job.current_stage?.includes('Docling') || job.current_stage?.includes('Marker') ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
                         <Sparkles className="w-2.5 h-2.5 text-purple-600" />
                         Docling AI (DocLayNet)
                       </span>
                     ) : job.status === 'EXTRACTING' ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-purple-500/10 text-purple-700 border border-purple-500/20 animate-pulse">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/10 text-purple-700 border border-purple-500/20 animate-pulse">
                         <Sparkles className="w-2.5 h-2.5 text-purple-600" />
                         Docling AI Engine
                       </span>
                     ) : job.status === 'COMPLETED' ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-surface-muted text-ink/65 border border-border">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-muted text-ink/65 border border-border">
                         Document AI
                       </span>
                     ) : null}
@@ -349,37 +345,35 @@ export const DatasetIngestionPageMobile: React.FC = () => {
 
                 {/* Progress Bar (Super Admin) */}
                 {isSuperAdmin && (
-                  <div className="space-y-1 bg-surface-muted/40 p-2 rounded-lg border border-border/40">
-                    <div className="flex justify-between items-center text-[10px] text-ink/60 font-mono">
-                      <span className="flex items-center gap-1.5 truncate max-w-[200px]">
+                  <div className="space-y-1.5 bg-surface-muted/40 p-2.5 rounded-lg border border-border/40">
+                    <div className="flex justify-between items-center text-[10px] text-ink/60 font-mono gap-2">
+                      <span
+                        className="flex items-center gap-1.5 min-w-0 flex-1 truncate"
+                        title={job.current_stage || `${job.processed_pages}/${job.total_pages} pages`}
+                      >
                         {job.current_stage?.includes('Google Drive') && (
                           <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
                         )}
                         {job.status === 'EXTRACTING' && !job.current_stage?.includes('Google Drive') && (
                           <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                         )}
-                        {job.current_stage || `${job.processed_pages}/${job.total_pages} pages`}
+                        <span className="truncate">
+                          {job.current_stage || `${job.processed_pages}/${job.total_pages} pages`}
+                        </span>
                       </span>
                       <span className="font-bold flex items-center gap-1.5 shrink-0">
                         {job.status === 'EXTRACTING' ? (
-                          <span className="inline-flex items-center gap-1 text-[9px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded border border-blue-200">
-                            <LiveTimer createdAt={job.created_at} />
-                            <span className="text-blue-300">·</span>
-                            <span>{job.progress_percentage === 0 ? 'Starting...' : `${job.progress_percentage}%`}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 shrink-0">
+                            {job.progress_percentage === 0 ? 'Starting...' : `${job.progress_percentage}%`}
                           </span>
                         ) : job.status === 'COMPLETED' ? (
-                          <span className="inline-flex items-center gap-1">
-                            {formatJobDuration(job) && (
-                              <span className="text-[9px] font-normal text-ink/50 flex items-center gap-0.5" title="Total time taken">
-                                <Clock className="w-2.5 h-2.5 text-ink/40" />
-                                <span>{formatJobDuration(job)}</span>
-                                <span className="mx-0.5 text-ink/30">·</span>
-                              </span>
-                            )}
-                            <span>100%</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 shrink-0">
+                            100%
                           </span>
                         ) : (
-                          `${job.progress_percentage}%`
+                          <span className="text-[10px] font-mono font-bold text-ink/70 shrink-0">
+                            {job.progress_percentage}%
+                          </span>
                         )}
                       </span>
                     </div>
@@ -418,22 +412,22 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                 )}
 
 
-                {/* Action Controls (Touch-Friendly: min 38px height) */}
-                <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-border/50">
+                {/* Action Controls (Responsive & Touch-Friendly, Never overflows) */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50 flex-wrap">
                   {/* Left: Auto Extract / Resume (Super Admin) */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {isSuperAdmin && (
                       <>
                         {job.status === 'EXTRACTING' ? (
-                          <div className="flex items-center gap-1">
-                            <div className="min-h-[38px] px-2.5 py-1.5 rounded-lg bg-forest/80 text-white text-xs font-heading font-semibold flex items-center gap-1 shadow-2xs">
+                          <div className="flex items-center gap-1.5">
+                            <div className="h-8 px-2.5 rounded-lg bg-forest/80 text-white text-xs font-heading font-semibold flex items-center gap-1.5 shadow-2xs">
                               <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                               <span>Extracting...</span>
                             </div>
                             <button
                               onClick={() => handleResetJob(job.id)}
                               disabled={resettingJobIds.has(job.id)}
-                              className="min-h-[38px] px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-heading font-semibold flex items-center gap-1 active:scale-95 disabled:opacity-50 cursor-pointer"
+                              className="h-8 px-2.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-heading font-semibold flex items-center gap-1 active:scale-95 disabled:opacity-50 cursor-pointer transition-colors"
                               title="Stop & Reset"
                             >
                               <RotateCcw className="w-3 h-3" />
@@ -444,7 +438,7 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                           <button
                             onClick={() => handleAutoProcessAll(job.id)}
                             disabled={isProcessing}
-                            className="min-h-[38px] px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                            className="h-8 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
                           >
                             <RotateCcw className="w-3 h-3" />
                             <span>Retry</span>
@@ -453,7 +447,7 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                           <button
                             onClick={() => handleAutoProcessAll(job.id)}
                             disabled={isProcessing}
-                            className="min-h-[38px] px-3 py-1.5 rounded-lg bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                            className="h-8 px-3 rounded-lg bg-forest hover:bg-forest/90 text-white text-xs font-heading font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
                           >
                             <Play className="w-3.5 h-3.5 fill-current" />
                             <span>Extract</span>
@@ -464,12 +458,12 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                   </div>
 
                   {/* Right: Inspect, Download, Delete */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                     {isSuperAdmin && (
                       <>
                         <button
                           onClick={() => setInspectionJob({ id: job.id, title: job.title })}
-                          className="min-h-[38px] min-w-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-ink text-xs font-heading font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                          className="h-8 px-2.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-ink text-xs font-heading font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
                           title="Inspect Visual & JSON"
                         >
                           <Eye className="w-3.5 h-3.5 text-ink/70" />
@@ -477,7 +471,7 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                         </button>
                         <button
                           onClick={() => handleDownloadJson(job)}
-                          className="min-h-[38px] min-w-[38px] p-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-ink/70 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+                          className="h-8 w-8 rounded-lg border border-border bg-surface hover:bg-surface-muted text-ink/70 hover:text-ink active:scale-95 transition-all flex items-center justify-center cursor-pointer"
                           title="Download Dataset JSON"
                         >
                           <Download className="w-3.5 h-3.5" />
@@ -486,7 +480,7 @@ export const DatasetIngestionPageMobile: React.FC = () => {
                     )}
                     <button
                       onClick={() => handleDeleteClick(job)}
-                      className="min-h-[38px] min-w-[38px] p-2 rounded-lg border border-border/80 bg-surface hover:bg-red-50 text-ink/40 hover:text-red-600 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
+                      className="h-8 w-8 rounded-lg border border-border/80 bg-surface hover:bg-red-50 text-ink/40 hover:text-red-600 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
                       title="Delete"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
