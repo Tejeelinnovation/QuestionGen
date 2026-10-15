@@ -339,7 +339,14 @@ def _parse_docling_document(
                 }
                 words = [w.lower() for w in re.findall(r"\b[a-zA-Z]{3,}\b", raw_formula)]
                 prose_count = sum(1 for w in words if w in prose_keywords)
-                is_actually_prose = (len(words) > 8 and prose_count >= 3) or len(raw_formula.splitlines()) > 3
+                # Also detect prose keywords embedded inside fused OCR words without spaces
+                raw_lower = raw_formula.lower()
+                concatenated_prose_count = sum(1 for kw in prose_keywords if len(kw) >= 5 and kw in raw_lower)
+                is_actually_prose = (
+                    (len(words) > 8 and prose_count >= 3)
+                    or concatenated_prose_count >= 3
+                    or len(raw_formula.splitlines()) > 3
+                )
 
                 if is_actually_prose:
                     # Treat as structured paragraph or solved example rather than forcing into a broken formula

@@ -80,12 +80,12 @@ const MathFormula: React.FC<{ math: string }> = ({ math }) => {
 
   if (hasError || !html) {
     return (
-      <div className="my-1.5 p-2.5 bg-amber-500/5 rounded-lg border border-amber-500/20 text-left space-y-1">
+      <div className="my-1.5 p-2.5 bg-amber-500/5 rounded-lg border border-amber-500/20 text-left space-y-1 max-w-full overflow-hidden">
         <div className="flex items-center gap-1.5 text-[10px] font-heading font-bold text-amber-700">
-          <AlertTriangle className="w-3 h-3 text-amber-600" />
+          <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
           <span>Formula (Syntax Warning)</span>
         </div>
-        <pre className="text-xs font-mono text-ink/80 whitespace-pre-wrap break-all bg-surface-muted/60 p-1.5 rounded">
+        <pre className="text-xs font-mono text-ink/80 whitespace-pre-wrap break-all bg-surface-muted/60 p-1.5 rounded max-w-full overflow-x-auto">
           {sanitized || math}
         </pre>
       </div>
@@ -94,7 +94,7 @@ const MathFormula: React.FC<{ math: string }> = ({ math }) => {
 
   return (
     <div
-      className="my-1.5 py-1 px-3 bg-white/95 rounded-lg border border-purple-200/80 shadow-2xs overflow-x-auto text-center"
+      className="my-1.5 py-1 px-3 bg-white/95 rounded-lg border border-purple-200/80 shadow-2xs overflow-x-auto max-w-full text-center"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -102,14 +102,14 @@ const MathFormula: React.FC<{ math: string }> = ({ math }) => {
 
 const InlineMathText: React.FC<{ text: string }> = ({ text }) => {
   if (!text || !text.includes('$')) {
-    return <span className="whitespace-pre-line">{text}</span>;
+    return <span className="whitespace-pre-line break-words">{text}</span>;
   }
 
   // Split by $...$ inline math delimiters
   const parts = text.split(/(\$[^\$]+\$)/g);
 
   return (
-    <span className="whitespace-pre-line">
+    <span className="whitespace-pre-line break-words">
       {parts.map((part, idx) => {
         if (part.startsWith('$') && part.endsWith('$') && part.length > 2) {
           const rawMath = part.slice(1, -1).trim();
@@ -118,7 +118,10 @@ const InlineMathText: React.FC<{ text: string }> = ({ text }) => {
             const html = katex.renderToString(cleanMath, { throwOnError: false, displayMode: false });
             if (html.includes('katex-error')) {
               return (
-                <code key={idx} className="px-1 py-0.5 mx-0.5 rounded bg-amber-500/10 text-amber-800 text-[11px] font-mono">
+                <code
+                  key={idx}
+                  className="inline-block max-w-full overflow-x-auto align-middle px-1.5 py-0.5 mx-0.5 rounded bg-amber-500/10 text-amber-800 text-[11px] font-mono break-all"
+                >
                   {rawMath}
                 </code>
               );
@@ -126,13 +129,13 @@ const InlineMathText: React.FC<{ text: string }> = ({ text }) => {
             return (
               <span
                 key={idx}
-                className="inline-block px-1 py-0.5 mx-0.5 rounded bg-purple-500/10 text-purple-900 border border-purple-500/20 align-baseline text-[11px] sm:text-xs font-mono font-medium shadow-2xs"
+                className="inline-block max-w-full overflow-x-auto align-middle px-1.5 py-0.5 mx-0.5 rounded bg-purple-500/10 text-purple-900 border border-purple-500/20 text-[11px] sm:text-xs font-mono font-medium shadow-2xs"
                 dangerouslySetInnerHTML={{ __html: html }}
               />
             );
           } catch {
             return (
-              <span key={idx} className="font-mono text-purple-800">
+              <span key={idx} className="font-mono text-purple-800 break-all">
                 {rawMath}
               </span>
             );
@@ -467,7 +470,7 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
               </div>
             )}
 
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-w-0">
               {/* Mobile Page Navigator Bar (Visible on < 768px, replaces the crushing sidebar) */}
               <div className="md:hidden flex items-center justify-between gap-2 px-3 py-2 bg-surface-muted/70 border-b border-border shrink-0">
                 <button
@@ -539,7 +542,7 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
               </div>
 
               {/* Right Content Pane (Takes 100% width on mobile, flex-1 on tablet/desktop) */}
-              <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 bg-surface">
+              <div className="flex-1 min-w-0 overflow-y-auto p-3.5 sm:p-6 space-y-4 bg-surface">
                 {currentPage ? (
                   <>
                     <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1.5 pb-3 border-b border-border">
@@ -558,39 +561,39 @@ export const DatasetInspectionModal: React.FC<DatasetInspectionModalProps> = ({
                       </span>
                     </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3 min-w-0 max-w-full">
                     {currentPage.structured_content && currentPage.structured_content.length > 0 ? (
                       currentPage.structured_content.map((sec, sIdx) => (
                         <div
                           key={sIdx}
-                          className="p-3 sm:p-4 rounded-xl border border-border bg-surface-muted/30 hover:border-forest/30 transition-all space-y-2"
+                          className="p-3 sm:p-4 rounded-xl border border-border bg-surface-muted/30 hover:border-forest/30 transition-all space-y-2 min-w-0 max-w-full overflow-hidden"
                         >
                           <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
                               {getSectionBadge(sec.type)}
                               {sec.heading && (
-                                <span className="text-xs font-heading font-bold text-ink">
+                                <span className="text-xs font-heading font-bold text-ink break-words min-w-0">
                                   <InlineMathText text={sec.heading} />
                                 </span>
                               )}
                             </div>
                             {sec.column_index ? (
-                              <span className="text-[10px] font-mono text-ink/40">
+                              <span className="text-[10px] font-mono text-ink/40 shrink-0">
                                 Column {sec.column_index}
                               </span>
                             ) : null}
                           </div>
 
                           {sec.text && (sec.type !== 'FORMULA' || !sec.latex_equations || sec.latex_equations.length === 0) && (
-                            <p className="text-xs text-ink/80 leading-relaxed font-body">
+                            <p className="text-xs text-ink/80 leading-relaxed font-body break-words min-w-0 max-w-full overflow-hidden">
                               <InlineMathText text={sec.text} />
                             </p>
                           )}
 
                           {sec.latex_equations && sec.latex_equations.length > 0 && (
-                            <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-1.5">
+                            <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/20 space-y-1.5 min-w-0 max-w-full overflow-hidden">
                               <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5">
-                                <Sigma className="w-3.5 h-3.5" />
+                                <Sigma className="w-3.5 h-3.5 shrink-0" />
                                 <span>Mathematical Formula</span>
                               </p>
                               {sec.latex_equations.map((eq, eqIdx) => (
