@@ -345,4 +345,179 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   3D DESK & HERO OPENING ANIMATIONS
+   ───────────────────────────────────────────────────────────────── */
+
+@keyframes hero-3d-entrance {
+  0% {
+    opacity: 0;
+    transform: perspective(1200px) rotateX(16deg) rotateY(-20deg) translateY(45px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1200px) rotateX(4deg) rotateY(-8deg) translateY(0) scale(1);
+  }
+}
+
+@keyframes ambient-desk-float {
+  0%, 100% {
+    transform: translateY(0px) rotateX(4deg) rotateY(-8deg);
+  }
+  50% {
+    transform: translateY(-8px) rotateX(6deg) rotateY(-5deg);
+  }
+}
+
+@keyframes float-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-hero-entrance {
+  animation: hero-3d-entrance 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-ambient-float {
+  animation: ambient-desk-float 6s ease-in-out infinite;
+}
+
+.animate-float-subtle {
+  animation: float-subtle 3.5s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   HOLISTIC DIRECTIONAL ENTRANCE & CIRCLE ANIMATIONS
+   ───────────────────────────────────────────────────────────────── */
+
+@keyframes slide-in-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-45px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  0% {
+    opacity: 0;
+    transform: translateX(45px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-35px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(35px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes expand-circle {
+  0% {
+    opacity: 0;
+    transform: scale(0.35) rotate(-30deg);
+  }
+  70% {
+    opacity: 0.9;
+    transform: scale(1.05) rotate(5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes orbit-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbit-counter {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(0.85);
+    opacity: 0.1;
+  }
+}
+
+.animate-slide-left {
+  animation: slide-in-left 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-right {
+  animation: slide-in-right 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-down {
+  animation: slide-in-down 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-up {
+  animation: slide-in-up 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-expand-circle {
+  animation: expand-circle 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-orbit-slow {
+  animation: orbit-spin 32s linear infinite;
+}
+
+.animate-orbit-counter {
+  animation: orbit-counter 32s linear infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 4s ease-in-out infinite;
+}
+
+
+
 

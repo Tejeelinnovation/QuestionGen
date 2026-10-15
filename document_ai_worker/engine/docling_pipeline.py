@@ -328,6 +328,45 @@ def _parse_docling_document(
                 else:
                     latex_str = raw_formula
 
+                # Detect if this block is actually an explanation paragraph, problem statement, or exercise question
+                # that was misclassified by the layout model as a formula
+                prose_keywords = {
+                    "removal", "addition", "reaction", "substance", "element", "because", "identify",
+                    "undergoing", "problem", "solution", "calculate", "compound", "determine", "consider",
+                    "following", "example", "exercise", "between", "according", "definition",
+                    "simultaneous", "apparent", "observed", "therefore", "oxidised", "reduced",
+                    "the", "and", "from", "with", "that", "this", "which", "where", "into", "also"
+                }
+                words = [w.lower() for w in re.findall(r"\b[a-zA-Z]{3,}\b", raw_formula)]
+                prose_count = sum(1 for w in words if w in prose_keywords)
+                is_actually_prose = (len(words) > 8 and prose_count >= 3) or len(raw_formula.splitlines()) > 3
+
+                if is_actually_prose:
+                    # Treat as structured paragraph or solved example rather than forcing into a broken formula
+                    p_type = "PARAGRAPH"
+                    heading = ""
+                    if re.match(r"^\s*(Problem|Question|Exercise|उदाहरण|प्रश्न)\b", raw_formula, re.IGNORECASE):
+                        p_type = "SOLVED_EXAMPLE" if re.match(r"^\s*(Problem|Example|उदाहरण)\b", raw_formula, re.IGNORECASE) else "EXERCISE_QUESTION"
+                        heading = raw_formula[:40]
+
+                    # Extract any clean inline formulas inside this prose block
+                    inline_eqs = []
+                    for line in raw_formula.splitlines():
+                        line_s = line.strip()
+                        if any(sym in line_s for sym in ("=", "→", r"\rightarrow", r"\to", r"\le", r"\ge")) and len(line_s.split()) <= 15:
+                            inline_eqs.append(f"${line_s}$")
+
+                    sections.append(SectionSchema(
+                        type=p_type,
+                        heading=heading,
+                        text=raw_formula,
+                        column_index=0,
+                        latex_equations=inline_eqs,
+                        metadata={"bbox": bbox, "reclassified_from_formula": True},
+                    ))
+                    page_text_pieces.append(raw_formula)
+                    continue
+
                 # If digital text is empty or lacks LaTeX mathematical syntax, extract visually via RapidLaTeXOCR
                 has_latex_tokens = any(sym in (latex_str or "") for sym in ("\\", "{", "^", "_", "=", "∫", "∑", "√", "±"))
                 if not latex_str or not has_latex_tokens or len(latex_str.strip()) < 3:
@@ -384,6 +423,14 @@ def _parse_docling_document(
                     except Exception:
                         pass
 
+                # Universal formula sanitization and syntax check across all subjects
+                try:
+                    from .latex_ocr_engine import is_valid_latex, sanitize_latex
+                    latex_str = sanitize_latex(latex_str)
+                    formula_is_valid = is_valid_latex(latex_str)
+                except Exception:
+                    formula_is_valid = True
+
                 # If formula contains Hindi/Devanagari characters, render as text without forcing $ math delimiters
                 has_devanagari = any("\u0900" <= c <= "\u097f" for c in (latex_str or ""))
                 if has_devanagari:
@@ -392,9 +439,9 @@ def _parse_docling_document(
                     display_formula = f"${latex_str}$" if (latex_str and not latex_str.startswith("$")) else latex_str
 
                 formula_body = display_formula if (display_formula and display_formula.strip() not in ("$$", "$Formula$", "$formula$")) else ""
-                
-                # Formula needs review if empty or has Devanagari mixed text
-                formula_needs_review = bool(not formula_body or has_devanagari)
+
+                # Formula needs review if empty, has Devanagari mixed text, or failed LaTeX syntax validation
+                formula_needs_review = bool(not formula_body or has_devanagari or not formula_is_valid)
 
                 sections.append(SectionSchema(
                     type="FORMULA",
@@ -402,7 +449,7 @@ def _parse_docling_document(
                     text=formula_body,
                     column_index=0,
                     latex_equations=[latex_str] if (latex_str and not has_devanagari and latex_str.strip().lower() not in ("formula", "equation", "math")) else [],
-                    metadata={"bbox": bbox, "needs_review": formula_needs_review},
+                    metadata={"bbox": bbox, "needs_review": formula_needs_review, "syntax_invalid": not formula_is_valid},
                 ))
                 if formula_body:
                     page_text_pieces.append(formula_body)
@@ -527,9 +574,46 @@ def _parse_docling_document(
                 p_flags.append("legacy_font_unresolved")
                 p_reason = f"{p_reason}; Legacy font detected requiring visual AI rescue"
 
+        # Universal formula health & syntax check across all academic subjects
+        broken_formula_count = 0
+        for sec in sections:
+            if sec.type == "FORMULA":
+                s_meta = sec.metadata or {}
+                if s_meta.get("syntax_invalid") or s_meta.get("needs_review"):
+                    broken_formula_count += 1
+                elif sec.text and (r"\right)" in sec.text or r"\mathrm{qquad" in sec.text or sec.text.count("Omega") >= 2):
+                    broken_formula_count += 1
+
+        if broken_formula_count > 0:
+            p_review = True
+            p_quality = min(p_quality, 0.60)
+            p_flags.append("corrupted_formula_detected")
+            p_meta["broken_formula_count"] = broken_formula_count
+
+        # Dynamic layout column detection from section bounding boxes
+        page_layout_type = "SINGLE_COLUMN"
+        page_col_count = 1
+        if fitz_page is not None:
+            page_w = fitz_page.rect.width
+            col1_boxes = 0
+            col2_boxes = 0
+            for sec in sections:
+                s_bbox = (sec.metadata or {}).get("bbox") or sec.bbox
+                if s_bbox and len(s_bbox) >= 4:
+                    x0 = min(s_bbox[0], s_bbox[2])
+                    x1 = max(s_bbox[0], s_bbox[2])
+                    if x1 <= page_w * 0.55:
+                        col1_boxes += 1
+                    elif x0 >= page_w * 0.45:
+                        col2_boxes += 1
+            if col1_boxes >= 2 and col2_boxes >= 2:
+                page_layout_type = "TWO_COLUMN"
+                page_col_count = 2
+
         pages.append(PageSchema(
             page_number=global_page_num,
-            layout_type="SINGLE_COLUMN",
+            layout_type=page_layout_type,
+            column_count=page_col_count,
             raw_text=page_raw_text,
             chapter_number=current_chapter_num,
             chapter_title=current_chapter_title,

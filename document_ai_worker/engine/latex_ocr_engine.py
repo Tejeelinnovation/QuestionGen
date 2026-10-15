@@ -22,21 +22,85 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 
+def sanitize_latex(s: str) -> str:
+    """
+    Cleans OCR-extracted formula strings by stripping trailing equation numbers,
+    fixing mismatched delimiter brackets, and removing runaway tokens.
+    Applicable across all academic subjects (Math, Physics, Chemistry, Economics, etc.).
+    """
+    if not s or not s.strip():
+        return ""
+
+    cleaned = s.strip()
+
+    # 1. Remove outer math wrappers if doubled ($$...$$ or $...$)
+    if cleaned.startswith("$$") and cleaned.endswith("$$") and len(cleaned) > 4:
+        cleaned = cleaned[2:-2].strip()
+    elif cleaned.startswith("$") and cleaned.endswith("$") and len(cleaned) > 2:
+        cleaned = cleaned[1:-1].strip()
+
+    # 2. Strip trailing equation labels/numbers captured at the end of formulas
+    # Examples: \mathrm{qquad(7.3)}\right), \qquad(7.3), (7.3), (7.4\right), \quad (12.1)
+    cleaned = re.sub(r"\\mathrm\{[q\s]*quad\s*\([0-9\.]+\)\s*\}\s*\\right\)?\s*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\\qquad\s*\([0-9\.]+\s*\\right\)?\s*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\\quad\s*\([0-9\.]+\s*\\right\)?\s*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\\qquad\s*\([0-9\.]+\)\s*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\\quad\s*\([0-9\.]+\)\s*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\([0-9\.]+\s*\\right\)\s*$", "", cleaned)
+    cleaned = re.sub(r"\s+\([0-9\.]+\)\s*$", "", cleaned)
+
+    # 3. Fix orphaned \right) or \right] without matching \left
+    left_count = len(re.findall(r"\\left(?![a-zA-Z])", cleaned))
+    right_count = len(re.findall(r"\\right(?![a-zA-Z])", cleaned))
+
+    if right_count > left_count:
+        while right_count > left_count and re.search(r"\\right[\)\]\.\>]\s*$", cleaned):
+            cleaned = re.sub(r"\\right[\)\]\.\>]\s*$", "", cleaned).strip()
+            right_count = len(re.findall(r"\\right(?![a-zA-Z])", cleaned))
+
+        if right_count > left_count:
+            diff = right_count - left_count
+            cleaned = re.sub(r"\\right\)", ")", cleaned, count=diff)
+    elif left_count > right_count:
+        diff = left_count - right_count
+        cleaned += r" \right." * diff
+
+    return cleaned.strip()
+
+
 def is_valid_latex(s: str) -> bool:
     """
-    Validates that an OCR-extracted LaTeX string is mathematically sound and
-    not a runaway autoregressive Transformer hallucination loop (e.g. from Hindi text).
+    Validates that an OCR-extracted LaTeX string is mathematically sound across all subjects
+    and not an OCR hallucination loop or a swallowed English prose paragraph.
     """
     if not s or not s.strip():
         return False
     s = s.strip()
 
-    # 1. Unescaped curly brace balance check (unescaped { must match })
+    # 1. Reject if string contains multiple lines of regular English prose
+    prose_words = {
+        "removal", "addition", "reaction", "substance", "element", "because", "identify",
+        "undergoing", "problem", "solution", "calculate", "compound", "determine", "consider",
+        "following", "example", "exercise", "between", "according", "definition",
+        "simultaneous", "apparent", "observed", "therefore", "oxidised", "reduced"
+    }
+    words = [w.lower() for w in re.findall(r"\b[a-zA-Z]{3,}\b", s)]
+    prose_match_count = sum(1 for w in words if w in prose_words)
+    if prose_match_count >= 3 or (len(words) > 12 and prose_match_count >= 2):
+        return False
+
+    # 2. Unescaped curly brace balance check (unescaped { must match })
     clean_braces = re.sub(r"\\(\{|\})", "", s)
     if clean_braces.count("{") != clean_braces.count("}"):
         return False
 
-    # 2. Runaway repetitive hallucinations from ViT decoder loop
+    # 3. Delimiter balance check (\left must match \right)
+    left_count = len(re.findall(r"\\left(?![a-zA-Z])", s))
+    right_count = len(re.findall(r"\\right(?![a-zA-Z])", s))
+    if left_count != right_count:
+        return False
+
+    # 4. Runaway repetitive hallucinations from ViT decoder loop
     if s.count(r"\tilde") > 4:
         return False
     if s.count(r"\mp") > 4:
@@ -48,6 +112,10 @@ def is_valid_latex(s: str) -> bool:
     if s.count(r"\Gamma") > 5:
         return False
     if s.count(r"\Psi") > 5:
+        return False
+    if s.count(r"\Omega") > 3:
+        return False
+    if s.count(r"\mathfrak") > 4:
         return False
     if "{{{{{" in s or "}}}}}" in s:
         return False
@@ -154,10 +222,10 @@ class LatexOCREngine:
             if not latex_res:
                 return None
 
-            # Clean LaTeX output: remove markdown wrappers or duplicate delimiters
-            latex_clean = latex_res.strip().strip("$").strip()
+            # Clean LaTeX output: remove markdown wrappers, trailing equation numbers, and balance brackets
+            latex_clean = sanitize_latex(latex_res)
 
-            # Reject hallucinated / broken LaTeX outputs (e.g. from Hindi script inside math boxes)
+            # Reject hallucinated / broken LaTeX outputs (e.g. from text or non-math crops)
             if not is_valid_latex(latex_clean):
                 logger.debug(f"[LatexOCR] Rejected hallucinated/invalid LaTeX: {latex_clean[:50]}...")
                 return None

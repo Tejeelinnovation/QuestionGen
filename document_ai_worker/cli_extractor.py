@@ -33,11 +33,6 @@ WORKER_DIR = Path(__file__).resolve().parent
 if str(WORKER_DIR) not in sys.path:
     sys.path.insert(0, str(WORKER_DIR))
 
-from engine.docling_pipeline import DoclingPipeline
-from engine.drive_uploader import WorkerGoogleDriveUploader
-from engine.handwriting_pipeline import HandwritingPipeline
-from engine.textbook_pipeline import TextbookPipeline
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] [DocumentAI-CLI] %(message)s",
@@ -430,6 +425,7 @@ def main():
 
         engine_name = "Rule-Based Pipeline"
         if effective_kind == "HANDWRITTEN_NOTES":
+            from engine.handwriting_pipeline import HandwritingPipeline
             gemini_key = args.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
             pipeline_label = "Gemini 2.0 Flash Vision AI" if gemini_key else "Tesseract/EasyOCR AI"
             logger.info(f"Initializing Handwriting Pipeline ({pipeline_label})...")
@@ -441,6 +437,7 @@ def main():
             extracted_successfully = False
             if use_docling:
                 try:
+                    from engine.docling_pipeline import DoclingPipeline
                     logger.info("Initializing IBM Docling AI Pipeline (DocLayNet Layout + Tables)...")
                     docling_pipeline = DoclingPipeline(media_dir=os.path.join(temp_dir, "assets"))
                     chapters, pages, granularity = docling_pipeline.process_pdf(local_pdf, progress_callback=on_pipeline_progress)
@@ -451,6 +448,7 @@ def main():
                     logger.warning(f"Docling AI encountered an issue: {docling_err}. Falling back to TextbookPipeline...")
 
             if not extracted_successfully:
+                from engine.textbook_pipeline import TextbookPipeline
                 logger.info("Initializing Textbook & Pedagogical Pipeline (Enhanced Fallback)...")
                 pipeline = TextbookPipeline(media_dir=os.path.join(temp_dir, "assets"))
                 chapters, pages, granularity = pipeline.process_pdf(
@@ -472,10 +470,11 @@ def main():
         pages_to_rescue = [
             p for p in pages
             if p.page_kind not in ("image_only", "blank") and (
-                p.quality_score < 0.70 or
+                p.quality_score < 0.85 or
                 p.needs_review or
                 not p.raw_text.strip() or
-                "legacy_font_unresolved" in p.quality_flags
+                "legacy_font_unresolved" in p.quality_flags or
+                "corrupted_formula_detected" in p.quality_flags
             )
         ][:call_cap]
 
@@ -501,54 +500,67 @@ def main():
                                 from document_ai_worker.engine.text_cleaner import clean_page_text
                             clean_res = clean_page_text(transcribed)
                             p.raw_text = clean_res.text
-                            p.quality_score = max(0.85, clean_res.quality_score)
+                            p.quality_score = max(0.90, clean_res.quality_score)
                             p.needs_review = False
+                            p.quality_flags = [f for f in p.quality_flags if f not in ("corrupted_formula_detected", "needs_review")]
                             p.quality_flags.append("retried_with_gemini")
                             p.quality_flags.extend(clean_res.flags)
                             p.route_reason = f"{p.route_reason}; Transcribed and verified via Gemini Vision"
 
-                            # If sections are empty or lack text, rebuild sections from transcribed markdown
-                            has_non_diagram_text = any(s.text.strip() for s in p.sections if s.type != "DIAGRAM")
-                            if not has_non_diagram_text:
-                                try:
-                                    from engine.schema import SectionSchema
-                                except ImportError:
-                                    from document_ai_worker.engine.schema import SectionSchema
+                            # Rebuild structured sections cleanly from Gemini's markdown
+                            try:
+                                from engine.schema import SectionSchema
+                            except ImportError:
+                                from document_ai_worker.engine.schema import SectionSchema
 
-                                p_sections = [s for s in p.sections if s.type == "DIAGRAM"]
-                                blocks = [b.strip() for b in transcribed.split("\n\n") if b.strip()]
-                                for b in blocks:
-                                    sec_type = "PARAGRAPH"
-                                    if b.startswith("#") or (len(b) < 60 and not b.endswith(".")):
-                                        sec_type = "PARAGRAPH"
-                                    if "$" in b or "\\frac" in b or "\\lim" in b:
-                                        sec_type = "FORMULA"
+                            p_sections = [s for s in p.sections if s.type == "DIAGRAM"]
+                            blocks = [b.strip() for b in transcribed.split("\n\n") if b.strip()]
+                            for b in blocks:
+                                sec_type = "PARAGRAPH"
+                                heading = ""
+                                if b.startswith("#"):
+                                    heading = b.lstrip("#").strip()[:60]
+                                elif re.match(r"^\s*(Problem|Question|Exercise|Example|Solved Example|Solution|Activity|Definition)\b", b, re.IGNORECASE):
+                                    m = re.match(r"^\s*(Problem|Question|Exercise|Example|Solved Example|Solution|Activity|Definition)\b[^\n:]*", b, re.IGNORECASE)
+                                    if m:
+                                        heading = m.group(0)[:60]
+                                    if re.match(r"^\s*(Problem|Example|Solved Example)\b", b, re.IGNORECASE):
+                                        sec_type = "SOLVED_EXAMPLE"
+                                    elif re.match(r"^\s*(Question|Exercise)\b", b, re.IGNORECASE):
+                                        sec_type = "EXERCISE_QUESTION"
+                                    elif re.match(r"^\s*Activity\b", b, re.IGNORECASE):
+                                        sec_type = "ACTIVITY"
+                                    elif re.match(r"^\s*Definition\b", b, re.IGNORECASE):
+                                        sec_type = "DEFINITION"
+
+                                # Check if block is a pure standalone formula vs prose text with inline math
+                                is_standalone_formula = (
+                                    (b.startswith("$$") and b.endswith("$$")) or
+                                    (b.startswith("$") and b.endswith("$") and len(b.split()) <= 15) or
+                                    (any(sym in b for sym in (r"\rightarrow", r"\to", r"\le", r"\ge", r"\frac", r"\int", r"\sum", "=")) and len(b.split()) <= 12 and not any(w in b.lower() for w in ("because", "removal", "addition", "identify", "therefore", "where", "reaction", "compound", "oxidised", "reduced")))
+                                )
+
+                                if is_standalone_formula:
+                                    clean_eq = b.strip("$").strip()
+                                    p_sections.append(SectionSchema(
+                                        type="FORMULA",
+                                        heading="Formula",
+                                        text=f"${clean_eq}$",
+                                        column_index=0,
+                                        latex_equations=[clean_eq],
+                                    ))
+                                else:
+                                    inline_eqs = [eq.strip("$").strip() for eq in re.findall(r"\$([^\$]+)\$", b) if eq.strip()]
                                     p_sections.append(SectionSchema(
                                         type=sec_type,
-                                        heading=b[:40] if sec_type != "PARAGRAPH" else "",
+                                        heading=heading,
                                         text=b,
                                         column_index=0,
-                                        latex_equations=[b] if sec_type == "FORMULA" else [],
+                                        latex_equations=inline_eqs,
                                     ))
+
+                            if p_sections:
                                 p.sections = p_sections
-                            else:
-                                # Backfill any remaining empty or needs_review FORMULA sections from Gemini's transcribed equations
-                                formula_indices = [
-                                    idx for idx, s in enumerate(p.sections)
-                                    if s.type == "FORMULA" and (not (s.text or "").strip() or s.metadata.get("needs_review"))
-                                ]
-                                if formula_indices:
-                                    gemini_eqs = [
-                                        b.strip() for b in transcribed.split("\n\n")
-                                        if b.strip() and ("$" in b or "\\frac" in b or "\\lim" in b or "\\sum" in b)
-                                    ]
-                                    for i, f_idx in enumerate(formula_indices):
-                                        if i < len(gemini_eqs):
-                                            eq_val = gemini_eqs[i]
-                                            p.sections[f_idx].text = eq_val
-                                            p.sections[f_idx].latex_equations = [eq_val]
-                                            if hasattr(p.sections[f_idx], "metadata") and isinstance(p.sections[f_idx].metadata, dict):
-                                                p.sections[f_idx].metadata["needs_review"] = False
 
                             logger.info(f"[Quality Gate] Page {p.page_number} successfully recovered via Gemini Vision (score={p.quality_score:.2f})")
                         else:
@@ -564,9 +576,15 @@ def main():
                 p.quality_flags.append("needs_review_no_gemini_key")
 
         # 3. Direct Google Drive Diagram Uploading from 16GB runner (Parallel Multi-threaded)
-        drive_uploader = WorkerGoogleDriveUploader()
-        is_drive_active = drive_uploader.is_configured()
-        logger.info(f"Worker Google Drive Uploader active: {is_drive_active}")
+        try:
+            from engine.drive_uploader import WorkerGoogleDriveUploader
+            drive_uploader = WorkerGoogleDriveUploader()
+            is_drive_active = drive_uploader.is_configured()
+            logger.info(f"Worker Google Drive Uploader active: {is_drive_active}")
+        except Exception as drive_init_err:
+            drive_uploader = None
+            is_drive_active = False
+            logger.info(f"Worker Google Drive Uploader skipped: {drive_init_err}")
 
         diagram_items = []
         for p in pages:
