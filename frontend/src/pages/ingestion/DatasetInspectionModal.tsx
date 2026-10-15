@@ -37,30 +37,60 @@ function sanitizeFormula(raw: string): string {
   s = s.replace(/\|(\s*\\?(?:left)?\s*\()/g, ']$1');
   s = s.replace(/\|(?=\s*[+\-=→\\])/g, ']');
 
-  // 3. Remove trailing orphaned \right. outside \end{array} or at end of expression
+  // 3. Normalize unicode reaction arrows, operators, and dashes
+  s = s.replace(/→/g, '\\rightarrow ').replace(/⇌/g, '\\rightleftharpoons ');
+  s = s.replace(/[–—]/g, '-');
+
+  // 4. Truncate autoregressive ViT hallucination loops (e.g. repeated _{\cfrac{\alpha}{\alpha}})
+  const hallucinationMatch = s.search(/[_^]?\{?\\c?frac\{(\\[a-zA-Z]+)\}\{\1\}/);
+  if (hallucinationMatch !== -1) {
+    s = s.slice(0, hallucinationMatch).trim();
+  }
+
+  // 5. Clean orphaned \end{...} when no matching \begin{...} exists in string
+  const envs = ['array', 'matrix', 'pmatrix', 'bmatrix', 'vmatrix', 'cases', 'align', 'aligned'];
+  for (const env of envs) {
+    if (s.includes(`\\end{${env}}`) && !s.includes(`\\begin{${env}}`)) {
+      s = s.replaceAll(`\\end{${env}}`, '');
+    }
+  }
+
+  // 6. Remove trailing orphaned \right. outside \end{array} or at end of expression
   s = s.replace(/\\right\.\s*$/g, '');
   s = s.replace(/\\end\{array\}\s*\\right\./g, '\\end{array}');
 
-  // 4. Fix orphaned \right) preceded by regular unclosed '('
+  // 7. Fix orphaned \right) preceded by regular unclosed '('
   s = s.replace(/\(([^()\\]*)\\right\)/g, '($1)');
 
-  // 5. In LaTeX arrays/tables, \left[ and \right] must stay within the same cell or bracket matching fails.
+  // 8. In LaTeX arrays/tables, \left[ and \right] must stay within the same cell or bracket matching fails.
   // Replacing \left[ and \right] with plain [ and ] safely prevents cell boundary delimiter errors across all subjects.
   s = s.replace(/\\left\[/g, '[').replace(/\\right\]/g, ']');
 
-  // 6. Fix escaped \& into & and repair \begin{array}{c} when alignment column & is used
+  // 9. Fix escaped \& into & and repair \begin{array}{c} when alignment column & is used
   s = s.replace(/\\&/g, '&');
   if (s.includes('\\begin{array}{c}') && s.includes('&')) {
     s = s.replace(/\\begin\{array\}\{c\}/g, '\\begin{array}{ll}');
   }
 
-  // 7. Universal delimiter balancing: if \left and \right counts are unequal, degrade to plain delimiters
-  // Note: Never append \right. to the end of array expressions, as delimiters cannot cross cell scopes.
+  // 10. Universal delimiter balancing: if \left and \right counts are unequal, degrade to plain delimiters
   const leftMatches = s.match(/\\left(?![a-zA-Z])/g) || [];
   const rightMatches = s.match(/\\right(?![a-zA-Z])/g) || [];
   if (leftMatches.length !== rightMatches.length) {
     s = s.replace(/\\left([(\[{|])/g, '$1');
     s = s.replace(/\\right([)\]}|.])/g, '$1');
+  }
+
+  // 11. Balance curly braces if truncation left open braces
+  const openBraces = (s.match(/\{/g) || []).length;
+  const closeBraces = (s.match(/\}/g) || []).length;
+  if (openBraces > closeBraces) {
+    s += '}'.repeat(openBraces - closeBraces);
+  } else if (closeBraces > openBraces) {
+    let diff = closeBraces - openBraces;
+    while (diff > 0 && s.endsWith('}')) {
+      s = s.slice(0, -1).trim();
+      diff--;
+    }
   }
 
   return s.trim();

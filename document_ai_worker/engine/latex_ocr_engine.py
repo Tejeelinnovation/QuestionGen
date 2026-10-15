@@ -68,12 +68,32 @@ def sanitize_latex(s: str) -> str:
     if r"\begin{array}{c}" in cleaned and "&" in cleaned:
         cleaned = cleaned.replace(r"\begin{array}{c}", r"\begin{array}{ll}")
 
-    # 8. Safe delimiter balancing: if \left and \right counts are unequal, degrade to plain delimiters
+    # 8. Normalize unicode reaction arrows, operators, and dashes
+    cleaned = cleaned.replace("→", r"\rightarrow ").replace("⇌", r"\rightleftharpoons ")
+    cleaned = cleaned.replace("–", "-").replace("—", "-")
+
+    # 9. Truncate autoregressive ViT hallucination loops (e.g. repeated _{\cfrac{\alpha}{\alpha}})
+    hallucination_match = re.search(r"[_^]?\{?\\c?frac\{(\\[a-zA-Z]+)\}\{\1\}", cleaned)
+    if hallucination_match:
+        cleaned = cleaned[:hallucination_match.start()].strip()
+
+    # 10. Clean orphaned \end{...} when no matching \begin{...} exists in string
+    for env in ("array", "matrix", "pmatrix", "bmatrix", "vmatrix", "cases", "align", "aligned"):
+        if f"\\end{{{env}}}" in cleaned and f"\\begin{{{env}}}" not in cleaned:
+            cleaned = cleaned.replace(f"\\end{{{env}}}", "")
+
+    # 11. Safe delimiter balancing: if \left and \right counts are unequal, degrade to plain delimiters
     left_count = len(re.findall(r"\\left(?![a-zA-Z])", cleaned))
     right_count = len(re.findall(r"\\right(?![a-zA-Z])", cleaned))
     if left_count != right_count:
         cleaned = re.sub(r"\\left([(\[{|])", r"\1", cleaned)
         cleaned = re.sub(r"\\right([)\]}|.])", r"\1", cleaned)
+
+    # 12. Balance curly braces if truncation left open braces
+    while cleaned.count("{") > cleaned.count("}"):
+        cleaned += "}"
+    while cleaned.count("}") > cleaned.count("{") and cleaned.endswith("}"):
+        cleaned = cleaned[:-1].strip()
 
     return cleaned.strip()
 
@@ -131,6 +151,17 @@ def is_valid_latex(s: str) -> bool:
     if "{{{{{" in s or "}}}}}" in s:
         return False
     if re.search(r"(\\_\s*){4,}", s):
+        return False
+
+    # 5. Environment balance check: reject if any \end{env} exists without matching \begin{env}
+    end_envs = re.findall(r"\\end\{([a-zA-Z*]+)\}", s)
+    begin_envs = re.findall(r"\\begin\{([a-zA-Z*]+)\}", s)
+    for env in set(end_envs):
+        if end_envs.count(env) > begin_envs.count(env):
+            return False
+
+    # 6. Reject repeating fraction hallucination loops (e.g. \cfrac{\alpha}{\alpha})
+    if len(re.findall(r"\\c?frac\{(\\[a-zA-Z]+)\}\{\1\}", s)) >= 2:
         return False
 
     return True

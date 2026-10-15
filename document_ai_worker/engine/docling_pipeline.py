@@ -375,7 +375,13 @@ def _parse_docling_document(
                     continue
 
                 # If digital text is empty or lacks LaTeX mathematical syntax, extract visually via RapidLaTeXOCR
-                has_latex_tokens = any(sym in (latex_str or "") for sym in ("\\", "{", "^", "_", "=", "∫", "∑", "√", "±"))
+                has_latex_tokens = any(
+                    sym in (latex_str or "")
+                    for sym in (
+                        "\\", "{", "^", "_", "=", "∫", "∑", "√", "±", "→", "\\rightarrow",
+                        "\\to", "⇌", "⇒", "⇔", "×", "÷", "≤", "≥", "<", ">"
+                    )
+                )
                 if not latex_str or not has_latex_tokens or len(latex_str.strip()) < 3:
                     try:
                         from .latex_ocr_engine import LatexOCREngine
