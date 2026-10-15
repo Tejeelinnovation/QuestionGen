@@ -49,21 +49,31 @@ def sanitize_latex(s: str) -> str:
     cleaned = re.sub(r"\([0-9\.]+\s*\\right\)\s*$", "", cleaned)
     cleaned = re.sub(r"\s+\([0-9\.]+\)\s*$", "", cleaned)
 
-    # 3. Fix orphaned \right) or \right] without matching \left
+    # 3. Fix OCR pipe symbol mistaken for closing square bracket in chemical complexes
+    cleaned = re.sub(r"\|(\s*\\?(?:left)?\s*\()", r"]\1", cleaned)
+    cleaned = re.sub(r"\|(?=\s*[+\-=→\\])", "]", cleaned)
+
+    # 4. Remove trailing orphaned \right. outside \end{array} or at end
+    cleaned = re.sub(r"\\right\.\s*$", "", cleaned)
+    cleaned = re.sub(r"\\end\{array\}\s*\\right\.", r"\\end{array}", cleaned)
+
+    # 5. Fix orphaned \right) when preceded by regular unclosed (
+    cleaned = re.sub(r"\(([^()\\]*)\\right\)", r"(\1)", cleaned)
+
+    # 6. Degrade \left[ / \right] to [ / ] to avoid cell scope errors in arrays/tables
+    cleaned = cleaned.replace(r"\left[", "[").replace(r"\right]", "]")
+
+    # 7. In \begin{array}{c}, fix \& and & column count mismatch
+    cleaned = cleaned.replace(r"\&", "&")
+    if r"\begin{array}{c}" in cleaned and "&" in cleaned:
+        cleaned = cleaned.replace(r"\begin{array}{c}", r"\begin{array}{ll}")
+
+    # 8. Safe delimiter balancing: if \left and \right counts are unequal, degrade to plain delimiters
     left_count = len(re.findall(r"\\left(?![a-zA-Z])", cleaned))
     right_count = len(re.findall(r"\\right(?![a-zA-Z])", cleaned))
-
-    if right_count > left_count:
-        while right_count > left_count and re.search(r"\\right[\)\]\.\>]\s*$", cleaned):
-            cleaned = re.sub(r"\\right[\)\]\.\>]\s*$", "", cleaned).strip()
-            right_count = len(re.findall(r"\\right(?![a-zA-Z])", cleaned))
-
-        if right_count > left_count:
-            diff = right_count - left_count
-            cleaned = re.sub(r"\\right\)", ")", cleaned, count=diff)
-    elif left_count > right_count:
-        diff = left_count - right_count
-        cleaned += r" \right." * diff
+    if left_count != right_count:
+        cleaned = re.sub(r"\\left([(\[{|])", r"\1", cleaned)
+        cleaned = re.sub(r"\\right([)\]}|.])", r"\1", cleaned)
 
     return cleaned.strip()
 
@@ -90,7 +100,8 @@ def is_valid_latex(s: str) -> bool:
         return False
 
     # 2. Unescaped curly brace balance check (unescaped { must match })
-    clean_braces = re.sub(r"\\(\{|\})", "", s)
+    # Use negative lookbehind (?<!\\) so LaTeX newlines like \\{ are not misidentified as escaped braces \{
+    clean_braces = re.sub(r"(?<!\\)\\(\{|\})", "", s)
     if clean_braces.count("{") != clean_braces.count("}"):
         return False
 
