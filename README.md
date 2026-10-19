@@ -91,6 +91,23 @@ python manage.py runserver
 
 Visit [http://127.0.0.1:8000/](http://127.0.0.1:8000/) — you should see the Django welcome page.
 
+### 8. System Health Check
+
+The backend exposes an unauthenticated health check endpoint for uptime monitors, container orchestrators, and load balancers:
+
+```bash
+curl http://127.0.0.1:8000/api/health/
+```
+
+**Response (HTTP 200 OK):**
+```json
+{
+  "status": "healthy",
+  "database": "connected"
+}
+```
+If the database connection fails, it returns `HTTP 503 Service Unavailable` with `{"status": "unhealthy", "database": "disconnected", "error": "..."}`.
+
 ---
 
 ## Full Demo Environment Reset (Copy-Pasteable Sequence)

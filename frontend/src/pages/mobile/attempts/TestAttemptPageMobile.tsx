@@ -356,17 +356,28 @@ export const TestAttemptPageMobile: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <span
-              className={`pill text-[10px] py-0.5 px-2 ${
-                currentStatus === 'saving'
-                  ? 'pill-ember animate-pulse'
-                  : currentStatus === 'saved'
-                  ? 'pill-forest'
-                  : 'pill-muted'
-              }`}
-            >
-              {currentStatus === 'saving' ? 'Saving...' : currentStatus === 'saved' ? '✓ Saved' : 'Draft'}
-            </span>
+            {currentStatus === 'error' ? (
+              <button
+                type="button"
+                onClick={() => performSave(attemptData.attempt_id, currentQ.question_id, currentAnswer)}
+                className="pill bg-ember/15 text-ember border border-ember/30 text-[10px] py-0.5 px-2 font-bold cursor-pointer active:scale-95 flex items-center gap-1"
+                title="Tap to retry saving answer"
+              >
+                <span>! Retry Save</span>
+              </button>
+            ) : (
+              <span
+                className={`pill text-[10px] py-0.5 px-2 ${
+                  currentStatus === 'saving'
+                    ? 'pill-ember animate-pulse'
+                    : currentStatus === 'saved'
+                    ? 'pill-forest'
+                    : 'pill-muted'
+                }`}
+              >
+                {currentStatus === 'saving' ? 'Saving...' : currentStatus === 'saved' ? '✓ Saved' : 'Draft'}
+              </span>
+            )}
 
             <span className="pill pill-muted text-[10px] py-0.5 px-2 font-mono font-medium">
               {currentQ.marks || 1} mark{(currentQ.marks || 1) === 1 ? '' : 's'}

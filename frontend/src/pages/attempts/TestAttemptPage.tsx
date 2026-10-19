@@ -425,8 +425,16 @@ const TestAttemptPageDesktop: React.FC = () => {
                       </span>
                     )}
                     {saveStatus === 'error' && (
-                      <span className="text-ember font-medium flex items-center gap-1">
-                        ! Save error
+                      <span className="text-ember font-medium flex items-center gap-1.5">
+                        <span>! Save error</span>
+                        <button
+                          type="button"
+                          onClick={() => performSave(attemptData.attempt_id, q.question_id, currentAnswer)}
+                          className="underline text-ember hover:text-ember/80 font-semibold cursor-pointer active:scale-95"
+                          title="Click to retry saving this answer"
+                        >
+                          Retry
+                        </button>
                       </span>
                     )}
                   </div>

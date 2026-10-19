@@ -1,28 +1,46 @@
 import React from 'react';
 import { Navigate, Link, type RouteObject } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
-import { LoginPage } from './pages/LoginPage';
-import { SuperAdminDashboard } from './pages/dashboards/SuperAdminDashboard';
-import { SchoolAdminDashboard } from './pages/dashboards/SchoolAdminDashboard';
-import { TeacherDashboard } from './pages/dashboards/TeacherDashboard';
-import { StudentDashboard } from './pages/dashboards/StudentDashboard';
-import { QBMDashboard } from './pages/dashboards/QBMDashboard';
-import { TestAttemptPage } from './pages/attempts/TestAttemptPage';
-import { ResultPage } from './pages/attempts/ResultPage';
-import { ResultsRosterPage } from './pages/attempts/ResultsRosterPage';
-import { GradeAttemptPage } from './pages/attempts/GradeAttemptPage';
-import { PaperSetupPage } from './pages/papers/PaperSetupPage';
-import { PaperConfigurePage } from './pages/papers/PaperConfigurePage';
-import { QuestionReviewPage } from './pages/papers/QuestionReviewPage';
-import { VersionDetailPage } from './pages/papers/VersionDetailPage';
-import { DeliveryPage } from './pages/papers/DeliveryPage';
-import { PrintViewPage } from './pages/papers/PrintViewPage';
-import { PaperDetailPage } from './pages/papers/PaperDetailPage';
-import { ProfilePage } from './pages/profile/ProfilePage';
-import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
-import { DatasetIngestionPage } from './pages/ingestion/DatasetIngestionPage';
 import { RequireCapability } from './auth/RequireCapability';
 import { useAuth } from './auth/AuthContext';
+
+// Top-level suspense boundary fallback for unauthenticated routes (e.g. /login)
+const TopLevelSuspense: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <React.Suspense
+    fallback={
+      <div className="flex items-center justify-center min-h-screen p-8">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-forest/20 border-t-forest animate-spin" />
+          <span className="text-[11px] font-mono text-ink/40 tracking-wider">LOADING...</span>
+        </div>
+      </div>
+    }
+  >
+    {children}
+  </React.Suspense>
+);
+
+// Route-level code splitting via dynamic imports
+const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const SuperAdminDashboard = React.lazy(() => import('./pages/dashboards/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
+const SchoolAdminDashboard = React.lazy(() => import('./pages/dashboards/SchoolAdminDashboard').then(m => ({ default: m.SchoolAdminDashboard })));
+const TeacherDashboard = React.lazy(() => import('./pages/dashboards/TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
+const StudentDashboard = React.lazy(() => import('./pages/dashboards/StudentDashboard').then(m => ({ default: m.StudentDashboard })));
+const QBMDashboard = React.lazy(() => import('./pages/dashboards/QBMDashboard').then(m => ({ default: m.QBMDashboard })));
+const TestAttemptPage = React.lazy(() => import('./pages/attempts/TestAttemptPage').then(m => ({ default: m.TestAttemptPage })));
+const ResultPage = React.lazy(() => import('./pages/attempts/ResultPage').then(m => ({ default: m.ResultPage })));
+const ResultsRosterPage = React.lazy(() => import('./pages/attempts/ResultsRosterPage').then(m => ({ default: m.ResultsRosterPage })));
+const GradeAttemptPage = React.lazy(() => import('./pages/attempts/GradeAttemptPage').then(m => ({ default: m.GradeAttemptPage })));
+const PaperSetupPage = React.lazy(() => import('./pages/papers/PaperSetupPage').then(m => ({ default: m.PaperSetupPage })));
+const PaperConfigurePage = React.lazy(() => import('./pages/papers/PaperConfigurePage').then(m => ({ default: m.PaperConfigurePage })));
+const QuestionReviewPage = React.lazy(() => import('./pages/papers/QuestionReviewPage').then(m => ({ default: m.QuestionReviewPage })));
+const VersionDetailPage = React.lazy(() => import('./pages/papers/VersionDetailPage').then(m => ({ default: m.VersionDetailPage })));
+const DeliveryPage = React.lazy(() => import('./pages/papers/DeliveryPage').then(m => ({ default: m.DeliveryPage })));
+const PrintViewPage = React.lazy(() => import('./pages/papers/PrintViewPage').then(m => ({ default: m.PrintViewPage })));
+const PaperDetailPage = React.lazy(() => import('./pages/papers/PaperDetailPage').then(m => ({ default: m.PaperDetailPage })));
+const ProfilePage = React.lazy(() => import('./pages/profile/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const ResetPasswordPage = React.lazy(() => import('./pages/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
+const DatasetIngestionPage = React.lazy(() => import('./pages/ingestion/DatasetIngestionPage').then(m => ({ default: m.DatasetIngestionPage })));
 
 /**
  * Root index redirector: resolves the starting dashboard based on the user's
@@ -45,11 +63,19 @@ const DashboardIndexRedirect: React.FC = () => {
 export const routes: RouteObject[] = [
   {
     path: '/login',
-    element: <LoginPage />,
+    element: (
+      <TopLevelSuspense>
+        <LoginPage />
+      </TopLevelSuspense>
+    ),
   },
   {
     path: '/reset-password',
-    element: <ResetPasswordPage />,
+    element: (
+      <TopLevelSuspense>
+        <ResetPasswordPage />
+      </TopLevelSuspense>
+    ),
   },
   {
     path: '/',
