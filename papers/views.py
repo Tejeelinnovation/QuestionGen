@@ -531,7 +531,10 @@ class PaperVersionCloneView(APIView):
 
         if explicit_qids:
             questions_by_id = {
-                q.id: q for q in Question.objects.filter(id__in=explicit_qids, is_active=True)
+                q.id: q
+                for q in Question.objects.select_related(
+                    "topic", "topic__chapter", "topic__chapter__book"
+                ).filter(id__in=explicit_qids, is_active=True)
             }
             missing = [qid for qid in explicit_qids if qid not in questions_by_id]
             if missing:

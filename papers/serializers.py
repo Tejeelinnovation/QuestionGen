@@ -309,9 +309,12 @@ class CreateVersionSerializer(serializers.Serializer):
         question_ids = attrs["question_ids"]
         constraints = attrs.get("constraints_used", {})
 
-        # Fetch questions preserving order
+        # Fetch questions preserving order with joined topic, chapter, and book relations
         questions_by_id = {
-            q.id: q for q in Question.objects.filter(id__in=question_ids, is_active=True)
+            q.id: q
+            for q in Question.objects.select_related(
+                "topic", "topic__chapter", "topic__chapter__book"
+            ).filter(id__in=question_ids, is_active=True)
         }
 
         missing_ids = [qid for qid in question_ids if qid not in questions_by_id]

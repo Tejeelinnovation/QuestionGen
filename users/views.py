@@ -241,15 +241,32 @@ def dispatch_system_email(subject: str, message: str, recipient_email: str) -> b
     import urllib.request
     import urllib.error
 
+    email_user = getattr(settings, "EMAIL_HOST_USER", "")
+    email_pass = getattr(settings, "EMAIL_HOST_PASSWORD", "")
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", email_user)
+
+    # In test environments (or when in-memory locmem backend is active), use Django's send_mail directly
+    email_backend = getattr(settings, "EMAIL_BACKEND", "")
+    if "locmem" in email_backend or getattr(settings, "TESTING", False):
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=from_email,
+                recipient_list=[recipient_email],
+                fail_silently=False,
+            )
+            return True
+        except Exception as exc:
+            logger.error("Failed test send_mail for %s: %s", recipient_email, exc)
+            return False
+
     frontend_url = getattr(settings, "FRONTEND_URL", "").rstrip("/")
     bridge_candidates = []
     if frontend_url and "localhost" not in frontend_url:
         bridge_candidates.append(f"{frontend_url}/api/send-email")
     if "https://question-gen-alpha.vercel.app/api/send-email" not in bridge_candidates:
         bridge_candidates.append("https://question-gen-alpha.vercel.app/api/send-email")
-
-    email_user = getattr(settings, "EMAIL_HOST_USER", "") or "queraai78789@gmail.com"
-    email_pass = getattr(settings, "EMAIL_HOST_PASSWORD", "") or "gehx gwoo ltgp lwsx"
 
     for bridge_url in bridge_candidates:
         try:
@@ -282,7 +299,7 @@ def dispatch_system_email(subject: str, message: str, recipient_email: str) -> b
         send_mail(
             subject=subject,
             message=message,
-            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", email_user),
+            from_email=from_email,
             recipient_list=[recipient_email],
             fail_silently=False,
         )

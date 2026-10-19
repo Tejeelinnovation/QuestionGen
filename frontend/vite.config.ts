@@ -11,5 +11,26 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('katex')) {
+            return 'vendor-katex'
+          }
+          if (id.includes('lucide-react')) {
+            return 'vendor-icons'
+          }
+          if (
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/react-router')
+          ) {
+            return 'vendor-react'
+          }
+        },
+      },
+    },
+  },
 })
 

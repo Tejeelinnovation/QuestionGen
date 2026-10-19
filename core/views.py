@@ -129,3 +129,39 @@ class AuditLogListView(APIView):
 
         return Response({"results": results}, status=status.HTTP_200_OK)
 
+
+class HealthCheckView(APIView):
+    """
+    GET /api/health/
+
+    Lightweight, unauthenticated endpoint for cloud platforms (Render, Railway),
+    Docker healthchecks, and uptime monitors. Verifies database connectivity.
+    """
+
+    permission_classes = []
+
+    def get(self, request):
+        from django.db import connection
+
+        db_ok = True
+        error_msg = None
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+        except Exception as exc:
+            db_ok = False
+            error_msg = str(exc)
+
+        payload = {
+            "status": "healthy" if db_ok else "unhealthy",
+            "database": "connected" if db_ok else "disconnected",
+        }
+        if error_msg:
+            payload["error"] = error_msg
+
+        return Response(
+            payload,
+            status=status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+

@@ -466,3 +466,13 @@ class EndToEndTargetFlowTests(TestCase):
         self.assertEqual(print_data["subjects"], ["Mathematics", "Science"])
         self.assertEqual(print_data["total_question_count"], 3)
         self.assertEqual(print_data["question_count"], 3)
+
+
+class HealthCheckViewTests(TestCase):
+    def test_health_check_returns_ok(self):
+        client = APIClient()
+        response = client.get("/api/health/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("status"), "healthy")
+        self.assertEqual(response.data.get("database"), "connected")
+
