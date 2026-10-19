@@ -21,7 +21,7 @@ from __future__ import annotations
 import hashlib
 
 from django.core.cache import cache
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from rest_framework import status
@@ -208,7 +208,11 @@ class BookListView(ListAPIView):
         return Response(data)
 
     def get_queryset(self):
-        qs = Book.objects.filter(is_active=True).prefetch_related("chapters")
+        qs = (
+            Book.objects.filter(is_active=True)
+            .annotate(_chapter_count=Count("chapters"))
+            .prefetch_related("chapters")
+        )
         board = self.request.query_params.get("board")
         if board:
             qs = qs.filter(board=board)
@@ -238,6 +242,7 @@ class ChapterListView(ListAPIView):
     def get_queryset(self):
         qs = (
             Chapter.objects.select_related("book")
+            .annotate(_topic_count=Count("topics"))
             .prefetch_related("topics")
             .filter(book__is_active=True)
             .order_by("chapter_order")
@@ -269,9 +274,11 @@ class TopicListView(ListAPIView):
         return Response(data)
 
     def get_queryset(self):
-        qs = Topic.objects.select_related(
-            "chapter", "chapter__book"
-        ).filter(chapter__book__is_active=True)
+        qs = (
+            Topic.objects.select_related("chapter", "chapter__book")
+            .annotate(_question_count=Count("questions", filter=Q(questions__is_active=True)))
+            .filter(chapter__book__is_active=True)
+        )
 
         chapter_id = self.request.query_params.get("chapter_id")
         if chapter_id:

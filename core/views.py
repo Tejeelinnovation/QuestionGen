@@ -165,3 +165,33 @@ class HealthCheckView(APIView):
             status=status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
+
+class ApiRootView(APIView):
+    """
+    GET /
+    Lightweight, unauthenticated greeting and service discovery endpoint.
+    """
+
+    permission_classes = []
+
+    def get(self, request):
+        return Response(
+            {
+                "name": "Question Generation System API",
+                "version": "1.0.0",
+                "status": "online",
+                "endpoints": {
+                    "health": "/api/health/",
+                    "admin": "/admin/",
+                    "auth": "/api/auth/",
+                    "users": "/api/users/",
+                    "schools": "/api/schools/",
+                    "content": "/api/",
+                    "papers": "/api/",
+                    "attempts": "/api/",
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+

@@ -5,9 +5,13 @@ Root URL configuration for the Question Generation System.
 from django.contrib import admin
 from django.urls import include, path
 
+from core.views import ApiRootView
 from users.urls import auth_urlpatterns, users_urlpatterns
 
 urlpatterns = [
+    # API Landing & Service Discovery
+    path("", ApiRootView.as_view(), name="api-root"),
+
     # Django admin
     path("admin/", admin.site.urls),
 

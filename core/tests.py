@@ -476,3 +476,15 @@ class HealthCheckViewTests(TestCase):
         self.assertEqual(response.data.get("status"), "healthy")
         self.assertEqual(response.data.get("database"), "connected")
 
+
+class ApiRootViewTests(TestCase):
+    def test_api_root_returns_ok(self):
+        client = APIClient()
+        response = client.get("/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("name"), "Question Generation System API")
+        self.assertEqual(response.data.get("status"), "online")
+        self.assertIn("health", response.data.get("endpoints", {}))
+        self.assertIn("admin", response.data.get("endpoints", {}))
+
+

@@ -80,6 +80,9 @@ class ChapterSerializer(serializers.ModelSerializer):
         ]
 
     def get_topic_count(self, obj) -> int:
+        # Avoids N+1 if the queryset is annotated with _topic_count; falls back to COUNT query.
+        if hasattr(obj, "_topic_count"):
+            return obj._topic_count
         return obj.topics.count()
 
 
@@ -110,6 +113,9 @@ class TopicSerializer(serializers.ModelSerializer):
         ]
 
     def get_question_count(self, obj) -> int:
+        # Avoids N+1 if the queryset is annotated with _question_count; falls back to filtered count.
+        if hasattr(obj, "_question_count"):
+            return obj._question_count
         return obj.questions.filter(is_active=True).count()
 
 
