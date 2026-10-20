@@ -232,7 +232,13 @@ class QuestionListSerializer(serializers.ModelSerializer):
         ]
 
     def get_variants_count(self, obj) -> int:
-        return obj.variants.count()
+        if hasattr(obj, "_variants_count"):
+            return obj._variants_count
+        if hasattr(obj, "variants"):
+            if hasattr(obj, "_prefetched_objects_cache") and "variants" in obj._prefetched_objects_cache:
+                return len(obj.variants.all())
+            return obj.variants.count()
+        return 0
 
     def get_topics(self, obj):
         return [{"id": t.id, "name": t.name} for t in obj.topics.all()]

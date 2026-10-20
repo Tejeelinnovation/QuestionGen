@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import type { QuestionPreview, Paper } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
@@ -217,8 +217,24 @@ export const QuestionReviewPageMobile: React.FC = () => {
       {/* Single-Column Question Cards */}
       <div className="space-y-3">
         {questions.length === 0 ? (
-          <div className="p-8 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
-            No questions in list. Go back to configuration to generate questions.
+          <div
+            id="mobile-empty-review-state"
+            className="p-8 text-center text-xs text-ink/70 bg-surface border-2 border-dashed border-border rounded-card space-y-3"
+          >
+            <div className="text-3xl">📝</div>
+            <h3 className="font-heading font-bold text-base text-ink">
+              All candidate questions removed
+            </h3>
+            <p className="text-xs text-ink/65 leading-relaxed">
+              No questions remain in the curated list. You can re-query the question bank with adjusted filters.
+            </p>
+            <Link
+              to={`/papers/${paperId}/configure`}
+              className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs active:scale-95 transition-all shadow-sm min-h-[44px]"
+            >
+              <span>Reconfigure Questions</span>
+              <span>→</span>
+            </Link>
           </div>
         ) : (
           questions.map((q, idx) => (

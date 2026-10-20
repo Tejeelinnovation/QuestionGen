@@ -70,8 +70,11 @@ class IngestionJobListCreateView(generics.ListCreateAPIView):
             raise PermissionDenied("You do not have permission to upload or view study materials.")
 
         # Cleanup any stuck extracting jobs that have timed out (>45 minutes)
-        from .queue import IngestionQueueWorker
-        IngestionQueueWorker.cleanup_stalled_jobs(timeout_minutes=45)
+        # Throttled using Django cache so high-frequency polling clients don't hit the DB on every request
+        from django.core.cache import cache
+        if cache.add("ingestion_stalled_cleanup_throttle", True, timeout=300):
+            from .queue import IngestionQueueWorker
+            IngestionQueueWorker.cleanup_stalled_jobs(timeout_minutes=45)
 
         # Super Admin sees all materials across all schools
         if is_super_admin(user):

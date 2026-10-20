@@ -323,13 +323,23 @@ export const QuestionReviewPageTablet: React.FC = () => {
         ))}
 
         {questions.length === 0 && (
-          <div className="bg-surface border-2 border-dashed border-border rounded-card p-10 text-center space-y-3">
-            <h3 className="font-heading font-bold text-lg text-ink">No questions remaining</h3>
+          <div
+            id="tablet-empty-review-state"
+            className="bg-surface border-2 border-dashed border-border rounded-card p-10 text-center space-y-3"
+          >
+            <div className="text-3xl">📝</div>
+            <h3 className="font-heading font-bold text-lg text-ink">
+              All candidate questions have been removed
+            </h3>
+            <p className="text-xs text-ink/65 max-w-md mx-auto">
+              You can re-query the question bank with different constraint parameters or topic coverage.
+            </p>
             <Link
               to={`/papers/${paperId}/configure`}
-              className="inline-block px-5 py-2.5 rounded-pill bg-forest text-white text-xs font-heading font-semibold"
+              className="inline-flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-pill bg-forest text-white text-xs font-heading font-semibold hover:bg-forest/90 transition-colors min-h-[44px]"
             >
-              Reconfigure Questions →
+              <span>Reconfigure Questions</span>
+              <span>→</span>
             </Link>
           </div>
         )}
