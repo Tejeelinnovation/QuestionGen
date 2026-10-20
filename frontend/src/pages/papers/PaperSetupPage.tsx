@@ -24,7 +24,7 @@ const PaperSetupPageDesktop: React.FC = () => {
   const toast = useToast();
 
   useEffect(() => {
-    if (user && user.role_label !== 'Teacher') {
+    if (user && !user.capabilities?.includes('CREATE_PAPER') && user.role_label !== 'Teacher') {
       navigate(dashboardPath, { replace: true });
     }
   }, [user, dashboardPath, navigate]);

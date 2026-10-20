@@ -15,7 +15,7 @@ export const PaperSetupPageTablet: React.FC = () => {
   const toast = useToast();
 
   useEffect(() => {
-    if (user && user.role_label !== 'Teacher') {
+    if (user && !user.capabilities?.includes('CREATE_PAPER') && user.role_label !== 'Teacher') {
       navigate(dashboardPath, { replace: true });
     }
   }, [user, dashboardPath, navigate]);
@@ -24,6 +24,17 @@ export const PaperSetupPageTablet: React.FC = () => {
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [chapterId, setChapterId] = useState<number | ''>('');
+  const [examMode, setExamMode] = useState<'single' | 'multi'>('single');
+  const availableSubjects = [
+    'Mathematics',
+    'Physics',
+    'Chemistry',
+    'Biology',
+    'Science',
+    'Social Science',
+    'English',
+  ];
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>(['Mathematics']);
 
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,6 +60,12 @@ export const PaperSetupPageTablet: React.FC = () => {
     loadChapters();
   }, []);
 
+  const handleSubjectToggle = (subj: string) => {
+    setSelectedSubjects((prev) =>
+      prev.includes(subj) ? prev.filter((s) => s !== subj) : [...prev, subj]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -56,8 +73,12 @@ export const PaperSetupPageTablet: React.FC = () => {
       toast.warning('Paper title is required.');
       return;
     }
-    if (!chapterId) {
-      toast.warning('Please select a chapter.');
+    if (examMode === 'single' && !chapterId) {
+      toast.warning('Please select a curriculum chapter.');
+      return;
+    }
+    if (examMode === 'multi' && selectedSubjects.length === 0) {
+      toast.warning('Please select at least one subject for the combined test.');
       return;
     }
 
@@ -66,7 +87,10 @@ export const PaperSetupPageTablet: React.FC = () => {
       const paper = await papersApi.createPaper({
         title: title.trim(),
         instructions: instructions.trim(),
-        chapter: Number(chapterId),
+        chapter: examMode === 'single' ? Number(chapterId) : null,
+        subjects: examMode === 'multi' ? selectedSubjects : [],
+        duration_minutes: 60,
+        total_question_count: 0,
       });
 
       toast.success(`Paper "${paper.title}" created successfully.`);
@@ -124,22 +148,99 @@ export const PaperSetupPageTablet: React.FC = () => {
               />
             </div>
 
+            {/* Blueprint Scope Mode: Single Chapter vs Multi-Subject */}
             <div>
-              <label htmlFor="paper-chapter" className="block text-xs font-heading font-semibold text-ink uppercase mb-1">
-                Curriculum Chapter *
+              <label className="block text-xs font-heading font-semibold text-ink uppercase mb-1">
+                Blueprint Scope Mode *
               </label>
-              <CustomSelect
-                value={chapterId ? String(chapterId) : ''}
-                onChange={(val) => setChapterId(val ? Number(val) : '')}
-                disabled={isSubmitting}
-                options={chapters.map((c) => ({
-                  value: String(c.id),
-                  label: `${c.book_title ? `[${c.book_title}] ` : ''}${c.title} (${c.topic_count} Topics)`,
-                }))}
-                placeholder="Select curriculum chapter..."
-                className="w-full"
-              />
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setExamMode('single')}
+                  className={`p-3 rounded-card border text-left transition-all cursor-pointer ${
+                    examMode === 'single'
+                      ? 'border-forest bg-forest/5 text-ink ring-1 ring-forest'
+                      : 'border-border bg-bg text-ink/70 hover:bg-surface'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-heading font-semibold text-xs">
+                    <span className={`w-2 h-2 rounded-full ${examMode === 'single' ? 'bg-forest' : 'bg-ink/30'}`} />
+                    Single Chapter
+                  </div>
+                  <p className="text-[10px] text-ink/60 mt-0.5">
+                    Unit test or weekly assessment
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExamMode('multi')}
+                  className={`p-3 rounded-card border text-left transition-all cursor-pointer ${
+                    examMode === 'multi'
+                      ? 'border-forest bg-forest/5 text-ink ring-1 ring-forest'
+                      : 'border-border bg-bg text-ink/70 hover:bg-surface'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-heading font-semibold text-xs">
+                    <span className={`w-2 h-2 rounded-full ${examMode === 'multi' ? 'bg-forest' : 'bg-ink/30'}`} />
+                    Multi-Subject
+                  </div>
+                  <p className="text-[10px] text-ink/60 mt-0.5">
+                    Combined or term mock exam
+                  </p>
+                </button>
+              </div>
             </div>
+
+            {/* Chapter Selection or Multi-Subject Pills */}
+            {examMode === 'single' ? (
+              <div>
+                <label htmlFor="paper-chapter" className="block text-xs font-heading font-semibold text-ink uppercase mb-1">
+                  Curriculum Chapter *
+                </label>
+                <CustomSelect
+                  value={chapterId ? String(chapterId) : ''}
+                  onChange={(val) => setChapterId(val ? Number(val) : '')}
+                  disabled={isSubmitting}
+                  options={chapters.map((c) => ({
+                    value: String(c.id),
+                    label: `${c.book_title ? `[${c.book_title}] ` : ''}${c.title} (${c.topic_count} Topics)`,
+                  }))}
+                  placeholder="Select curriculum chapter..."
+                  className="w-full"
+                />
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-heading font-semibold text-ink uppercase">
+                    Participating Subjects *
+                  </label>
+                  <span className="text-[11px] font-mono text-ink/40">
+                    {selectedSubjects.length} selected
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  {availableSubjects.map((subj) => {
+                    const isSelected = selectedSubjects.includes(subj);
+                    return (
+                      <button
+                        key={subj}
+                        type="button"
+                        onClick={() => handleSubjectToggle(subj)}
+                        className={`px-3 py-1.5 rounded-pill text-xs font-heading font-semibold transition-all cursor-pointer border ${
+                          isSelected
+                            ? 'bg-forest text-white border-forest shadow-xs'
+                            : 'bg-bg text-ink/70 border-border hover:bg-surface hover:text-ink'
+                        }`}
+                      >
+                        {subj}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div>
               <label htmlFor="paper-instructions" className="block text-xs font-heading font-semibold text-ink uppercase mb-1">
@@ -166,7 +267,7 @@ export const PaperSetupPageTablet: React.FC = () => {
               <button
                 type="submit"
                 id="submit-paper-setup-btn"
-                disabled={isSubmitting || chapters.length === 0}
+                disabled={isSubmitting || (examMode === 'single' && chapters.length === 0)}
                 className="px-6 py-3 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 active:scale-95 transition-all shadow-sm cursor-pointer disabled:opacity-50 min-h-[44px] flex items-center gap-2"
               >
                 <span>{isSubmitting ? 'Creating...' : 'Configure Questions'}</span>
@@ -185,19 +286,41 @@ export const PaperSetupPageTablet: React.FC = () => {
                 <span className="pill pill-forest text-[10px]">Step 1 of 6</span>
               </div>
 
-              {selectedChapter && (
+              {examMode === 'single' ? (
+                selectedChapter ? (
+                  <div className="space-y-2">
+                    <div className="font-heading font-bold text-xl text-ink">
+                      {selectedChapter.title}
+                    </div>
+                    {selectedChapter.book_title && (
+                      <div className="text-xs text-ink/70">
+                        Textbook: <strong className="text-forest">{selectedChapter.book_title}</strong>
+                      </div>
+                    )}
+                    <div className="p-3 bg-bg rounded-card border border-border flex items-center justify-between text-xs font-mono mt-2">
+                      <span className="text-ink/60">Registered Syllabus Topics:</span>
+                      <span className="font-bold text-forest">{selectedChapter.topic_count} Topics</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-ink/60 py-2">
+                    Select a chapter to review curriculum coverage.
+                  </div>
+                )
+              ) : (
                 <div className="space-y-2">
                   <div className="font-heading font-bold text-xl text-ink">
-                    {selectedChapter.title}
+                    Multi-Subject Examination
                   </div>
-                  {selectedChapter.book_title && (
-                    <div className="text-xs text-ink/70">
-                      Textbook: <strong className="text-forest">{selectedChapter.book_title}</strong>
-                    </div>
-                  )}
-                  <div className="p-3 bg-bg rounded-card border border-border flex items-center justify-between text-xs font-mono mt-2">
-                    <span className="text-ink/60">Registered Syllabus Topics:</span>
-                    <span className="font-bold text-forest">{selectedChapter.topic_count} Topics</span>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {selectedSubjects.map((s) => (
+                      <span key={s} className="pill pill-forest text-[10px]">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="p-3 bg-bg rounded-card border border-border text-xs text-ink/70 mt-2">
+                    Combined exam pooling questions across {selectedSubjects.length} chosen subjects.
                   </div>
                 </div>
               )}

@@ -5,7 +5,8 @@ Views for the core app, including the Super Admin Audit & System Log API.
 from __future__ import annotations
 
 from typing import Any
-from django.db.models import Q
+from django.db.models import Q, TextField
+from django.db.models.functions import Cast
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -68,15 +69,19 @@ class AuditLogListView(APIView):
         if action_filter:
             qs = qs.filter(action=action_filter)
 
-        # Keyword search across username, action, and target
+        # Keyword search across username, action, target, and metadata
         search = request.query_params.get("search")
         if search:
             search_str = search.strip()
-            qs = qs.filter(
+            qs = qs.annotate(
+                metadata_text=Cast("metadata", TextField())
+            ).filter(
                 Q(user__username__icontains=search_str)
+                | Q(user__first_name__icontains=search_str)
+                | Q(user__last_name__icontains=search_str)
                 | Q(action__icontains=search_str)
                 | Q(target_type__icontains=search_str)
-                | Q(metadata__icontains=search_str)
+                | Q(metadata_text__icontains=search_str)
             )
 
         paginator = self.pagination_class()
