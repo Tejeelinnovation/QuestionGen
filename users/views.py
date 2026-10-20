@@ -17,9 +17,12 @@ from __future__ import annotations
 
 import logging
 from django.conf import settings
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -538,7 +541,21 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
 
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
-        """Return user counts broken down by role within the caller's scope."""
+        """Return user counts broken down by role within the caller's scope with short-lived cache."""
+        user = request.user
+        if user.school_id is None:
+            cache_key = "user_stats_global"
+        elif user.has_capability("VIEW_SCHOOL_WIDE_CONTROLS"):
+            cache_key = f"user_stats_school_{user.school_id}"
+        elif user.has_capability("CREATE_STUDENT"):
+            cache_key = f"user_stats_teacher_{user.id}_{user.school_id}"
+        else:
+            cache_key = f"user_stats_user_{user.id}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
         queryset = self.get_scoped_queryset()
         users = list(queryset)
         counts = {
@@ -551,6 +568,7 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
             "deo": sum(1 for u in users if u.role_label in ("Data Entry Operator", "DEO & Validator")),
             "validator": sum(1 for u in users if u.role_label in ("Validator", "DEO & Validator")),
         }
+        cache.set(cache_key, counts, timeout=60)
         return Response(counts)
 
     # ------------------------------------------------------------------
@@ -939,3 +957,32 @@ class UserViewSet(ScopedUserQuerysetMixin, viewsets.GenericViewSet):
         if user is None:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         return user
+
+
+# ---------------------------------------------------------------------------
+# Cache Invalidation Signals for User Statistics
+# ---------------------------------------------------------------------------
+
+def invalidate_user_stats(user: User):
+    cache.delete("user_stats_global")
+    if getattr(user, "school_id", None):
+        cache.delete(f"user_stats_school_{user.school_id}")
+    if getattr(user, "created_by_id", None):
+        cache.delete(f"user_stats_teacher_{user.created_by_id}_{user.school_id}")
+    if getattr(user, "id", None):
+        cache.delete(f"user_stats_user_{user.id}")
+
+
+@receiver([post_save, post_delete], sender=User)
+def _on_user_saved_or_deleted(sender, instance, **kwargs):
+    invalidate_user_stats(instance)
+
+
+@receiver([post_save, post_delete], sender=UserCapability)
+def _on_capability_saved_or_deleted(sender, instance, **kwargs):
+    if getattr(instance, "user_id", None):
+        try:
+            invalidate_user_stats(instance.user)
+        except Exception:
+            cache.delete("user_stats_global")
+

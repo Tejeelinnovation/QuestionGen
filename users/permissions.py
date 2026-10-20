@@ -132,7 +132,7 @@ class ScopedUserQuerysetMixin:
         from users.models import User  # noqa: PLC0415
 
         user = self.request.user
-        base_qs = User.objects.select_related("school", "created_by").prefetch_related(
+        base_qs = User.objects.select_related("school", "created_by", "class_section").prefetch_related(
             "user_capabilities__capability"
         )
 
