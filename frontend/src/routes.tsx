@@ -3,6 +3,7 @@ import { Navigate, Link, type RouteObject } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
 import { RequireCapability } from './auth/RequireCapability';
 import { useAuth } from './auth/AuthContext';
+import { RouteErrorBoundary } from './components/ui/RouteErrorBoundary';
 
 // Top-level suspense boundary fallback for unauthenticated routes (e.g. /login)
 const TopLevelSuspense: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -63,6 +64,7 @@ const DashboardIndexRedirect: React.FC = () => {
 export const routes: RouteObject[] = [
   {
     path: '/login',
+    errorElement: <RouteErrorBoundary />,
     element: (
       <TopLevelSuspense>
         <LoginPage />
@@ -71,6 +73,7 @@ export const routes: RouteObject[] = [
   },
   {
     path: '/reset-password',
+    errorElement: <RouteErrorBoundary />,
     element: (
       <TopLevelSuspense>
         <ResetPasswordPage />
@@ -80,6 +83,7 @@ export const routes: RouteObject[] = [
   {
     path: '/',
     element: <AppLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,

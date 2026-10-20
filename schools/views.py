@@ -5,7 +5,7 @@ Views for the schools app.
 from __future__ import annotations
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -35,8 +35,13 @@ class SchoolViewSet(viewsets.ModelViewSet):
     - create: Supports atomic provisioning of an initial School Administrator via optional `admin` payload.
     """
 
-    queryset = School.objects.all()
     serializer_class = SchoolSerializer
+
+    def get_queryset(self):
+        return School.objects.annotate(
+            _student_count=Count("users", filter=Q(users__role="Student"), distinct=True),
+            _teacher_count=Count("users", filter=Q(users__role="Teacher"), distinct=True),
+        )
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
@@ -291,13 +296,18 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return ClassSection.objects.none()
+        base_qs = (
+            ClassSection.objects.select_related("class_teacher", "school")
+            .prefetch_related("subject_teachers__teacher")
+            .annotate(_student_count=Count("students", distinct=True))
+        )
         if user.school_id is None:
             # Super Admin
             school_id = self.request.query_params.get("school_id")
             if school_id:
-                return ClassSection.objects.filter(school_id=school_id)
-            return ClassSection.objects.all()
-        return ClassSection.objects.filter(school_id=user.school_id)
+                return base_qs.filter(school_id=school_id)
+            return base_qs.all()
+        return base_qs.filter(school_id=user.school_id)
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
@@ -345,7 +355,7 @@ class ClassSectionViewSet(viewsets.ModelViewSet):
     def subject_teachers(self, request, pk=None):
         class_section = self.get_object()
         if request.method == "GET":
-            mappings = class_section.subject_teachers.all()
+            mappings = class_section.subject_teachers.select_related("teacher").all()
             serializer = ClassSubjectTeacherSerializer(mappings, many=True)
             return Response(serializer.data)
 

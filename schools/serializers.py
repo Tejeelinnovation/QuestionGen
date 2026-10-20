@@ -60,9 +60,13 @@ class SchoolSerializer(serializers.ModelSerializer):
         return value
 
     def get_student_count(self, obj: School) -> int:
+        if hasattr(obj, "_student_count"):
+            return obj._student_count
         return obj.users.filter(role="Student").count()
 
     def get_teacher_count(self, obj: School) -> int:
+        if hasattr(obj, "_teacher_count"):
+            return obj._teacher_count
         return obj.users.filter(role="Teacher").count()
 
 
@@ -148,9 +152,13 @@ class ClassSectionSerializer(serializers.ModelSerializer):
         ]
 
     def get_student_count(self, obj: ClassSection) -> int:
+        if hasattr(obj, "_student_count"):
+            return obj._student_count
         return obj.students.count()
 
     def get_enrolled_students_count(self, obj: ClassSection) -> int:
+        if hasattr(obj, "_student_count"):
+            return obj._student_count
         return obj.students.count()
 
     def get_class_teacher_name(self, obj: ClassSection) -> str | None:
