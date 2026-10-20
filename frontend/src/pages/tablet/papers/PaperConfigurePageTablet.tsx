@@ -296,7 +296,23 @@ export const PaperConfigurePageTablet: React.FC = () => {
                 Click interactive pills to adjust question characteristics
               </p>
             </div>
-            <span className="font-mono text-[11px] text-ink/40 uppercase">Pill Filters</span>
+            <div className="flex items-center gap-2.5">
+              {(difficulty || questionType || learnerLevel) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDifficulty('');
+                    setQuestionType('');
+                    setLearnerLevel('');
+                  }}
+                  className="text-xs font-heading font-semibold text-ember hover:bg-ember/10 px-2.5 py-1 rounded-pill transition-colors cursor-pointer"
+                  title="Reset difficulty, format, and learner level to default"
+                >
+                  Clear Filters
+                </button>
+              )}
+              <span className="font-mono text-[11px] text-ink/40 uppercase">Pill Filters</span>
+            </div>
           </div>
 
           {/* Hidden accessible selects for automation / test script compatibility */}

@@ -448,11 +448,11 @@ class DeliveryResultsView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        attempts = delivery.attempts.select_related("student").all()
-        submitted_count = attempts.filter(status=AttemptStatus.SUBMITTED).count()
-        evaluated_count = attempts.filter(status=AttemptStatus.EVALUATED).count()
+        attempts_list = list(delivery.attempts.select_related("student").all())
+        submitted_count = sum(1 for a in attempts_list if a.status == AttemptStatus.SUBMITTED)
+        evaluated_count = sum(1 for a in attempts_list if a.status == AttemptStatus.EVALUATED)
 
-        attempt_list = [
+        attempt_data = [
             {
                 "attempt_id": a.id,
                 "student_id": a.student.id,
@@ -462,7 +462,7 @@ class DeliveryResultsView(APIView):
                 "max_score": float(a.max_score),
                 "submitted_at": a.submitted_at,
             }
-            for a in attempts
+            for a in attempts_list
         ]
 
         roster_data = {
@@ -471,10 +471,10 @@ class DeliveryResultsView(APIView):
             "version_label": delivery.paper_version.version_label,
             "total_marks": delivery.paper_version.total_marks,
             "total_students_assigned": delivery.assigned_students.count(),
-            "attempts_count": attempts.count(),
+            "attempts_count": len(attempts_list),
             "submitted_count": submitted_count,
             "evaluated_count": evaluated_count,
-            "attempts": attempt_list,
+            "attempts": attempt_data,
         }
 
         serializer = DeliveryResultsRosterSerializer(roster_data)
