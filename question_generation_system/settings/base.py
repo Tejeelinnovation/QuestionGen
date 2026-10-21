@@ -129,6 +129,19 @@ DATABASES = {
 }
 # Reuse persistent database connections to cut SSL handshake latency under load
 DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
+# Enable connection health checks (reconnects if idle connection dropped by Neon serverless)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool("CONN_HEALTH_CHECKS", default=True)
+
+# Support for PgBouncer / Neon connection pooling (transaction mode disables server-side cursors)
+database_url_str = env("DATABASE_URL", default="")
+if env.bool("DATABASE_DISABLE_SERVER_SIDE_CURSORS", default=False) or "-pooler" in database_url_str:
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+
+# Database connection options (e.g. connect timeout)
+db_options = DATABASES["default"].get("OPTIONS", {})
+if "connect_timeout" not in db_options:
+    db_options["connect_timeout"] = env.int("DB_CONNECT_TIMEOUT", default=10)
+DATABASES["default"]["OPTIONS"] = db_options
 
 if "test" in sys.argv:
     DATABASES["default"] = {

@@ -130,6 +130,16 @@ class Paper(TimestampedModel):
         ordering = ["-created_at"]
         verbose_name = "Paper"
         verbose_name_plural = "Papers"
+        indexes = [
+            models.Index(
+                fields=["school", "status"],
+                name="paper_school_status_idx",
+            ),
+            models.Index(
+                fields=["created_by", "status"],
+                name="paper_creator_status_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.title} ({self.get_status_display()})"
@@ -268,6 +278,26 @@ class Delivery(TimestampedModel):
         ordering = ["-created_at"]
         verbose_name = "Delivery"
         verbose_name_plural = "Deliveries"
+        indexes = [
+            models.Index(
+                fields=["status", "available_until"],
+                name="delivery_status_avail_idx",
+            ),
+            models.Index(
+                fields=["created_by", "status"],
+                name="delivery_creator_status_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(available_until__gte=models.F("available_from"))
+                    | models.Q(available_from__isnull=True)
+                    | models.Q(available_until__isnull=True)
+                ),
+                name="delivery_dates_valid",
+            ),
+        ]
 
     def __str__(self) -> str:
         return (

@@ -327,6 +327,20 @@ class Question(TimestampedModel):
                 fields=["validation_status", "school"],
                 name="question_val_status_idx",
             ),
+            models.Index(
+                fields=["topic", "validation_status", "difficulty"],
+                name="question_top_val_diff_idx",
+            ),
+            models.Index(
+                fields=["school", "validation_status", "created_at"],
+                name="question_sch_val_dt_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(marks__gte=0),
+                name="question_marks_gte_0",
+            ),
         ]
 
     def __str__(self) -> str:

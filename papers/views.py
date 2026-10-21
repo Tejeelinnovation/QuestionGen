@@ -112,7 +112,10 @@ class PaperListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        papers = get_scoped_papers(request.user)
+        papers = get_scoped_papers(request.user).annotate(
+            version_count_annotated=models.Count("versions", distinct=True),
+            delivery_count_annotated=models.Count("versions__deliveries", distinct=True),
+        )
         serializer = PaperListSerializer(papers, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -556,7 +559,9 @@ class PaperVersionCloneView(APIView):
             constraints_used = source_version.constraints_used.copy()
             source_qids = {item["question_id"] for item in source_version.question_snapshot}
 
-            candidate_qs = Question.objects.select_related("topic", "topic__chapter").filter(
+            candidate_qs = Question.objects.select_related(
+                "topic", "topic__chapter", "topic__chapter__book"
+            ).filter(
                 topic__chapter=paper.chapter,
                 is_active=True,
             )

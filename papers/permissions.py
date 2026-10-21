@@ -77,7 +77,7 @@ def get_scoped_deliveries(user: "User") -> "QuerySet":
         "paper_version__paper",
         "paper_version__paper__chapter",
         "created_by",
-    ).prefetch_related("assigned_students")
+    ).prefetch_related("assigned_students", "attempts")
 
     if not user or not user.is_authenticated:
         return Delivery.objects.none()

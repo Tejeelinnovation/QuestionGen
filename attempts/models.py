@@ -90,6 +90,16 @@ class Attempt(TimestampedModel):
         verbose_name = "Attempt"
         verbose_name_plural = "Attempts"
         unique_together = [("delivery", "student")]
+        indexes = [
+            models.Index(
+                fields=["student", "status"],
+                name="attempt_student_status_idx",
+            ),
+            models.Index(
+                fields=["delivery", "status"],
+                name="attempt_delivery_status_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Attempt #{self.pk} — {self.student.username} on {self.delivery}"
@@ -135,6 +145,12 @@ class Answer(TimestampedModel):
         verbose_name = "Answer"
         verbose_name_plural = "Answers"
         unique_together = [("attempt", "question_id")]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(marks_awarded__gte=0) | models.Q(marks_awarded__isnull=True),
+                name="answer_marks_gte_0",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Answer #{self.pk} (Q{self.question_id}) on Attempt #{self.attempt_id}"

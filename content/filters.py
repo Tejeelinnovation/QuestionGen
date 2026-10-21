@@ -91,12 +91,32 @@ def filter_questions(queryset: "QuerySet", params: dict) -> "QuerySet":
     search = params.get("search") or params.get("q")
     if search and search.strip():
         s = search.strip()
-        queryset = queryset.filter(
-            Q(question_text__icontains=s)
-            | Q(topic__name__icontains=s)
-            | Q(topic__chapter__title__icontains=s)
-            | Q(topic__chapter__book__title__icontains=s)
-        )
+        from django.db import connection
+
+        if connection.vendor == "postgresql":
+            try:
+                from django.contrib.postgres.search import SearchQuery, SearchVector
+                query = SearchQuery(s, search_type="websearch")
+                queryset = queryset.annotate(
+                    search_vector=SearchVector("question_text", weight="A")
+                    + SearchVector("topic__name", "topic__chapter__title", weight="B")
+                ).filter(
+                    Q(search_vector=query) | Q(question_text__icontains=s)
+                )
+            except Exception:
+                queryset = queryset.filter(
+                    Q(question_text__icontains=s)
+                    | Q(topic__name__icontains=s)
+                    | Q(topic__chapter__title__icontains=s)
+                    | Q(topic__chapter__book__title__icontains=s)
+                )
+        else:
+            queryset = queryset.filter(
+                Q(question_text__icontains=s)
+                | Q(topic__name__icontains=s)
+                | Q(topic__chapter__title__icontains=s)
+                | Q(topic__chapter__book__title__icontains=s)
+            )
 
     # Ordering / Sorting
     ordering = params.get("ordering") or params.get("sort")

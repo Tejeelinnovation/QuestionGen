@@ -336,8 +336,8 @@ class QuestionListView(ListAPIView):
             return Question.objects.none()
 
         qs = Question.objects.select_related(
-            "topic", "topic__chapter", "topic__chapter__book"
-        ).prefetch_related("variants").filter(is_active=True)
+            "topic", "topic__chapter", "topic__chapter__book", "school", "created_by"
+        ).prefetch_related("variants", "topics").filter(is_active=True)
 
         # Tenant isolation
         if user.is_superuser or (user.school_id is None and user.has_capability("CREATE_SCHOOL")):
@@ -810,7 +810,7 @@ class ValidationQueueView(ListAPIView):
             return Question.objects.none()
 
         qs = Question.objects.select_related(
-            "topic", "topic__chapter", "topic__chapter__book"
+            "topic", "topic__chapter", "topic__chapter__book", "school", "created_by"
         ).prefetch_related("variants", "topics").filter(is_active=True)
 
         if not is_super:

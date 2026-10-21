@@ -68,12 +68,18 @@ class PaperListSerializer(serializers.ModelSerializer):
         return obj.chapter.title if obj.chapter else None
 
     def get_version_count(self, obj: Paper) -> int:
+        if hasattr(obj, "version_count_annotated"):
+            return obj.version_count_annotated
         return obj.versions.count()
 
     def get_is_assigned(self, obj: Paper) -> bool:
+        if hasattr(obj, "delivery_count_annotated"):
+            return obj.delivery_count_annotated > 0
         return Delivery.objects.filter(paper_version__paper=obj).exists()
 
     def get_delivery_count(self, obj: Paper) -> int:
+        if hasattr(obj, "delivery_count_annotated"):
+            return obj.delivery_count_annotated
         return Delivery.objects.filter(paper_version__paper=obj).count()
 
 
@@ -517,6 +523,8 @@ class DeliverySerializer(serializers.ModelSerializer):
         ]
 
     def get_assigned_students_count(self, obj: Delivery) -> int:
+        if hasattr(obj, "_prefetched_objects_cache") and "assigned_students" in obj._prefetched_objects_cache:
+            return len(obj.assigned_students.all())
         return obj.assigned_students.count()
 
     def get_assigned_students_details(self, obj: Delivery) -> list[dict[str, Any]]:
@@ -529,7 +537,12 @@ class DeliverySerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not request or not request.user or not request.user.is_authenticated:
             return None
-        attempt = obj.attempts.filter(student=request.user).first()
+        if hasattr(obj, "prefetched_my_attempts"):
+            attempt = obj.prefetched_my_attempts[0] if obj.prefetched_my_attempts else None
+        elif hasattr(obj, "_prefetched_objects_cache") and "attempts" in obj._prefetched_objects_cache:
+            attempt = next((a for a in obj.attempts.all() if a.student_id == request.user.id), None)
+        else:
+            attempt = obj.attempts.filter(student=request.user).first()
         if not attempt:
             return None
         return {
