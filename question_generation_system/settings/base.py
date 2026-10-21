@@ -84,6 +84,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.gzip.GZipMiddleware",
+    "core.middleware.RequestCorrelationMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -365,6 +366,62 @@ TOC_V2_ENABLED = env.bool("TOC_V2_ENABLED", default=False)
 # Support large extracted textbook payloads and multi-page diagrams
 DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB
+
+# ---------------------------------------------------------------------------
+# Structured Observability & Logging Configuration
+# ---------------------------------------------------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {
+            "()": "core.middleware.RequestIdFilter",
+        },
+    },
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] [{levelname}] [{request_id}] {name}: {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "[{levelname}] [{request_id}] {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "filters": ["request_id"],
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": env("LOG_LEVEL", default="INFO"),
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "core.request": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "generation": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "content_ingestion": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
 
 
 

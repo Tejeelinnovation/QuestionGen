@@ -138,36 +138,129 @@ class AuditLogListView(APIView):
 class HealthCheckView(APIView):
     """
     GET /api/health/
+    GET /api/health/readiness/
+    GET /api/health/?deep=true
 
-    Lightweight, unauthenticated endpoint for cloud platforms (Render, Railway),
-    Docker healthchecks, and uptime monitors. Verifies database connectivity.
+    Liveness & Readiness probe endpoint for cloud orchestrators (Render, K8s, Docker).
+    - Standard (Liveness): Quick database ping.
+    - Deep (Readiness): Inspects DB latency, Cache read/write, Disk space, and AI backend.
     """
 
     permission_classes = []
 
-    def get(self, request):
+    def get(self, request, *args, **kwargs):
+        import os
+        import shutil
+        import sys
+        import time
+        from django.conf import settings
+        from django.core.cache import cache
         from django.db import connection
+        from django.utils import timezone
 
+        is_deep = request.query_params.get("deep", "").lower() in ("true", "1", "yes") or "readiness" in request.path
+
+        # 1. Database check & latency
+        db_start = time.monotonic()
         db_ok = True
-        error_msg = None
+        db_error = None
+        db_latency_ms = 0.0
         try:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
                 cursor.fetchone()
+            db_latency_ms = round((time.monotonic() - db_start) * 1000.0, 2)
         except Exception as exc:
             db_ok = False
-            error_msg = str(exc)
+            db_error = str(exc)
 
-        payload = {
-            "status": "healthy" if db_ok else "unhealthy",
-            "database": "connected" if db_ok else "disconnected",
+        # Standard lightweight liveness probe
+        if not is_deep:
+            payload = {
+                "status": "healthy" if db_ok else "unhealthy",
+                "timestamp": timezone.now().isoformat(),
+                "database": "connected" if db_ok else "disconnected",
+            }
+            if db_error:
+                payload["error"] = db_error
+            return Response(
+                payload,
+                status=status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # 2. Cache read/write roundtrip check
+        cache_start = time.monotonic()
+        cache_ok = True
+        cache_error = None
+        cache_latency_ms = 0.0
+        try:
+            cache_key = f"_health_probe_{int(time.time())}"
+            cache.set(cache_key, "ok", 10)
+            val = cache.get(cache_key)
+            if val != "ok":
+                cache_ok = False
+                cache_error = "Cache roundtrip value mismatch"
+            cache.delete(cache_key)
+            cache_latency_ms = round((time.monotonic() - cache_start) * 1000.0, 2)
+        except Exception as exc:
+            cache_ok = False
+            cache_error = str(exc)
+
+        # 3. Storage & Disk free space
+        media_root = getattr(settings, "MEDIA_ROOT", "media")
+        disk_ok = True
+        disk_free_gb = 0.0
+        try:
+            os.makedirs(media_root, exist_ok=True)
+            usage = shutil.disk_usage(media_root)
+            disk_free_gb = round(usage.free / (1024**3), 2)
+            disk_writable = os.access(media_root, os.W_OK)
+            if not disk_writable or disk_free_gb < 0.1:
+                disk_ok = False
+        except Exception:
+            disk_ok = False
+
+        # 4. AI & Generation Backend Status
+        generation_backend = getattr(settings, "GENERATION_SERVICE_BACKEND", "seeded_bank")
+        gemini_configured = bool(getattr(settings, "GEMINI_API_KEY", ""))
+
+        overall_healthy = db_ok and cache_ok
+
+        deep_payload = {
+            "status": "healthy" if overall_healthy else "unhealthy",
+            "timestamp": timezone.now().isoformat(),
+            "components": {
+                "database": {
+                    "status": "connected" if db_ok else "disconnected",
+                    "latency_ms": db_latency_ms,
+                    "engine": connection.settings_dict.get("ENGINE", "").split(".")[-1],
+                    "error": db_error,
+                },
+                "cache": {
+                    "status": "connected" if cache_ok else "disconnected",
+                    "latency_ms": cache_latency_ms,
+                    "backend": settings.CACHES.get("default", {}).get("BACKEND", "").split(".")[-1],
+                    "error": cache_error,
+                },
+                "storage": {
+                    "status": "writable" if disk_ok else "degraded",
+                    "free_disk_gb": disk_free_gb,
+                    "media_root": str(media_root),
+                },
+                "generation_service": {
+                    "backend": generation_backend,
+                    "llm_key_configured": gemini_configured,
+                },
+            },
+            "runtime": {
+                "python": sys.version.split()[0],
+                "django": settings.VERSION if hasattr(settings, "VERSION") else "5.x",
+            },
         }
-        if error_msg:
-            payload["error"] = error_msg
 
         return Response(
-            payload,
-            status=status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
+            deep_payload,
+            status=status.HTTP_200_OK if overall_healthy else status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
 

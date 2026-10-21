@@ -476,6 +476,44 @@ class HealthCheckViewTests(TestCase):
         self.assertEqual(response.data.get("status"), "healthy")
         self.assertEqual(response.data.get("database"), "connected")
 
+    def test_deep_readiness_probe_returns_components(self):
+        client = APIClient()
+        response = client.get("/api/health/?deep=true")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("status"), "healthy")
+        components = response.data.get("components", {})
+        self.assertIn("database", components)
+        self.assertIn("cache", components)
+        self.assertIn("storage", components)
+        self.assertIn("generation_service", components)
+        self.assertEqual(components["database"]["status"], "connected")
+        self.assertEqual(components["cache"]["status"], "connected")
+
+    def test_readiness_endpoint_path(self):
+        client = APIClient()
+        response = client.get("/api/health/readiness/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("status"), "healthy")
+        self.assertIn("components", response.data)
+
+
+class RequestCorrelationMiddlewareTests(TestCase):
+    def test_auto_generates_request_id_header(self):
+        client = APIClient()
+        response = client.get("/api/health/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.has_header("X-Request-ID"))
+        req_id = response["X-Request-ID"]
+        self.assertGreater(len(req_id), 8)
+        self.assertTrue(response.has_header("X-Response-Time-Ms"))
+
+    def test_propagates_incoming_request_id_header(self):
+        client = APIClient()
+        custom_id = "trace-test-uuid-999"
+        response = client.get("/api/health/", HTTP_X_REQUEST_ID=custom_id)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get("X-Request-ID"), custom_id)
+
 
 class ApiRootViewTests(TestCase):
     def test_api_root_returns_ok(self):
@@ -558,6 +596,26 @@ class PruneAuditLogsCommandTests(TestCase):
         self.assertEqual(AuditLog.objects.count(), 2)
         self.assertFalse(AuditLog.objects.filter(pk=self.old_proctoring_log.pk).exists())
         self.assertTrue(AuditLog.objects.filter(pk=self.old_log.pk).exists())
+
+
+class SystemSmokeTestCommandTests(TestCase):
+    def test_smoke_test_command_execution(self):
+        from django.core.management import call_command
+        out = io.StringIO()
+        call_command("system_smoke_test", verbose=True, stdout=out)
+        output = out.getvalue()
+        self.assertIn("SYSTEM OPERATIONAL SMOKE TEST SUITE", output)
+        self.assertIn("ALL 6 OPERATIONAL GATES PASSED CLEANLY", output)
+
+    def test_smoke_test_json_output(self):
+        import json
+        from django.core.management import call_command
+        out = io.StringIO()
+        call_command("system_smoke_test", json=True, stdout=out)
+        payload = json.loads(out.getvalue())
+        self.assertEqual(payload["overall_status"], "PASSED")
+        self.assertEqual(payload["total_gates"], 6)
+        self.assertEqual(payload["failed_gates"], 0)
 
 
 
