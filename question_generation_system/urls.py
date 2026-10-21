@@ -5,12 +5,23 @@ Root URL configuration for the Question Generation System.
 from django.contrib import admin
 from django.urls import include, path
 
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
+
 from core.views import ApiRootView
 from users.urls import auth_urlpatterns, users_urlpatterns
 
 urlpatterns = [
     # API Landing & Service Discovery
     path("", ApiRootView.as_view(), name="api-root"),
+
+    # OpenAPI 3.0 Schema & Interactive Documentation
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 
     # Django admin
     path("admin/", admin.site.urls),

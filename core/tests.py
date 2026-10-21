@@ -485,6 +485,79 @@ class ApiRootViewTests(TestCase):
         self.assertEqual(response.data.get("name"), "Question Generation System API")
         self.assertEqual(response.data.get("status"), "online")
         self.assertIn("health", response.data.get("endpoints", {}))
+        self.assertIn("docs", response.data.get("endpoints", {}))
+        self.assertIn("schema", response.data.get("endpoints", {}))
         self.assertIn("admin", response.data.get("endpoints", {}))
+
+
+class SwaggerDocsRouteTests(TestCase):
+    def test_openapi_schema_endpoint(self):
+        client = APIClient()
+        response = client.get("/api/schema/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_swagger_ui_endpoint(self):
+        client = APIClient()
+        response = client.get("/api/docs/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(b"swagger-ui", response.content)
+
+
+class PruneAuditLogsCommandTests(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        now = timezone.now()
+        # Create old and recent audit logs
+        self.old_log = AuditLog.objects.create(
+            action="user.login",
+            target_type="users.user",
+            target_id="1",
+        )
+        # Directly update timestamp in database (auto_now_add bypass)
+        AuditLog.objects.filter(pk=self.old_log.pk).update(
+            timestamp=now - timedelta(days=120)
+        )
+
+        self.old_proctoring_log = AuditLog.objects.create(
+            action="exam.proctoring_warning",
+            target_type="attempts.attempt",
+            target_id="2",
+        )
+        AuditLog.objects.filter(pk=self.old_proctoring_log.pk).update(
+            timestamp=now - timedelta(days=100)
+        )
+
+        self.recent_log = AuditLog.objects.create(
+            action="user.login",
+            target_type="users.user",
+            target_id="3",
+        )
+
+    def test_prune_dry_run_preserves_records(self):
+        from django.core.management import call_command
+        out = io.StringIO()
+        call_command("prune_audit_logs", days=90, dry_run=True, stdout=out)
+        self.assertIn("[DRY-RUN]", out.getvalue())
+        self.assertEqual(AuditLog.objects.count(), 3)
+
+    def test_prune_deletes_records_older_than_cutoff(self):
+        from django.core.management import call_command
+        out = io.StringIO()
+        call_command("prune_audit_logs", days=90, stdout=out)
+        self.assertIn("Successfully pruned 2 audit log record(s)", out.getvalue())
+        self.assertEqual(AuditLog.objects.count(), 1)
+        self.assertTrue(AuditLog.objects.filter(pk=self.recent_log.pk).exists())
+
+    def test_prune_filters_by_specific_action(self):
+        from django.core.management import call_command
+        out = io.StringIO()
+        call_command("prune_audit_logs", days=90, action="exam.proctoring_warning", stdout=out)
+        self.assertIn("Successfully pruned 1 audit log record(s)", out.getvalue())
+        self.assertEqual(AuditLog.objects.count(), 2)
+        self.assertFalse(AuditLog.objects.filter(pk=self.old_proctoring_log.pk).exists())
+        self.assertTrue(AuditLog.objects.filter(pk=self.old_log.pk).exists())
+
 
 

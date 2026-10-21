@@ -37,6 +37,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
 from core.audit import log_action
 from core.pagination import StandardPageNumberPagination
+from core.throttles import AuthRateThrottle
 
 logger = logging.getLogger(__name__)
 from .models import Capability, CapabilityName, User, UserCapability
@@ -71,6 +72,7 @@ class LoginView(APIView):
     """
 
     permission_classes = []  # Public endpoint
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={"request": request})
@@ -321,6 +323,7 @@ class PasswordResetRequestView(APIView):
     """
 
     permission_classes = []
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)

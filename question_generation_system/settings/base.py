@@ -54,6 +54,7 @@ THIRD_PARTY_APPS = [
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "drf_spectacular",
 ]
 
 LOCAL_APPS = [
@@ -150,15 +151,32 @@ if "test" in sys.argv:
     }
 
 # ---------------------------------------------------------------------------
-# Caching configuration
+# Caching configuration (Redis in staging/prod with LocMem fallback)
 # ---------------------------------------------------------------------------
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "qgs-cache-locmem",
-        "TIMEOUT": env.int("CACHE_TIMEOUT", default=300),
+REDIS_URL = env("REDIS_URL", default="")
+
+if REDIS_URL and "test" not in sys.argv:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "TIMEOUT": env.int("CACHE_TIMEOUT", default=300),
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "IGNORE_EXCEPTIONS": True,  # Fall back to database gracefully if Redis drops
+                "SOCKET_CONNECT_TIMEOUT": 5,
+                "SOCKET_TIMEOUT": 5,
+            },
+        }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "qgs-cache-locmem",
+            "TIMEOUT": env.int("CACHE_TIMEOUT", default=300),
+        }
+    }
 
 # ---------------------------------------------------------------------------
 # Password validation
@@ -241,6 +259,42 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    # OpenAPI 3.0 schema generation via drf-spectacular
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Rate limiting & Throttling
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON_RATE", default="120/minute"),
+        "user": env("THROTTLE_USER_RATE", default="1200/minute"),
+        "auth": env("THROTTLE_AUTH_RATE", default="15/minute"),
+        "exam_submit": env("THROTTLE_EXAM_SUBMIT_RATE", default="10/minute"),
+    },
+}
+
+# During automated test runs, raise throttle limits to prevent false-positive 429 errors
+if "test" in sys.argv:
+    REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+        "anon": "100000/day",
+        "user": "100000/day",
+        "auth": "100000/day",
+        "exam_submit": "100000/day",
+    }
+
+# ---------------------------------------------------------------------------
+# drf-spectacular (OpenAPI 3.0 / Swagger UI) configuration
+# ---------------------------------------------------------------------------
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Question Generation System API",
+    "DESCRIPTION": (
+        "REST API for Question Generation System — question banks, paper assembly, "
+        "online & print test delivery, student assessment, and validation workflow."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
 }
 
 # ---------------------------------------------------------------------------

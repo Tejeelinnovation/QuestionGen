@@ -25,6 +25,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.audit import log_action
+from core.throttles import ExamSubmitRateThrottle
 from papers.models import Delivery, DeliveryMode
 from .models import Answer, Attempt, AttemptStatus
 from .permissions import (
@@ -290,6 +291,7 @@ class AttemptSubmitView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ExamSubmitRateThrottle]
 
     def post(self, request, pk):
         attempt = Attempt.objects.select_related(

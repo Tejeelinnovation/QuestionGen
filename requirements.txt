@@ -38,4 +38,11 @@ google-auth==2.59.1
 google-auth-httplib2==0.4.3
 google-auth-oauthlib==1.5.0
 
+# OpenAPI 3.0 / Swagger documentation
+drf-spectacular==0.30.0
+inflection==0.5.1
+
+# Redis caching
+django-redis==6.0.0
+
 

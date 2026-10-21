@@ -187,6 +187,9 @@ class ApiRootView(APIView):
                 "status": "online",
                 "endpoints": {
                     "health": "/api/health/",
+                    "docs": "/api/docs/",
+                    "schema": "/api/schema/",
+                    "redoc": "/api/redoc/",
                     "admin": "/admin/",
                     "auth": "/api/auth/",
                     "users": "/api/users/",
