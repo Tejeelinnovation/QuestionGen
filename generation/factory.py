@@ -12,11 +12,14 @@ from typing import Optional, Type
 from django.conf import settings
 
 from generation.interfaces import QuestionGenerationService
+from generation.services.llm_generation import LLMQuestionGenerationService
 from generation.services.seeded_bank import SeededBankGenerationService
 
 # Registry mapping backend identifiers to service classes
 _BACKENDS: dict[str, Type[QuestionGenerationService]] = {
     "seeded_bank": SeededBankGenerationService,
+    "llm": LLMQuestionGenerationService,
+    "gemini": LLMQuestionGenerationService,
 }
 
 

@@ -179,3 +179,226 @@ class GenerationFactoryTests(TestCase):
         drafts = service.generate_questions(1, {})
         self.assertEqual(len(drafts), 1)
         self.assertEqual(drafts[0].question_text, "AI Generated Question")
+
+
+class DocumentChunkerTests(TestCase):
+    """Tests for intelligent document chunking with LaTeX protection."""
+
+    def setUp(self):
+        from content_ingestion.chunker import DocumentChunker
+        self.chunker = DocumentChunker(default_chunk_size=300, default_overlap=60, min_chunk_size=50)
+
+    def test_short_text_single_chunk(self):
+        text = "This is a brief textbook section about Newton's Laws."
+        chunks = self.chunker.chunk_text(text)
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0].text, text)
+        self.assertEqual(chunks[0].total_chunks, 1)
+
+    def test_sliding_window_overlap(self):
+        long_text = (
+            "Section 1: Thermodynamics.\n\n"
+            "The first law of thermodynamics is an adaptation of the law of conservation of energy. "
+            "It states that the total energy of an isolated system is constant. "
+            "Energy can be transformed from one form to another, but can neither be created nor destroyed. "
+            "Heat and work are mutually convertible in thermodynamic processes.\n\n"
+            "Section 2: Second Law.\n\n"
+            "The second law establishes the concept of entropy as a physical property of a thermodynamic system. "
+            "It dictates that heat does not spontaneously flow from a colder body to a hotter body without external work."
+        )
+        chunks = self.chunker.chunk_text(long_text, chunk_size=200, chunk_overlap=50)
+        self.assertGreater(len(chunks), 1)
+        # Check that subsequent chunks have overlap
+        self.assertGreater(chunks[1].overlap_chars, 0)
+
+    def test_latex_formula_not_severed(self):
+        # Place a formula right across the boundary
+        formula = "$$\\int_{a}^{b} f(x) dx = F(b) - F(a)$$"
+        text = (
+            "Here is the Fundamental Theorem of Calculus: "
+            + formula
+            + ". This connects derivatives with definite integrals in real analysis."
+        )
+        chunks = self.chunker.chunk_text(text, chunk_size=70, chunk_overlap=20, preserve_latex=True)
+        # Verify formula is whole in at least one chunk and never cut in half
+        found_whole_formula = False
+        for c in chunks:
+            if formula in c.text:
+                found_whole_formula = True
+            # Never contains severed opening or closing
+            if "$$" in c.text:
+                self.assertEqual(c.text.count("$$") % 2, 0)
+        self.assertTrue(found_whole_formula)
+
+
+class TokenBudgetManagerTests(TestCase):
+    """Tests for TokenBudgetManager and priority context fitting."""
+
+    def setUp(self):
+        from generation.token_budget import TokenBudgetManager
+        self.manager = TokenBudgetManager()
+
+    def test_latex_token_estimation_density(self):
+        prose = "The velocity of the particle increases steadily over time."
+        math_heavy = "$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a} \\cdot \\int_0^\\infty e^{-x^2} dx$$"
+        prose_tokens = self.manager.estimate_tokens(prose)
+        math_tokens = self.manager.estimate_tokens(math_heavy)
+        self.assertGreater(prose_tokens, 0)
+        self.assertGreater(math_tokens, 0)
+        # Math formula should have higher token density per character
+        math_density = math_tokens / len(math_heavy)
+        prose_density = prose_tokens / len(prose)
+        self.assertGreater(math_density, prose_density)
+
+    def test_calculate_budget_reserves_output(self):
+        report = self.manager.calculate_budget(
+            model_name="gemini-2.0-flash",
+            system_prompt="Generate test questions in JSON format.",
+            target_question_count=5,
+        )
+        self.assertGreater(report.reserved_output_tokens, 1000)
+        self.assertGreater(report.context_budget_available, 5000)
+        self.assertFalse(report.is_truncated)
+
+    def test_fit_educational_items_preserves_high_priority(self):
+        items = [
+            {"item_type": "PARAGRAPH", "content": "Narrative intro filler text " * 50},
+            {"item_type": "FORMULA", "content": "$$E = mc^2$$"},
+            {"item_type": "DEFINITION", "content": "Work is defined as force multiplied by displacement."},
+            {"item_type": "PARAGRAPH", "content": "More background historical context " * 50},
+        ]
+        # Restrict budget so not all items fit
+        fitted, report = self.manager.fit_educational_items(items, available_budget=80)
+        self.assertTrue(report.is_truncated)
+        fitted_types = [item["item_type"] for item in fitted]
+        # FORMULA and DEFINITION must be preserved over long paragraphs
+        self.assertIn("FORMULA", fitted_types)
+        self.assertIn("DEFINITION", fitted_types)
+
+
+class DuplicateQuestionDetectorTests(TestCase):
+    """Tests for DuplicateQuestionDetector similarity scoring and deduplication."""
+
+    def setUp(self):
+        from generation.duplicate_detector import DuplicateQuestionDetector
+        self.detector = DuplicateQuestionDetector(default_threshold=0.80)
+
+    def test_exact_normalized_match(self):
+        q1 = "What is Newton's First Law of Motion?"
+        q2 = "what is newton's first law of motion"
+        match = self.detector.is_duplicate = self.detector.compare_questions(
+            QuestionDraft(question_text=q1, question_type="SHORT_ANSWER", marks=2, difficulty="EASY", learner_level="BEGINNER", correct_answer="Law of inertia"),
+            QuestionDraft(question_text=q2, question_type="SHORT_ANSWER", marks=2, difficulty="EASY", learner_level="BEGINNER", correct_answer="Law of inertia"),
+        )
+        self.assertTrue(match.is_duplicate)
+        self.assertEqual(match.reason, "EXACT_NORMALIZED")
+        self.assertEqual(match.similarity_score, 1.0)
+
+    def test_paraphrased_similarity_detected(self):
+        q1 = "Calculate the acceleration of a car having mass 1000 kg and force 5000 N."
+        q2 = "Determine the acceleration of an automobile with mass 1000 kg and net force 5000 N."
+        draft1 = QuestionDraft(question_text=q1, question_type="SHORT_ANSWER", marks=3, difficulty="MEDIUM", learner_level="INTERMEDIATE", correct_answer="5 m/s^2")
+        draft2 = QuestionDraft(question_text=q2, question_type="SHORT_ANSWER", marks=3, difficulty="MEDIUM", learner_level="INTERMEDIATE", correct_answer="5 m/s^2")
+        match = self.detector.compare_questions(draft1, draft2, threshold=0.75)
+        self.assertTrue(match.is_duplicate)
+        self.assertGreater(match.similarity_score, 0.75)
+
+    def test_distinct_questions_not_flagged(self):
+        q1 = "Explain the process of photosynthesis in green plants."
+        q2 = "What are the stages of cellular respiration in human cells?"
+        draft1 = QuestionDraft(question_text=q1, question_type="LONG_ANSWER", marks=5, difficulty="HARD", learner_level="ADVANCED", correct_answer="Chlorophyll...")
+        draft2 = QuestionDraft(question_text=q2, question_type="LONG_ANSWER", marks=5, difficulty="HARD", learner_level="ADVANCED", correct_answer="Glycolysis...")
+        match = self.detector.compare_questions(draft1, draft2)
+        self.assertFalse(match.is_duplicate)
+        self.assertLess(match.similarity_score, 0.50)
+
+    def test_mcq_option_match_detection(self):
+        draft1 = QuestionDraft(
+            question_text="Which gas is released during photosynthesis?",
+            question_type="MCQ",
+            marks=1,
+            difficulty="EASY",
+            learner_level="BEGINNER",
+            correct_answer="Oxygen",
+            options={"A": "Nitrogen", "B": "Carbon Dioxide", "C": "Oxygen", "D": "Hydrogen"},
+        )
+        draft2 = QuestionDraft(
+            question_text="Identify the gas liberated in photosynthetic reactions.",
+            question_type="MCQ",
+            marks=1,
+            difficulty="EASY",
+            learner_level="BEGINNER",
+            correct_answer="Oxygen",
+            options={"A": "Carbon Dioxide", "B": "Oxygen", "C": "Hydrogen", "D": "Nitrogen"},
+        )
+        match = self.detector.compare_questions(draft1, draft2)
+        self.assertTrue(match.is_duplicate)
+        self.assertEqual(match.reason, "MCQ_OPTION_MATCH")
+
+    def test_batch_deduplication_filters_redundant(self):
+        batch = [
+            QuestionDraft(question_text="What is Ohm's law?", question_type="SHORT_ANSWER", marks=2, difficulty="EASY", learner_level="BEGINNER", correct_answer="V = IR"),
+            QuestionDraft(question_text="State Ohm's law formula.", question_type="SHORT_ANSWER", marks=2, difficulty="EASY", learner_level="BEGINNER", correct_answer="V = IR"),
+            QuestionDraft(question_text="Define electric current.", question_type="SHORT_ANSWER", marks=2, difficulty="EASY", learner_level="BEGINNER", correct_answer="I = Q/t"),
+        ]
+        unique, dups = self.detector.filter_batch_duplicates(batch, threshold=0.75)
+        self.assertEqual(len(unique), 2)
+        self.assertEqual(len(dups), 1)
+
+
+class LLMQuestionGenerationServiceTests(TestCase):
+    """Tests for LLMQuestionGenerationService with provider routing and fallback."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.book = Book.objects.create(title="Physics 12", subject="Physics", grade="12")
+        cls.chapter = Chapter.objects.create(book=cls.book, title="Current Electricity", chapter_order=1)
+        cls.topic = Topic.objects.create(chapter=cls.chapter, name="Resistance")
+        cls.q1 = Question.objects.create(
+            topic=cls.topic,
+            question_text="What is electrical resistance?",
+            question_type="SHORT_ANSWER",
+            marks=Decimal("2.00"),
+            difficulty="EASY",
+            learner_level="BEGINNER",
+            correct_answer="Opposition to current",
+        )
+
+    def test_factory_resolves_llm_service(self):
+        service = get_generation_service("llm")
+        from generation.services.llm_generation import LLMQuestionGenerationService
+        self.assertIsInstance(service, LLMQuestionGenerationService)
+
+    def test_service_falls_back_when_no_api_key(self):
+        from generation.services.llm_generation import LLMQuestionGenerationService
+        service = LLMQuestionGenerationService(api_key="")
+        drafts = service.generate_questions(self.chapter, {"quantity": 1})
+        self.assertEqual(len(drafts), 1)
+        # Should gracefully return question from SeededBankGenerationService
+        self.assertEqual(drafts[0].question_text, "What is electrical resistance?")
+        self.assertEqual(drafts[0].metadata.get("source"), "seeded_bank")
+
+    def test_response_parsing_valid_json(self):
+        from generation.services.llm_generation import LLMQuestionGenerationService
+        service = LLMQuestionGenerationService(api_key="mock_key")
+        mock_json = """
+        [
+          {
+            "question_text": "What is the SI unit of electric potential?",
+            "question_type": "MCQ",
+            "marks": 1.0,
+            "difficulty": "EASY",
+            "learner_level": "BEGINNER",
+            "correct_answer": "Volt",
+            "options": {"A": "Ampere", "B": "Volt", "C": "Ohm", "D": "Watt"},
+            "source_reference": "NCERT Page 42"
+          }
+        ]
+        """
+        drafts = service._parse_llm_response(mock_json, self.chapter.id, {})
+        self.assertEqual(len(drafts), 1)
+        self.assertEqual(drafts[0].question_text, "What is the SI unit of electric potential?")
+        self.assertEqual(drafts[0].question_type, "MCQ")
+        self.assertEqual(drafts[0].marks, Decimal("1.0"))
+        self.assertEqual(drafts[0].options["B"], "Volt")
+        self.assertEqual(drafts[0].metadata["source"], "llm_pipeline")
