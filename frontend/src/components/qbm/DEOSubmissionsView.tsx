@@ -19,6 +19,8 @@ import { Pagination } from '../ui/pagination';
 import { SkeletonSubmissionsList } from '../ui/skeleton';
 import { getStaggerDelay, CARD_MOTION } from '../../lib/motion';
 import { useToast } from '../../context/ToastContext';
+import { MathText } from '../ui/MathText';
+import { MathToolbar } from '../ui/MathToolbar';
 
 interface DEOSubmissionsViewProps {
   onNewQuestionClick?: () => void;
@@ -117,11 +119,29 @@ export const DEOSubmissionsView: React.FC<DEOSubmissionsViewProps> = ({
       });
     }
 
+    const previousQuestion = resubmittingQuestion;
+    const optimisticRevision = (previousQuestion.revision || 1) + 1;
+
+    // Optimistically update question list with pending status
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === previousQuestion.id
+          ? {
+              ...q,
+              validation_status: 'SUBMITTED',
+              revision: optimisticRevision,
+              question_text: resubmitText.trim(),
+            }
+          : q
+      )
+    );
+
     setIsSubmittingResubmit(true);
     setResubmitError(null);
+    setResubmittingQuestion(null);
 
     try {
-      await contentApi.resubmitQuestion(resubmittingQuestion.id, {
+      await contentApi.resubmitQuestion(previousQuestion.id, {
         question_text: resubmitText.trim(),
         options: formattedOptions,
         correct_answer: resubmitAnswer.trim() || undefined,
@@ -129,13 +149,15 @@ export const DEOSubmissionsView: React.FC<DEOSubmissionsViewProps> = ({
         comment: resubmitComment.trim() || undefined,
       });
 
-      toast.success(`Question #${resubmittingQuestion.id} successfully updated and resubmitted for validation!`);
-      setResubmittingQuestion(null);
+      toast.success(`Question #${previousQuestion.id} successfully updated and resubmitted for validation!`);
       fetchQuestions();
     } catch (err: any) {
       const errText = err.response?.data?.detail || 'Failed to resubmit question.';
-      setResubmitError(errText);
-      toast.error(errText);
+      toast.error(`Resubmission failed: ${errText}`);
+      // Revert optimistic update
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === previousQuestion.id ? previousQuestion : q))
+      );
     } finally {
       setIsSubmittingResubmit(false);
     }
@@ -347,9 +369,9 @@ export const DEOSubmissionsView: React.FC<DEOSubmissionsViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Question Text */}
+                  {/* Question Text with KaTeX Math rendering */}
                   <div className="text-xs text-ink font-body whitespace-pre-wrap leading-relaxed">
-                    {q.question_text}
+                    <MathText text={q.question_text} />
                   </div>
 
                   {/* Multiple Topics Pills */}
@@ -433,17 +455,25 @@ export const DEOSubmissionsView: React.FC<DEOSubmissionsViewProps> = ({
                 </div>
               )}
 
-              {/* Editable Question Text */}
-              <div className="space-y-1">
-                <label className="block text-xs font-heading font-semibold text-ink">
-                  Question Text *
-                </label>
+              {/* Editable Question Text with KaTeX Math Toolbar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-heading font-semibold text-ink">
+                    Question Text *
+                  </label>
+                  <span className="text-[10px] text-ink/50 font-mono">LaTeX & Chemistry supported</span>
+                </div>
+                <MathToolbar
+                  value={resubmitText}
+                  onInsert={(snippet) => setResubmitText((prev) => prev + snippet)}
+                />
                 <textarea
                   rows={4}
                   required
                   value={resubmitText}
                   onChange={(e) => setResubmitText(e.target.value)}
-                  className="w-full p-3 rounded-card bg-bg border border-border text-xs text-ink focus:border-forest focus:outline-none"
+                  placeholder="Enter question text or formulas (e.g. $x^2 + y^2 = r^2$)..."
+                  className="w-full p-3 rounded-b-card bg-bg border border-border text-xs text-ink focus:border-forest focus:outline-none font-mono"
                 />
               </div>
 

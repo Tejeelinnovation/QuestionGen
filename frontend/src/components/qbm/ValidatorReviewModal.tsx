@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { MathText } from '../ui/MathText';
 
 interface ValidatorReviewModalProps {
   question: Question | null;
@@ -75,6 +76,54 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
     }
   }, [isOpen, question]);
 
+  // Keyboard accessibility shortcuts for power-user validators
+  useEffect(() => {
+    if (!isOpen || !question) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape closes action prompt or entire modal
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (activeAction) {
+          setActiveAction(null);
+        } else {
+          onClose();
+        }
+        return;
+      }
+
+      // Alt+A: Approve
+      if (e.altKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setActiveAction('APPROVE');
+        return;
+      }
+
+      // Alt+R: Reject
+      if (e.altKey && e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        setActiveAction('REJECT');
+        return;
+      }
+
+      // Alt+C: Send for correction
+      if (e.altKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        setActiveAction('SEND_FOR_CORRECTION');
+        return;
+      }
+
+      // Ctrl+Enter or Cmd+Enter executes active action
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && activeAction) {
+        e.preventDefault();
+        handleExecuteValidationAction();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, question, activeAction, actionComment]);
+
   if (!isOpen || !question) return null;
 
   const handleSaveMetadata = async () => {
@@ -121,34 +170,43 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
       return;
     }
 
-    setIsPerformingAction(true);
-    setFeedbackMessage(null);
+    const originalQuestion = { ...question };
+    const optimisticStatus =
+      activeAction === 'APPROVE'
+        ? 'APPROVED'
+        : activeAction === 'REJECT'
+        ? 'REJECTED'
+        : 'CORRECTION_REQUIRED';
 
+    const optimisticQuestion: Question = {
+      ...question,
+      validation_status: optimisticStatus as any,
+    };
+
+    // Optimistically update parent list immediately for instant UI feedback
+    onUpdated(optimisticQuestion);
+    onClose();
+
+    if (activeAction === 'APPROVE') {
+      toast.success(`Question #${question.id} approved and added to Question Bank!`);
+    } else if (activeAction === 'SEND_FOR_CORRECTION') {
+      toast.warning(`Question #${question.id} returned to DEO for corrections.`);
+    } else if (activeAction === 'REJECT') {
+      toast.error(`Question #${question.id} has been rejected.`);
+    }
+
+    setIsPerformingAction(true);
     try {
       const updated = await contentApi.validateQuestion(question.id, {
         action: activeAction,
         comment: actionComment.trim() || undefined,
       });
-
-      if (activeAction === 'APPROVE') {
-        toast.success(`Question #${question.id} successfully approved and added to Question Bank!`);
-      } else if (activeAction === 'SEND_FOR_CORRECTION') {
-        toast.warning(`Question #${question.id} returned to DEO for corrections.`);
-      } else if (activeAction === 'REJECT') {
-        toast.error(`Question #${question.id} has been rejected.`);
-      }
-
-      setActiveAction(null);
-      setActionComment('');
       onUpdated(updated);
-      onClose();
     } catch (err: any) {
       const errText = err.response?.data?.detail || 'Failed to execute validation action.';
-      setFeedbackMessage({
-        type: 'error',
-        text: errText,
-      });
-      toast.error(errText);
+      toast.error(`Validation action failed: ${errText}`);
+      // Rollback optimistic state
+      onUpdated(originalQuestion);
     } finally {
       setIsPerformingAction(false);
     }
@@ -400,7 +458,7 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
                   Question Text ({question.question_type_display || question.question_type})
                 </label>
                 <div className="p-3.5 rounded-card bg-bg border border-border text-xs text-ink font-body whitespace-pre-wrap leading-relaxed">
-                  {question.question_text}
+                  <MathText text={question.question_text} />
                 </div>
               </div>
 
@@ -431,7 +489,7 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
                           >
                             {key}
                           </span>
-                          <span className="mt-0.5 leading-snug">{String(val)}</span>
+                          <MathText text={String(val)} className="mt-0.5 leading-snug flex-1" />
                         </div>
                       );
                     })}
@@ -446,7 +504,7 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
                     Correct Answer
                   </label>
                   <div className="p-2.5 rounded-card bg-bg border border-border text-xs font-mono font-bold text-forest">
-                    {question.correct_answer || 'N/A'}
+                    <MathText text={question.correct_answer || 'N/A'} />
                   </div>
                 </div>
 
@@ -465,8 +523,8 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
                   <label className="block text-xs font-heading font-semibold text-ink">
                     Explanation / Solution Rubric
                   </label>
-                  <div className="p-3 rounded-card bg-bg border border-border text-xs text-ink/80 leading-relaxed">
-                    {question.explanation}
+                  <div className="p-3 rounded-card bg-bg border border-border text-xs text-ink/80 leading-relaxed max-h-40 overflow-y-auto">
+                    <MathText text={question.explanation} />
                   </div>
                 </div>
               )}
@@ -565,27 +623,33 @@ export const ValidatorReviewModal: React.FC<ValidatorReviewModalProps> = ({
             <button
               type="button"
               onClick={() => setActiveAction('REJECT')}
-              className="px-3 py-2 text-xs font-heading font-semibold rounded-pill border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer"
+              title="Shortcut: Alt+R"
+              className="px-3 py-2 text-xs font-heading font-semibold rounded-pill border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer flex items-center gap-1.5"
             >
-              Reject Question
+              <span>Reject Question</span>
+              <kbd className="hidden sm:inline-block text-[10px] bg-red-100 text-red-800 px-1 py-0.2 rounded font-mono border border-red-200">Alt+R</kbd>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveAction('SEND_FOR_CORRECTION')}
+              title="Shortcut: Alt+C"
               className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-ember/30 text-ember bg-ember/10 hover:bg-ember/20 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Send for Correction</span>
+              <kbd className="hidden sm:inline-block text-[10px] bg-ember/20 text-ember px-1 py-0.2 rounded font-mono border border-ember/30">Alt+C</kbd>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveAction('APPROVE')}
+              title="Shortcut: Alt+A"
               className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Approve Question</span>
+              <kbd className="hidden sm:inline-block text-[10px] bg-white/25 text-white px-1 py-0.2 rounded font-mono">Alt+A</kbd>
             </button>
           </div>
         </div>

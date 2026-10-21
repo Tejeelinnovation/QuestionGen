@@ -8,9 +8,11 @@ import { useExamProctoring } from '../../hooks/useExamProctoring';
 import { ProctoringWarningModal } from '../../components/attempts/ProctoringWarningModal';
 import { TestAttemptPageTablet } from '../tablet/attempts/TestAttemptPageTablet';
 import { TestAttemptPageMobile } from '../mobile/attempts/TestAttemptPageMobile';
-import { Maximize2, ShieldAlert, Clock } from 'lucide-react';
+import { Maximize2, ShieldAlert, Clock, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useExamCountdown } from '../../hooks/useExamCountdown';
 import { ConfirmSubmitModal } from '../../components/attempts/ConfirmSubmitModal';
+import { useOfflineExamSync } from '../../hooks/useOfflineExamSync';
+import { MathText } from '../../components/ui/MathText';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -29,6 +31,28 @@ const TestAttemptPageDesktop: React.FC = () => {
   const [isExpired, setIsExpired] = useState(false);
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState<number>(0);
+  const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Offline resilience hook: caches answers in localStorage and auto-syncs on reconnect
+  const {
+    isOnline,
+    pendingCount,
+    isSyncing,
+    saveAnswer: offlineSaveAnswer,
+    flushQueue,
+    getStoredAnswers,
+    clearOfflineCache,
+  } = useOfflineExamSync({
+    deliveryId,
+    attemptId: attemptData?.attempt_id,
+    onAnswerSaved: (qId) => {
+      setSaveStatuses((prev) => ({ ...prev, [qId]: 'saved' }));
+    },
+    onAnswerSaveError: (qId) => {
+      setSaveStatuses((prev) => ({ ...prev, [qId]: 'error' }));
+    },
+  });
 
   const handleAutoSubmitOnMaxWarnings = useCallback(async () => {
     if (!attemptData || isSubmitting) return;
@@ -38,9 +62,10 @@ const TestAttemptPageDesktop: React.FC = () => {
     } catch {
       // Ignore if already submitted
     } finally {
+      clearOfflineCache();
       navigate(`/attempts/${attemptData.attempt_id}/result`, { replace: true });
     }
-  }, [attemptData, isSubmitting, navigate]);
+  }, [attemptData, isSubmitting, navigate, clearOfflineCache]);
 
   // Reverse countdown timer with auto-submit on 00:00
   const { formattedTime, isUrgent } = useExamCountdown({
@@ -97,18 +122,21 @@ const TestAttemptPageDesktop: React.FC = () => {
 
         // If already submitted or evaluated, redirect straight to result
         if (data.status === 'SUBMITTED' || data.status === 'EVALUATED') {
+          clearOfflineCache();
           navigate(`/attempts/${data.attempt_id}/result`, { replace: true });
           return;
         }
 
         setAttemptData(data);
 
-        // Initialize answers map from existing student_responses
+        // Initialize answers map: Merge server responses with any offline cached entries
+        const localBackup = getStoredAnswers();
         const initialAnswers: Record<number, string> = {};
         const initialStatuses: Record<number, SaveStatus> = {};
         data.questions.forEach((q) => {
-          initialAnswers[q.question_id] = q.student_response || '';
-          initialStatuses[q.question_id] = q.student_response ? 'saved' : 'idle';
+          const val = q.student_response || localBackup[q.question_id] || '';
+          initialAnswers[q.question_id] = val;
+          initialStatuses[q.question_id] = q.student_response ? 'saved' : val ? 'saving' : 'idle';
         });
         setAnswers(initialAnswers);
         setSaveStatuses(initialStatuses);
@@ -121,6 +149,7 @@ const TestAttemptPageDesktop: React.FC = () => {
         const resData = err.response?.data;
         const detail = resData?.detail;
         if (resData?.attempt_id) {
+          clearOfflineCache();
           navigate(`/attempts/${resData.attempt_id}/result`, { replace: true });
           return;
         }
@@ -138,21 +167,15 @@ const TestAttemptPageDesktop: React.FC = () => {
     if (deliveryId) {
       startOrResume();
     }
-  }, [deliveryId, navigate]);
+  }, [deliveryId, navigate, clearOfflineCache, getStoredAnswers]);
 
-  // Actual API save function
+  // Actual API save function with offline local resilience
   const performSave = useCallback(
-    async (attemptId: number, questionId: number, responseText: string) => {
+    async (_attemptId: number, questionId: number, responseText: string) => {
       setSaveStatuses((prev) => ({ ...prev, [questionId]: 'saving' }));
-      try {
-        await attemptsApi.saveAnswer(attemptId, questionId, responseText);
-        setSaveStatuses((prev) => ({ ...prev, [questionId]: 'saved' }));
-      } catch (err: any) {
-        console.error(`Failed to auto-save answer for question ${questionId}:`, err);
-        setSaveStatuses((prev) => ({ ...prev, [questionId]: 'error' }));
-      }
+      await offlineSaveAnswer(questionId, responseText);
     },
-    []
+    [offlineSaveAnswer]
   );
 
   // Debounced handler for text inputs
@@ -172,17 +195,74 @@ const TestAttemptPageDesktop: React.FC = () => {
   };
 
   // Immediate handler for option select (MCQ)
-  const handleOptionSelect = (questionId: number, optionKey: string) => {
-    if (isExpired || isSubmitting || !attemptData) return;
+  const handleOptionSelect = useCallback(
+    (questionId: number, optionKey: string) => {
+      if (isExpired || isSubmitting || !attemptData) return;
 
-    setAnswers((prev) => ({ ...prev, [questionId]: optionKey }));
+      setAnswers((prev) => ({ ...prev, [questionId]: optionKey }));
 
-    if (debounceTimers.current[questionId]) {
-      clearTimeout(debounceTimers.current[questionId]);
-    }
+      if (debounceTimers.current[questionId]) {
+        clearTimeout(debounceTimers.current[questionId]);
+      }
 
-    performSave(attemptData.attempt_id, questionId, optionKey);
-  };
+      performSave(attemptData.attempt_id, questionId, optionKey);
+    },
+    [isExpired, isSubmitting, attemptData, performSave]
+  );
+
+  // Keyboard navigation for students:
+  // Alt+Down / Alt+Up to jump between questions
+  // 1-4 or A-D to select options when not typing in text inputs
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isExpired || isSubmitting || !attemptData) return;
+
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+      if (e.altKey && (e.key === 'ArrowDown' || e.key === 'j')) {
+        e.preventDefault();
+        setActiveQuestionIndex((prev) => {
+          const next = Math.min(prev + 1, attemptData.questions.length - 1);
+          questionRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return next;
+        });
+        return;
+      }
+
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'k')) {
+        e.preventDefault();
+        setActiveQuestionIndex((prev) => {
+          const next = Math.max(prev - 1, 0);
+          questionRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return next;
+        });
+        return;
+      }
+
+      if (!isInput && attemptData.questions[activeQuestionIndex]) {
+        const q = attemptData.questions[activeQuestionIndex];
+        if (q.question_type === 'MCQ' && q.options) {
+          const optKeys = Object.keys(q.options);
+          const pressed = e.key.toUpperCase();
+          let targetKey: string | null = null;
+          if (['1', '2', '3', '4'].includes(pressed)) {
+            const numIdx = parseInt(pressed, 10) - 1;
+            if (numIdx < optKeys.length) targetKey = optKeys[numIdx];
+          } else if (optKeys.includes(pressed)) {
+            targetKey = pressed;
+          }
+          if (targetKey) {
+            e.preventDefault();
+            handleOptionSelect(q.question_id, targetKey);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [attemptData, activeQuestionIndex, isExpired, isSubmitting, handleOptionSelect]);
 
   const handleOpenSubmitModal = () => {
     if (!attemptData || isSubmitting || isExpired) return;
@@ -192,15 +272,27 @@ const TestAttemptPageDesktop: React.FC = () => {
   const handleConfirmSubmit = async () => {
     if (!attemptData || isSubmitting || isExpired) return;
 
+    if (!isOnline) {
+      toast.error('You are currently offline. Please reconnect to the internet to submit your final assessment.');
+      return;
+    }
+
+    if (pendingCount > 0) {
+      toast.info(`Flushing ${pendingCount} offline answer(s) to server before submitting...`);
+      await flushQueue();
+    }
+
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
       const result = await attemptsApi.submitAttempt(attemptData.attempt_id);
+      clearOfflineCache();
       toast.success('Exam submitted successfully! Generating result analysis...');
       navigate(`/attempts/${result.id}/result`);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (detail === 'Attempt has already been submitted.') {
+        clearOfflineCache();
         toast.info('Attempt has already been submitted.');
         navigate(`/attempts/${attemptData.attempt_id}/result`);
         return;
@@ -320,6 +412,41 @@ const TestAttemptPageDesktop: React.FC = () => {
               </button>
             )}
 
+            {/* Offline Resilience & Network Indicator */}
+            <span
+              className={`pill text-[11px] font-mono font-semibold flex items-center gap-1.5 ${
+                !isOnline
+                  ? 'bg-ember/15 text-ember border border-ember/30 animate-pulse'
+                  : isSyncing || pendingCount > 0
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                  : 'bg-forest/10 text-forest border border-forest/20'
+              }`}
+              title={
+                !isOnline
+                  ? 'Network offline: Answers are safely stored locally on this device'
+                  : pendingCount > 0
+                  ? `${pendingCount} answer(s) syncing to server...`
+                  : 'Online & synchronized with assessment server'
+              }
+            >
+              {!isOnline ? (
+                <>
+                  <WifiOff className="w-3.5 h-3.5 text-ember" />
+                  <span>Offline (Cached Locally)</span>
+                </>
+              ) : isSyncing || pendingCount > 0 ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                  <span>Syncing ({pendingCount} queued)</span>
+                </>
+              ) : (
+                <>
+                  <Wifi className="w-3.5 h-3.5 text-forest" />
+                  <span>Connected</span>
+                </>
+              )}
+            </span>
+
             <span
               className={`pill text-[11px] font-mono font-semibold flex items-center gap-1 ${
                 warningCount > 0
@@ -359,7 +486,7 @@ const TestAttemptPageDesktop: React.FC = () => {
           </div>
         )}
 
-        {/* Understated typographic progress in header area (no loud progress bars) */}
+        {/* Understated typographic progress in header area */}
         <div className="flex items-center justify-between text-xs pt-1">
           <div className="flex items-baseline gap-1.5">
             <span className="text-ink/60">Answered:</span>
@@ -369,11 +496,35 @@ const TestAttemptPageDesktop: React.FC = () => {
             <span className="text-ink/40 font-mono">questions completed</span>
           </div>
 
-          <div className="font-mono text-xs text-ink/70">
-            Total Value: <span className="font-bold text-forest">{attemptData.total_marks} Marks</span>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-[11px] font-mono text-ink/50">
+              Shortcuts: <kbd className="px-1.5 py-0.5 bg-bg border rounded text-[10px]">Alt+↓/↑</kbd> Navigate • <kbd className="px-1.5 py-0.5 bg-bg border rounded text-[10px]">1-4 / A-D</kbd> Select
+            </span>
+            <div className="font-mono text-xs text-ink/70">
+              Total Value: <span className="font-bold text-forest">{attemptData.total_marks} Marks</span>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Network drop offline warning alert with sync retry */}
+      {!isOnline && (
+        <div className="rounded-card border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 p-4 text-xs font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
+            <span>
+              <strong>Internet connection offline.</strong> Your answers are safely preserved in browser local storage. They will automatically sync to the server as soon as connection is re-established.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => flushQueue()}
+            className="px-3 py-1.5 rounded-pill bg-amber-600 text-white font-semibold text-xs hover:bg-amber-700 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+          >
+            Retry Sync Now
+          </button>
+        </div>
+      )}
 
       {isExpired && (
         <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-xs font-medium">
@@ -392,16 +543,25 @@ const TestAttemptPageDesktop: React.FC = () => {
         {attemptData.questions.map((q: AttemptQuestionItem, idx: number) => {
           const currentAnswer = answers[q.question_id] || '';
           const saveStatus = saveStatuses[q.question_id] || 'idle';
+          const isActive = activeQuestionIndex === idx;
 
           return (
             <div
               key={q.question_id}
-              className="bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card space-y-4 transition-all"
+              ref={(el) => {
+                questionRefs.current[idx] = el;
+              }}
+              onClick={() => setActiveQuestionIndex(idx)}
+              className={`bg-surface border rounded-card p-6 sm:p-7 shadow-card space-y-4 transition-all ${
+                isActive ? 'border-forest/50 ring-1 ring-forest/20' : 'border-border'
+              }`}
             >
               {/* Question Header Bar with subtle peripheral auto-save indicator */}
               <div className="flex items-center justify-between border-b border-border/70 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="font-mono font-bold text-xs bg-bg border border-border px-2.5 py-1 rounded-sm text-ink">
+                  <span className={`font-mono font-bold text-xs px-2.5 py-1 rounded-sm ${
+                    isActive ? 'bg-forest text-white' : 'bg-bg border border-border text-ink'
+                  }`}>
                     Q{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
                   </span>
                   <span className="pill pill-muted text-[10px]">
@@ -445,10 +605,12 @@ const TestAttemptPageDesktop: React.FC = () => {
                 </div>
               </div>
 
-              {/* Question Text */}
-              <p className="font-body text-base font-medium text-ink leading-relaxed">
-                {q.question_text}
-              </p>
+              {/* Question Text with KaTeX STEM Math & Chemistry Rendering */}
+              <MathText
+                text={q.question_text}
+                as="p"
+                className="font-body text-base font-medium text-ink leading-relaxed"
+              />
 
               {/* MCQ Options: Large, clearly clickable tactile blocks with FOREST fill on selected state */}
               {q.question_type === 'MCQ' && q.options && (
@@ -488,10 +650,8 @@ const TestAttemptPageDesktop: React.FC = () => {
                           {key}
                         </div>
 
-                        {/* Option text */}
-                        <span className="text-sm font-medium leading-normal flex-1">
-                          {label}
-                        </span>
+                        {/* Option text with MathText rendering */}
+                        <MathText text={String(label)} className="text-sm font-medium leading-normal flex-1" />
 
                         {isSelected && (
                           <span className="font-mono text-xs font-bold text-lime shrink-0">

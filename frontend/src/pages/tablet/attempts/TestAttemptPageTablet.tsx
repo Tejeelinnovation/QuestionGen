@@ -4,9 +4,11 @@ import { attemptsApi } from '../../../api/attempts';
 import type { AttemptQuestionItem, AttemptStartResponse } from '../../../types';
 import { useExamProctoring } from '../../../hooks/useExamProctoring';
 import { ProctoringWarningModal } from '../../../components/attempts/ProctoringWarningModal';
-import { Maximize2, ShieldAlert, Clock } from 'lucide-react';
+import { Maximize2, ShieldAlert, Clock, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useExamCountdown } from '../../../hooks/useExamCountdown';
 import { ConfirmSubmitModal } from '../../../components/attempts/ConfirmSubmitModal';
+import { useOfflineExamSync } from '../../../hooks/useOfflineExamSync';
+import { MathText } from '../../../components/ui/MathText';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -25,6 +27,26 @@ export const TestAttemptPageTablet: React.FC = () => {
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Offline resilience hook
+  const {
+    isOnline,
+    pendingCount,
+    isSyncing,
+    saveAnswer: offlineSaveAnswer,
+    flushQueue,
+    getStoredAnswers,
+    clearOfflineCache,
+  } = useOfflineExamSync({
+    deliveryId,
+    attemptId: attemptData?.attempt_id,
+    onAnswerSaved: (qId) => {
+      setSaveStatuses((prev) => ({ ...prev, [qId]: 'saved' }));
+    },
+    onAnswerSaveError: (qId) => {
+      setSaveStatuses((prev) => ({ ...prev, [qId]: 'error' }));
+    },
+  });
+
   const handleAutoSubmitOnMaxWarnings = useCallback(async () => {
     if (!attemptData || isSubmitting) return;
     setIsSubmitting(true);
@@ -33,9 +55,10 @@ export const TestAttemptPageTablet: React.FC = () => {
     } catch {
       // Ignore if already submitted
     } finally {
+      clearOfflineCache();
       navigate(`/attempts/${attemptData.attempt_id}/result`, { replace: true });
     }
-  }, [attemptData, isSubmitting, navigate]);
+  }, [attemptData, isSubmitting, navigate, clearOfflineCache]);
 
   // Reverse countdown timer with auto-submit on 00:00
   const { formattedTime, isUrgent } = useExamCountdown({
@@ -89,17 +112,21 @@ export const TestAttemptPageTablet: React.FC = () => {
         const data = await attemptsApi.startOrResumeAttempt(deliveryId);
 
         if (data.status === 'SUBMITTED' || data.status === 'EVALUATED') {
+          clearOfflineCache();
           navigate(`/attempts/${data.attempt_id}/result`, { replace: true });
           return;
         }
 
         setAttemptData(data);
 
+        // Merge server answers with local offline cache
+        const localBackup = getStoredAnswers();
         const initialAnswers: Record<number, string> = {};
         const initialStatuses: Record<number, SaveStatus> = {};
         data.questions.forEach((q) => {
-          initialAnswers[q.question_id] = q.student_response || '';
-          initialStatuses[q.question_id] = q.student_response ? 'saved' : 'idle';
+          const val = q.student_response || localBackup[q.question_id] || '';
+          initialAnswers[q.question_id] = val;
+          initialStatuses[q.question_id] = q.student_response ? 'saved' : val ? 'saving' : 'idle';
         });
         setAnswers(initialAnswers);
         setSaveStatuses(initialStatuses);
@@ -111,6 +138,7 @@ export const TestAttemptPageTablet: React.FC = () => {
         const resData = err.response?.data;
         const detail = resData?.detail;
         if (resData?.attempt_id) {
+          clearOfflineCache();
           navigate(`/attempts/${resData.attempt_id}/result`, { replace: true });
           return;
         }
@@ -128,20 +156,14 @@ export const TestAttemptPageTablet: React.FC = () => {
     if (deliveryId) {
       startOrResume();
     }
-  }, [deliveryId, navigate]);
+  }, [deliveryId, navigate, clearOfflineCache, getStoredAnswers]);
 
   const performSave = useCallback(
-    async (attemptId: number, questionId: number, responseText: string) => {
+    async (_attemptId: number, questionId: number, responseText: string) => {
       setSaveStatuses((prev) => ({ ...prev, [questionId]: 'saving' }));
-      try {
-        await attemptsApi.saveAnswer(attemptId, questionId, responseText);
-        setSaveStatuses((prev) => ({ ...prev, [questionId]: 'saved' }));
-      } catch (err: any) {
-        console.error(`Failed to auto-save answer for question ${questionId}:`, err);
-        setSaveStatuses((prev) => ({ ...prev, [questionId]: 'error' }));
-      }
+      await offlineSaveAnswer(questionId, responseText);
     },
-    []
+    [offlineSaveAnswer]
   );
 
   const handleTextChange = (questionId: number, value: string) => {
@@ -179,14 +201,25 @@ export const TestAttemptPageTablet: React.FC = () => {
   const handleConfirmSubmit = async () => {
     if (!attemptData || isSubmitting || isExpired) return;
 
+    if (!isOnline) {
+      setErrorMessage('You are currently offline. Please reconnect to the internet to submit your final assessment.');
+      return;
+    }
+
+    if (pendingCount > 0) {
+      await flushQueue();
+    }
+
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
       const result = await attemptsApi.submitAttempt(attemptData.attempt_id);
+      clearOfflineCache();
       navigate(`/attempts/${result.id}/result`);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (detail === 'Attempt has already been submitted.') {
+        clearOfflineCache();
         navigate(`/attempts/${attemptData.attempt_id}/result`);
         return;
       }
@@ -291,6 +324,42 @@ export const TestAttemptPageTablet: React.FC = () => {
               <span className="pill pill-forest text-xs font-semibold">
                 Version {attemptData.version_label}
               </span>
+
+              {/* Offline Resilience & Network Indicator */}
+              <span
+                className={`pill text-[11px] font-mono font-semibold flex items-center gap-1.5 ${
+                  !isOnline
+                    ? 'bg-ember/15 text-ember border border-ember/30 animate-pulse'
+                    : isSyncing || pendingCount > 0
+                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                    : 'bg-forest/10 text-forest border border-forest/20'
+                }`}
+                title={
+                  !isOnline
+                    ? 'Tablet Offline: Answers cached locally and will auto-sync on reconnect'
+                    : pendingCount > 0
+                    ? `${pendingCount} answer(s) syncing...`
+                    : 'Connected & synchronized'
+                }
+              >
+                {!isOnline ? (
+                  <>
+                    <WifiOff className="w-3.5 h-3.5 text-ember" />
+                    <span>Offline (Cached Locally)</span>
+                  </>
+                ) : isSyncing || pendingCount > 0 ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                    <span>Syncing ({pendingCount} queued)</span>
+                  </>
+                ) : (
+                  <>
+                    <Wifi className="w-3.5 h-3.5 text-forest" />
+                    <span>Connected</span>
+                  </>
+                )}
+              </span>
+
               {/* Reverse Countdown Timer */}
               <span
                 className={`pill text-[11px] font-mono font-bold flex items-center gap-1.5 ${
@@ -351,6 +420,25 @@ export const TestAttemptPageTablet: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Network drop alert for tablet */}
+      {!isOnline && (
+        <div className="rounded-card border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 p-4 text-xs font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <WifiOff className="w-4 h-4 shrink-0 text-amber-600" />
+            <span>
+              <strong>Tablet offline.</strong> Responses are securely cached on this device and will automatically sync when network connection resumes.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => flushQueue()}
+            className="px-3 py-1.5 rounded-pill bg-amber-600 text-white font-semibold text-xs hover:bg-amber-700 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+          >
+            Retry Sync Now
+          </button>
+        </div>
+      )}
 
       {isExpired && (
         <div className="rounded-card border border-ember/30 bg-ember/10 text-ember p-4 text-sm font-medium">
@@ -422,10 +510,12 @@ export const TestAttemptPageTablet: React.FC = () => {
                 </div>
               </div>
 
-              {/* Question Body */}
-              <p className="font-body text-base sm:text-lg font-medium text-ink leading-relaxed">
-                {q.question_text}
-              </p>
+              {/* Question Body with KaTeX Math rendering */}
+              <MathText
+                text={q.question_text}
+                as="p"
+                className="font-body text-base sm:text-lg font-medium text-ink leading-relaxed"
+              />
 
               {/* MCQ Options: Minimum 56px touch target, tactile feedback on touch */}
               {q.question_type === 'MCQ' && q.options && (
@@ -464,10 +554,8 @@ export const TestAttemptPageTablet: React.FC = () => {
                           {key}
                         </div>
 
-                        {/* Option text */}
-                        <span className="text-sm sm:text-base font-medium leading-normal flex-1">
-                          {label}
-                        </span>
+                        {/* Option text with MathText rendering */}
+                        <MathText text={String(label)} className="text-sm sm:text-base font-medium leading-normal flex-1" />
 
                         {isSelected && (
                           <span className="font-mono text-xs font-bold text-lime shrink-0 px-2 py-1 bg-white/10 rounded">

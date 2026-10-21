@@ -16,6 +16,7 @@ import { Pagination } from '../ui/pagination';
 import { CustomSelect } from '../ui/custom-select';
 import { SkeletonSubmissionsList } from '../ui/skeleton';
 import { getStaggerDelay, CARD_MOTION } from '../../lib/motion';
+import { MathText } from '../ui/MathText';
 
 export const ValidatorQueueView: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -296,9 +297,9 @@ export const ValidatorQueueView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Question Text Snippet */}
+              {/* Question Text Snippet with KaTeX Math rendering */}
               <div className="text-xs text-ink font-body line-clamp-3 whitespace-pre-wrap leading-relaxed">
-                {q.question_text}
+                <MathText text={q.question_text} />
               </div>
 
               {/* Multiple Topics Pills */}

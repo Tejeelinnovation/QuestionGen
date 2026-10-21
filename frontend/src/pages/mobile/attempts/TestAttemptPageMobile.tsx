@@ -9,11 +9,16 @@ import {
   Shield,
   Clock,
   Maximize2,
+  Wifi,
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 import { useExamProctoring } from '../../../hooks/useExamProctoring';
 import { useExamCountdown } from '../../../hooks/useExamCountdown';
 import { ProctoringWarningModal } from '../../../components/attempts/ProctoringWarningModal';
 import { ConfirmSubmitModal } from '../../../components/attempts/ConfirmSubmitModal';
+import { useOfflineExamSync } from '../../../hooks/useOfflineExamSync';
+import { MathText } from '../../../components/ui/MathText';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -33,6 +38,26 @@ export const TestAttemptPageMobile: React.FC = () => {
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
 
+  // Offline resilience hook for mobile
+  const {
+    isOnline,
+    pendingCount,
+    isSyncing,
+    saveAnswer: offlineSaveAnswer,
+    flushQueue,
+    getStoredAnswers,
+    clearOfflineCache,
+  } = useOfflineExamSync({
+    deliveryId,
+    attemptId: attemptData?.attempt_id,
+    onAnswerSaved: (qId) => {
+      setSaveStatuses((prev) => ({ ...prev, [qId]: 'saved' }));
+    },
+    onAnswerSaveError: (qId) => {
+      setSaveStatuses((prev) => ({ ...prev, [qId]: 'error' }));
+    },
+  });
+
   const handleAutoSubmitOnMaxWarnings = useCallback(async () => {
     if (!attemptData || isSubmitting) return;
     setIsSubmitting(true);
@@ -41,9 +66,10 @@ export const TestAttemptPageMobile: React.FC = () => {
     } catch {
       // Ignore if already submitted
     } finally {
+      clearOfflineCache();
       navigate(`/attempts/${attemptData.attempt_id}/result`, { replace: true });
     }
-  }, [attemptData, isSubmitting, navigate]);
+  }, [attemptData, isSubmitting, navigate, clearOfflineCache]);
 
   // Anti-cheating exam proctoring hook with mandatory fullscreen enforcement
   const {
@@ -100,17 +126,21 @@ export const TestAttemptPageMobile: React.FC = () => {
         const data = await attemptsApi.startOrResumeAttempt(deliveryId);
 
         if (data.status === 'SUBMITTED' || data.status === 'EVALUATED') {
+          clearOfflineCache();
           navigate(`/attempts/${data.attempt_id}/result`, { replace: true });
           return;
         }
 
         setAttemptData(data);
 
+        // Merge server responses with local offline cache
+        const localBackup = getStoredAnswers();
         const initialAnswers: Record<number, string> = {};
         const initialStatuses: Record<number, SaveStatus> = {};
         data.questions.forEach((q) => {
-          initialAnswers[q.question_id] = q.student_response || '';
-          initialStatuses[q.question_id] = q.student_response ? 'saved' : 'idle';
+          const val = q.student_response || localBackup[q.question_id] || '';
+          initialAnswers[q.question_id] = val;
+          initialStatuses[q.question_id] = q.student_response ? 'saved' : val ? 'saving' : 'idle';
         });
         setAnswers(initialAnswers);
         setSaveStatuses(initialStatuses);
@@ -122,6 +152,7 @@ export const TestAttemptPageMobile: React.FC = () => {
         const resData = err.response?.data;
         const detail = resData?.detail;
         if (resData?.attempt_id) {
+          clearOfflineCache();
           navigate(`/attempts/${resData.attempt_id}/result`, { replace: true });
           return;
         }
@@ -139,20 +170,14 @@ export const TestAttemptPageMobile: React.FC = () => {
     if (deliveryId) {
       startOrResume();
     }
-  }, [deliveryId, navigate]);
+  }, [deliveryId, navigate, clearOfflineCache, getStoredAnswers]);
 
   const performSave = useCallback(
-    async (attemptId: number, questionId: number, responseText: string) => {
+    async (_attemptId: number, questionId: number, responseText: string) => {
       setSaveStatuses((prev) => ({ ...prev, [questionId]: 'saving' }));
-      try {
-        await attemptsApi.saveAnswer(attemptId, questionId, responseText);
-        setSaveStatuses((prev) => ({ ...prev, [questionId]: 'saved' }));
-      } catch (err: any) {
-        console.error(`Failed to auto-save answer for question ${questionId}:`, err);
-        setSaveStatuses((prev) => ({ ...prev, [questionId]: 'error' }));
-      }
+      await offlineSaveAnswer(questionId, responseText);
     },
-    []
+    [offlineSaveAnswer]
   );
 
   const handleTextChange = (questionId: number, value: string) => {
@@ -179,10 +204,21 @@ export const TestAttemptPageMobile: React.FC = () => {
   const handleSubmitAttempt = async () => {
     if (!attemptData || isSubmitting) return;
 
+    if (!isOnline) {
+      setErrorMessage('You are currently offline. Please reconnect to submit your assessment.');
+      setShowSubmitModal(false);
+      return;
+    }
+
+    if (pendingCount > 0) {
+      await flushQueue();
+    }
+
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
       await attemptsApi.submitAttempt(attemptData.attempt_id);
+      clearOfflineCache();
       navigate(`/attempts/${attemptData.attempt_id}/result`, { replace: true });
     } catch (err: any) {
       const detail =
@@ -317,12 +353,38 @@ export const TestAttemptPageMobile: React.FC = () => {
 
       {/* ── Top Focus Status Header (2-Tier Zero-Overflow Layout) ── */}
       <div className="p-3 rounded-card bg-surface border border-border shadow-xs space-y-2">
-        {/* Tier 1: Title on left, countdown and proctoring shield on right */}
+        {/* Tier 1: Title on left, countdown, offline status, and proctoring shield on right */}
         <div className="flex items-center justify-between gap-2">
           <span className="font-heading font-bold text-xs text-ink truncate flex-1" title={attemptData.paper_title}>
             {attemptData.paper_title || 'Assessment'}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Mobile Offline / Connection Pill */}
+            <span
+              className={`pill text-[10px] py-0.5 px-1.5 font-mono font-semibold flex items-center gap-1 ${
+                !isOnline
+                  ? 'bg-ember/15 text-ember border border-ember/30 animate-pulse'
+                  : isSyncing || pendingCount > 0
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                  : 'bg-forest/10 text-forest border border-forest/20'
+              }`}
+              title={!isOnline ? 'Offline: cached locally' : pendingCount > 0 ? `${pendingCount} syncing` : 'Connected'}
+            >
+              {!isOnline ? (
+                <>
+                  <WifiOff className="w-2.5 h-2.5 text-ember" />
+                  <span>Offline</span>
+                </>
+              ) : isSyncing || pendingCount > 0 ? (
+                <>
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin text-amber-600" />
+                  <span>{pendingCount}</span>
+                </>
+              ) : (
+                <Wifi className="w-2.5 h-2.5 text-forest" />
+              )}
+            </span>
+
             <span
               className={`pill text-[10px] py-0.5 px-2 font-mono font-bold flex items-center gap-1 ${
                 isUrgent
@@ -386,6 +448,23 @@ export const TestAttemptPageMobile: React.FC = () => {
         </div>
       </div>
 
+      {/* Network drop alert for mobile */}
+      {!isOnline && (
+        <div className="rounded-card border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 p-2.5 text-[11px] font-medium flex items-center justify-between gap-2 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-1.5">
+            <WifiOff className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+            <span>Answers saved locally. Reconnect to auto-sync.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => flushQueue()}
+            className="px-2 py-0.5 rounded-pill bg-amber-600 text-white font-semibold text-[10px] hover:bg-amber-700 transition-colors cursor-pointer shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* ── Question Quick-Jump Mini Bar ── */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
         {attemptData.questions.map((q, idx) => {
@@ -421,10 +500,12 @@ export const TestAttemptPageMobile: React.FC = () => {
             <span className="text-ink/40">Swipe left / right to navigate</span>
           </div>
 
-          {/* Prompt */}
-          <h2 className="font-heading font-bold text-sm sm:text-base text-ink leading-relaxed">
-            {currentQ.question_text}
-          </h2>
+          {/* Prompt with KaTeX Math rendering */}
+          <MathText
+            text={currentQ.question_text}
+            as="h2"
+            className="font-heading font-bold text-sm sm:text-base text-ink leading-relaxed"
+          />
 
           {/* Response area: MCQ or Textarea */}
           {currentQ.question_type === 'MCQ' && currentQ.options ? (
@@ -450,9 +531,8 @@ export const TestAttemptPageMobile: React.FC = () => {
                       >
                         {key}
                       </span>
-                      <span className="text-xs sm:text-sm font-body leading-snug">
-                        {optText}
-                      </span>
+                      {/* Option text with MathText rendering */}
+                      <MathText text={String(optText)} className="text-xs sm:text-sm font-body leading-snug" />
                     </div>
                   </button>
                 );
