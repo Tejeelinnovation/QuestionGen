@@ -11,6 +11,8 @@ from .views import (
     AttemptResultView,
     AttemptStartResumeView,
     AttemptSubmitView,
+    DeliveryBatchEvaluateView,
+    DeliveryProctoringReportView,
     DeliveryResultsView,
 )
 
@@ -19,6 +21,10 @@ urlpatterns = [
     path("deliveries/<int:pk>/start/", AttemptStartResumeView.as_view(), name="delivery-start"),
     # Teacher roster results: GET /api/deliveries/{id}/results/
     path("deliveries/<int:pk>/results/", DeliveryResultsView.as_view(), name="delivery-results"),
+    # Classroom proctoring analytics report: GET /api/deliveries/{id}/proctoring-report/
+    path("deliveries/<int:pk>/proctoring-report/", DeliveryProctoringReportView.as_view(), name="delivery-proctoring-report"),
+    # Batch evaluate and gradebook summary: POST /api/deliveries/{id}/batch-evaluate/
+    path("deliveries/<int:pk>/batch-evaluate/", DeliveryBatchEvaluateView.as_view(), name="delivery-batch-evaluate"),
     # Incremental answer save: PATCH /api/attempts/{id}/answers/{question_id}/
     path("attempts/<int:pk>/answers/<int:question_id>/", AttemptAnswerSaveView.as_view(), name="attempt-answer-save"),
     # Finalize / submit attempt: POST /api/attempts/{id}/submit/

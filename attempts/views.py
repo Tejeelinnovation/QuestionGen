@@ -12,6 +12,7 @@ Endpoints:
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from django.core.cache import cache
@@ -314,6 +315,12 @@ class AttemptSubmitView(APIView):
             )
 
         # Auto-grade and finalize
+        from .evaluator import ExamEvaluationEngine
+        engine = ExamEvaluationEngine()
+
+        constraints = getattr(attempt.delivery.paper_version, "constraints_used", {}) or {}
+        penalty_rate = float(constraints.get("negative_marking_rate", 0.0) or 0.0)
+
         with transaction.atomic():
             answers = list(attempt.answers.all())
             has_pending = False
@@ -321,29 +328,26 @@ class AttemptSubmitView(APIView):
 
             for ans in answers:
                 snap = ans.question_snapshot
-                q_type = snap.get("question_type")
-                q_marks = float(snap.get("marks", 0))
+                eval_res = engine.evaluate_answer(
+                    question_snapshot=snap,
+                    student_response=ans.student_response,
+                    negative_marking_penalty=penalty_rate,
+                )
 
-                if q_type == "MCQ":
-                    student_choice = ans.student_response.strip().upper()
-                    correct_choice = str(snap.get("correct_answer", "")).strip().upper()
-
-                    if student_choice and student_choice == correct_choice:
-                        ans.is_correct = True
-                        ans.marks_awarded = q_marks
-                        running_score += q_marks
-                    else:
-                        ans.is_correct = False
-                        ans.marks_awarded = 0.0
-                    ans.save()
-                else:
-                    # SHORT_ANSWER or LONG_ANSWER -> pending manual review
+                if eval_res.is_correct is None:
+                    # Subjective SHORT/LONG answer -> pending manual review
                     ans.is_correct = None
                     ans.marks_awarded = None
                     ans.save()
                     has_pending = True
+                else:
+                    ans.is_correct = eval_res.is_correct
+                    # Enforce answer_marks_gte_0 DB check constraint
+                    ans.marks_awarded = max(Decimal("0.00"), eval_res.marks_awarded or Decimal("0.00"))
+                    ans.save()
+                    running_score += float(eval_res.marks_awarded or 0.0)
 
-            attempt.score = running_score
+            attempt.score = max(0.0, running_score)
             attempt.submitted_at = timezone.now()
             attempt.status = (
                 AttemptStatus.SUBMITTED if has_pending else AttemptStatus.EVALUATED
@@ -647,30 +651,23 @@ class AttemptProctoringWarningView(APIView):
             has_pending = False
             running_score = 0.0
 
+            from .evaluator import ExamEvaluationEngine
+            engine = ExamEvaluationEngine()
             for ans in answers:
                 snap = ans.question_snapshot
-                q_type = snap.get("question_type")
-                q_marks = float(snap.get("marks", 0))
-
-                if q_type == "MCQ":
-                    student_choice = ans.student_response.strip().upper()
-                    correct_choice = str(snap.get("correct_answer", "")).strip().upper()
-
-                    if student_choice and student_choice == correct_choice:
-                        ans.is_correct = True
-                        ans.marks_awarded = q_marks
-                        running_score += q_marks
-                    else:
-                        ans.is_correct = False
-                        ans.marks_awarded = 0.0
-                    ans.save()
-                else:
+                eval_res = engine.evaluate_answer(snap, ans.student_response)
+                if eval_res.is_correct is None:
                     ans.is_correct = None
                     ans.marks_awarded = None
                     ans.save()
                     has_pending = True
+                else:
+                    ans.is_correct = eval_res.is_correct
+                    ans.marks_awarded = max(Decimal("0.00"), eval_res.marks_awarded or Decimal("0.00"))
+                    ans.save()
+                    running_score += float(eval_res.marks_awarded or 0.0)
 
-            attempt.score = running_score
+            attempt.score = max(0.0, running_score)
             attempt.submitted_at = timezone.now()
             attempt.status = (
                 AttemptStatus.SUBMITTED if has_pending else AttemptStatus.EVALUATED
@@ -709,3 +706,125 @@ class AttemptProctoringWarningView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+# ---------------------------------------------------------------------------
+# 7. Delivery Proctoring Analytics Report View
+# ---------------------------------------------------------------------------
+
+class DeliveryProctoringReportView(APIView):
+    """
+    GET /api/deliveries/{id}/proctoring-report/
+
+    Classroom-wide integrity audit and proctoring anomaly report for teachers & admins.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        delivery = Delivery.objects.select_related("paper_version", "paper_version__paper").filter(pk=pk).first()
+        if not delivery:
+            return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_teacher_access_delivery_results(request.user, delivery):
+            return Response(
+                {"detail": "You do not have permission to view proctoring reports for this delivery."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from .proctoring import ProctoringAnalyticsService
+        service = ProctoringAnalyticsService()
+        report = service.generate_delivery_report(delivery)
+        return Response(report, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# 8. Delivery Batch Evaluation & Gradebook Finalization View
+# ---------------------------------------------------------------------------
+
+class DeliveryBatchEvaluateView(APIView):
+    """
+    POST /api/deliveries/{id}/batch-evaluate/
+
+    Evaluates or re-grades all submitted student attempts for a delivery:
+    - Auto-grades objective and numerical questions using ExamEvaluationEngine.
+    - Calculates aggregate metrics: mean score, median score, highest, lowest, pass rate.
+    - Scoped to Delivery creator teacher, School Admin, or Super Admin.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        delivery = Delivery.objects.select_related("paper_version", "paper_version__paper").filter(pk=pk).first()
+        if not delivery:
+            return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_teacher_access_delivery_results(request.user, delivery):
+            return Response(
+                {"detail": "You do not have permission to evaluate this delivery."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from .evaluator import ExamEvaluationEngine
+        engine = ExamEvaluationEngine()
+        constraints = getattr(delivery.paper_version, "constraints_used", {}) or {}
+        penalty_rate = float(constraints.get("negative_marking_rate", 0.0) or 0.0)
+
+        attempts = delivery.attempts.filter(status__in=[AttemptStatus.SUBMITTED, AttemptStatus.EVALUATED])
+        evaluated_count = 0
+        scores: list[float] = []
+
+        with transaction.atomic():
+            for att in attempts:
+                running_score = 0.0
+                has_pending = False
+                for ans in att.answers.all():
+                    if ans.marks_awarded is not None and ans.is_correct is not None:
+                        running_score += float(ans.marks_awarded)
+                    else:
+                        eval_res = engine.evaluate_answer(
+                            ans.question_snapshot,
+                            ans.student_response,
+                            negative_marking_penalty=penalty_rate,
+                        )
+                        if eval_res.is_correct is None:
+                            has_pending = True
+                        else:
+                            ans.is_correct = eval_res.is_correct
+                            ans.marks_awarded = max(Decimal("0.00"), eval_res.marks_awarded or Decimal("0.00"))
+                            ans.save()
+                            running_score += float(eval_res.marks_awarded or 0.0)
+
+                att.score = max(0.0, running_score)
+                att.status = AttemptStatus.SUBMITTED if has_pending else AttemptStatus.EVALUATED
+                att.save()
+                evaluated_count += 1
+                scores.append(att.score)
+
+        # Calculate statistics
+        total = len(scores)
+        mean_score = round(sum(scores) / total, 2) if total > 0 else 0.0
+        sorted_scores = sorted(scores)
+        median_score = sorted_scores[total // 2] if total > 0 else 0.0
+        max_possible = float(delivery.paper_version.total_marks or 0.0)
+        pass_threshold = max_possible * 0.40
+        passed_count = sum(1 for s in scores if s >= pass_threshold)
+        pass_rate_pct = round((passed_count / total) * 100.0, 1) if total > 0 else 0.0
+
+        return Response(
+            {
+                "delivery_id": delivery.id,
+                "evaluated_attempts_count": evaluated_count,
+                "statistics": {
+                    "total_attempts": total,
+                    "mean_score": mean_score,
+                    "median_score": median_score,
+                    "highest_score": max(scores) if scores else 0.0,
+                    "lowest_score": min(scores) if scores else 0.0,
+                    "pass_rate_percentage": pass_rate_pct,
+                    "passing_score_threshold": pass_threshold,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+

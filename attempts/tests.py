@@ -25,6 +25,7 @@ from __future__ import annotations
 from datetime import timedelta
 from decimal import Decimal
 
+from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -703,4 +704,196 @@ class AttemptsWorkflowTests(APITestCase):
         self.assertTrue(res.data["is_evaluation_pending"])
         self.assertIsNotNone(res.data["evaluation_message"])
         self.assertEqual(res.data["warning_count"], 2)
+
+
+class ExamEvaluationEngineTests(TestCase):
+    """Unit tests for ExamEvaluationEngine."""
+
+    def setUp(self):
+        from attempts.evaluator import ExamEvaluationEngine
+        self.engine = ExamEvaluationEngine()
+
+    def test_mcq_letter_match(self):
+        snap = {
+            "question_type": "MCQ",
+            "marks": 2.0,
+            "correct_answer": "B",
+            "options": {"A": "10", "B": "20", "C": "30", "D": "40"},
+        }
+        res = self.engine.evaluate_answer(snap, "B")
+        self.assertTrue(res.is_correct)
+        self.assertEqual(res.marks_awarded, Decimal("2.0"))
+        self.assertEqual(res.matched_rule, "MCQ_LETTER")
+
+    def test_mcq_option_text_match(self):
+        snap = {
+            "question_type": "MCQ",
+            "marks": 1.0,
+            "correct_answer": "C",
+            "options": {"A": "Nitrogen", "B": "Hydrogen", "C": "Oxygen", "D": "Argon"},
+        }
+        res = self.engine.evaluate_answer(snap, "Oxygen")
+        self.assertTrue(res.is_correct)
+        self.assertEqual(res.marks_awarded, Decimal("1.0"))
+        self.assertEqual(res.matched_rule, "MCQ_TEXT")
+
+    def test_numerical_tolerance_match(self):
+        snap = {
+            "question_type": "SHORT_ANSWER",
+            "marks": 3.0,
+            "correct_answer": "9.8 m/s^2",
+        }
+        # Student answers 9.80
+        res = self.engine.evaluate_answer(snap, "9.80 m/s^2")
+        self.assertTrue(res.is_correct)
+        self.assertEqual(res.marks_awarded, Decimal("3.0"))
+        self.assertEqual(res.matched_rule, "NUMERICAL")
+
+    def test_canonical_text_match(self):
+        snap = {
+            "question_type": "SHORT_ANSWER",
+            "marks": 2.0,
+            "correct_answer": "Photosynthesis",
+        }
+        res = self.engine.evaluate_answer(snap, "photosynthesis")
+        self.assertTrue(res.is_correct)
+        self.assertEqual(res.marks_awarded, Decimal("2.0"))
+        self.assertEqual(res.matched_rule, "CANONICAL_TEXT")
+
+    def test_negative_marking_penalty(self):
+        snap = {
+            "question_type": "MCQ",
+            "marks": 4.0,
+            "correct_answer": "A",
+            "options": {"A": "True", "B": "False"},
+        }
+        # Penalty 1.0 mark for wrong answer
+        res = self.engine.evaluate_answer(snap, "B", negative_marking_penalty=1.0)
+        self.assertFalse(res.is_correct)
+        self.assertEqual(res.marks_awarded, Decimal("-1.0"))
+
+
+class DeliveryProctoringAndBatchEvaluationTests(TestCase):
+    """Integration tests for Proctoring Reports and Batch Evaluation."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from users.models import User, Capability, CapabilityName
+        from schools.models import School
+        from content.models import Book, Chapter, Topic, Question
+        from papers.models import Paper, PaperVersion, Delivery, DeliveryMode, DeliveryStatus
+        from attempts.models import Attempt, Answer, AttemptStatus
+
+        for cap in CapabilityName.values:
+            Capability.objects.get_or_create(name=cap)
+
+        cls.school = School.objects.create(name="Apex International")
+        cls.teacher = User.objects.create_user(
+            username="test_teacher",
+            email="teacher@apex.edu",
+            password="pass",
+            role="Teacher",
+            school=cls.school,
+        )
+        grant_teacher_defaults(cls.teacher)
+
+        cls.student = User.objects.create_user(
+            username="student_101",
+            email="s101@apex.edu",
+            password="pass",
+            role="Student",
+            school=cls.school,
+        )
+        grant_student_defaults(cls.student)
+
+        cls.book = Book.objects.create(title="Physics 10", subject="Physics", grade="10")
+        cls.chapter = Chapter.objects.create(book=cls.book, title="Optics", chapter_order=1)
+        cls.topic = Topic.objects.create(chapter=cls.chapter, name="Lenses")
+
+        cls.paper = Paper.objects.create(
+            title="Optics Unit Test",
+            created_by=cls.teacher,
+            school=cls.school,
+            chapter=cls.chapter,
+            duration_minutes=60,
+        )
+        cls.version = PaperVersion.objects.create(
+            paper=cls.paper,
+            version_label="A",
+            total_marks=5.0,
+            question_snapshot=[
+                {
+                    "question_id": 1,
+                    "question_text": "What is the focal length of a plane mirror?",
+                    "question_type": "MCQ",
+                    "marks": 2.0,
+                    "correct_answer": "B",
+                    "options": {"A": "Zero", "B": "Infinity", "C": "10 cm", "D": "1 cm"},
+                },
+                {
+                    "question_id": 2,
+                    "question_text": "Calculate power of lens with f = 0.5 m",
+                    "question_type": "SHORT_ANSWER",
+                    "marks": 3.0,
+                    "correct_answer": "2 Dioptre",
+                },
+            ],
+        )
+        cls.delivery = Delivery.objects.create(
+            paper_version=cls.version,
+            mode=DeliveryMode.ONLINE,
+            status=DeliveryStatus.ACTIVE,
+            created_by=cls.teacher,
+        )
+        cls.delivery.assigned_students.add(cls.student)
+
+        # Create an attempt with a warning log
+        cls.attempt = Attempt.objects.create(
+            delivery=cls.delivery,
+            student=cls.student,
+            status=AttemptStatus.SUBMITTED,
+            warning_count=2,
+            proctoring_logs=[
+                {"action": "tab_switch", "timestamp": "2026-10-21T10:00:00Z"},
+                {"action": "window_blur", "timestamp": "2026-10-21T10:05:00Z"},
+            ],
+            score=Decimal("2.00"),
+            max_score=Decimal("5.00"),
+        )
+        Answer.objects.create(
+            attempt=cls.attempt,
+            question_id=1,
+            question_snapshot=cls.version.question_snapshot[0],
+            student_response="Infinity",  # Tests text match for MCQ!
+        )
+        Answer.objects.create(
+            attempt=cls.attempt,
+            question_id=2,
+            question_snapshot=cls.version.question_snapshot[1],
+            student_response="2.0 D",  # Tests numerical match!
+        )
+
+    def test_proctoring_report_endpoint(self):
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(user=self.teacher)
+        res = client.get(f"/api/deliveries/{self.delivery.id}/proctoring-report/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["delivery_id"], self.delivery.id)
+        self.assertEqual(res.data["total_attempts"], 1)
+        self.assertEqual(res.data["anomaly_summary"]["tab_switches"], 1)
+        self.assertEqual(len(res.data["student_roster"]), 1)
+        self.assertEqual(res.data["student_roster"][0]["warning_count"], 2)
+
+    def test_batch_evaluate_endpoint(self):
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(user=self.teacher)
+        res = client.post(f"/api/deliveries/{self.delivery.id}/batch-evaluate/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["evaluated_attempts_count"], 1)
+        stats = res.data["statistics"]
+        self.assertGreater(stats["highest_score"], 0)
+        self.assertEqual(stats["total_attempts"], 1)
+
 

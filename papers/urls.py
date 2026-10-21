@@ -16,6 +16,7 @@ from .views import (
     PaperVersionFinalizeView,
     PaperVersionListCreateView,
     PaperVersionPrintView,
+    PaperVersionAnswerKeyView,
 )
 
 urlpatterns = [
@@ -37,6 +38,8 @@ urlpatterns = [
     path("papers/<int:pk>/versions/<int:version_pk>/deliver/", PaperVersionDeliverView.as_view(), name="paper-version-deliver"),
     # Print layout: GET /api/papers/{id}/versions/{version_id}/print/
     path("papers/<int:pk>/versions/<int:version_pk>/print/", PaperVersionPrintView.as_view(), name="paper-version-print"),
+    # Teacher Answer Key & Solution Scheme: GET /api/papers/{id}/versions/{version_id}/answer-key/
+    path("papers/<int:pk>/versions/<int:version_pk>/answer-key/", PaperVersionAnswerKeyView.as_view(), name="paper-version-answer-key"),
     # Deliveries: GET /api/deliveries/, GET /api/deliveries/{id}/
     path("deliveries/", DeliveryListView.as_view(), name="delivery-list"),
     path("deliveries/<int:pk>/", DeliveryDetailView.as_view(), name="delivery-detail"),

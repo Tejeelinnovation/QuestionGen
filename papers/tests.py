@@ -15,6 +15,7 @@ Covers:
 
 from __future__ import annotations
 
+from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -777,5 +778,116 @@ class PapersWorkflowTests(APITestCase):
         # Student cannot see or delete the paper
         self.assertIn(res.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
         self.assertTrue(Paper.objects.filter(id=paper.id).exists())
+
+
+class PaperPublishingAndAnswerKeyTests(TestCase):
+    """Tests for academic exam publishing, sections, and answer key generation."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from users.models import User, Capability, CapabilityName
+        from schools.models import School
+        from content.models import Book, Chapter, Topic
+        from papers.models import Paper, PaperVersion, VersionStatus
+
+        for cap in CapabilityName.values:
+            Capability.objects.get_or_create(name=cap)
+
+        cls.school = School.objects.create(name="St. Xavier's High School")
+        cls.teacher = User.objects.create_user(
+            username="publish_teacher",
+            email="pub@xavier.edu",
+            password="pass",
+            role="Teacher",
+            school=cls.school,
+        )
+        grant_teacher_defaults(cls.teacher)
+
+        cls.book = Book.objects.create(title="Chemistry 10", subject="Chemistry", grade="10")
+        cls.chapter = Chapter.objects.create(book=cls.book, title="Acids and Bases", chapter_order=1)
+
+        cls.paper = Paper.objects.create(
+            title="Acids & Bases Mid-Term",
+            created_by=cls.teacher,
+            school=cls.school,
+            chapter=cls.chapter,
+            subjects=["Chemistry"],
+            duration_minutes=90,
+            instructions="All sections are compulsory. Use of scientific calculator is permitted.",
+        )
+        cls.version = PaperVersion.objects.create(
+            paper=cls.paper,
+            version_label="A",
+            total_marks=10.0,
+            status=VersionStatus.FINALIZED,
+            question_snapshot=[
+                {
+                    "question_id": 101,
+                    "question_text": "What is the pH of pure water at 25°C?",
+                    "question_type": "MCQ",
+                    "marks": 1.0,
+                    "difficulty": "EASY",
+                    "correct_answer": "B",
+                    "options": {"A": "1", "B": "7", "C": "14", "D": "0"},
+                },
+                {
+                    "question_id": 102,
+                    "question_text": "Define neutralization reaction with an equation.",
+                    "question_type": "SHORT_ANSWER",
+                    "marks": 3.0,
+                    "difficulty": "MEDIUM",
+                    "correct_answer": "Acid + Base -> Salt + Water. Example: HCl + NaOH -> NaCl + H2O",
+                },
+                {
+                    "question_id": 103,
+                    "question_text": "Explain the chlor-alkali process with chemical reactions and uses of all products.",
+                    "question_type": "LONG_ANSWER",
+                    "marks": 6.0,
+                    "difficulty": "HARD",
+                    "correct_answer": "2NaCl + 2H2O -> 2NaOH + Cl2 + H2. Products: Chlorine, Hydrogen, Sodium Hydroxide...",
+                },
+            ],
+        )
+
+    def test_publishing_service_sections(self):
+        from papers.publishing import PaperPublishingService
+        service = PaperPublishingService()
+        sections = service.compile_sections(self.version)
+        self.assertEqual(len(sections), 3)
+        self.assertEqual(sections[0].section_code, "A")
+        self.assertEqual(sections[0].questions[0].question_type, "MCQ")
+        self.assertEqual(sections[1].section_code, "B")
+        self.assertEqual(sections[2].section_code, "C")
+
+    def test_student_paper_output(self):
+        from papers.publishing import PaperPublishingService
+        service = PaperPublishingService()
+        paper_data = service.generate_student_exam_paper(self.version)
+        self.assertEqual(paper_data["document_type"], "STUDENT_QUESTION_PAPER")
+        self.assertEqual(paper_data["school_name"], "St. Xavier's High School")
+        self.assertEqual(paper_data["total_marks"], 10.0)
+        self.assertIn("watermark", paper_data)
+        self.assertEqual(len(paper_data["student_metadata_fields"]), 4)
+
+    def test_teacher_answer_key_output(self):
+        from papers.publishing import PaperPublishingService
+        service = PaperPublishingService()
+        key_data = service.generate_teacher_answer_key(self.version)
+        self.assertEqual(key_data["document_type"], "TEACHER_ANSWER_KEY")
+        self.assertIn("Answer Key", key_data["title"])
+        sec_a = key_data["sections"][0]
+        q1 = sec_a["questions"][0]
+        self.assertEqual(q1["correct_answer"], "B")
+        self.assertEqual(q1["correct_option_text"], "7")
+
+    def test_answer_key_api_endpoint(self):
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(user=self.teacher)
+        res = client.get(f"/api/papers/{self.paper.id}/versions/{self.version.id}/answer-key/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["document_type"], "TEACHER_ANSWER_KEY")
+        self.assertEqual(res.data["total_questions"], 3)
+
 
 

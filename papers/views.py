@@ -805,7 +805,46 @@ class PaperVersionPrintView(APIView):
         }
 
         serializer = PaperPrintSerializer(print_data)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        res_data = dict(serializer.data)
+
+        # Enhance with academic sections and metadata from PaperPublishingService
+        try:
+            from .publishing import PaperPublishingService
+            pub_service = PaperPublishingService()
+            published = pub_service.generate_student_exam_paper(version)
+            res_data["sections"] = published.get("sections", [])
+            res_data["watermark"] = published.get("watermark", "")
+            res_data["student_metadata_fields"] = published.get("student_metadata_fields", [])
+        except Exception:
+            pass
+
+        return Response(res_data, status=status.HTTP_200_OK)
+
+
+class PaperVersionAnswerKeyView(APIView):
+    """
+    GET /api/papers/{id}/versions/{version_id}/answer-key/
+
+    Returns synchronized teacher answer key, model solutions, and marking scheme
+    for the finalized paper version.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, version_pk):
+        paper = get_scoped_papers(request.user).filter(pk=pk).first()
+        if not paper:
+            return Response({"detail": "Paper not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        version = paper.versions.filter(pk=version_pk).first()
+        if not version:
+            return Response({"detail": "Paper version not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from .publishing import PaperPublishingService
+        service = PaperPublishingService()
+        key_data = service.generate_teacher_answer_key(version)
+        return Response(key_data, status=status.HTTP_200_OK)
+
 
 
 # ---------------------------------------------------------------------------
