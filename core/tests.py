@@ -496,6 +496,21 @@ class HealthCheckViewTests(TestCase):
         self.assertEqual(response.data.get("status"), "healthy")
         self.assertIn("components", response.data)
 
+    def test_root_healthz_alias_returns_ok(self):
+        client = APIClient()
+        response = client.get("/healthz/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("status"), "healthy")
+        self.assertEqual(response.data.get("database"), "connected")
+
+    def test_root_readyz_alias_returns_deep_readiness(self):
+        client = APIClient()
+        response = client.get("/readyz/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("status"), "healthy")
+        self.assertIn("components", response.data)
+        self.assertIn("database", response.data["components"])
+
 
 class RequestCorrelationMiddlewareTests(TestCase):
     def test_auto_generates_request_id_header(self):

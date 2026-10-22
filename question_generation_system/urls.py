@@ -11,10 +11,14 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
-from core.views import ApiRootView
+from core.views import ApiRootView, HealthCheckView
 from users.urls import auth_urlpatterns, users_urlpatterns
 
 urlpatterns = [
+    # Container Platform Liveness & Readiness Probes (Root Aliases)
+    path("healthz/", HealthCheckView.as_view(), name="healthz"),
+    path("readyz/", HealthCheckView.as_view(), name="readyz"),
+
     # API Landing & Service Discovery
     path("", ApiRootView.as_view(), name="api-root"),
 

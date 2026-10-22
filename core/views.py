@@ -158,7 +158,11 @@ class HealthCheckView(APIView):
         from django.db import connection
         from django.utils import timezone
 
-        is_deep = request.query_params.get("deep", "").lower() in ("true", "1", "yes") or "readiness" in request.path
+        is_deep = (
+            request.query_params.get("deep", "").lower() in ("true", "1", "yes")
+            or "readiness" in request.path
+            or "readyz" in request.path
+        )
 
         # 1. Database check & latency
         db_start = time.monotonic()
