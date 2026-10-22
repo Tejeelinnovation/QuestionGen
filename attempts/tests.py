@@ -897,3 +897,198 @@ class DeliveryProctoringAndBatchEvaluationTests(TestCase):
         self.assertEqual(stats["total_attempts"], 1)
 
 
+class ClassroomGradebookExportTests(TestCase):
+    """
+    Test suite for Classroom Gradebook (.xlsx) Excel export.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        import openpyxl
+        from schools.models import ClassSection
+
+        cls.school = School.objects.create(name="St. Xavier High School")
+        cls.section = ClassSection.objects.create(
+            school=cls.school,
+            standard=10,
+            section="A",
+            max_students=40,
+        )
+
+        cls.teacher = User.objects.create_user(
+            username="teacher_sharma",
+            first_name="Ramesh",
+            last_name="Sharma",
+            email="sharma@stxavier.edu",
+            password="pass",
+            role="Teacher",
+            school=cls.school,
+        )
+        grant_teacher_defaults(cls.teacher)
+
+        # Student 1: Appeared and scored
+        cls.student1 = User.objects.create_user(
+            username="student_aarav",
+            first_name="Aarav",
+            last_name="Patel",
+            email="aarav@stxavier.edu",
+            password="pass",
+            role="Student",
+            school=cls.school,
+            roll_number="101",
+            gr_number="GR-2024-001",
+            class_section=cls.section,
+        )
+        grant_student_defaults(cls.student1)
+
+        # Student 2: Absent / did not sit
+        cls.student2 = User.objects.create_user(
+            username="student_rohan",
+            first_name="Rohan",
+            last_name="Verma",
+            email="rohan@stxavier.edu",
+            password="pass",
+            role="Student",
+            school=cls.school,
+            roll_number="102",
+            gr_number="GR-2024-002",
+            class_section=cls.section,
+        )
+        grant_student_defaults(cls.student2)
+
+        cls.book = Book.objects.create(title="Math 10", subject="Mathematics", grade="10")
+        cls.chapter = Chapter.objects.create(book=cls.book, title="Algebra", chapter_order=1)
+        cls.topic = Topic.objects.create(chapter=cls.chapter, name="Quadratic")
+
+        cls.paper = Paper.objects.create(
+            title="Class 10 Math Midterm",
+            created_by=cls.teacher,
+            school=cls.school,
+            chapter=cls.chapter,
+            duration_minutes=90,
+        )
+        cls.version = PaperVersion.objects.create(
+            paper=cls.paper,
+            version_label="A",
+            total_marks=10.0,
+            question_snapshot=[
+                {
+                    "question_id": 1,
+                    "question_text": "Find roots of x^2 - 4 = 0",
+                    "question_type": "MCQ",
+                    "marks": 4.0,
+                    "correct_answer": "A",
+                    "options": {"A": "+-2", "B": "+-4", "C": "0", "D": "2"},
+                },
+                {
+                    "question_id": 2,
+                    "question_text": "Derive quadratic formula",
+                    "question_type": "LONG_ANSWER",
+                    "marks": 6.0,
+                    "correct_answer": "Detailed steps",
+                },
+            ],
+        )
+        cls.delivery = Delivery.objects.create(
+            paper_version=cls.version,
+            mode=DeliveryMode.ONLINE,
+            status=DeliveryStatus.ACTIVE,
+            created_by=cls.teacher,
+            target_class=cls.section,
+        )
+        cls.delivery.assigned_students.add(cls.student1, cls.student2)
+
+        # Create evaluated attempt for student 1
+        cls.attempt1 = Attempt.objects.create(
+            delivery=cls.delivery,
+            student=cls.student1,
+            status=AttemptStatus.EVALUATED,
+            score=Decimal("8.00"),
+            max_score=Decimal("10.00"),
+        )
+        Answer.objects.create(
+            attempt=cls.attempt1,
+            question_id=1,
+            question_snapshot=cls.version.question_snapshot[0],
+            student_response="A",
+            is_correct=True,
+            marks_awarded=Decimal("4.00"),
+        )
+        Answer.objects.create(
+            attempt=cls.attempt1,
+            question_id=2,
+            question_snapshot=cls.version.question_snapshot[1],
+            student_response="x = (-b +- sqrt(b^2-4ac))/2a",
+            is_correct=True,
+            marks_awarded=Decimal("4.00"),
+        )
+
+    def test_gradebook_export_service_structure(self):
+        import openpyxl
+        import io
+        from .gradebook_export import GradebookExcelExportService
+
+        service = GradebookExcelExportService(self.delivery, sort_by="roll_number")
+        xlsx_bytes = service.generate()
+
+        self.assertIsInstance(xlsx_bytes, bytes)
+        self.assertGreater(len(xlsx_bytes), 1000)
+
+        wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes))
+        self.assertIn("Gradebook", wb.sheetnames)
+        ws = wb["Gradebook"]
+
+        # Check title banner
+        self.assertIn("ST. XAVIER HIGH SCHOOL", str(ws["A1"].value))
+
+        # Check headers at row 9
+        row9_vals = [ws.cell(row=9, column=col).value for col in range(1, 13)]
+        self.assertIn("S.No.", row9_vals[0])
+        self.assertIn("Roll No.", row9_vals[1])
+        self.assertIn("Student Name", row9_vals[3])
+        self.assertIn("MCQ Marks (4)", row9_vals[5])
+        self.assertIn("Descriptive (6)", row9_vals[6])
+        self.assertIn("Total Marks (10)", row9_vals[7])
+
+        # Check student 1 (Aarav Patel)
+        row10_vals = [ws.cell(row=10, column=col).value for col in range(1, 13)]
+        self.assertEqual(row10_vals[1], "101")
+        self.assertEqual(row10_vals[3], "Aarav Patel")
+        self.assertEqual(row10_vals[4], "Evaluated")
+        self.assertEqual(row10_vals[5], 4.0)  # MCQ
+        self.assertEqual(row10_vals[6], 4.0)  # Desc
+        self.assertEqual(row10_vals[7], 8.0)  # Total
+        self.assertEqual(row10_vals[10], "A")  # Grade 80% is A
+
+        # Check student 2 (Rohan Verma - Absent)
+        row11_vals = [ws.cell(row=11, column=col).value for col in range(1, 13)]
+        self.assertEqual(row11_vals[1], "102")
+        self.assertEqual(row11_vals[3], "Rohan Verma")
+        self.assertEqual(row11_vals[4], "Absent")
+        self.assertEqual(row11_vals[10], "AB")
+
+    def test_gradebook_export_api_endpoint(self):
+        from rest_framework.test import APIClient
+        client = APIClient()
+
+        # Unauthenticated request fails
+        res_anon = client.get(f"/api/deliveries/{self.delivery.id}/export-gradebook/")
+        self.assertEqual(res_anon.status_code, 401)
+
+        # Student request is forbidden
+        client.force_authenticate(user=self.student1)
+        res_student = client.get(f"/api/deliveries/{self.delivery.id}/export-gradebook/")
+        self.assertEqual(res_student.status_code, 403)
+
+        # Teacher gets .xlsx download
+        client.force_authenticate(user=self.teacher)
+        res = client.get(f"/api/deliveries/{self.delivery.id}/export-gradebook/?sort_by=score")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(
+            res["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertTrue(res["Content-Disposition"].startswith("attachment; filename=\"Gradebook_"))
+
+
+

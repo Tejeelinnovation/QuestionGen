@@ -4,6 +4,7 @@ import { attemptsApi } from '../../../api/attempts';
 import { useAuth } from '../../../auth/AuthContext';
 import type { DeliveryResultsRoster } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
+import { FileSpreadsheet } from 'lucide-react';
 
 export const ResultsRosterPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,10 @@ export const ResultsRosterPageTablet: React.FC = () => {
   const [roster, setRoster] = useState<DeliveryResultsRoster | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Gradebook export configuration
+  const [sortBy, setSortBy] = useState<'roll_number' | 'name' | 'score'>('roll_number');
+  const [isExporting, setIsExporting] = useState(false);
 
   const fetchRoster = async () => {
     setIsLoading(true);
@@ -26,6 +31,17 @@ export const ResultsRosterPageTablet: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleExportGradebook = async () => {
+    try {
+      setIsExporting(true);
+      await attemptsApi.exportGradebook(deliveryId, sortBy);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to export gradebook spreadsheet.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -77,7 +93,7 @@ export const ResultsRosterPageTablet: React.FC = () => {
   return (
     <div className="pb-20 font-body space-y-6">
       {/* ── TABLET HEADER ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-4">
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
             <span className="w-2 h-2 rounded-full bg-forest" />
@@ -95,17 +111,42 @@ export const ResultsRosterPageTablet: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Sort By Selector */}
+          <div className="flex items-center text-xs border border-border rounded-pill px-3 py-2 bg-surface text-ink/80 shadow-xs min-h-[44px]">
+            <span className="text-[11px] font-heading font-medium text-ink/50 mr-1.5">Order by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent text-ink font-heading font-semibold text-xs focus:outline-none cursor-pointer"
+            >
+              <option value="roll_number">Roll No.</option>
+              <option value="name">Name</option>
+              <option value="score">Rank (Score)</option>
+            </select>
+          </div>
+
+          {/* Export Gradebook (.xlsx) Button */}
+          <button
+            onClick={handleExportGradebook}
+            disabled={isExporting}
+            id="tablet-export-gradebook-btn"
+            className="min-h-[44px] px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>{isExporting ? 'Generating...' : 'Export (.xlsx)'}</span>
+          </button>
+
           <button
             onClick={fetchRoster}
             disabled={isLoading}
-            className="min-h-[44px] px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer disabled:opacity-50 active:scale-95"
+            className="min-h-[44px] px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer disabled:opacity-50 active:scale-95"
           >
-            Refresh Roster ↻
+            Refresh ↻
           </button>
           <Link
             to={dashboardPath}
-            className="min-h-[44px] px-5 py-2 inline-flex items-center text-xs font-heading font-semibold rounded-pill bg-surface-muted border border-border text-ink hover:bg-ink hover:text-white transition-colors active:scale-95"
+            className="min-h-[44px] px-4 py-2 inline-flex items-center text-xs font-heading font-semibold rounded-pill bg-surface-muted border border-border text-ink hover:bg-ink hover:text-white transition-colors active:scale-95"
           >
             ← Dashboard
           </Link>

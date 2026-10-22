@@ -12,6 +12,7 @@ from .views import (
     AttemptStartResumeView,
     AttemptSubmitView,
     DeliveryBatchEvaluateView,
+    DeliveryGradebookExportView,
     DeliveryProctoringReportView,
     DeliveryResultsView,
 )
@@ -21,6 +22,8 @@ urlpatterns = [
     path("deliveries/<int:pk>/start/", AttemptStartResumeView.as_view(), name="delivery-start"),
     # Teacher roster results: GET /api/deliveries/{id}/results/
     path("deliveries/<int:pk>/results/", DeliveryResultsView.as_view(), name="delivery-results"),
+    # Classroom Gradebook Excel export: GET /api/deliveries/{id}/export-gradebook/
+    path("deliveries/<int:pk>/export-gradebook/", DeliveryGradebookExportView.as_view(), name="delivery-export-gradebook"),
     # Classroom proctoring analytics report: GET /api/deliveries/{id}/proctoring-report/
     path("deliveries/<int:pk>/proctoring-report/", DeliveryProctoringReportView.as_view(), name="delivery-proctoring-report"),
     # Batch evaluate and gradebook summary: POST /api/deliveries/{id}/batch-evaluate/

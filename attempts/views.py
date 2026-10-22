@@ -19,6 +19,7 @@ from django.core.cache import cache
 from django.db import transaction
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -485,6 +486,72 @@ class DeliveryResultsView(APIView):
 
         serializer = DeliveryResultsRosterSerializer(roster_data)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# 5b. Delivery Gradebook Export View (Teacher/Admin - .xlsx)
+# ---------------------------------------------------------------------------
+
+class DeliveryGradebookExportView(APIView):
+    """
+    GET /api/deliveries/{id}/export-gradebook/
+
+    Exports the complete classroom gradebook for a delivery into a formatted .xlsx file.
+    Includes all assigned students, separate MCQ and descriptive marks, and class statistics.
+    Query params:
+        sort_by: 'roll_number' (default) | 'name' | 'score'
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        delivery = (
+            Delivery.objects.select_related(
+                "paper_version",
+                "paper_version__paper",
+                "paper_version__paper__school",
+                "target_class",
+                "target_class__school",
+                "created_by",
+            )
+            .prefetch_related(
+                "assigned_students",
+                "assigned_students__class_section",
+                "attempts",
+                "attempts__student",
+                "attempts__answers",
+            )
+            .filter(pk=pk)
+            .first()
+        )
+
+        if not delivery:
+            return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_teacher_access_delivery_results(request.user, delivery):
+            return Response(
+                {"detail": "You do not have permission to export the gradebook for this delivery."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        sort_by = request.query_params.get("sort_by", "roll_number")
+
+        from .gradebook_export import GradebookExcelExportService
+        service = GradebookExcelExportService(delivery=delivery, sort_by=sort_by)
+        xlsx_bytes = service.generate()
+
+        paper = delivery.paper_version.paper
+        safe_title = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in paper.title).strip("_") or "Exam"
+        class_name = ("_" + delivery.target_class.name.replace(" ", "_")) if delivery.target_class else ""
+        filename = f"Gradebook_{safe_title}{class_name}_v{delivery.paper_version.version_label}.xlsx"
+
+        response = HttpResponse(
+            xlsx_bytes,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Access-Control-Expose-Headers"] = "Content-Disposition"
+        return response
 
 
 # ---------------------------------------------------------------------------

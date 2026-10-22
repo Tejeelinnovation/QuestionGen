@@ -56,6 +56,39 @@ export const attemptsApi = {
     return response.data;
   },
 
+  exportGradebook: async (
+    deliveryId: number,
+    sortBy: 'roll_number' | 'name' | 'score' = 'roll_number'
+  ): Promise<void> => {
+    const response = await apiClient.get(
+      `/api/deliveries/${deliveryId}/export-gradebook/?sort_by=${sortBy}`,
+      {
+        responseType: 'blob',
+      }
+    );
+
+    const disposition = response.headers['content-disposition'];
+    let filename = `Gradebook_Delivery_${deliveryId}.xlsx`;
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+    }
+
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   getTeacherAttemptDetail: async (attemptId: number): Promise<TeacherAttemptDetail> => {
     const response = await apiClient.get<TeacherAttemptDetail>(
       `/api/attempts/${attemptId}/result/`

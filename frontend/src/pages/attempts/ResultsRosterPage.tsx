@@ -7,6 +7,7 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { ResultsRosterPageTablet } from '../tablet/attempts/ResultsRosterPageTablet';
 import { ResultsRosterPageMobile } from '../mobile/attempts/ResultsRosterPageMobile';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
+import { FileSpreadsheet } from 'lucide-react';
 
 const ResultsRosterPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +17,10 @@ const ResultsRosterPageDesktop: React.FC = () => {
   const [roster, setRoster] = useState<DeliveryResultsRoster | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Gradebook export configuration
+  const [sortBy, setSortBy] = useState<'roll_number' | 'name' | 'score'>('roll_number');
+  const [isExporting, setIsExporting] = useState(false);
 
   const fetchRoster = async () => {
     setIsLoading(true);
@@ -29,6 +34,17 @@ const ResultsRosterPageDesktop: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleExportGradebook = async () => {
+    try {
+      setIsExporting(true);
+      await attemptsApi.exportGradebook(deliveryId, sortBy);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to export gradebook spreadsheet.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -98,17 +114,44 @@ const ResultsRosterPageDesktop: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-end md:self-auto">
+        <div className="flex flex-wrap items-center gap-2.5 self-end md:self-auto">
+          {/* Sort By Preference */}
+          <div className="flex items-center text-xs border border-border rounded-pill px-3 py-1.5 bg-surface text-ink/80 shadow-xs">
+            <span className="text-[11px] font-heading font-medium text-ink/50 mr-1.5">Order by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent text-ink font-heading font-semibold text-xs focus:outline-none cursor-pointer"
+              title="Choose sort order for exported Excel gradebook"
+            >
+              <option value="roll_number">Roll No. (1, 2, 3...)</option>
+              <option value="name">Name (A → Z)</option>
+              <option value="score">Rank (Highest Score)</option>
+            </select>
+          </div>
+
+          {/* Export Gradebook (.xlsx) Button */}
+          <button
+            onClick={handleExportGradebook}
+            disabled={isExporting}
+            id="export-gradebook-btn"
+            className="px-3.5 py-1.5 text-xs font-heading font-semibold rounded-pill border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            title="Export full class marks roster with MCQ/Descriptive breakdown to Microsoft Excel (.xlsx)"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{isExporting ? 'Generating Excel...' : 'Export Gradebook (.xlsx)'}</span>
+          </button>
+
           <button
             onClick={fetchRoster}
             disabled={isLoading}
-            className="px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-colors cursor-pointer disabled:opacity-50"
           >
-            Refresh Roster ↻
+            Refresh ↻
           </button>
           <Link
             to={dashboardPath}
-            className="px-4 py-2 text-xs font-heading font-semibold rounded-pill bg-surface-muted border border-border text-ink hover:bg-ink hover:text-white transition-colors"
+            className="px-3.5 py-1.5 text-xs font-heading font-semibold rounded-pill bg-surface-muted border border-border text-ink hover:bg-ink hover:text-white transition-colors"
           >
             ← Dashboard
           </Link>

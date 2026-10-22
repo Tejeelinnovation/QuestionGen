@@ -4,7 +4,7 @@ import { attemptsApi } from '../../../api/attempts';
 import { useAuth } from '../../../auth/AuthContext';
 import type { DeliveryResultsRoster, DeliveryRosterAttempt } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
-import { ChevronRight, ArrowLeft } from 'lucide-react';
+import { ChevronRight, ArrowLeft, FileSpreadsheet } from 'lucide-react';
 
 export const ResultsRosterPageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +14,10 @@ export const ResultsRosterPageMobile: React.FC = () => {
   const [roster, setRoster] = useState<DeliveryResultsRoster | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Gradebook export configuration
+  const [sortBy, setSortBy] = useState<'roll_number' | 'name' | 'score'>('roll_number');
+  const [isExporting, setIsExporting] = useState(false);
 
   const fetchRoster = async () => {
     setIsLoading(true);
@@ -27,6 +31,17 @@ export const ResultsRosterPageMobile: React.FC = () => {
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleExportGradebook = async () => {
+    try {
+      setIsExporting(true);
+      await attemptsApi.exportGradebook(deliveryId, sortBy);
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to export gradebook spreadsheet.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -65,15 +80,25 @@ export const ResultsRosterPageMobile: React.FC = () => {
   const gradedCount = submissions.filter((s) => s.status === 'EVALUATED').length;
 
   return (
-    <div className="space-y-4 font-body">
-      {/* Top back link */}
-      <Link
-        to={dashboardPath}
-        className="inline-flex items-center gap-1 text-xs font-heading font-semibold text-forest hover:underline"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Back</span>
-      </Link>
+    <div className="space-y-4 font-body pb-12">
+      {/* Top back link and refresh */}
+      <div className="flex items-center justify-between">
+        <Link
+          to={dashboardPath}
+          className="inline-flex items-center gap-1 text-xs font-heading font-semibold text-forest hover:underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back</span>
+        </Link>
+
+        <button
+          onClick={fetchRoster}
+          disabled={isLoading}
+          className="text-xs text-ink/70 font-heading font-medium hover:text-ink cursor-pointer"
+        >
+          Refresh ↻
+        </button>
+      </div>
 
       {/* ── Headline Summary Block ── */}
       <div className="p-4 rounded-card bg-surface border border-border shadow-card space-y-3">
@@ -103,6 +128,31 @@ export const ResultsRosterPageMobile: React.FC = () => {
             {gradedCount} Evaluated
           </span>
         </div>
+      </div>
+
+      {/* ── Mobile Export Gradebook Card ── */}
+      <div className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-heading font-bold text-ink">Classroom Gradebook</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="text-[11px] font-heading font-semibold bg-surface-muted border border-border rounded-pill px-2.5 py-1 text-ink focus:outline-none cursor-pointer"
+          >
+            <option value="roll_number">By Roll No.</option>
+            <option value="name">By Name (A-Z)</option>
+            <option value="score">By Score (Rank)</option>
+          </select>
+        </div>
+        <button
+          onClick={handleExportGradebook}
+          disabled={isExporting}
+          id="mobile-export-gradebook-btn"
+          className="w-full py-2.5 px-4 rounded-pill border border-emerald-300 bg-emerald-50 text-emerald-800 text-xs font-heading font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xs disabled:opacity-50 min-h-[42px] cursor-pointer"
+        >
+          <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{isExporting ? 'Generating Excel...' : 'Download Gradebook (.xlsx)'}</span>
+        </button>
       </div>
 
       {/* ── Single-Column Student Submissions Feed ── */}
