@@ -44,5 +44,6 @@ inflection==0.5.1
 
 # Redis caching
 django-redis==6.0.0
-
-
+# Word (.docx) and PDF Document Generation
+python-docx==1.2.0
+reportlab==5.0.1

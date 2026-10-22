@@ -8,6 +8,8 @@ import { PrintViewPageMobile } from '../mobile/papers/PrintViewPageMobile';
 
 import { PrintablePaperSheet } from '../../components/papers/PrintablePaperSheet';
 
+import { FileText, Download, Printer } from 'lucide-react';
+
 const PrintViewPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
   const paperId = Number(id);
@@ -16,6 +18,12 @@ const PrintViewPageDesktop: React.FC = () => {
   const [printData, setPrintData] = useState<PaperPrintData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Blank line configuration
+  const [linesPerMark, setLinesPerMark] = useState<number>(2);
+  const [questionLineOverrides, setQuestionLineOverrides] = useState<Record<number, number>>({});
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
+  const [isExportingKey, setIsExportingKey] = useState(false);
 
   useEffect(() => {
     const loadPrintData = async () => {
@@ -40,6 +48,31 @@ const PrintViewPageDesktop: React.FC = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleExportDocx = async (target: 'paper' | 'answer-key' = 'paper') => {
+    try {
+      if (target === 'answer-key') setIsExportingKey(true);
+      else setIsExportingDocx(true);
+
+      await papersApi.exportDocx(paperId, vId, {
+        target,
+        linesPerMark,
+        overrides: questionLineOverrides,
+      });
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to generate Microsoft Word (.docx) file.');
+    } finally {
+      setIsExportingDocx(false);
+      setIsExportingKey(false);
+    }
+  };
+
+  const handleOverrideChange = (questionId: number, lines: number) => {
+    setQuestionLineOverrides((prev) => ({
+      ...prev,
+      [questionId]: lines,
+    }));
   };
 
   if (isLoading) {
@@ -71,46 +104,117 @@ const PrintViewPageDesktop: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-6 font-body">
       {/* ── NON-PRINTED CONTROL BAR (Document-forward framing, print:hidden) ── */}
-      <div className="print:hidden bg-surface border border-border rounded-card p-4 shadow-card flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-forest" />
-            <span className="font-heading font-bold text-sm text-ink">
-              Official Examination Document
-            </span>
-            <span className="font-mono text-[11px] text-ink/50">
-              • Version {printData.version_label}
-            </span>
+      <div className="print:hidden bg-surface border border-border rounded-card p-4 shadow-card space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-forest" />
+              <span className="font-heading font-bold text-sm text-ink">
+                Official Examination Document
+              </span>
+              <span className="font-mono text-[11px] text-ink/50">
+                • Version {printData.version_label}
+              </span>
+            </div>
+            <p className="text-xs text-ink/60">
+              Configure blank writing lines and export to Microsoft Word (.docx) or print directly.
+            </p>
           </div>
-          <p className="text-xs text-ink/60">
-            Formatted with high-contrast document restraint for clean physical reproduction.
-          </p>
-          <p className="text-[11px] text-ink/50 font-mono">
-            Tip: In browser print dialog, uncheck &quot;Headers and footers&quot; to remove page URL and timestamp.
-          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/papers/${paperId}/versions/${vId}`}
+              className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors"
+            >
+              ← Version Detail
+            </Link>
+
+            {/* Export Word (.docx) */}
+            <button
+              onClick={() => handleExportDocx('paper')}
+              disabled={isExportingDocx}
+              id="export-docx-btn"
+              className="px-3.5 py-1.5 text-xs font-heading font-semibold rounded-pill border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              title="Download editable Microsoft Word document with writing lines"
+            >
+              <FileText className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{isExportingDocx ? 'Generating Word...' : 'Download Word (.docx)'}</span>
+            </button>
+
+            {/* Export Answer Key (.docx) */}
+            <button
+              onClick={() => handleExportDocx('answer-key')}
+              disabled={isExportingKey}
+              id="export-answer-key-docx-btn"
+              className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              title="Download teacher solution scheme Word document"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{isExportingKey ? 'Generating Key...' : 'Answer Key (.docx)'}</span>
+            </button>
+
+            {/* Print / Save PDF */}
+            <button
+              onClick={handlePrint}
+              id="trigger-print-btn"
+              className="px-4 py-1.5 text-xs font-heading font-semibold rounded-pill bg-ink text-white hover:bg-ink/90 transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print / PDF</span>
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link
-            to={`/papers/${paperId}/versions/${vId}`}
-            className="px-4 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors"
-          >
-            ← Version Detail
-          </Link>
+        {/* Universal Blank Lines Control Row */}
+        <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs bg-bg/50 p-2.5 rounded-card">
+          <div className="flex items-center gap-2">
+            <span className="font-heading font-semibold text-ink">Universal Answer Lines:</span>
+            <div className="flex items-center border border-border rounded-pill overflow-hidden bg-surface shadow-xs">
+              {[0, 1, 2, 3, 4, 5].map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setLinesPerMark(count)}
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                    linesPerMark === count
+                      ? 'bg-ink text-white font-bold'
+                      : 'text-ink/70 hover:bg-surface-muted'
+                  }`}
+                >
+                  {count === 0 ? 'Compact (0)' : `${count} / mk`}
+                </button>
+              ))}
+            </div>
+            <span className="text-[11px] text-ink/50 font-mono hidden sm:inline">
+              (Lines per mark for descriptive questions; MCQs default to 0)
+            </span>
+          </div>
 
-          <button
-            onClick={handlePrint}
-            id="trigger-print-btn"
-            className="px-5 py-2 text-xs font-heading font-semibold rounded-pill bg-ink text-white hover:bg-ink/90 transition-all shadow-sm cursor-pointer flex items-center gap-2"
-          >
-            <span>Print Sheet / Save PDF</span>
-            <span>⎙</span>
-          </button>
+          {Object.keys(questionLineOverrides).length > 0 && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="bg-forest/10 text-forest font-semibold px-2 py-0.5 rounded-pill border border-forest/20 text-[11px]">
+                {Object.keys(questionLineOverrides).length} custom override{Object.keys(questionLineOverrides).length === 1 ? '' : 's'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQuestionLineOverrides({})}
+                className="text-[11px] text-ink/60 hover:text-ink underline cursor-pointer"
+              >
+                Clear all overrides
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── PRINTABLE SHEET: HIGH CONTRAST, FORMAL RESTRAINT ── */}
-      <PrintablePaperSheet printData={printData} />
+      <PrintablePaperSheet
+        printData={printData}
+        linesPerMark={linesPerMark}
+        questionLineOverrides={questionLineOverrides}
+        onOverrideChange={handleOverrideChange}
+        interactive={true}
+      />
     </div>
   );
 };

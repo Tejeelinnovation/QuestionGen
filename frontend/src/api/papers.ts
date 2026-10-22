@@ -191,6 +191,49 @@ export const papersApi = {
     return response.data;
   },
 
+  exportDocx: async (
+    paperId: number,
+    versionId: number,
+    options?: {
+      target?: 'paper' | 'answer-key';
+      linesPerMark?: number;
+      overrides?: Record<number, number>;
+      lineStyle?: 'dotted' | 'solid';
+    }
+  ): Promise<void> => {
+    const params = new URLSearchParams();
+    if (options?.target) params.set('target', options.target);
+    if (options?.linesPerMark !== undefined) params.set('lines_per_mark', String(options.linesPerMark));
+    if (options?.lineStyle) params.set('line_style', options.lineStyle);
+    if (options?.overrides && Object.keys(options.overrides).length > 0) {
+      params.set('overrides', JSON.stringify(options.overrides));
+    }
+
+    const response = await apiClient.get(
+      `/api/papers/${paperId}/versions/${versionId}/export-docx/?${params.toString()}`,
+      { responseType: 'blob' }
+    );
+
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    const disposition = response.headers['content-disposition'];
+    let filename = `Exam_v${versionId}.docx`;
+    if (disposition && disposition.indexOf('filename=') !== -1) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match && match[1]) filename = match[1];
+    }
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+  },
+
   getDeliveries: async (): Promise<Delivery[]> => {
     const response = await apiClient.get<Delivery[]>('/api/deliveries/');
     return response.data;
@@ -201,3 +244,4 @@ export const papersApi = {
     return response.data;
   },
 };
+

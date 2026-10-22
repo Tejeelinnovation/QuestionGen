@@ -17,6 +17,7 @@ from .views import (
     PaperVersionListCreateView,
     PaperVersionPrintView,
     PaperVersionAnswerKeyView,
+    PaperVersionDocxExportView,
 )
 
 urlpatterns = [
@@ -40,6 +41,8 @@ urlpatterns = [
     path("papers/<int:pk>/versions/<int:version_pk>/print/", PaperVersionPrintView.as_view(), name="paper-version-print"),
     # Teacher Answer Key & Solution Scheme: GET /api/papers/{id}/versions/{version_id}/answer-key/
     path("papers/<int:pk>/versions/<int:version_pk>/answer-key/", PaperVersionAnswerKeyView.as_view(), name="paper-version-answer-key"),
+    # Microsoft Word (.docx) Export: GET /api/papers/{id}/versions/{version_id}/export-docx/
+    path("papers/<int:pk>/versions/<int:version_pk>/export-docx/", PaperVersionDocxExportView.as_view(), name="paper-version-export-docx"),
     # Deliveries: GET /api/deliveries/, GET /api/deliveries/{id}/
     path("deliveries/", DeliveryListView.as_view(), name="delivery-list"),
     path("deliveries/<int:pk>/", DeliveryDetailView.as_view(), name="delivery-detail"),

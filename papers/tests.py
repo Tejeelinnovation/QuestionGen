@@ -889,5 +889,60 @@ class PaperPublishingAndAnswerKeyTests(TestCase):
         self.assertEqual(res.data["document_type"], "TEACHER_ANSWER_KEY")
         self.assertEqual(res.data["total_questions"], 3)
 
+    def test_docx_export_student_paper_with_blank_lines(self):
+        from papers.docx_export import ExamPaperDocxService
+        service = ExamPaperDocxService()
+        # Set universal lines_per_mark=2, and override question 102 (3 marks) to have 10 lines
+        buf = service.generate_student_paper(
+            version=self.version,
+            lines_per_mark=2,
+            question_line_overrides={"102": 10},
+        )
+        self.assertGreater(len(buf.getvalue()), 1000)
+        # Verify it's a valid Word document by reading back with docx
+        import docx
+        doc = docx.Document(buf)
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        self.assertIn("ST. XAVIER'S HIGH SCHOOL", full_text)
+        self.assertIn("ACIDS & BASES MID-TERM", full_text)
+        self.assertIn("SECTION A", full_text)
+        self.assertIn("SECTION B", full_text)
+        self.assertIn("SECTION C", full_text)
+
+    def test_docx_export_answer_key(self):
+        from papers.docx_export import ExamPaperDocxService
+        service = ExamPaperDocxService()
+        buf = service.generate_answer_key(self.version)
+        self.assertGreater(len(buf.getvalue()), 1000)
+        import docx
+        doc = docx.Document(buf)
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+        self.assertIn("ANSWER KEY", full_text)
+        self.assertIn("CORRECT ANSWER:", full_text)
+
+    def test_docx_export_api_endpoints(self):
+        from rest_framework.test import APIClient
+        import json
+        client = APIClient()
+        client.force_authenticate(user=self.teacher)
+
+        # 1. Student Paper Docx Export
+        overrides = json.dumps({"102": 8})
+        res = client.get(
+            f"/api/papers/{self.paper.id}/versions/{self.version.id}/export-docx/?target=paper&lines_per_mark=3&overrides={overrides}"
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res["Content-Type"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        self.assertIn("Question_Paper.docx", res["Content-Disposition"])
+        self.assertGreater(len(res.content), 1000)
+
+        # 2. Teacher Answer Key Docx Export
+        res_key = client.get(
+            f"/api/papers/{self.paper.id}/versions/{self.version.id}/export-docx/?target=answer-key"
+        )
+        self.assertEqual(res_key.status_code, 200)
+        self.assertEqual(res_key["Content-Type"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        self.assertIn("Answer_Key.docx", res_key["Content-Disposition"])
+
 
 

@@ -3,9 +3,19 @@ import type { PaperPrintData } from '../../types';
 
 interface PrintablePaperSheetProps {
   printData: PaperPrintData;
+  linesPerMark?: number;
+  questionLineOverrides?: Record<number, number>;
+  onOverrideChange?: (questionId: number, lines: number) => void;
+  interactive?: boolean;
 }
 
-export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({ printData }) => {
+export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
+  printData,
+  linesPerMark = 2,
+  questionLineOverrides = {},
+  onOverrideChange,
+  interactive = false,
+}) => {
   const institutionName = printData.school_name
     ? printData.school_name.toUpperCase()
     : 'INSTITUTIONAL EXAMINATION PAPER';
@@ -73,45 +83,105 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({ printD
 
       {/* Questions Body */}
       <div className="space-y-8 pt-2">
-        {printData.questions?.map((q, idx) => (
-          <div key={q.question_id || idx} className="space-y-3 break-inside-avoid">
-            <div className="flex justify-between items-baseline gap-4">
-              <div className="text-sm font-medium leading-relaxed">
-                <span className="font-bold mr-1.5">{idx + 1}.</span>
-                {q.question_text}
-              </div>
-              <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
-                [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
-              </span>
-            </div>
+        {printData.questions?.map((q, idx) => {
+          const qId = q.question_id || idx + 1;
+          const isOverridden = questionLineOverrides && qId in questionLineOverrides;
+          const defaultLines =
+            q.question_type === 'MCQ'
+              ? 0
+              : Math.max(0, Math.round(q.marks * (linesPerMark ?? 2)));
+          const currentLines = isOverridden
+            ? questionLineOverrides[qId]
+            : defaultLines;
 
-            {/* MCQ Options Display */}
-            {q.options && Object.keys(q.options).length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pl-5 pt-1">
-                {Object.entries(q.options).map(([key, val]) => (
-                  <div key={key} className="flex items-baseline gap-1.5">
-                    <span className="font-bold font-mono">({key})</span>
-                    <span>{val}</span>
+          return (
+            <div key={q.question_id || idx} className="space-y-3 break-inside-avoid">
+              <div className="flex justify-between items-baseline gap-4">
+                <div className="text-sm font-medium leading-relaxed">
+                  <span className="font-bold mr-1.5">{idx + 1}.</span>
+                  {q.question_text}
+                </div>
+                <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
+                  [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
+                </span>
+              </div>
+
+              {/* MCQ Options Display */}
+              {q.options && Object.keys(q.options).length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pl-5 pt-1">
+                  {Object.entries(q.options).map(([key, val]) => (
+                    <div key={key} className="flex items-baseline gap-1.5">
+                      <span className="font-bold font-mono">({key})</span>
+                      <span>{val}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Lined writing space for answers */}
+              {currentLines > 0 && (
+                <div className="pt-2 space-y-3 pl-5">
+                  {Array.from({ length: currentLines }).map((_, lIdx) => (
+                    <div
+                      key={lIdx}
+                      className="h-4 border-b border-dashed border-gray-300 w-full"
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Interactive Per-Question Line Stepper (Non-printed) */}
+              {interactive && onOverrideChange && (
+                <div className="print:hidden flex flex-wrap items-center justify-between text-xs text-ink/60 bg-surface-muted/60 border border-border/80 rounded-card px-3 py-1.5 mt-2 gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-heading font-medium text-[11px] text-ink/70">
+                      Answer lines:
+                    </span>
+                    <div className="flex items-center border border-border rounded-pill overflow-hidden bg-surface shadow-xs">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOverrideChange(qId, Math.max(0, currentLines - 1))
+                        }
+                        className="px-2.5 py-0.5 hover:bg-surface-muted text-ink font-bold text-xs cursor-pointer select-none"
+                        title="Decrease lines"
+                      >
+                        −
+                      </button>
+                      <span className="px-2 py-0.5 font-mono text-[11px] font-semibold text-ink bg-surface border-x border-border min-w-[55px] text-center">
+                        {currentLines} {currentLines === 1 ? 'line' : 'lines'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onOverrideChange(qId, currentLines + 1)}
+                        className="px-2.5 py-0.5 hover:bg-surface-muted text-ink font-bold text-xs cursor-pointer select-none"
+                        title="Increase lines"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    {isOverridden && (
+                      <span className="text-[10px] bg-forest/10 text-forest font-semibold px-2 py-0.5 rounded-pill border border-forest/20">
+                        Custom
+                      </span>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
 
-            {/* Lined writing space for descriptive answers */}
-            {q.question_type !== 'MCQ' && (
-              <div className="pt-2 space-y-3 pl-5">
-                <div className="h-4 border-b border-dashed border-gray-300 w-full" />
-                <div className="h-4 border-b border-dashed border-gray-300 w-full" />
-                {q.question_type === 'LONG_ANSWER' && (
-                  <>
-                    <div className="h-4 border-b border-dashed border-gray-300 w-full" />
-                    <div className="h-4 border-b border-dashed border-gray-300 w-full" />
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+                  {isOverridden && (
+                    <button
+                      type="button"
+                      onClick={() => onOverrideChange(qId, defaultLines)}
+                      className="text-[11px] font-heading font-medium text-ink/50 hover:text-ink underline cursor-pointer"
+                    >
+                      Reset to default ({defaultLines})
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* End of Examination Marker */}

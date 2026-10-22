@@ -846,6 +846,75 @@ class PaperVersionAnswerKeyView(APIView):
         return Response(key_data, status=status.HTTP_200_OK)
 
 
+class PaperVersionDocxExportView(APIView):
+    """
+    GET /api/papers/{id}/versions/{version_id}/export-docx/
+
+    Downloads the finalized examination paper or teacher answer key as a
+    formatted Microsoft Word (.docx) file.
+
+    Query Parameters:
+    - target: 'paper' (default) or 'answer-key'
+    - lines_per_mark: integer (default: 2) - Universal blank answer lines per mark
+    - overrides: JSON-encoded dictionary of {question_id: line_count}
+    - line_style: 'dotted' (default) or 'solid'
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, version_pk):
+        import json
+        from django.http import HttpResponse
+
+        paper = get_scoped_papers(request.user).filter(pk=pk).first()
+        if not paper:
+            return Response({"detail": "Paper not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        version = paper.versions.filter(pk=version_pk).first()
+        if not version:
+            return Response({"detail": "Paper version not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        target = request.query_params.get("target", "paper").lower()
+        try:
+            lines_per_mark = int(request.query_params.get("lines_per_mark", 2))
+        except (ValueError, TypeError):
+            lines_per_mark = 2
+
+        line_style = request.query_params.get("line_style", "dotted")
+
+        # Parse overrides if passed
+        raw_overrides = request.query_params.get("overrides", "{}")
+        try:
+            overrides = json.loads(raw_overrides) if isinstance(raw_overrides, str) else dict(raw_overrides)
+        except Exception:
+            overrides = {}
+
+        from .docx_export import ExamPaperDocxService
+        service = ExamPaperDocxService()
+
+        safe_title = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in paper.title).strip("_") or "Exam"
+
+        if target == "answer-key":
+            buf = service.generate_answer_key(version)
+            filename = f"{safe_title}_v{version.version_label}_Answer_Key.docx"
+        else:
+            buf = service.generate_student_paper(
+                version=version,
+                lines_per_mark=lines_per_mark,
+                question_line_overrides=overrides,
+                line_style=line_style,
+            )
+            filename = f"{safe_title}_v{version.version_label}_Question_Paper.docx"
+
+        response = HttpResponse(
+            buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["X-Filename"] = filename
+        return response
+
+
 
 # ---------------------------------------------------------------------------
 # 10. Deliveries List & Detail Views
