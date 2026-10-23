@@ -9,6 +9,7 @@ from .views import (
     AttemptAnswerSaveView,
     AttemptProctoringWarningView,
     AttemptResultView,
+    AttemptScorecardPdfView,
     AttemptStartResumeView,
     AttemptSubmitView,
     DeliveryBatchEvaluateView,
@@ -36,6 +37,8 @@ urlpatterns = [
     path("attempts/<int:pk>/proctoring-warning/", AttemptProctoringWarningView.as_view(), name="attempt-proctoring-warning"),
     # View attempt result: GET /api/attempts/{id}/result/
     path("attempts/<int:pk>/result/", AttemptResultView.as_view(), name="attempt-result"),
+    # Download student scorecard PDF: GET /api/attempts/{id}/download-scorecard/
+    path("attempts/<int:pk>/download-scorecard/", AttemptScorecardPdfView.as_view(), name="attempt-download-scorecard"),
     # Teacher manual grade: POST /api/attempts/{id}/answers/{question_id}/grade/
     path("attempts/<int:pk>/answers/<int:question_id>/grade/", AttemptAnswerGradeView.as_view(), name="attempt-answer-grade"),
 ]

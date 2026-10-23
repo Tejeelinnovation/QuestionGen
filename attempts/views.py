@@ -424,6 +424,87 @@ class AttemptResultView(APIView):
 
 
 # ---------------------------------------------------------------------------
+# 4b. Download Student Scorecard PDF View (Student / Teacher / Admin)
+# ---------------------------------------------------------------------------
+
+class AttemptScorecardPdfView(APIView):
+    """
+    GET /api/attempts/{id}/download-scorecard/
+
+    Generates and downloads a publication-grade institutional PDF scorecard for an Attempt.
+    - Accessible by: owning student, delivery creator teacher, school admin, or super admin.
+    - Requires attempt status to be SUBMITTED or EVALUATED (IN_PROGRESS returns 400).
+    - Returns application/pdf with Content-Disposition header.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        attempt = (
+            Attempt.objects.select_related(
+                "student",
+                "student__class_section",
+                "delivery",
+                "delivery__target_class",
+                "delivery__paper_version",
+                "delivery__paper_version__paper",
+                "delivery__paper_version__paper__school",
+                "delivery__created_by",
+            )
+            .prefetch_related("answers")
+            .filter(pk=pk)
+            .first()
+        )
+
+        if not attempt:
+            return Response({"detail": "Attempt not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not can_access_attempt_result(request.user, attempt):
+            return Response(
+                {"detail": "You do not have permission to download this scorecard."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if attempt.status == AttemptStatus.IN_PROGRESS:
+            return Response(
+                {"detail": "Cannot download scorecard while test is in progress."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .scorecard_pdf import StudentScorecardPdfService
+        service = StudentScorecardPdfService(attempt=attempt)
+        pdf_bytes = service.generate()
+
+        student_name = "".join(
+            c if c.isalnum() or c in ("-", "_") else "_"
+            for c in (attempt.student.get_full_name() or attempt.student.username)
+        ).strip("_") or "Student"
+        paper_title = "".join(
+            c if c.isalnum() or c in ("-", "_") else "_"
+            for c in attempt.delivery.paper_version.paper.title
+        ).strip("_") or "Exam"
+
+        filename = f"Scorecard_{student_name}_{paper_title}_Attempt{attempt.id}.pdf"
+
+        log_action(
+            user=request.user,
+            action="attempt.scorecard_downloaded",
+            target=attempt,
+            metadata={
+                "attempt_id": attempt.id,
+                "student_id": attempt.student_id,
+                "score": float(attempt.score) if attempt.score is not None else None,
+                "status": attempt.status,
+            },
+        )
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Access-Control-Expose-Headers"] = "Content-Disposition"
+        return response
+
+
+# ---------------------------------------------------------------------------
 # 5. Delivery Results Roster View (Teacher)
 # ---------------------------------------------------------------------------
 

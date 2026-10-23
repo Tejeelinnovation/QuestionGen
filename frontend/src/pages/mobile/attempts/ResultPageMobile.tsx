@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
 import type { StudentAttemptResult } from '../../../types';
-import { Clock, ArrowLeft } from 'lucide-react';
+import { Clock, ArrowLeft, FileDown, Loader2 } from 'lucide-react';
 
 export const ResultPageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -11,6 +11,19 @@ export const ResultPageMobile: React.FC = () => {
   const [result, setResult] = useState<StudentAttemptResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadScorecard = async () => {
+    if (!attemptId || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await attemptsApi.downloadScorecardPdf(attemptId);
+    } catch (err: any) {
+      console.error('Failed to download scorecard PDF:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -97,24 +110,43 @@ export const ResultPageMobile: React.FC = () => {
         </div>
 
         {isEvaluated ? (
-          <div className="flex items-baseline justify-between pt-2 border-t border-border/50">
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-heading font-bold text-4xl text-forest tracking-tight">
-                {scoreNum % 1 === 0 ? scoreNum : scoreNum.toFixed(1)}
-              </span>
-              <span className="font-mono text-sm text-ink/60">
-                / {maxScoreNum} Marks
-              </span>
+          <>
+            <div className="flex items-baseline justify-between pt-2 border-t border-border/50">
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-heading font-bold text-4xl text-forest tracking-tight">
+                  {scoreNum % 1 === 0 ? scoreNum : scoreNum.toFixed(1)}
+                </span>
+                <span className="font-mono text-sm text-ink/60">
+                  / {maxScoreNum} Marks
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="font-heading font-bold text-2xl text-ink">
+                  {percentage}%
+                </span>
+                <span className="block text-[10px] text-ink/50 font-mono uppercase">
+                  Final Score
+                </span>
+              </div>
             </div>
-            <div className="text-right">
-              <span className="font-heading font-bold text-2xl text-ink">
-                {percentage}%
-              </span>
-              <span className="block text-[10px] text-ink/50 font-mono uppercase">
-                Final Score
-              </span>
+
+            <div className="pt-2 border-t border-border/50">
+              <button
+                type="button"
+                id="mobile-download-scorecard-btn"
+                onClick={handleDownloadScorecard}
+                disabled={isDownloading}
+                className="w-full py-2.5 px-4 rounded-pill bg-forest text-white font-heading font-semibold text-xs active:scale-95 transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px] cursor-pointer disabled:opacity-60"
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                ) : (
+                  <FileDown className="w-4 h-4 shrink-0" />
+                )}
+                <span>{isDownloading ? 'Compiling PDF...' : 'Download Scorecard (PDF)'}</span>
+              </button>
             </div>
-          </div>
+          </>
         ) : (
           <div className="p-3 rounded-card bg-surface-muted border border-border text-xs text-ink/70 flex items-center gap-2">
             <Clock className="w-4 h-4 text-ember shrink-0" />

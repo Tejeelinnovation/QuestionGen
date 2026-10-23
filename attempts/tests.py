@@ -1091,4 +1091,183 @@ class ClassroomGradebookExportTests(TestCase):
         self.assertTrue(res["Content-Disposition"].startswith("attachment; filename=\"Gradebook_"))
 
 
+class StudentScorecardPdfExportTests(TestCase):
+    """
+    Test suite for Student Scorecard (.pdf) ReportLab export.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from schools.models import ClassSection
+
+        cls.school = School.objects.create(name="St. Xavier High School")
+        cls.section = ClassSection.objects.create(
+            school=cls.school,
+            standard=10,
+            section="A",
+            max_students=40,
+        )
+
+        cls.teacher = User.objects.create_user(
+            username="teacher_kapoor",
+            first_name="Vikram",
+            last_name="Kapoor",
+            email="kapoor@stxavier.edu",
+            password="pass",
+            role="Teacher",
+            school=cls.school,
+        )
+        grant_teacher_defaults(cls.teacher)
+
+        # Student 1: Appeared and evaluated
+        cls.student1 = User.objects.create_user(
+            username="student_ananya",
+            first_name="Ananya",
+            last_name="Iyer",
+            email="ananya@stxavier.edu",
+            password="pass",
+            role="Student",
+            school=cls.school,
+            roll_number="105",
+            gr_number="GR-2024-105",
+            class_section=cls.section,
+        )
+        grant_student_defaults(cls.student1)
+
+        # Student 2: Separate student
+        cls.student2 = User.objects.create_user(
+            username="student_kabir",
+            first_name="Kabir",
+            last_name="Mehta",
+            email="kabir@stxavier.edu",
+            password="pass",
+            role="Student",
+            school=cls.school,
+            roll_number="106",
+            gr_number="GR-2024-106",
+            class_section=cls.section,
+        )
+        grant_student_defaults(cls.student2)
+
+        cls.book = Book.objects.create(title="Math 10", subject="Mathematics", grade="10")
+        cls.chapter = Chapter.objects.create(book=cls.book, title="Algebra", chapter_order=1)
+        cls.topic = Topic.objects.create(chapter=cls.chapter, name="Quadratic")
+
+        cls.paper = Paper.objects.create(
+            title="Class 10 Math Unit Test",
+            created_by=cls.teacher,
+            school=cls.school,
+            chapter=cls.chapter,
+            duration_minutes=60,
+        )
+        cls.version = PaperVersion.objects.create(
+            paper=cls.paper,
+            version_label="A",
+            total_marks=10.0,
+            question_snapshot=[
+                {
+                    "id": 1,
+                    "question_text": "What is the discriminant of 2x^2 - 4x + 3 = 0?",
+                    "question_type": "MCQ",
+                    "marks": 4.0,
+                    "correct_answer": "-8",
+                    "options": {"A": "-8", "B": "8", "C": "4", "D": "0"},
+                },
+                {
+                    "id": 2,
+                    "question_text": "State the quadratic formula.",
+                    "question_type": "SHORT_ANSWER",
+                    "marks": 6.0,
+                    "correct_answer": "x = (-b +- sqrt(b^2 - 4ac)) / (2a)",
+                },
+            ],
+        )
+        cls.delivery = Delivery.objects.create(
+            paper_version=cls.version,
+            mode=DeliveryMode.ONLINE,
+            status=DeliveryStatus.ACTIVE,
+            created_by=cls.teacher,
+            target_class=cls.section,
+        )
+        cls.delivery.assigned_students.add(cls.student1, cls.student2)
+
+        cls.attempt_evaluated = Attempt.objects.create(
+            delivery=cls.delivery,
+            student=cls.student1,
+            status=AttemptStatus.EVALUATED,
+            score=Decimal("8.50"),
+            max_score=Decimal("10.00"),
+            submitted_at=timezone.now(),
+        )
+        Answer.objects.create(
+            attempt=cls.attempt_evaluated,
+            question_id=1,
+            question_snapshot=cls.version.question_snapshot[0],
+            student_response="A",
+            is_correct=True,
+            marks_awarded=Decimal("4.00"),
+        )
+        Answer.objects.create(
+            attempt=cls.attempt_evaluated,
+            question_id=2,
+            question_snapshot=cls.version.question_snapshot[1],
+            student_response="x = (-b +- sqrt(b^2 - 4ac)) / (2a)",
+            is_correct=True,
+            marks_awarded=Decimal("4.50"),
+        )
+
+        cls.attempt_in_progress = Attempt.objects.create(
+            delivery=cls.delivery,
+            student=cls.student2,
+            status=AttemptStatus.IN_PROGRESS,
+            score=None,
+            max_score=Decimal("10.00"),
+        )
+
+    def test_scorecard_pdf_service_generates_valid_pdf(self):
+        from .scorecard_pdf import StudentScorecardPdfService
+
+        service = StudentScorecardPdfService(attempt=self.attempt_evaluated)
+        pdf_bytes = service.generate()
+
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF-"), "Output must start with PDF magic header")
+        self.assertGreater(len(pdf_bytes), 2000, "Scorecard PDF should contain multi-element layout")
+
+    def test_scorecard_pdf_api_endpoint(self):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+
+        # 1. Unauthenticated request -> 401
+        res_anon = client.get(f"/api/attempts/{self.attempt_evaluated.id}/download-scorecard/")
+        self.assertEqual(res_anon.status_code, 401)
+
+        # 2. In-progress attempt cannot be downloaded -> 400
+        client.force_authenticate(user=self.student2)
+        res_in_prog = client.get(f"/api/attempts/{self.attempt_in_progress.id}/download-scorecard/")
+        self.assertEqual(res_in_prog.status_code, 400)
+        self.assertIn("while test is in progress", res_in_prog.data["detail"])
+
+        # 3. Another student cannot download student1's scorecard -> 403
+        res_forbidden = client.get(f"/api/attempts/{self.attempt_evaluated.id}/download-scorecard/")
+        self.assertEqual(res_forbidden.status_code, 403)
+
+        # 4. Owning student can download -> 200 with PDF content
+        client.force_authenticate(user=self.student1)
+        res_student = client.get(f"/api/attempts/{self.attempt_evaluated.id}/download-scorecard/")
+        self.assertEqual(res_student.status_code, 200)
+        self.assertEqual(res_student["Content-Type"], "application/pdf")
+        self.assertTrue(res_student["Content-Disposition"].startswith("attachment; filename=\"Scorecard_"))
+        self.assertTrue(res_student.content.startswith(b"%PDF-"))
+
+        # 5. Teacher who created delivery can download -> 200
+        client.force_authenticate(user=self.teacher)
+        res_teacher = client.get(f"/api/attempts/{self.attempt_evaluated.id}/download-scorecard/")
+        self.assertEqual(res_teacher.status_code, 200)
+        self.assertEqual(res_teacher["Content-Type"], "application/pdf")
+        self.assertTrue(res_teacher.content.startswith(b"%PDF-"))
+
+
+
 

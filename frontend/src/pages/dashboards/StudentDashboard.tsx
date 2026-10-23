@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { FileDown, Loader2 } from 'lucide-react';
 import { deliveriesApi } from '../../api/deliveries';
+import { attemptsApi } from '../../api/attempts';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { StudentDashboardTablet } from '../tablet/dashboards/StudentDashboardTablet';
 import { StudentDashboardMobile } from '../mobile/dashboards/StudentDashboardMobile';
@@ -12,6 +14,19 @@ const StudentDashboardDesktop: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  const handleDownloadPdf = async (attemptId: number) => {
+    if (downloadingId !== null) return;
+    setDownloadingId(attemptId);
+    try {
+      await attemptsApi.downloadScorecardPdf(attemptId);
+    } catch (err: any) {
+      console.error('Failed to download scorecard PDF:', err);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   useEffect(() => {
     const fetchDeliveries = async () => {
@@ -169,13 +184,30 @@ const StudentDashboardDesktop: React.FC = () => {
 
                   <div className="pt-5 mt-4 border-t border-border/70 flex flex-wrap items-center gap-2">
                     {isEvaluated ? (
-                      <Link
-                        to={`/attempts/${myAttempt.id}/result`}
-                        id={`view-result-btn-${d.id}`}
-                        className="px-5 py-2 rounded-pill bg-grape text-white font-heading font-semibold text-xs hover:bg-grape/90 transition-all shadow-sm flex items-center gap-1.5"
-                      >
-                        View Result →
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/attempts/${myAttempt.id}/result`}
+                          id={`view-result-btn-${d.id}`}
+                          className="px-5 py-2 rounded-pill bg-grape text-white font-heading font-semibold text-xs hover:bg-grape/90 transition-all shadow-sm flex items-center gap-1.5"
+                        >
+                          View Result →
+                        </Link>
+                        <button
+                          type="button"
+                          id={`download-pdf-btn-${d.id}`}
+                          onClick={() => handleDownloadPdf(myAttempt.id)}
+                          disabled={downloadingId === myAttempt.id}
+                          title="Download Official Scorecard PDF"
+                          className="px-3.5 py-2 rounded-pill border border-border bg-surface hover:bg-surface-muted text-ink/80 hover:text-forest font-heading font-semibold text-xs transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {downloadingId === myAttempt.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-forest" />
+                          ) : (
+                            <FileDown className="w-3.5 h-3.5 text-forest" />
+                          )}
+                          <span>PDF</span>
+                        </button>
+                      </div>
                     ) : isSubmitted ? (
                       <div className="flex items-center gap-2">
                         <span className="px-4 py-2 rounded-pill bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-heading font-semibold text-xs flex items-center gap-1.5">

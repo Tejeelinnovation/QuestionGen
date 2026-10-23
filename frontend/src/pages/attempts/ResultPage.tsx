@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { FileDown, Loader2 } from 'lucide-react';
 import { attemptsApi } from '../../api/attempts';
 import type { StudentAttemptResult } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
@@ -14,6 +15,19 @@ const ResultPageDesktop: React.FC = () => {
   const [result, setResult] = useState<StudentAttemptResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadScorecard = async () => {
+    if (!attemptId || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await attemptsApi.downloadScorecardPdf(attemptId);
+    } catch (err: any) {
+      console.error('Failed to download scorecard PDF:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -140,23 +154,42 @@ const ResultPageDesktop: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-8 border-t md:border-t-0 md:border-l border-border pt-4 md:pt-0 md:pl-8">
-              <div>
-                <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
-                  Percentage
+            <div className="flex flex-col sm:flex-row sm:items-center gap-6 border-t md:border-t-0 md:border-l border-border pt-4 md:pt-0 md:pl-8">
+              <div className="flex items-center gap-8">
+                <div>
+                  <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
+                    Percentage
+                  </div>
+                  <div className="font-heading font-bold text-3xl sm:text-4xl text-ink">
+                    {percentage}%
+                  </div>
                 </div>
-                <div className="font-heading font-bold text-3xl sm:text-4xl text-ink">
-                  {percentage}%
+
+                <div>
+                  <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
+                    Attempt Status
+                  </div>
+                  <span className="pill text-xs font-semibold pill-forest">
+                    Evaluated
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50 mb-1">
-                  Attempt Status
-                </div>
-                <span className="pill text-xs font-semibold pill-forest">
-                  Evaluated
-                </span>
+              <div className="sm:pl-2">
+                <button
+                  type="button"
+                  id="download-scorecard-btn"
+                  onClick={handleDownloadScorecard}
+                  disabled={isDownloading}
+                  className="px-4 py-2.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 active:scale-95 transition-all shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  ) : (
+                    <FileDown className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{isDownloading ? 'Compiling PDF...' : 'Download Scorecard (PDF)'}</span>
+                </button>
               </div>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { FileDown, Loader2 } from 'lucide-react';
 import { attemptsApi } from '../../../api/attempts';
 import { getStaggerDelay } from '../../../lib/motion';
 import type { StudentAttemptResult } from '../../../types';
@@ -11,6 +12,19 @@ export const ResultPageTablet: React.FC = () => {
   const [result, setResult] = useState<StudentAttemptResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadScorecard = async () => {
+    if (!attemptId || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await attemptsApi.downloadScorecardPdf(attemptId);
+    } catch (err: any) {
+      console.error('Failed to download scorecard PDF:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -141,29 +155,46 @@ export const ResultPageTablet: React.FC = () => {
               </p>
             </div>
 
-            {/* Right Bento: Percentage & Status Stack */}
-            <div className="md:col-span-5 grid grid-cols-2 gap-4">
-              <div className="bg-surface border border-border rounded-card p-5 shadow-card flex flex-col justify-between">
-                <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50">
-                  Percentage
+            {/* Right Bento: Percentage, Status Stack & Download Action */}
+            <div className="md:col-span-5 flex flex-col justify-between gap-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-surface border border-border rounded-card p-5 shadow-card flex flex-col justify-between">
+                  <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50">
+                    Percentage
+                  </div>
+                  <div className="font-heading font-bold text-3xl sm:text-4xl text-ink mt-2">
+                    {percentage}%
+                  </div>
+                  <span className="text-[10px] text-ink/40 font-mono">Performance ratio</span>
                 </div>
-                <div className="font-heading font-bold text-3xl sm:text-4xl text-ink mt-2">
-                  {percentage}%
+
+                <div className="bg-surface border border-border rounded-card p-5 shadow-card flex flex-col justify-between">
+                  <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50">
+                    Attempt Status
+                  </div>
+                  <div className="mt-2">
+                    <span className="pill text-xs font-semibold pill-forest">
+                      Evaluated
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-ink/40 font-mono">Current state</span>
                 </div>
-                <span className="text-[10px] text-ink/40 font-mono">Performance ratio</span>
               </div>
 
-              <div className="bg-surface border border-border rounded-card p-5 shadow-card flex flex-col justify-between">
-                <div className="text-[11px] font-mono uppercase tracking-widest text-ink/50">
-                  Attempt Status
-                </div>
-                <div className="mt-2">
-                  <span className="pill text-xs font-semibold pill-forest">
-                    Evaluated
-                  </span>
-                </div>
-                <span className="text-[10px] text-ink/40 font-mono">Current state</span>
-              </div>
+              <button
+                type="button"
+                id="tablet-download-scorecard-btn"
+                onClick={handleDownloadScorecard}
+                disabled={isDownloading}
+                className="w-full min-h-[44px] px-4 py-2.5 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isDownloading ? (
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                ) : (
+                  <FileDown className="w-4 h-4 shrink-0" />
+                )}
+                <span>{isDownloading ? 'Compiling PDF...' : 'Download Official Scorecard (PDF)'}</span>
+              </button>
             </div>
           </div>
 

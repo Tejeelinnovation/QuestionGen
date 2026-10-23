@@ -1,15 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { deliveriesApi } from '../../../api/deliveries';
+import { attemptsApi } from '../../../api/attempts';
 import type { Delivery } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
-import { BookOpen, Clock, ArrowRight, Award } from 'lucide-react';
+import { BookOpen, Clock, ArrowRight, Award, FileDown, Loader2 } from 'lucide-react';
 import { SkeletonDeliveriesList } from '../../../components/ui/skeleton';
 
 export const StudentDashboardMobile: React.FC = () => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  const handleDownloadPdf = async (attemptId: number) => {
+    if (downloadingId !== null) return;
+    setDownloadingId(attemptId);
+    try {
+      await attemptsApi.downloadScorecardPdf(attemptId);
+    } catch (err: any) {
+      console.error('Failed to download scorecard PDF:', err);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   useEffect(() => {
     const fetchDeliveries = async () => {
@@ -143,14 +157,30 @@ export const StudentDashboardMobile: React.FC = () => {
 
                 <div className="pt-2 border-t border-border/50">
                   {isEvaluated ? (
-                    <Link
-                      to={`/attempts/${myAttempt.id}/result`}
-                      id={`view-result-btn-${d.id}`}
-                      className="w-full py-2.5 px-4 rounded-pill border border-border bg-surface-muted text-forest font-heading font-semibold text-xs hover:bg-forest hover:text-white active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[44px]"
-                    >
-                      <Award className="w-3.5 h-3.5" />
-                      <span>Review Score & Feedback</span>
-                    </Link>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link
+                        to={`/attempts/${myAttempt.id}/result`}
+                        id={`view-result-btn-${d.id}`}
+                        className="py-2.5 px-3 rounded-pill border border-border bg-surface-muted text-forest font-heading font-semibold text-xs hover:bg-forest hover:text-white active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[44px]"
+                      >
+                        <Award className="w-3.5 h-3.5 shrink-0" />
+                        <span>Review</span>
+                      </Link>
+                      <button
+                        type="button"
+                        id={`mobile-download-pdf-btn-${d.id}`}
+                        onClick={() => handleDownloadPdf(myAttempt.id)}
+                        disabled={downloadingId === myAttempt.id}
+                        className="py-2.5 px-3 rounded-pill bg-forest text-white font-heading font-semibold text-xs hover:bg-forest/90 active:scale-95 transition-all shadow-xs flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer disabled:opacity-50"
+                      >
+                        {downloadingId === myAttempt.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                        ) : (
+                          <FileDown className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                        <span>Scorecard</span>
+                      </button>
+                    </div>
                   ) : isSubmitted ? (
                     <div className="w-full py-2.5 px-4 rounded-pill bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-heading font-semibold text-xs flex items-center justify-center gap-1.5 min-h-[44px]">
                       <Clock className="w-3.5 h-3.5" />

@@ -125,4 +125,35 @@ export const attemptsApi = {
     );
     return response.data;
   },
+
+  downloadScorecardPdf: async (attemptId: number): Promise<void> => {
+    const response = await apiClient.get(
+      `/api/attempts/${attemptId}/download-scorecard/`,
+      {
+        responseType: 'blob',
+      }
+    );
+
+    const disposition = response.headers['content-disposition'];
+    let filename = `Scorecard_Attempt_${attemptId}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^";]+)"?/);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+    }
+
+    const blob = new Blob([response.data], {
+      type: 'application/pdf',
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 };
+
