@@ -6,6 +6,7 @@ import type { Paper, Topic } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
+import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 import {
   Sparkles,
   Clock,
@@ -235,14 +236,7 @@ export const PaperConfigurePageMobile: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-4 font-body">
-        <PaperWorkflowNavMobile currentStep="configure" backTo="/papers/create" />
-        <div className="p-8 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
-          Loading paper parameters and question bank...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   return (

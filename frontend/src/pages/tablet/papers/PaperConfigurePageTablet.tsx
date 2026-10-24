@@ -6,6 +6,7 @@ import type { Paper, Topic } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
+import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 import {
   Clock,
   Sparkles,
@@ -233,14 +234,7 @@ export const PaperConfigurePageTablet: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6 font-body">
-        <PaperWorkflowNavTablet currentStep="configure" paperId={paperId} />
-        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60 text-sm">
-          Loading question bank filters...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   const isMarksMatching = Number(totalMarks) === rubricTotalMarks;

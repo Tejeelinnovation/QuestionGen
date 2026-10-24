@@ -7,6 +7,7 @@ import type { TeacherAttemptDetail, TeacherAttemptAnswerItem } from '../../types
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { GradeAttemptPageTablet } from '../tablet/attempts/GradeAttemptPageTablet';
 import { GradeAttemptPageMobile } from '../mobile/attempts/GradeAttemptPageMobile';
+import { SkeletonGradingDesk } from '../../components/ui/skeleton';
 
 interface GradeFormState {
   marks: string;
@@ -204,11 +205,7 @@ const GradeAttemptPageDesktop: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="max-w-4xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
-        Opening grading desk for attempt #{attemptId}...
-      </div>
-    );
+    return <SkeletonGradingDesk />;
   }
 
   if (errorMessage || !attempt) {

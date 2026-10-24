@@ -9,6 +9,7 @@ import { useExamCountdown } from '../../../hooks/useExamCountdown';
 import { ConfirmSubmitModal } from '../../../components/attempts/ConfirmSubmitModal';
 import { useOfflineExamSync } from '../../../hooks/useOfflineExamSync';
 import { MathText } from '../../../components/ui/MathText';
+import { SkeletonExamEnvironment } from '../../../components/ui/skeleton';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -232,11 +233,7 @@ export const TestAttemptPageTablet: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="py-20 text-center text-ink/60 font-body text-base">
-        Preparing examination environment for tablet...
-      </div>
-    );
+    return <SkeletonExamEnvironment />;
   }
 
   if (!attemptData) {

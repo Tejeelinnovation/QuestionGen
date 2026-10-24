@@ -5,6 +5,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { PaperVersion, QuestionSnapshotItem } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { Lock, Send, Printer, CheckCircle2, Copy, Loader2 } from 'lucide-react';
+import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 
 export const VersionDetailPageMobile: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -79,11 +80,7 @@ export const VersionDetailPageMobile: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="py-12 text-center text-xs text-ink/60 font-body">
-        Loading version details...
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   if (errorMessage || !version) {

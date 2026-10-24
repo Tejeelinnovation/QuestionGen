@@ -4,6 +4,7 @@ import { attemptsApi } from '../../../api/attempts';
 import { useAuth } from '../../../auth/AuthContext';
 import type { TeacherAttemptDetail } from '../../../types';
 import { ArrowLeft, CheckCircle2, Save, Check, X } from 'lucide-react';
+import { SkeletonGradingDesk } from '../../../components/ui/skeleton';
 
 interface GradeFormState {
   marks: string;
@@ -127,11 +128,7 @@ export const GradeAttemptPageMobile: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="py-20 text-center text-xs text-ink/60 font-body">
-        Loading student attempt for grading...
-      </div>
-    );
+    return <SkeletonGradingDesk />;
   }
 
   if (errorMessage || !attempt) {

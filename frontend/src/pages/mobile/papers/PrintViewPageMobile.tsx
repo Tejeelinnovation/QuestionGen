@@ -4,6 +4,7 @@ import { papersApi } from '../../../api/papers';
 import type { PaperPrintData } from '../../../types';
 import { Printer, ChevronLeft, FileText, Download } from 'lucide-react';
 import { PrintablePaperSheet } from '../../../components/papers/PrintablePaperSheet';
+import { Skeleton } from '../../../components/ui/skeleton';
 
 export const PrintViewPageMobile: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -68,8 +69,25 @@ export const PrintViewPageMobile: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="py-12 text-center text-xs text-ink/60 font-body">
-        Loading printable examination sheet...
+      <div className="space-y-4 font-body py-4" aria-hidden="true">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-5 w-36" radius="sm" />
+          <Skeleton className="h-8 w-24" radius="pill" />
+        </div>
+        <div className="bg-surface border border-border rounded-card p-5 shadow-card space-y-4 min-h-[350px]">
+          <div className="text-center space-y-2 pb-4 border-b border-border/70">
+            <Skeleton className="h-6 w-3/4 mx-auto" radius="sm" />
+            <Skeleton className="h-3.5 w-1/2 mx-auto" radius="sm" />
+          </div>
+          <div className="space-y-3 pt-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-3.5 w-full" radius="sm" />
+                <Skeleton className="h-3.5 w-4/5" radius="sm" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

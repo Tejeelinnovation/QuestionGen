@@ -4,6 +4,7 @@ import { AppLayout } from './layouts/AppLayout';
 import { RequireCapability } from './auth/RequireCapability';
 import { useAuth } from './auth/AuthContext';
 import { RouteErrorBoundary } from './components/ui/RouteErrorBoundary';
+import { SkeletonPage } from './components/ui/skeleton';
 
 // Top-level suspense boundary fallback for unauthenticated routes (e.g. /login)
 const TopLevelSuspense: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -52,7 +53,7 @@ const DashboardIndexRedirect: React.FC = () => {
   const { user, dashboardPath, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div className="p-4 text-gray-600">Loading session...</div>;
+    return <SkeletonPage />;
   }
 
   if (!user) {

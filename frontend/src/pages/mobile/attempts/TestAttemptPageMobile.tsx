@@ -13,6 +13,7 @@ import {
   WifiOff,
   RefreshCw,
 } from 'lucide-react';
+import { SkeletonExamEnvironment } from '../../../components/ui/skeleton';
 import { useExamProctoring } from '../../../hooks/useExamProctoring';
 import { useExamCountdown } from '../../../hooks/useExamCountdown';
 import { ProctoringWarningModal } from '../../../components/attempts/ProctoringWarningModal';
@@ -255,11 +256,7 @@ export const TestAttemptPageMobile: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="py-20 text-center text-xs text-ink/60 font-body">
-        Connecting to test engine...
-      </div>
-    );
+    return <SkeletonExamEnvironment />;
   }
 
   if (errorMessage && !attemptData) {

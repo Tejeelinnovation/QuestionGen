@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
 import { useAuth } from '../../../auth/AuthContext';
+import { SkeletonGradingDesk } from '../../../components/ui/skeleton';
 import type { TeacherAttemptDetail, TeacherAttemptAnswerItem } from '../../../types';
 
 interface GradeFormState {
@@ -192,11 +193,7 @@ export const GradeAttemptPageTablet: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="py-20 text-center text-ink/60 font-body text-base">
-        Opening tablet grading desk for attempt #{attemptId}...
-      </div>
-    );
+    return <SkeletonGradingDesk />;
   }
 
   if (errorMessage || !attempt) {

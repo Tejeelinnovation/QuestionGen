@@ -8,6 +8,7 @@ import { useExamProctoring } from '../../hooks/useExamProctoring';
 import { ProctoringWarningModal } from '../../components/attempts/ProctoringWarningModal';
 import { TestAttemptPageTablet } from '../tablet/attempts/TestAttemptPageTablet';
 import { TestAttemptPageMobile } from '../mobile/attempts/TestAttemptPageMobile';
+import { SkeletonExamEnvironment } from '../../components/ui/skeleton';
 import { Maximize2, ShieldAlert, Clock, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useExamCountdown } from '../../hooks/useExamCountdown';
 import { ConfirmSubmitModal } from '../../components/attempts/ConfirmSubmitModal';
@@ -306,11 +307,7 @@ const TestAttemptPageDesktop: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="max-w-3xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
-        Preparing examination environment...
-      </div>
-    );
+    return <SkeletonExamEnvironment />;
   }
 
   if (!attemptData) {

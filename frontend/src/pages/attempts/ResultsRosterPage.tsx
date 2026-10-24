@@ -8,6 +8,7 @@ import { ResultsRosterPageTablet } from '../tablet/attempts/ResultsRosterPageTab
 import { ResultsRosterPageMobile } from '../mobile/attempts/ResultsRosterPageMobile';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
 import { FileSpreadsheet } from 'lucide-react';
+import { SkeletonTable, Skeleton } from '../../components/ui/skeleton';
 
 const ResultsRosterPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -56,8 +57,17 @@ const ResultsRosterPageDesktop: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
-        Loading delivery results roster...
+      <div className="max-w-4xl mx-auto py-8 space-y-6 font-body" aria-hidden="true">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-56" radius="sm" />
+            <Skeleton className="h-4 w-72" radius="sm" />
+          </div>
+          <Skeleton className="h-9 w-32" radius="pill" />
+        </div>
+        <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-4">
+          <SkeletonTable rows={6} />
+        </div>
       </div>
     );
   }

@@ -623,11 +623,11 @@ export const SkeletonAuditTable: React.FC<{ rows?: number }> = ({ rows = 5 }) =>
  */
 export const SkeletonPage: React.FC = () => {
   return (
-    <div className="min-h-[70vh] p-6 max-w-6xl mx-auto space-y-6" aria-hidden="true">
+    <div className="min-h-[70vh] p-4 sm:p-6 max-w-6xl mx-auto space-y-6" aria-hidden="true">
       <div className="flex items-center justify-between">
         <div className="space-y-2">
           <Skeleton className="h-7 w-64" radius="sm" />
-          <Skeleton className="h-4 w-96" radius="sm" />
+          <Skeleton className="h-4 w-96 max-w-full" radius="sm" />
         </div>
         <Skeleton className="h-9 w-32" radius="pill" />
       </div>
@@ -643,6 +643,227 @@ export const SkeletonPage: React.FC = () => {
       <div className="p-6 rounded-2xl bg-surface border border-border space-y-4">
         <Skeleton className="h-5 w-48" radius="sm" />
         <SkeletonTable rows={5} />
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Skeleton for Live Examination Environment (TestAttemptPage across Desktop, Tablet, Mobile)
+ */
+export const SkeletonExamEnvironment: React.FC = () => {
+  return (
+    <div className="max-w-4xl mx-auto pb-20 space-y-6 font-body" aria-hidden="true">
+      {/* Top Examination Status Header */}
+      <div className="bg-surface border border-border rounded-card p-4 sm:p-5 shadow-xs flex items-center justify-between gap-4">
+        <div className="space-y-2 flex-1">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-24" radius="pill" />
+            <Skeleton className="h-4 w-16" radius="pill" />
+          </div>
+          <Skeleton className="h-6 w-3/4 max-w-md" radius="sm" />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Skeleton className="h-10 w-28" radius="card" />
+        </div>
+      </div>
+
+      {/* Main Question Card + Options */}
+      <div className="bg-surface border border-border rounded-card p-5 sm:p-7 shadow-card space-y-6">
+        <div className="flex items-center justify-between border-b border-border/70 pb-4">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-5 w-28" radius="pill" />
+            <Skeleton className="h-5 w-16" radius="pill" />
+          </div>
+          <Skeleton className="h-5 w-20" radius="pill" />
+        </div>
+
+        {/* Question Prompt */}
+        <div className="space-y-2.5 py-2">
+          <Skeleton className="h-5 w-full" radius="sm" />
+          <Skeleton className="h-5 w-11/12" radius="sm" />
+          <Skeleton className="h-5 w-4/5" radius="sm" />
+        </div>
+
+        {/* 4 MCQ Option Blocks */}
+        <div className="space-y-3 pt-2">
+          {[0, 1, 2, 3].map((opt) => (
+            <div
+              key={opt}
+              className="p-3.5 sm:p-4 rounded-card border border-border bg-bg flex items-center gap-3"
+            >
+              <Skeleton className="w-6 h-6 rounded-full shrink-0" />
+              <Skeleton className="h-4 w-3/4" radius="sm" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom Sticky Action Bar */}
+      <div className="bg-surface border border-border rounded-card p-4 shadow-float flex items-center justify-between gap-3">
+        <Skeleton className="h-9 w-24" radius="pill" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-28" radius="pill" />
+          <Skeleton className="h-9 w-32" radius="pill" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Skeleton for Assessment Scorecard & Results Report (ResultPage)
+ */
+export const SkeletonScorecard: React.FC = () => {
+  return (
+    <div className="max-w-3xl mx-auto pb-20 space-y-6 font-body" aria-hidden="true">
+      {/* Top Return link */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-36" radius="sm" />
+        <Skeleton className="h-8 w-28" radius="pill" />
+      </div>
+
+      {/* Hero Scorecard Banner */}
+      <div className="bg-surface border border-border rounded-card p-6 sm:p-8 shadow-card flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
+        <div className="space-y-2.5 flex-1">
+          <Skeleton className="h-4 w-24" radius="pill" />
+          <Skeleton className="h-7 w-64 max-w-full" radius="sm" />
+          <Skeleton className="h-4 w-48" radius="sm" />
+        </div>
+        <div className="w-24 h-24 rounded-full border-4 border-border flex items-center justify-center shrink-0">
+          <Skeleton className="w-14 h-8" radius="sm" />
+        </div>
+      </div>
+
+      {/* Metric Cards Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="p-4 rounded-card bg-surface border border-border shadow-xs space-y-2">
+            <Skeleton className="h-3 w-16" radius="pill" />
+            <Skeleton className="h-6 w-12" radius="sm" />
+          </div>
+        ))}
+      </div>
+
+      {/* Question Breakdown List */}
+      <div className="bg-surface border border-border rounded-card p-5 sm:p-6 shadow-card space-y-4">
+        <Skeleton className="h-5 w-48" radius="sm" />
+        <div className="divide-y divide-border/60">
+          {[0, 1, 2, 3].map((q) => (
+            <div key={q} className="py-3.5 flex items-center justify-between gap-4">
+              <div className="space-y-1.5 flex-1">
+                <Skeleton className="h-4 w-3/4" radius="sm" />
+                <Skeleton className="h-3 w-1/3" radius="sm" />
+              </div>
+              <Skeleton className="h-6 w-16" radius="pill" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Skeleton for Grading Desk (GradeAttemptPage across Desktop, Tablet, Mobile)
+ */
+export const SkeletonGradingDesk: React.FC = () => {
+  return (
+    <div className="max-w-4xl mx-auto pb-20 space-y-6 font-body" aria-hidden="true">
+      {/* Top Nav */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-4 w-40" radius="sm" />
+        <Skeleton className="h-4 w-20" radius="sm" />
+      </div>
+
+      {/* Candidate Banner */}
+      <div className="bg-surface border border-border rounded-card p-5 sm:p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-24" radius="pill" />
+            <Skeleton className="h-4 w-20" radius="pill" />
+          </div>
+          <Skeleton className="h-6 w-56" radius="sm" />
+          <Skeleton className="h-3.5 w-40" radius="sm" />
+        </div>
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-24" radius="card" />
+        </div>
+      </div>
+
+      {/* Answer Grading Cards */}
+      <div className="space-y-4">
+        {[0, 1, 2].map((idx) => (
+          <div key={idx} className="bg-surface border border-border rounded-card p-5 sm:p-6 shadow-card space-y-4">
+            <div className="flex items-center justify-between border-b border-border/70 pb-3">
+              <Skeleton className="h-4 w-32" radius="pill" />
+              <Skeleton className="h-5 w-20" radius="pill" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-full" radius="sm" />
+              <Skeleton className="h-4 w-4/5" radius="sm" />
+            </div>
+            <div className="p-3.5 rounded-card bg-bg border border-border space-y-2">
+              <Skeleton className="h-3 w-28" radius="pill" />
+              <Skeleton className="h-4 w-3/4" radius="sm" />
+            </div>
+            <div className="pt-2 border-t border-border/70 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-8 w-20" radius="sm" />
+                <Skeleton className="h-8 w-24" radius="pill" />
+              </div>
+              <Skeleton className="h-8 w-28" radius="pill" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Skeleton for Question Paper Blueprints, Setup & Version Detail views
+ */
+export const SkeletonPaperDetail: React.FC = () => {
+  return (
+    <div className="max-w-5xl mx-auto pb-20 space-y-6 font-body" aria-hidden="true">
+      {/* Workflow Steps Indicator Bar */}
+      <div className="bg-surface border border-border rounded-card p-3 shadow-xs flex items-center justify-between gap-2 overflow-x-auto">
+        {[0, 1, 2, 3, 4].map((step) => (
+          <div key={step} className="flex items-center gap-2 shrink-0">
+            <Skeleton className="w-6 h-6 rounded-full" />
+            <Skeleton className="h-3.5 w-20 hidden sm:inline-block" radius="sm" />
+          </div>
+        ))}
+      </div>
+
+      {/* Paper Hero Header */}
+      <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Skeleton className="h-4 w-20" radius="pill" />
+          <Skeleton className="h-4 w-24" radius="pill" />
+          <Skeleton className="h-4 w-16" radius="pill" />
+        </div>
+        <Skeleton className="h-7 w-3/4 max-w-lg" radius="sm" />
+        <Skeleton className="h-4 w-1/2" radius="sm" />
+      </div>
+
+      {/* Grid of Version / Question Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[0, 1, 2].map((card) => (
+          <div key={card} className="bg-surface border border-border rounded-card p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-4 w-16" radius="pill" />
+              <Skeleton className="h-4 w-12" radius="pill" />
+            </div>
+            <Skeleton className="h-5 w-40" radius="sm" />
+            <Skeleton className="h-3.5 w-full" radius="sm" />
+            <div className="pt-3 border-t border-border flex justify-between">
+              <Skeleton className="h-3 w-20" radius="sm" />
+              <Skeleton className="h-7 w-20" radius="pill" />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

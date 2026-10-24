@@ -9,6 +9,7 @@ import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import { ArrowRight } from 'lucide-react';
 import { CustomSelect } from '../../../components/ui/custom-select';
+import { Skeleton } from '../../../components/ui/skeleton';
 
 export const PaperSetupPageMobile: React.FC = () => {
   const navigate = useNavigate();
@@ -187,7 +188,7 @@ export const PaperSetupPageMobile: React.FC = () => {
                 Curriculum Chapter *
               </label>
               {isLoadingChapters ? (
-                <div className="text-xs text-ink/50 py-2">Loading chapters...</div>
+                <Skeleton className="h-12 w-full" radius="card" />
               ) : (
                 <CustomSelect
                   id="mobile-paper-chapter"

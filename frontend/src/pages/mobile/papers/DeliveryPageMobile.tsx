@@ -9,6 +9,7 @@ import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import { Send, Check, Search, CheckCircle2, GraduationCap, Users } from 'lucide-react';
 import { CustomSelect } from '../../../components/ui/custom-select';
+import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 
 export const DeliveryPageMobile: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -138,11 +139,7 @@ export const DeliveryPageMobile: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="py-12 text-center text-xs text-ink/60 font-body">
-        Loading test delivery parameters...
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   return (

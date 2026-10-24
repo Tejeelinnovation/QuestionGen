@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { attemptsApi } from '../../../api/attempts';
 import type { StudentAttemptResult } from '../../../types';
 import { Clock, ArrowLeft, FileDown, Loader2 } from 'lucide-react';
+import { SkeletonScorecard } from '../../../components/ui/skeleton';
 
 export const ResultPageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -47,11 +48,7 @@ export const ResultPageMobile: React.FC = () => {
   }, [attemptId]);
 
   if (isLoading) {
-    return (
-      <div className="py-20 text-center text-xs text-ink/60 font-body">
-        Compiling assessment evaluation report...
-      </div>
-    );
+    return <SkeletonScorecard />;
   }
 
   if (errorMessage || !result) {

@@ -5,6 +5,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { DeliveryResultsRoster } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { FileSpreadsheet } from 'lucide-react';
+import { SkeletonRoster, Skeleton } from '../../../components/ui/skeleton';
 
 export const ResultsRosterPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -53,8 +54,15 @@ export const ResultsRosterPageTablet: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="py-20 text-center text-ink/60 font-body text-base">
-        Loading delivery results roster for tablet...
+      <div className="py-8 space-y-6 font-body" aria-hidden="true">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-56" radius="sm" />
+            <Skeleton className="h-4 w-72" radius="sm" />
+          </div>
+          <Skeleton className="h-9 w-32" radius="pill" />
+        </div>
+        <SkeletonRoster count={5} />
       </div>
     );
   }

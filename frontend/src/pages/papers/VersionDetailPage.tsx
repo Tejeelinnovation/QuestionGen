@@ -8,6 +8,7 @@ import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { VersionDetailPageTablet } from '../tablet/papers/VersionDetailPageTablet';
 import { VersionDetailPageMobile } from '../mobile/papers/VersionDetailPageMobile';
+import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { Loader2, Copy } from 'lucide-react';
 
 const VersionDetailPageDesktop: React.FC = () => {
@@ -94,14 +95,7 @@ const VersionDetailPageDesktop: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <PaperWorkflowNav currentStep="version" paperId={paperId} versionId={vId} />
-        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60">
-          Loading immutable version snapshot...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   if (!version) {

@@ -7,6 +7,7 @@ import { PaperWorkflowNav } from './components/PaperWorkflowNav';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { PaperDetailPageTablet } from '../tablet/papers/PaperDetailPageTablet';
 import { PaperDetailPageMobile } from '../mobile/papers/PaperDetailPageMobile';
+import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
 
 const PaperDetailPageDesktop: React.FC = () => {
@@ -40,14 +41,7 @@ const PaperDetailPageDesktop: React.FC = () => {
   }, [paperId]);
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <PaperWorkflowNav currentStep="version" paperId={paperId} />
-        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60">
-          Loading paper blueprint and version archive...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   if (errorMessage || !paper) {

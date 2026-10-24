@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { authApi } from '../../api/auth';
+import { useToast } from '../../context/ToastContext';
 import {
   GraduationCap,
   BookOpen,
@@ -11,6 +12,7 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
+  Check,
 } from 'lucide-react';
 
 interface DemoAccountsCardProps {
@@ -78,11 +80,14 @@ const DEMO_BUTTONS: DemoRoleButton[] = [
 
 export const DemoAccountsCard: React.FC<DemoAccountsCardProps> = ({ className = '' }) => {
   const [launchingKey, setLaunchingKey] = useState<DemoRoleKey | null>(null);
+  const [recentlyLaunchedKey, setRecentlyLaunchedKey] = useState<DemoRoleKey | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
 
-  const handleLaunch = async (roleKey: DemoRoleKey) => {
+  const handleLaunch = async (roleKey: DemoRoleKey, roleLabel: string) => {
     setErrorMessage(null);
     setLaunchingKey(roleKey);
+    toast.info(`Launching isolated ${roleLabel} session in new tab...`);
 
     try {
       // 1. Request signed one-time ticket from backend
@@ -104,12 +109,19 @@ export const DemoAccountsCard: React.FC<DemoAccountsCardProps> = ({ className = 
         link.click();
         document.body.removeChild(link);
       }
+
+      // Mark as recently launched with clear confirmation badge for 3.5s
+      setRecentlyLaunchedKey(roleKey);
+      setTimeout(() => {
+        setRecentlyLaunchedKey((prev) => (prev === roleKey ? null : prev));
+      }, 3500);
     } catch (err: any) {
       console.error('Failed to launch demo persona:', err);
       const detail =
         err.response?.data?.detail ||
         'Could not generate demo session ticket. Please ensure you are logged in as Super Admin.';
       setErrorMessage(detail);
+      toast.error(detail);
     } finally {
       setLaunchingKey(null);
     }
@@ -130,9 +142,16 @@ export const DemoAccountsCard: React.FC<DemoAccountsCardProps> = ({ className = 
             // Isolated Tabs
           </span>
         </div>
-        <span className="text-[10px] font-mono font-medium text-forest bg-forest/8 px-2 py-0.5 rounded-pill border border-forest/15">
-          1-Click Launch
-        </span>
+        {launchingKey ? (
+          <span className="text-[10px] font-mono font-medium text-forest bg-forest/10 px-2 py-0.5 rounded-pill border border-forest/25 flex items-center gap-1 animate-pulse">
+            <Loader2 className="w-2.5 h-2.5 animate-spin text-forest" />
+            Opening Tab...
+          </span>
+        ) : (
+          <span className="text-[10px] font-mono font-medium text-forest bg-forest/8 px-2 py-0.5 rounded-pill border border-forest/15">
+            1-Click Launch
+          </span>
+        )}
       </div>
 
       {errorMessage && (
@@ -147,37 +166,62 @@ export const DemoAccountsCard: React.FC<DemoAccountsCardProps> = ({ className = 
         {DEMO_BUTTONS.map((btn) => {
           const Icon = btn.icon;
           const isLaunching = launchingKey === btn.key;
+          const isRecentlyLaunched = recentlyLaunchedKey === btn.key;
+          const isAnyLaunching = Boolean(launchingKey);
 
           return (
             <button
               key={btn.key}
               type="button"
               id={`demo-btn-${btn.key}`}
-              disabled={Boolean(launchingKey)}
-              onClick={() => handleLaunch(btn.key)}
-              title={`Launch isolated ${btn.label} session in new tab`}
-              className={`group flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-pill border border-border bg-bg hover:bg-surface hover:border-forest/50 hover:shadow-2xs active:scale-[0.98] transition-all text-xs font-heading font-medium text-ink cursor-pointer disabled:opacity-50 ${
+              disabled={isAnyLaunching}
+              onClick={() => handleLaunch(btn.key, btn.label)}
+              title={
+                isRecentlyLaunched
+                  ? `Opened ${btn.label} session in new tab`
+                  : `Launch isolated ${btn.label} session in new tab`
+              }
+              className={`group flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-pill border transition-all text-xs font-heading font-medium cursor-pointer ${
                 btn.spanCol ? 'col-span-2' : ''
+              } ${
+                isLaunching
+                  ? 'border-forest bg-forest/10 text-forest shadow-xs'
+                  : isRecentlyLaunched
+                  ? 'border-forest/40 bg-forest/5 text-forest'
+                  : 'border-border bg-bg text-ink hover:bg-surface hover:border-forest/50 hover:shadow-2xs active:scale-[0.98]'
+              } ${
+                isAnyLaunching && !isLaunching
+                  ? 'opacity-65 cursor-not-allowed'
+                  : ''
               }`}
             >
               <div className="flex items-center gap-1.5 truncate">
                 {isLaunching ? (
                   <Loader2 className="w-3.5 h-3.5 text-forest animate-spin shrink-0" />
+                ) : isRecentlyLaunched ? (
+                  <Check className="w-3.5 h-3.5 text-forest shrink-0 animate-scale-in" />
                 ) : (
-                  <Icon className={`w-3.5 h-3.5 ${btn.accentColor} shrink-0 group-hover:scale-105 transition-transform`} />
+                  <Icon
+                    className={`w-3.5 h-3.5 ${btn.accentColor} shrink-0 group-hover:scale-105 transition-transform`}
+                  />
                 )}
                 <span className="truncate text-[11px] sm:text-xs font-semibold">
-                  {btn.label}
+                  {isLaunching ? 'Launching...' : btn.label}
                 </span>
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
-                {btn.tag && (
+                {isRecentlyLaunched ? (
+                  <span className="pill text-[9px] py-0 px-1.5 bg-forest/15 text-forest border border-forest/25 font-mono animate-scale-in font-semibold">
+                    Opened ✓
+                  </span>
+                ) : btn.tag ? (
                   <span className="pill text-[9px] py-0 px-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase font-mono">
                     {btn.tag}
                   </span>
+                ) : (
+                  <ExternalLink className="w-3 h-3 text-ink/35 group-hover:text-forest transition-colors" />
                 )}
-                <ExternalLink className="w-3 h-3 text-ink/35 group-hover:text-forest transition-colors" />
               </div>
             </button>
           );

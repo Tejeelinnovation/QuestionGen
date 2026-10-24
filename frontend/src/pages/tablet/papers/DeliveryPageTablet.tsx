@@ -10,6 +10,7 @@ import { GraduationCap, Users } from 'lucide-react';
 import { CustomSelect } from '../../../components/ui/custom-select';
 import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
+import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 
 export const DeliveryPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -152,14 +153,7 @@ export const DeliveryPageTablet: React.FC = () => {
   });
 
   if (isLoading) {
-    return (
-      <div className="space-y-6 font-body">
-        <PaperWorkflowNavTablet currentStep="deliver" paperId={paperId} versionId={vId} />
-        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60 text-sm">
-          Loading delivery parameters...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   return (

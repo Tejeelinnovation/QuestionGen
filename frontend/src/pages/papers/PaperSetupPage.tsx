@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../components/ui/select';
+import { Skeleton } from '../../components/ui/skeleton';
 
 const PaperSetupPageDesktop: React.FC = () => {
   const navigate = useNavigate();
@@ -137,8 +138,28 @@ const PaperSetupPageDesktop: React.FC = () => {
           </div>
 
           {isLoadingChapters && (
-            <div className="bg-surface border border-border rounded-card p-6 text-sm text-ink/60">
-              Retrieving curriculum syllabus and chapters...
+            <div className="bg-surface border border-border rounded-card p-6 sm:p-7 shadow-card space-y-6">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-36" radius="sm" />
+                <Skeleton className="h-10 w-full" radius="card" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-28" radius="sm" />
+                <Skeleton className="h-24 w-full" radius="card" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" radius="sm" />
+                  <Skeleton className="h-10 w-full" radius="card" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" radius="sm" />
+                  <Skeleton className="h-10 w-full" radius="card" />
+                </div>
+              </div>
+              <div className="flex justify-end pt-4">
+                <Skeleton className="h-10 w-36" radius="pill" />
+              </div>
             </div>
           )}
 

@@ -10,6 +10,7 @@ import { useToast } from '../../context/ToastContext';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { DeliveryPageTablet } from '../tablet/papers/DeliveryPageTablet';
 import { DeliveryPageMobile } from '../mobile/papers/DeliveryPageMobile';
+import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { GraduationCap, Users } from 'lucide-react';
 import { CustomSelect } from '../../components/ui/custom-select';
 import { extractApiErrorMessage } from '../../utils/errorUtils';
@@ -156,14 +157,7 @@ const DeliveryPageDesktop: React.FC = () => {
   });
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <PaperWorkflowNav currentStep="deliver" paperId={paperId} versionId={vId} />
-        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60">
-          Loading delivery parameters and student rosters...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   return (

@@ -4,6 +4,7 @@ import { papersApi } from '../../../api/papers';
 import type { PaperPrintData } from '../../../types';
 import { FileText, Download, Printer } from 'lucide-react';
 import { PrintablePaperSheet } from '../../../components/papers/PrintablePaperSheet';
+import { Skeleton } from '../../../components/ui/skeleton';
 
 export const PrintViewPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -72,8 +73,28 @@ export const PrintViewPageTablet: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="py-16 text-center text-ink/60 font-body text-sm">
-        Generating print sheet for tablet preview...
+      <div className="py-8 space-y-6 font-body" aria-hidden="true">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-5 w-44" radius="sm" />
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-28" radius="pill" />
+            <Skeleton className="h-9 w-28" radius="pill" />
+          </div>
+        </div>
+        <div className="bg-surface border border-border rounded-card p-8 shadow-card space-y-6 min-h-[450px]">
+          <div className="text-center space-y-2 pb-6 border-b border-border/70">
+            <Skeleton className="h-7 w-2/3 mx-auto" radius="sm" />
+            <Skeleton className="h-4 w-1/3 mx-auto" radius="sm" />
+          </div>
+          <div className="space-y-4 pt-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-full" radius="sm" />
+                <Skeleton className="h-4 w-5/6" radius="sm" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

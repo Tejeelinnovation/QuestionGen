@@ -5,6 +5,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { Paper } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
+import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 
 export const PaperDetailPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,14 +38,7 @@ export const PaperDetailPageTablet: React.FC = () => {
   }, [paperId]);
 
   if (isLoading) {
-    return (
-      <div className="space-y-6 font-body">
-        <PaperWorkflowNavTablet currentStep="version" paperId={paperId} />
-        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60 text-sm">
-          Loading paper blueprint...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   if (errorMessage || !paper) {

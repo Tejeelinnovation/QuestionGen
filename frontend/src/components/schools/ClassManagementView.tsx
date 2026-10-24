@@ -20,7 +20,7 @@ import {
   ArrowRight,
   Search,
 } from 'lucide-react';
-import { SkeletonTable } from '../ui/skeleton';
+import { SkeletonTable, SkeletonClassSections } from '../ui/skeleton';
 import { useToast } from '../../context/ToastContext';
 import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
@@ -643,11 +643,7 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({
 
           {/* Classes Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3].map((n) => (
-                <div key={n} className="bg-surface border border-border rounded-card p-5 h-56 animate-pulse" />
-              ))}
-            </div>
+            <SkeletonClassSections count={3} />
           ) : classes.length === 0 ? (
             <div className="p-12 text-center bg-surface border border-border rounded-card text-ink/60 space-y-3">
               <GraduationCap className="w-10 h-10 mx-auto text-ink/30" />

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { FileDown, Loader2 } from 'lucide-react';
 import { attemptsApi } from '../../../api/attempts';
 import { getStaggerDelay } from '../../../lib/motion';
+import { SkeletonScorecard } from '../../../components/ui/skeleton';
 import type { StudentAttemptResult } from '../../../types';
 
 export const ResultPageTablet: React.FC = () => {
@@ -48,11 +49,7 @@ export const ResultPageTablet: React.FC = () => {
   }, [attemptId]);
 
   if (isLoading) {
-    return (
-      <div className="py-20 text-center text-ink/60 font-body text-base">
-        Compiling assessment evaluation report for tablet...
-      </div>
-    );
+    return <SkeletonScorecard />;
   }
 
   if (errorMessage || !result) {

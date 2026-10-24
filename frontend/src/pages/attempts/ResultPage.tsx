@@ -6,6 +6,7 @@ import type { StudentAttemptResult } from '../../types';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { ResultPageTablet } from '../tablet/attempts/ResultPageTablet';
 import { ResultPageMobile } from '../mobile/attempts/ResultPageMobile';
+import { SkeletonScorecard } from '../../components/ui/skeleton';
 import { getStaggerDelay } from '../../lib/motion';
 
 const ResultPageDesktop: React.FC = () => {
@@ -51,11 +52,7 @@ const ResultPageDesktop: React.FC = () => {
   }, [attemptId]);
 
   if (isLoading) {
-    return (
-      <div className="max-w-3xl mx-auto py-16 text-center text-ink/60 font-body text-sm">
-        Compiling assessment evaluation report...
-      </div>
-    );
+    return <SkeletonScorecard />;
   }
 
   if (errorMessage || !result) {

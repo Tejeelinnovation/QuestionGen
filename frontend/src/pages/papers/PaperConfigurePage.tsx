@@ -9,6 +9,7 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { extractApiErrorMessage } from '../../utils/errorUtils';
 import { PaperConfigurePageTablet } from '../tablet/papers/PaperConfigurePageTablet';
 import { PaperConfigurePageMobile } from '../mobile/papers/PaperConfigurePageMobile';
+import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { MOTION } from '../../lib/motion';
 import { Clock, CheckCircle2, Plus, Trash2, Sliders } from 'lucide-react';
 
@@ -231,14 +232,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <PaperWorkflowNav currentStep="configure" paperId={paperId} />
-        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60">
-          Loading question bank filters and chapter parameters...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   const activeFilterCount = [

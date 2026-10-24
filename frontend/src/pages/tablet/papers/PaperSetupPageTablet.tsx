@@ -6,6 +6,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { CustomSelect } from '../../../components/ui/custom-select';
+import { Skeleton } from '../../../components/ui/skeleton';
 import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
 
@@ -123,8 +124,34 @@ export const PaperSetupPageTablet: React.FC = () => {
       </div>
 
       {isLoadingChapters && (
-        <div className="bg-surface border border-border rounded-card p-6 text-sm text-ink/60 text-center">
-          Loading curriculum syllabus chapters...
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-4">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-36" radius="sm" />
+              <Skeleton className="h-10 w-full" radius="card" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" radius="sm" />
+              <Skeleton className="h-10 w-full" radius="card" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-28" radius="sm" />
+              <Skeleton className="h-20 w-full" radius="card" />
+            </div>
+            <div className="pt-2 flex items-center justify-between gap-3">
+              <Skeleton className="h-11 w-24" radius="pill" />
+              <Skeleton className="h-11 w-44" radius="pill" />
+            </div>
+          </div>
+          <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <Skeleton className="h-3 w-28" radius="sm" />
+              <Skeleton className="h-5 w-20" radius="pill" />
+            </div>
+            <Skeleton className="h-6 w-3/4" radius="sm" />
+            <Skeleton className="h-4 w-1/2" radius="sm" />
+            <Skeleton className="h-14 w-full" radius="card" />
+          </div>
         </div>
       )}
 

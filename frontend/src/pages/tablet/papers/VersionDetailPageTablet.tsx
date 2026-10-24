@@ -5,6 +5,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { PaperVersion } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { Loader2, Copy } from 'lucide-react';
+import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 import { useToast } from '../../../context/ToastContext';
 
 export const VersionDetailPageTablet: React.FC = () => {
@@ -91,14 +92,7 @@ export const VersionDetailPageTablet: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6 font-body">
-        <PaperWorkflowNavTablet currentStep="version" paperId={paperId} versionId={vId} />
-        <div className="bg-surface border border-border rounded-card p-8 text-center text-ink/60 text-sm">
-          Loading version snapshot...
-        </div>
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   if (!version) {

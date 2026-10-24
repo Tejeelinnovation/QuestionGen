@@ -6,6 +6,7 @@ import type { Paper } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { FilePlus, ChevronRight } from 'lucide-react';
+import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 
 export const PaperDetailPageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -38,11 +39,7 @@ export const PaperDetailPageMobile: React.FC = () => {
   }, [paperId]);
 
   if (isLoading) {
-    return (
-      <div className="py-12 text-center text-xs text-ink/60 font-body">
-        Loading paper overview...
-      </div>
-    );
+    return <SkeletonPaperDetail />;
   }
 
   if (errorMessage || !paper) {
