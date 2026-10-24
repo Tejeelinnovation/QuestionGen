@@ -41,6 +41,7 @@ const PrintViewPage = React.lazy(() => import('./pages/papers/PrintViewPage').th
 const PaperDetailPage = React.lazy(() => import('./pages/papers/PaperDetailPage').then(m => ({ default: m.PaperDetailPage })));
 const ProfilePage = React.lazy(() => import('./pages/profile/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const ResetPasswordPage = React.lazy(() => import('./pages/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
+const DemoLaunchPage = React.lazy(() => import('./pages/auth/DemoLaunchPage').then(m => ({ default: m.DemoLaunchPage })));
 const DatasetIngestionPage = React.lazy(() => import('./pages/ingestion/DatasetIngestionPage').then(m => ({ default: m.DatasetIngestionPage })));
 
 /**
@@ -77,6 +78,15 @@ export const routes: RouteObject[] = [
     element: (
       <TopLevelSuspense>
         <ResetPasswordPage />
+      </TopLevelSuspense>
+    ),
+  },
+  {
+    path: '/demo/launch',
+    errorElement: <RouteErrorBoundary />,
+    element: (
+      <TopLevelSuspense>
+        <DemoLaunchPage />
       </TopLevelSuspense>
     ),
   },

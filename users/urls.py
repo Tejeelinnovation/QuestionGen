@@ -20,6 +20,8 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
     ChangePasswordView,
+    DemoTicketConsumeView,
+    DemoTicketGenerateView,
     LoginView,
     LogoutView,
     MeView,
@@ -37,6 +39,8 @@ auth_urlpatterns = [
     path("password-reset/request/", PasswordResetRequestView.as_view(), name="auth-password-reset-request"),
     path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="auth-password-reset-confirm"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    path("demo-ticket/", DemoTicketGenerateView.as_view(), name="auth-demo-ticket"),
+    path("demo-consume/", DemoTicketConsumeView.as_view(), name="auth-demo-consume"),
 ]
 
 # User management URL patterns — mounted at /api/users/ in root urls.py

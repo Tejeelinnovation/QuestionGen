@@ -81,4 +81,25 @@ export const authApi = {
     const response = await apiClient.post<{ detail: string }>('/api/auth/password-reset/confirm/', data);
     return response.data;
   },
+
+  createDemoTicket: async (
+    role: 'teacher' | 'student' | 'school_admin' | 'qbm' | 'deo' | 'validator' | 'dual'
+  ): Promise<{ ticket: string; role: string; username: string; target_url: string }> => {
+    const response = await apiClient.post<{ ticket: string; role: string; username: string; target_url: string }>(
+      '/api/auth/demo-ticket/',
+      { role }
+    );
+    return response.data;
+  },
+
+  consumeDemoTicket: async (
+    ticket: string
+  ): Promise<LoginResponse & { redirect_url: string }> => {
+    const response = await apiClient.post<LoginResponse & { redirect_url: string }>(
+      '/api/auth/demo-consume/',
+      { ticket }
+    );
+    return response.data;
+  },
 };
+

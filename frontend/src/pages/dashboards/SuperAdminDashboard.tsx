@@ -16,6 +16,7 @@ import type { User, School, UserStats } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonTable, Skeleton } from '../../components/ui/skeleton';
 import { SuperAdminAuditLogViewer } from '../../components/audit/SuperAdminAuditLogViewer';
+import { DemoAccountsCard } from '../../components/dashboards/DemoAccountsCard';
 
 const SuperAdminDashboardDesktop: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -91,57 +92,64 @@ const SuperAdminDashboardDesktop: React.FC = () => {
 
   return (
     <div className="space-y-10">
-      {/* ── Top Typographic Headline with embedded stats & primary create triggers ── */}
-      <div className="border-b border-border pb-6 space-y-4">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
-            <span className="w-2 h-2 rounded-full bg-forest" />
-            Global Tenant Control
+      {/* ── Top Typographic Headline with embedded stats, primary create triggers & Demo Sandboxes ── */}
+      <div className="border-b border-border pb-6 flex flex-col xl:flex-row xl:items-start justify-between gap-6">
+        <div className="space-y-4 max-w-2xl">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-surface border border-border text-xs font-semibold text-forest">
+              <span className="w-2 h-2 rounded-full bg-forest" />
+              Global Tenant Control
+            </div>
+            <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+              Super Admin Directory
+            </h1>
+            <p className="font-body text-ink/75 text-base leading-relaxed">
+              Overseeing{' '}
+              <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
+                {totalSystemAccounts} active system accounts
+              </span>{' '}
+              and{' '}
+              <span className="font-heading font-bold text-ember text-lg underline decoration-ember/40 underline-offset-2">
+                {schools.length} institutions
+              </span>{' '}
+              with full atomic capability governance.
+            </p>
           </div>
-          <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
-            Super Admin Directory
-          </h1>
-          <p className="font-body text-ink/75 text-base max-w-3xl leading-relaxed">
-            Overseeing{' '}
-            <span className="font-heading font-bold text-forest text-lg underline decoration-forest/40 underline-offset-2">
-              {totalSystemAccounts} active system accounts
-            </span>{' '}
-            and{' '}
-            <span className="font-heading font-bold text-ember text-lg underline decoration-ember/40 underline-offset-2">
-              {schools.length} institutions
-            </span>{' '}
-            with full atomic capability governance.
-          </p>
+
+          {/* Primary Action Buttons - Left aligned in a neat row */}
+          <div className="flex flex-wrap items-center gap-2.5 pt-1">
+            <Link
+              to="/dashboard/qbm"
+              id="superadmin-qbm-engine-btn"
+              className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-[#0F766E] text-white hover:bg-[#0F766E]/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Question Bank (QBM) Engine</span>
+            </Link>
+            <button
+              type="button"
+              id="superadmin-create-school-btn"
+              onClick={() => setIsCreateSchoolOpen(true)}
+              className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Add School / Coaching Class & Admin</span>
+            </button>
+            <button
+              type="button"
+              id="superadmin-create-qbm-btn"
+              onClick={() => setCreateUserProfile('qbm')}
+              className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-forest" />
+              <span>Add QBM Staff</span>
+            </button>
+          </div>
         </div>
 
-        {/* Primary Action Buttons - Left aligned in a neat row */}
-        <div className="flex flex-wrap items-center gap-2.5 pt-1">
-          <Link
-            to="/dashboard/qbm"
-            id="superadmin-qbm-engine-btn"
-            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-[#0F766E] text-white hover:bg-[#0F766E]/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>Question Bank (QBM) Engine</span>
-          </Link>
-          <button
-            type="button"
-            id="superadmin-create-school-btn"
-            onClick={() => setIsCreateSchoolOpen(true)}
-            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Add School / Coaching Class & Admin</span>
-          </button>
-          <button
-            type="button"
-            id="superadmin-create-qbm-btn"
-            onClick={() => setCreateUserProfile('qbm')}
-            className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-forest" />
-            <span>Add QBM Staff</span>
-          </button>
+        {/* Right Side: Sleek, compact Demo Environments Sandbox widget */}
+        <div className="xl:w-[460px] w-full shrink-0">
+          <DemoAccountsCard />
         </div>
       </div>
 

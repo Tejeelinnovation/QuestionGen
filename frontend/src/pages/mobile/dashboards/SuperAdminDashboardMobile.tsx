@@ -8,11 +8,12 @@ import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../../components/schools/BulkImportModal';
-import { ShieldCheck, Search, Edit2, Building2, Loader2, X, Users as UsersIcon, FileSpreadsheet, ShieldAlert, UserPlus, Database, UploadCloud } from 'lucide-react';
+import { ShieldCheck, Search, Edit2, Building2, Loader2, X, Users as UsersIcon, FileSpreadsheet, ShieldAlert, UserPlus, Database, UploadCloud, Sparkles } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster } from '../../../components/ui/skeleton';
 import { SuperAdminAuditLogViewer } from '../../../components/audit/SuperAdminAuditLogViewer';
+import { DemoAccountsCard } from '../../../components/dashboards/DemoAccountsCard';
 
 export const SuperAdminDashboardMobile: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -21,7 +22,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
   const [schools, setSchools] = useState<School[]>([]);
-  const [activeTab, setActiveTab] = useState<'accounts' | 'schools' | 'logs'>('accounts');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'schools' | 'demos' | 'logs'>('accounts');
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isUpdatingUsers, setIsUpdatingUsers] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -185,12 +186,12 @@ export const SuperAdminDashboardMobile: React.FC = () => {
         </div>
       )}
 
-      {/* ── View Mode Switcher (Accounts vs Schools vs Logs) ── */}
-      <div className="grid grid-cols-3 gap-1 p-1 bg-surface-muted rounded-pill border border-border">
+      {/* ── View Mode Switcher (Accounts vs Schools vs Demos vs Logs) ── */}
+      <div className="grid grid-cols-4 gap-1 p-1 bg-surface-muted rounded-pill border border-border">
         <button
           type="button"
           onClick={() => setActiveTab('accounts')}
-          className={`py-1.5 px-2 rounded-pill text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
+          className={`py-1.5 px-1.5 rounded-pill text-[10px] sm:text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
             activeTab === 'accounts'
               ? 'bg-forest text-white shadow-xs'
               : 'text-ink/60 hover:text-ink'
@@ -203,7 +204,7 @@ export const SuperAdminDashboardMobile: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('schools')}
-          className={`py-1.5 px-2 rounded-pill text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
+          className={`py-1.5 px-1.5 rounded-pill text-[10px] sm:text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
             activeTab === 'schools'
               ? 'bg-forest text-white shadow-xs'
               : 'text-ink/60 hover:text-ink'
@@ -215,19 +216,35 @@ export const SuperAdminDashboardMobile: React.FC = () => {
 
         <button
           type="button"
+          id="mobile-tab-demos-btn"
+          onClick={() => setActiveTab('demos')}
+          className={`py-1.5 px-1.5 rounded-pill text-[10px] sm:text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
+            activeTab === 'demos'
+              ? 'bg-forest text-white shadow-xs'
+              : 'text-ink/60 hover:text-ink'
+          }`}
+        >
+          <Sparkles className="w-3 h-3 text-forest" />
+          <span>Demos</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('logs')}
-          className={`py-1.5 px-2 rounded-pill text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
+          className={`py-1.5 px-1.5 rounded-pill text-[10px] sm:text-[11px] font-heading font-semibold transition-all flex items-center justify-center gap-1 ${
             activeTab === 'logs'
               ? 'bg-forest text-white shadow-xs'
               : 'text-ink/60 hover:text-ink'
           }`}
         >
           <ShieldAlert className="w-3 h-3 text-ember" />
-          <span>Audit Logs</span>
+          <span>Logs</span>
         </button>
       </div>
 
       {activeTab === 'logs' && <SuperAdminAuditLogViewer />}
+
+      {activeTab === 'demos' && <DemoAccountsCard variant="mobile" />}
 
       {activeTab === 'schools' && (
         <div className="space-y-2.5">
@@ -310,6 +327,21 @@ export const SuperAdminDashboardMobile: React.FC = () => {
 
       {activeTab === 'accounts' && (
         <>
+          {/* Quick Demo Access Bar on mobile */}
+          <div className="p-2.5 rounded-card bg-forest/5 border border-forest/15 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-forest shrink-0" />
+              <span className="text-[11px] text-ink/80 font-medium">Demonstration Sandboxes</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('demos')}
+              className="px-2.5 py-1 rounded-pill bg-forest text-white text-[10px] font-heading font-semibold hover:bg-forest/90 transition-colors cursor-pointer shrink-0"
+            >
+              Open Demos
+            </button>
+          </div>
+
           {/* ── Search & Filter Controls ── */}
           <div className="space-y-2 pt-1">
             <div className="relative">

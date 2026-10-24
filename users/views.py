@@ -40,6 +40,7 @@ from core.pagination import StandardPageNumberPagination
 from core.throttles import AuthRateThrottle
 
 logger = logging.getLogger(__name__)
+from .demo_service import consume_demo_ticket, generate_demo_ticket
 from .models import Capability, CapabilityName, User, UserCapability
 from .permissions import (
     HasCapability,
@@ -428,6 +429,101 @@ class PasswordResetConfirmView(APIView):
             {"detail": "Your password has been reset successfully. You may now log in."},
             status=status.HTTP_200_OK,
         )
+
+
+class DemoTicketGenerateView(APIView):
+    """
+    POST /api/auth/demo-ticket/
+    Body: { "role": "teacher" | "student" | "school_admin" | "qbm" }
+
+    Generates an ephemeral, single-use signed ticket for Super Admins
+    to launch isolated demo personas in independent tabs without session collision.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        is_super_admin = (
+            user.is_superuser
+            or user.has_capability("CREATE_SCHOOL")
+            or getattr(user, "role_label", None) == "Super Admin"
+        )
+        if not is_super_admin:
+            return Response(
+                {"detail": "Only Super Administrators can provision demo launch tickets."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        role = request.data.get("role", "teacher").lower().strip()
+        if role not in ["teacher", "student", "school_admin", "qbm", "deo", "validator", "dual"]:
+            return Response(
+                {"detail": f"Unsupported demo persona '{role}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            ticket, username, target_url = generate_demo_ticket(role)
+            log_action(user, "demo.ticket_generated", user, metadata={"role": role, "demo_user": username})
+            return Response(
+                {
+                    "ticket": ticket,
+                    "role": role,
+                    "username": username,
+                    "target_url": target_url,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as exc:
+            logger.exception("Failed to generate demo session ticket: %s", exc)
+            return Response(
+                {"detail": f"Failed to generate demo session ticket: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class DemoTicketConsumeView(APIView):
+    """
+    POST /api/auth/demo-consume/
+    Body: { "ticket": "<signed_ticket>" }
+
+    Exchanges a valid signed demo ticket for fresh JWT tokens.
+    Public endpoint, isolated from AuthRateThrottle to allow fluid presentations.
+    """
+
+    permission_classes = []
+
+    def post(self, request):
+        ticket = request.data.get("ticket")
+        if not ticket:
+            return Response(
+                {"detail": "Demo ticket is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            demo_user, redirect_url = consume_demo_ticket(ticket)
+            refresh = RefreshToken.for_user(demo_user)
+            log_action(demo_user, "demo.session_launched", demo_user, metadata={"username": demo_user.username})
+            return Response(
+                {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "redirect_url": redirect_url,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as exc:
+            logger.exception("Error activating demo session: %s", exc)
+            return Response(
+                {"detail": f"Error activating demo session: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 # ---------------------------------------------------------------------------

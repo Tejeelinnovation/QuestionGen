@@ -677,4 +677,93 @@ class PasswordResetFlowTests(TestCase):
         self.assertEqual(repeat_response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class DemoAccountLaunchTests(TestCase):
+    """
+    Test suite for the isolated demo account ticket provisioning and consumption workflow.
+    """
 
+    def setUp(self):
+        self.client = APIClient()
+
+        # Ensure all standard capabilities exist
+        for cap_name in CapabilityName.values:
+            Capability.objects.get_or_create(name=cap_name)
+
+        # Super Admin user
+        self.superadmin = User.objects.create_user(
+            username="sa_demo_tester",
+            email="sa_demo@test.com",
+            password="password123",
+            role="Super Admin",
+            is_staff=True,
+            is_superuser=True,
+        )
+        grant_super_admin_defaults(self.superadmin)
+
+        # Non-SuperAdmin user (e.g., student)
+        self.student = User.objects.create_user(
+            username="student_tester",
+            email="student@test.com",
+            password="password123",
+            role="Student",
+        )
+        grant_student_defaults(self.student)
+
+    def test_superadmin_can_generate_demo_ticket(self):
+        self.client.force_authenticate(user=self.superadmin)
+        for role in ["teacher", "student", "school_admin", "qbm", "deo", "validator", "dual"]:
+            response = self.client.post("/api/auth/demo-ticket/", {"role": role}, format="json")
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertIn("ticket", response.data)
+            self.assertEqual(response.data["role"], role)
+            self.assertTrue(bool(response.data["target_url"]))
+
+    def test_non_superadmin_forbidden_from_generating_ticket(self):
+        # Authenticated as normal student
+        self.client.force_authenticate(user=self.student)
+        response = self.client.post("/api/auth/demo-ticket/", {"role": "teacher"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Unauthenticated
+        self.client.force_authenticate(user=None)
+        response = self.client.post("/api/auth/demo-ticket/", {"role": "teacher"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_unsupported_role_rejected(self):
+        self.client.force_authenticate(user=self.superadmin)
+        response = self.client.post("/api/auth/demo-ticket/", {"role": "hacker_role"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_consume_valid_demo_ticket(self):
+        # 1. Super Admin generates ticket for teacher
+        self.client.force_authenticate(user=self.superadmin)
+        gen_res = self.client.post("/api/auth/demo-ticket/", {"role": "teacher"}, format="json")
+        self.assertEqual(gen_res.status_code, status.HTTP_200_OK)
+        ticket = gen_res.data["ticket"]
+
+        # 2. Consume ticket as anonymous new tab
+        self.client.force_authenticate(user=None)
+        consume_res = self.client.post("/api/auth/demo-consume/", {"ticket": ticket}, format="json")
+        self.assertEqual(consume_res.status_code, status.HTTP_200_OK)
+        self.assertIn("access", consume_res.data)
+        self.assertIn("refresh", consume_res.data)
+        self.assertEqual(consume_res.data["redirect_url"], "/dashboard/teacher")
+
+    def test_consumed_ticket_cannot_be_replayed(self):
+        self.client.force_authenticate(user=self.superadmin)
+        gen_res = self.client.post("/api/auth/demo-ticket/", {"role": "student"}, format="json")
+        ticket = gen_res.data["ticket"]
+
+        self.client.force_authenticate(user=None)
+        res1 = self.client.post("/api/auth/demo-consume/", {"ticket": ticket}, format="json")
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+
+        # Second attempt must be rejected
+        res2 = self.client.post("/api/auth/demo-consume/", {"ticket": ticket}, format="json")
+        self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already been used", res2.data["detail"])
+
+    def test_invalid_ticket_rejected(self):
+        self.client.force_authenticate(user=None)
+        res = self.client.post("/api/auth/demo-consume/", {"ticket": "corrupted_fake_ticket_123"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)

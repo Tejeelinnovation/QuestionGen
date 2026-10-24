@@ -12,6 +12,7 @@ import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster, Skeleton } from '../../../components/ui/skeleton';
 import { SuperAdminAuditLogViewer } from '../../../components/audit/SuperAdminAuditLogViewer';
+import { DemoAccountsCard } from '../../../components/dashboards/DemoAccountsCard';
 
 export const SuperAdminDashboardTablet: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -259,6 +260,9 @@ export const SuperAdminDashboardTablet: React.FC = () => {
               ))}
             </div>
           </section>
+
+          {/* ── Demo Accounts Presentation Sandbox ── */}
+          <DemoAccountsCard variant="tablet" />
 
           {/* ── Registered Institutions Grid (Tablet) ── */}
           <section className="space-y-3 pt-2">
