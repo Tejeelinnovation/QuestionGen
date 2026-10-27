@@ -1,0 +1,14 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "dataset_slug": "acc_keac103_56",
+  "subject": "Accountancy / Economics",
+  "client_wall_time_sec": 155.64,
+  "eval_count": 603,
+  "prompt_eval_count": 1867,
+  "eval_tokens_per_sec": 4.54,
+  "vram_mb": 2273,
+  "is_valid_json": true,
+  "compliance_pct": 100.0,
+  "error": null,
+  "timestamp": "2026-10-27T15:00:27.291115"
+}

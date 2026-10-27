@@ -1,0 +1,70 @@
+{
+  "model": "qwen2.5:7b",
+  "dataset": {
+    "slug": "hindi_khat101_61",
+    "filename": "dataset_khat101_61.json",
+    "subject": "Hindi Literature",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:31:29.631941",
+  "raw_response": "[{\"question\":\"What is the name of the girl who is taking care of Hamid?\", \"options\":[\"Amina\", \"Fatima\", \"Nadia\", \"Hind\"], \"answer\":\"Amina\", \"type\":\"multiple_choice\"}, {\"question\":\"Why is Amina worried about Hamid going to the fair?\", \"options\":[\"He might get lost\", \"He might get hurt\", \"He might not return home\", \"He might get sick\"], \"answer\":\"He might get lost\", \"type\":\"multiple_choice\"}, {\"question\":\"What does Amina plan to do if Hamid gets lost?\", \"options\":[\"Look for him in the crowd\", \"Send someone to look for him\", \"Wait for him to come back on his own\", \"Go home and wait for him\"], \"answer\":\"Look for him in the crowd\", \"type\":\"multiple_choice\"}, {\"question\":\"How much money do Hamid and Amina have for the fair?\", \"options\":[\"10 rupees\", \"5 rupees\", \"3 rupees\", \"2 rupees\"], \"answer\":\"2 rupees\", \"type\":\"multiple_choice\"}, {\"question\":\"What does the author imply about the fair in the village?\", \"options\":[\"It is a joyful and exciting event\", \"It is a dangerous and scary event\", \"It is a rare and special event\", \"It is a disappointing and uneventful event\"], \"answer\":\"It is a disappointing and uneventful event\", \"type\":\"multiple_choice\"}]",
+  "parsed_questions": [
+    {
+      "question": "What is the name of the girl who is taking care of Hamid?",
+      "options": [
+        "Amina",
+        "Fatima",
+        "Nadia",
+        "Hind"
+      ],
+      "answer": "Amina",
+      "type": "multiple_choice"
+    },
+    {
+      "question": "Why is Amina worried about Hamid going to the fair?",
+      "options": [
+        "He might get lost",
+        "He might get hurt",
+        "He might not return home",
+        "He might get sick"
+      ],
+      "answer": "He might get lost",
+      "type": "multiple_choice"
+    },
+    {
+      "question": "What does Amina plan to do if Hamid gets lost?",
+      "options": [
+        "Look for him in the crowd",
+        "Send someone to look for him",
+        "Wait for him to come back on his own",
+        "Go home and wait for him"
+      ],
+      "answer": "Look for him in the crowd",
+      "type": "multiple_choice"
+    },
+    {
+      "question": "How much money do Hamid and Amina have for the fair?",
+      "options": [
+        "10 rupees",
+        "5 rupees",
+        "3 rupees",
+        "2 rupees"
+      ],
+      "answer": "2 rupees",
+      "type": "multiple_choice"
+    },
+    {
+      "question": "What does the author imply about the fair in the village?",
+      "options": [
+        "It is a joyful and exciting event",
+        "It is a dangerous and scary event",
+        "It is a rare and special event",
+        "It is a disappointing and uneventful event"
+      ],
+      "answer": "It is a disappointing and uneventful event",
+      "type": "multiple_choice"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

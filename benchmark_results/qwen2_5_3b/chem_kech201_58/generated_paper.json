@@ -1,0 +1,84 @@
+{
+  "model": "qwen2.5:3b",
+  "dataset": {
+    "slug": "chem_kech201_58",
+    "filename": "dataset_kech201_58.json",
+    "subject": "Chemistry",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T14:32:17.425248",
+  "raw_response": "[\n  {\n    \"question_text\": \"Which of the following reactions is an example of oxidation according to the classical definition of oxidation?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"B\",\n    \"options\": {\n      \"A\": \"2 Mg (s) + O2 (g) → 2 MgO (s)\",\n      \"B\": \"S (s) + O2 (g) → SO2 (g)\",\n      \"C\": \"CH4 (g) + 2 O2 (g) → CO2 (g) + 2 H2O (l)\",\n      \"D\": \"2 H2S (g) + O2 (g) → 2 S (s) + H2O (l)\"\n    },\n    \"source_reference\": \"REDOX REACTIONS\"\n  },\n  {\n    \"question_text\": \"Which of the following reactions is an example of oxidation according to the modern definition of oxidation?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"D\",\n    \"options\": {\n      \"A\": \"2 K4[Fe(CN)6] (aq) + H2O2 (aq) → 2 K3[Fe(CN)6] (aq) + 2 ROH (aq)\",\n      \"B\": \"2 HgO (s) → Hg (l) + O2 (g)\",\n      \"C\": \"2 Mg (s) + O2 (g) → 2 MgO (s)\",\n      \"D\": \"2 H2S (g) + O2 (g) → 2 S (s) + H2O (l)\"\n    },\n    \"source_reference\": \"REDOX REACTIONS\"\n  },\n  {\n    \"question_text\": \"Which of the following statements is true regarding the concept of oxidation and reduction in redox reactions?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"Oxidation is the addition of oxygen or removal of hydrogen from a substance, and reduction is the removal of oxygen or addition of hydrogen to a substance.\",\n    \"source_reference\": \"REDOX REACTIONS\"\n  },\n  {\n    \"question_text\": \"Which of the following reactions is a redox reaction involving the transfer of electrons?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"C\",\n    \"options\": {\n      \"A\": \"2 Mg (s) + O2 (g) → 2 MgO (s)\",\n      \"B\": \"S (s) + O2 (g) → SO2 (g)\",\n      \"C\": \"2 HgO (s) → Hg (l) + O2 (g)\",\n      \"D\": \"2 H2S (g) + O2 (g) → 2 S (s) + H2O (l)\"\n    },\n    \"source_reference\": \"REDOX REACTIONS\"\n  },\n  {\n    \"question_text\": \"Which of the following reactions is a redox reaction involving the transfer of electrons and can be classified as a combination reaction?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"A\",\n    \"options\": {\n      \"A\": \"2 K4[Fe(CN)6] (aq) + H2O2 (aq) → 2 K3[Fe(CN)6] (aq) + 2 ROH (aq)\",\n      \"B\": \"2 HgO (s) → Hg (l) + O2 (g)\",\n      \"C\": \"2 H2S (g) + O2 (g) → 2 S (s) + H2O (l)\",\n      \"D\": \"2 Mg (s) + O2 (g) → 2 MgO (s)\"\n    },\n    \"source_reference\": \"REDOX REACTIONS\"\n  }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "Which of the following reactions is an example of oxidation according to the classical definition of oxidation?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "B",
+      "options": {
+        "A": "2 Mg (s) + O2 (g) → 2 MgO (s)",
+        "B": "S (s) + O2 (g) → SO2 (g)",
+        "C": "CH4 (g) + 2 O2 (g) → CO2 (g) + 2 H2O (l)",
+        "D": "2 H2S (g) + O2 (g) → 2 S (s) + H2O (l)"
+      },
+      "source_reference": "REDOX REACTIONS"
+    },
+    {
+      "question_text": "Which of the following reactions is an example of oxidation according to the modern definition of oxidation?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "D",
+      "options": {
+        "A": "2 K4[Fe(CN)6] (aq) + H2O2 (aq) → 2 K3[Fe(CN)6] (aq) + 2 ROH (aq)",
+        "B": "2 HgO (s) → Hg (l) + O2 (g)",
+        "C": "2 Mg (s) + O2 (g) → 2 MgO (s)",
+        "D": "2 H2S (g) + O2 (g) → 2 S (s) + H2O (l)"
+      },
+      "source_reference": "REDOX REACTIONS"
+    },
+    {
+      "question_text": "Which of the following statements is true regarding the concept of oxidation and reduction in redox reactions?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Oxidation is the addition of oxygen or removal of hydrogen from a substance, and reduction is the removal of oxygen or addition of hydrogen to a substance.",
+      "source_reference": "REDOX REACTIONS"
+    },
+    {
+      "question_text": "Which of the following reactions is a redox reaction involving the transfer of electrons?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "C",
+      "options": {
+        "A": "2 Mg (s) + O2 (g) → 2 MgO (s)",
+        "B": "S (s) + O2 (g) → SO2 (g)",
+        "C": "2 HgO (s) → Hg (l) + O2 (g)",
+        "D": "2 H2S (g) + O2 (g) → 2 S (s) + H2O (l)"
+      },
+      "source_reference": "REDOX REACTIONS"
+    },
+    {
+      "question_text": "Which of the following reactions is a redox reaction involving the transfer of electrons and can be classified as a combination reaction?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "A",
+      "options": {
+        "A": "2 K4[Fe(CN)6] (aq) + H2O2 (aq) → 2 K3[Fe(CN)6] (aq) + 2 ROH (aq)",
+        "B": "2 HgO (s) → Hg (l) + O2 (g)",
+        "C": "2 H2S (g) + O2 (g) → 2 S (s) + H2O (l)",
+        "D": "2 Mg (s) + O2 (g) → 2 MgO (s)"
+      },
+      "source_reference": "REDOX REACTIONS"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

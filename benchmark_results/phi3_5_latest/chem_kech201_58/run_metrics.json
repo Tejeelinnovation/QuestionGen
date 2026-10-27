@@ -1,0 +1,14 @@
+{
+  "model": "phi3.5:latest",
+  "dataset_slug": "chem_kech201_58",
+  "subject": "Chemistry",
+  "client_wall_time_sec": 221.96,
+  "eval_count": 1046,
+  "prompt_eval_count": 2803,
+  "eval_tokens_per_sec": 5.27,
+  "vram_mb": 2311,
+  "is_valid_json": false,
+  "compliance_pct": 0.0,
+  "error": "JSON Decode Error: Expecting property name enclosed in double quotes: line 26 column 1 (char 1309)",
+  "timestamp": "2026-10-27T14:40:09.152075"
+}

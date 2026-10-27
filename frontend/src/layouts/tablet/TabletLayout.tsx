@@ -36,6 +36,9 @@ export const TabletLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
     ...(canUploadMaterial
       ? [{ label: isSuperAdmin ? 'Dataset Ingestion' : 'Upload Material', path: '/dataset-ingestion' }]
       : []),
+    ...(isSuperAdmin
+      ? [{ label: 'SLM Benchmarks', path: '/superadmin/benchmark-results' }]
+      : []),
   ];
 
   const isAttemptMode = /^\/deliveries\/\d+\/attempt(\/|$)/.test(location.pathname);

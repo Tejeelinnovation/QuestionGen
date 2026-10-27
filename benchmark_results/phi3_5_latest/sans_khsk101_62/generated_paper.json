@@ -1,0 +1,14 @@
+{
+  "model": "phi3.5:latest",
+  "dataset": {
+    "slug": "sans_khsk101_62",
+    "filename": "dataset_khsk101_62.json",
+    "subject": "Sanskrit (Shemushi)",
+    "class": "9"
+  },
+  "generated_at": "2026-10-27T14:50:26.332222",
+  "raw_response": "```json\n[\n  {\n    \"question\": \"What is the significance of the 'रामायण-परिचय' as described in the text?\",\n    \"options\": {\n      \"A\": \"It introduces the character of राम\",\n      \"B\": \"It discusses the political structure of Ayodhya\",\n      \"C\": \"It outlines the duties of a king\",\n      \"D\": \"It narrates the story of रामायण\"\n    },\n    \"correct_option\": \"A\"\n  },\n  {\n    \"question\": \"What does the term 'मन्त्री' symbolize in the context of the text?\",\n    \"options\": {\n      \"A\": \"A powerful weapon\",\n      \"B\": \"A wise and learned scholar\",\n      \"C\": \"A type of ritual\",\n      \"D\": \"A form of currency\"\n    },\n    \"correct_option\": \"B\"\n  },\n  {\n    \"question\": \"According to the text, what role does 'वेतनम्' play in the society described?\",\n    \"options\": {\n      \"A\": \"It is a form of entertainment\",\n      \"B\": \"It is a measure of wealth and social status\",\n      \"C\": \"It is a type of food\",\n      \"D\": \"It is a religious offering\"\n    },\n    \"correct_option\": \"B\"\n  },\n  {\n    \"question\": \"What is the meaning of 'अमात्यः' as used in the text?\n    \"options\": {\n      \"A\": \"A common citizen\",\n      \"B\": \"A respected and influential leader\",\n      \"C\": \"A type of clothing\",\n      \"D\": \"A religious ceremony\"\n    },\n    \"correct_option\": \"B\"\n  },\n  {\n    \"question\": \"What does 'स्थापयेदासने' refer to in the context of the text?\",\n    \"options\": {\n      \"A\": \"The act of establishing a new city\",\n      \"B\": \"The act of taking a vow or oath\",\n      \"C\": \"The act of building a temple\",\n      \"D\": \"The act of starting a war\"\n    },\n    \"correct_option\": \"B\"\n  }\n]\n```\n",
+  "parsed_questions": null,
+  "is_valid_json": false,
+  "validation_error": "JSON Decode Error: Invalid control character at: line 33 column 71 (char 1044)"
+}

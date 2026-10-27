@@ -1,0 +1,30 @@
+{
+  "model": "qwen2.5:3b",
+  "dataset": {
+    "slug": "sans_khsk101_62",
+    "filename": "dataset_khsk101_62.json",
+    "subject": "Sanskrit (Shemushi)",
+    "class": "9"
+  },
+  "generated_at": "2026-10-27T14:33:59.110685",
+  "raw_response": "[\n    {\n        \"question\": \"What is the role of a minister in the context of the Ramayana as described in the text?\"\n    },\n    {\n        \"question\": \"What are the qualities of a good minister according to the text?\"\n    },\n    {\n        \"question\": \"How does the text describe the duties of a minister in relation to the king's commands?\"\n    },\n    {\n        \"question\": \"What are the characteristics of a good minister as mentioned in the text?\"\n    },\n    {\n        \"question\": \"What are the duties and responsibilities of a minister in the context of the Ramayana?\"\n    }\n]",
+  "parsed_questions": [
+    {
+      "question": "What is the role of a minister in the context of the Ramayana as described in the text?"
+    },
+    {
+      "question": "What are the qualities of a good minister according to the text?"
+    },
+    {
+      "question": "How does the text describe the duties of a minister in relation to the king's commands?"
+    },
+    {
+      "question": "What are the characteristics of a good minister as mentioned in the text?"
+    },
+    {
+      "question": "What are the duties and responsibilities of a minister in the context of the Ramayana?"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

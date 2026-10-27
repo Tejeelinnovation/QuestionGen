@@ -1,0 +1,73 @@
+{
+  "model": "llama3.2:3b",
+  "dataset": {
+    "slug": "acc_keac103_56",
+    "filename": "dataset_keac103_56.json",
+    "subject": "Accountancy / Economics",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:14:11.926623",
+  "raw_response": "[\n  {\n    \"question_text\": \"Kya cash memo aur pay-in-slip dono hi transaction ke praman hain?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"B\",\n    \"options\": {\"A\": \"Haan\", \"B\": \"Naah\", \"C\": \"Kabhi-kabhi\", \"D\": \"Alawa\"}\n  },\n  {\n    \"question_text\": \"Accounting vachan patra ki jatilata kya hai?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"C\",\n    \"options\": {\"A\": \"Sthir\", \"B\": \"Kathin\", \"C\": \"Jatil\", \"D\": \"Saral\"}\n  },\n  {\n    \"question_text\": \"Aapke firm ke liye accounting vachan patra kya pramanit karte hain?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"D\",\n    \"options\": {\"A\": \"Cash memo\", \"B\": \"Pay-in-slip\", \"C\": \"Cheque\", \"D\": \"Alawa\"}\n  },\n  {\n    \"question_text\": \"Accounting vachan patra ki sanrachna kya hai?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 2.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"Voucher ki sanrachna nam, date, debit aur credit amount, description aur authorised person ki naam aur signature hoti hai.\"\n  },\n  {\n    \"question_text\": \"$A = L + C$ accounting vachan patra ki utpatti kaise hoti hai?\",\n    \"question_type\": \"LONG_ANSWER\",\n    \"marks\": 3.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"$A = L + C$ accounting vachan patra ki utpatti ke liye, sabse pehle assets aur liabilities ki jankari ki jati hai. Iske baad, capital aur liabilities ki jankari ki jati hai. Iske baad, accounting vachan patra ki utpatti hoti hai jismein assets aur liabilities ki jankari di jati hai.\"\n  }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "Kya cash memo aur pay-in-slip dono hi transaction ke praman hain?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "B",
+      "options": {
+        "A": "Haan",
+        "B": "Naah",
+        "C": "Kabhi-kabhi",
+        "D": "Alawa"
+      }
+    },
+    {
+      "question_text": "Accounting vachan patra ki jatilata kya hai?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "C",
+      "options": {
+        "A": "Sthir",
+        "B": "Kathin",
+        "C": "Jatil",
+        "D": "Saral"
+      }
+    },
+    {
+      "question_text": "Aapke firm ke liye accounting vachan patra kya pramanit karte hain?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "D",
+      "options": {
+        "A": "Cash memo",
+        "B": "Pay-in-slip",
+        "C": "Cheque",
+        "D": "Alawa"
+      }
+    },
+    {
+      "question_text": "Accounting vachan patra ki sanrachna kya hai?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 2.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "Voucher ki sanrachna nam, date, debit aur credit amount, description aur authorised person ki naam aur signature hoti hai."
+    },
+    {
+      "question_text": "$A = L + C$ accounting vachan patra ki utpatti kaise hoti hai?",
+      "question_type": "LONG_ANSWER",
+      "marks": 3.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "$A = L + C$ accounting vachan patra ki utpatti ke liye, sabse pehle assets aur liabilities ki jankari ki jati hai. Iske baad, capital aur liabilities ki jankari ki jati hai. Iske baad, accounting vachan patra ki utpatti hoti hai jismein assets aur liabilities ki jankari di jati hai."
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

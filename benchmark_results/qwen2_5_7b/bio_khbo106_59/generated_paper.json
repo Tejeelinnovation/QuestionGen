@@ -1,0 +1,40 @@
+{
+  "model": "qwen2.5:7b",
+  "dataset": {
+    "slug": "bio_khbo106_59",
+    "filename": "dataset_khbo106_59.json",
+    "subject": "Biology (Hindi)",
+    "class": "10"
+  },
+  "generated_at": "2026-10-27T15:32:48.425209",
+  "raw_response": "[{\"question\":\"What are conjunctive cells located between juxtaglomerular and extraglomerular bundles in the root apex of a uniseriate root hair cell?\",\"answer\":\"Conjunctive cells\",\"type\":\"text\"},{\"question\":\"How many juxtaglomerular and extraglomerular tubules are typically found in a uniseriate root hair cell?\",\"answer\":\"2-4\",\"type\":\"text\"},{\"question\":\"What structure forms between the juxtaglomerular and extraglomerular tubules after the formation of the juxtaglomerular and extraglomerular tubules?\",\"answer\":\"Vannan lamella\",\"type\":\"text\"},{\"question\":\"What type of cells are present in the endodermis of a dicot root?\",\"answer\":\"Parenchyma cells\",\"type\":\"text\"},{\"question\":\"What is the characteristic feature of a dicot root in terms of the number of juxtaglomerular tubules?\",\"answer\":\"Few\",\"type\":\"text\"}]",
+  "parsed_questions": [
+    {
+      "question": "What are conjunctive cells located between juxtaglomerular and extraglomerular bundles in the root apex of a uniseriate root hair cell?",
+      "answer": "Conjunctive cells",
+      "type": "text"
+    },
+    {
+      "question": "How many juxtaglomerular and extraglomerular tubules are typically found in a uniseriate root hair cell?",
+      "answer": "2-4",
+      "type": "text"
+    },
+    {
+      "question": "What structure forms between the juxtaglomerular and extraglomerular tubules after the formation of the juxtaglomerular and extraglomerular tubules?",
+      "answer": "Vannan lamella",
+      "type": "text"
+    },
+    {
+      "question": "What type of cells are present in the endodermis of a dicot root?",
+      "answer": "Parenchyma cells",
+      "type": "text"
+    },
+    {
+      "question": "What is the characteristic feature of a dicot root in terms of the number of juxtaglomerular tubules?",
+      "answer": "Few",
+      "type": "text"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

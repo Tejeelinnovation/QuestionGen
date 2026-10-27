@@ -1,0 +1,65 @@
+{
+  "model": "qwen2.5:7b",
+  "dataset": {
+    "slug": "sans_khsk101_62",
+    "filename": "dataset_khsk101_62.json",
+    "subject": "Sanskrit (Shemushi)",
+    "class": "9"
+  },
+  "generated_at": "2026-10-27T15:37:35.636515",
+  "raw_response": "[\n    {\n        \"question\": \"Which of the following best describes the role of a minister in the context of the provided text?\",\n        \"options\": [\n            \"च) राज्ञः कृते कीदृशः अमात्यः क्षेमकरः भवेत््\",\n            \"झ) मन्त्रः कीदृशः भवति्\",\n            \"क) बलेभ्यः यथाकालम् किं दातव्यम््\",\n            \"ख) मेधावी अमात्यः राजानं काम् प्रापयेत््\"\n        ],\n        \"answer\": \"च) राज्ञः कृते कीदृशः अमात्यः क्षेमकरः भवेत््\"\n    },\n    {\n        \"question\": \"What is the correct Sanskrit phrase to fill in the blank for the sentence 'रामः ददर्श दुर्दश ± युगान्ते ------------------------ यथा।'?\",\n        \"options\": [\n            \"क) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।\",\n            \"ख) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।\",\n            \"ग) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।\",\n            \"घ) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।\"\n        ],\n        \"answer\": \"क) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।\"\n    },\n    {\n        \"question\": \"Which of the following is the correct interpretation of the phrase 'कुलीनश्च भृत्याश्च' in the context of the provided text?\",\n        \"options\": [\n            \"क) रामायण-परिचयः\",\n            \"ख) कुलीनः भृत्याः च\",\n            \"ग) कुलीनः भृत्याः च\",\n            \"घ) कुलीनः भृत्याः च\"\n        ],\n        \"answer\": \"ख) कुलीनः भृत्याः च\"\n    },\n    {\n        \"question\": \"What is the meaning of the word 'निःश्रेयसम्' as per the provided text?\",\n        \"options\": [\n            \"च) निपुण\",\n            \"छ) सेना का\",\n            \"क) कठिनाई से देखने योग्य\",\n            \"ख) सिर में\"\n        ],\n        \"answer\": \"क) कठिनाई से देखने योग्य\"\n    },\n    {\n        \"question\": \"Which of the following best describes the role of a minister in the context of the provided text?\",\n        \"options\": [\n            \"च) राज्ञः कृते कीदृशः अमात्यः क्षेमकरः भवेत््\",\n            \"झ) मन्त्रः कीदृशः भवति्\",\n            \"क) बलेभ्यः यथाकालम् किं दातव्यम््\",\n            \"ख) मेधावी अमात्यः राजानं काम् प्रापयेत््\"\n        ],\n        \"answer\": \"च) राज्ञः कृते कीदृशः अमात्यः क्षेमकरः भवेत््\"\n    }\n]",
+  "parsed_questions": [
+    {
+      "question": "Which of the following best describes the role of a minister in the context of the provided text?",
+      "options": [
+        "च) राज्ञः कृते कीदृशः अमात्यः क्षेमकरः भवेत््",
+        "झ) मन्त्रः कीदृशः भवति्",
+        "क) बलेभ्यः यथाकालम् किं दातव्यम््",
+        "ख) मेधावी अमात्यः राजानं काम् प्रापयेत््"
+      ],
+      "answer": "च) राज्ञः कृते कीदृशः अमात्यः क्षेमकरः भवेत््"
+    },
+    {
+      "question": "What is the correct Sanskrit phrase to fill in the blank for the sentence 'रामः ददर्श दुर्दश ± युगान्ते ------------------------ यथा।'?",
+      "options": [
+        "क) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।",
+        "ख) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।",
+        "ग) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।",
+        "घ) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।"
+      ],
+      "answer": "क) रामः ददर्श दुर्दश ± युगान्ते अपराधान्ते यथा।"
+    },
+    {
+      "question": "Which of the following is the correct interpretation of the phrase 'कुलीनश्च भृत्याश्च' in the context of the provided text?",
+      "options": [
+        "क) रामायण-परिचयः",
+        "ख) कुलीनः भृत्याः च",
+        "ग) कुलीनः भृत्याः च",
+        "घ) कुलीनः भृत्याः च"
+      ],
+      "answer": "ख) कुलीनः भृत्याः च"
+    },
+    {
+      "question": "What is the meaning of the word 'निःश्रेयसम्' as per the provided text?",
+      "options": [
+        "च) निपुण",
+        "छ) सेना का",
+        "क) कठिनाई से देखने योग्य",
+        "ख) सिर में"
+      ],
+      "answer": "क) कठिनाई से देखने योग्य"
+    },
+    {
+      "question": "Which of the following best describes the role of a minister in the context of the provided text?",
+      "options": [
+        "च) राज्ञः कृते कीदृशः अमात्यः क्षेमकरः भवेत््",
+        "झ) मन्त्रः कीदृशः भवति्",
+        "क) बलेभ्यः यथाकालम् किं दातव्यम््",
+        "ख) मेधावी अमात्यः राजानं काम् प्रापयेत््"
+      ],
+      "answer": "च) राज्ञः कृते कीदृशः अमात्यः क्षेमकरः भवेत््"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

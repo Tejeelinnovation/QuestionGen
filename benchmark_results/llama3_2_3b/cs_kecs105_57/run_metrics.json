@@ -1,0 +1,14 @@
+{
+  "model": "llama3.2:3b",
+  "dataset_slug": "cs_kecs105_57",
+  "subject": "Computer Science (Python)",
+  "client_wall_time_sec": 50.59,
+  "eval_count": 534,
+  "prompt_eval_count": 1989,
+  "eval_tokens_per_sec": 25.04,
+  "vram_mb": 2309,
+  "is_valid_json": true,
+  "compliance_pct": 100.0,
+  "error": null,
+  "timestamp": "2026-10-27T15:12:40.708757"
+}

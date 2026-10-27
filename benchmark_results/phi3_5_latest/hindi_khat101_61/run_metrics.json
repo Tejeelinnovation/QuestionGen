@@ -1,0 +1,14 @@
+{
+  "model": "phi3.5:latest",
+  "dataset_slug": "hindi_khat101_61",
+  "subject": "Hindi Literature",
+  "client_wall_time_sec": 40.76,
+  "eval_count": 161,
+  "prompt_eval_count": 2050,
+  "eval_tokens_per_sec": 7.76,
+  "vram_mb": 2315,
+  "is_valid_json": true,
+  "compliance_pct": 0.0,
+  "error": null,
+  "timestamp": "2026-10-27T14:47:26.454366"
+}

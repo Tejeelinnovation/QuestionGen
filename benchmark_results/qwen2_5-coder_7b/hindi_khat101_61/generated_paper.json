@@ -1,0 +1,65 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "dataset": {
+    "slug": "hindi_khat101_61",
+    "filename": "dataset_khat101_61.json",
+    "subject": "Hindi Literature",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:07:42.941105",
+  "raw_response": "```json\n[\n    {\n        \"question\": \"What is the significance of Hammad's actions in the story?\",\n        \"options\": [\n            \"He is trying to save his family from a dangerous situation.\",\n            \"He is trying to impress his family with his bravery.\",\n            \"He is trying to avoid responsibility for his family's problems.\",\n            \"He is trying to escape from his family's problems.\"\n        ],\n        \"answer\": \"He is trying to save his family from a dangerous situation.\"\n    },\n    {\n        \"question\": \"What does Amine's reaction to Hammad's actions reveal about her character?\",\n        \"options\": [\n            \"She is supportive and caring towards her family.\",\n            \"She is indifferent and uncaring towards her family.\",\n            \"She is jealous and resentful towards Hammad.\",\n            \"She is angry and frustrated with Hammad.\"\n        ],\n        \"answer\": \"She is supportive and caring towards her family.\"\n    },\n    {\n        \"question\": \"What is the purpose of the story?\",\n        \"options\": [\n            \"To show the importance of family unity and support.\",\n            \"To demonstrate the dangers of greed and selfishness.\",\n            \"To highlight the consequences of violence and revenge.\",\n            \"To emphasize the importance of education and learning.\"\n        ],\n        \"answer\": \"To show the importance of family unity and support.\"\n    },\n    {\n        \"question\": \"What is the significance of the title of the story?\",\n        \"options\": [\n            \"It refers to the Eid festival and its traditions.\",\n            \"It refers to the importance of honesty and truthfulness.\",\n            \"It refers to the theme of the story, which is about a family's journey.\",\n            \"It refers to the main character, Hammad.\"\n        ],\n        \"answer\": \"It refers to the theme of the story, which is about a family's journey.\"\n    },\n    {\n        \"question\": \"What is the moral of the story?\",\n        \"options\": [\n            \"Family is more important than individual desires.\",\n            \"Greed and selfishness will lead to destruction.\",\n            \"Violence and revenge will only bring more suffering.\",\n            \"Education and learning are the keys to success.\"\n        ],\n        \"answer\": \"Family is more important than individual desires.\"\n    }\n]\n```",
+  "parsed_questions": [
+    {
+      "question": "What is the significance of Hammad's actions in the story?",
+      "options": [
+        "He is trying to save his family from a dangerous situation.",
+        "He is trying to impress his family with his bravery.",
+        "He is trying to avoid responsibility for his family's problems.",
+        "He is trying to escape from his family's problems."
+      ],
+      "answer": "He is trying to save his family from a dangerous situation."
+    },
+    {
+      "question": "What does Amine's reaction to Hammad's actions reveal about her character?",
+      "options": [
+        "She is supportive and caring towards her family.",
+        "She is indifferent and uncaring towards her family.",
+        "She is jealous and resentful towards Hammad.",
+        "She is angry and frustrated with Hammad."
+      ],
+      "answer": "She is supportive and caring towards her family."
+    },
+    {
+      "question": "What is the purpose of the story?",
+      "options": [
+        "To show the importance of family unity and support.",
+        "To demonstrate the dangers of greed and selfishness.",
+        "To highlight the consequences of violence and revenge.",
+        "To emphasize the importance of education and learning."
+      ],
+      "answer": "To show the importance of family unity and support."
+    },
+    {
+      "question": "What is the significance of the title of the story?",
+      "options": [
+        "It refers to the Eid festival and its traditions.",
+        "It refers to the importance of honesty and truthfulness.",
+        "It refers to the theme of the story, which is about a family's journey.",
+        "It refers to the main character, Hammad."
+      ],
+      "answer": "It refers to the theme of the story, which is about a family's journey."
+    },
+    {
+      "question": "What is the moral of the story?",
+      "options": [
+        "Family is more important than individual desires.",
+        "Greed and selfishness will lead to destruction.",
+        "Violence and revenge will only bring more suffering.",
+        "Education and learning are the keys to success."
+      ],
+      "answer": "Family is more important than individual desires."
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

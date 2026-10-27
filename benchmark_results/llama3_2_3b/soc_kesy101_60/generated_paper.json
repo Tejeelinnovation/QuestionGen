@@ -1,0 +1,80 @@
+{
+  "model": "llama3.2:3b",
+  "dataset": {
+    "slug": "soc_kesy101_60",
+    "filename": "dataset_kesy101_60.json",
+    "subject": "Sociology",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:15:04.200708",
+  "raw_response": "[\n  {\n    \"question_text\": \"सociology और समाज की परिभाषा क्या है?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"A\",\n    \"options\": {\n      \"A\": \"सociology एक विज्ञान है जो मानव समाज का अध्ययन करता है।\",\n      \"B\": \"सociology एक धर्म है जो मानव समाज का अध्ययन करता है।\",\n      \"C\": \"सociology एक राजनीति है जो मानव समाज का अध्ययन करती है।\",\n      \"D\": \"सociology एक अर्थशास्त्र है जो मानव समाज का अध्ययन करता है।\"\n    },\n    \"source_reference\": \"पृष्ठ 1\"\n  },\n  {\n    \"question_text\": \"सociological Imagination की परिभाषा क्या है?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"B\",\n    \"options\": {\n      \"A\": \"सociological Imagination एक विचार है जो मानव समाज का अध्ययन करता है।\",\n      \"B\": \"सociological Imagination एक परिभाषा है जो मानव समाज का अध्ययन करती है।\",\n      \"C\": \"सociological Imagination एक सिद्धांत है जो मानव समाज का अध्ययन करता है।\",\n      \"D\": \"सociological Imagination एक शब्द है जो मानव समाज का अध्ययन करता है।\"\n    },\n    \"source_reference\": \"पृष्ठ 5\"\n  },\n  {\n    \"question_text\": \"Pradhan Mantri Awas Yojna-Gramin का उद्देश्य क्या है?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 2.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"रural Development (MORD) को प्रदान करने के लिए वित्तीय और श्रमिक समर्थन प्रदान करना\",\n    \"options\": null,\n    \"source_reference\": \"पृष्ठ 10\"\n  },\n  {\n    \"question_text\": \"सociology का इतिहास क्या है?\",\n    \"question_type\": \"LONG_ANSWER\",\n    \"marks\": 4.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"सociology का इतिहास विकसित हुआ था जो मुख्य रूप से पश्चिमी देशों में हुआ था। यह विकास विभिन्न विचारों और विचारों के माध्यम से हुआ था, जिनमें से कुछ प्रमुख विचारों में से एक था कि मानव समाज एक जटिल और विविध संरचना है।\",\n    \"options\": null,\n    \"source_reference\": \"पृष्ठ 15\"\n  },\n  {\n    \"question_text\": \"सociology और अन्य विज्ञानों का संबंध क्या है?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"D\",\n    \"options\": {\n      \"A\": \"सociology और अर्थशास्त्र का संबंध है।\",\n      \"B\": \"सociology और राजनीति का संबंध है।\",\n      \"C\": \"सociology और धर्म का संबंध नहीं है।\",\n      \"D\": \"सociology और अर्थशास्त्र, राजनीति और धर्म का संबंध है।\"\n    },\n    \"source_reference\": \"पृष्ठ 20\"\n  }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "सociology और समाज की परिभाषा क्या है?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "A",
+      "options": {
+        "A": "सociology एक विज्ञान है जो मानव समाज का अध्ययन करता है।",
+        "B": "सociology एक धर्म है जो मानव समाज का अध्ययन करता है।",
+        "C": "सociology एक राजनीति है जो मानव समाज का अध्ययन करती है।",
+        "D": "सociology एक अर्थशास्त्र है जो मानव समाज का अध्ययन करता है।"
+      },
+      "source_reference": "पृष्ठ 1"
+    },
+    {
+      "question_text": "सociological Imagination की परिभाषा क्या है?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "B",
+      "options": {
+        "A": "सociological Imagination एक विचार है जो मानव समाज का अध्ययन करता है।",
+        "B": "सociological Imagination एक परिभाषा है जो मानव समाज का अध्ययन करती है।",
+        "C": "सociological Imagination एक सिद्धांत है जो मानव समाज का अध्ययन करता है।",
+        "D": "सociological Imagination एक शब्द है जो मानव समाज का अध्ययन करता है।"
+      },
+      "source_reference": "पृष्ठ 5"
+    },
+    {
+      "question_text": "Pradhan Mantri Awas Yojna-Gramin का उद्देश्य क्या है?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 2.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "रural Development (MORD) को प्रदान करने के लिए वित्तीय और श्रमिक समर्थन प्रदान करना",
+      "options": null,
+      "source_reference": "पृष्ठ 10"
+    },
+    {
+      "question_text": "सociology का इतिहास क्या है?",
+      "question_type": "LONG_ANSWER",
+      "marks": 4.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "सociology का इतिहास विकसित हुआ था जो मुख्य रूप से पश्चिमी देशों में हुआ था। यह विकास विभिन्न विचारों और विचारों के माध्यम से हुआ था, जिनमें से कुछ प्रमुख विचारों में से एक था कि मानव समाज एक जटिल और विविध संरचना है।",
+      "options": null,
+      "source_reference": "पृष्ठ 15"
+    },
+    {
+      "question_text": "सociology और अन्य विज्ञानों का संबंध क्या है?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "D",
+      "options": {
+        "A": "सociology और अर्थशास्त्र का संबंध है।",
+        "B": "सociology और राजनीति का संबंध है।",
+        "C": "सociology और धर्म का संबंध नहीं है।",
+        "D": "सociology और अर्थशास्त्र, राजनीति और धर्म का संबंध है।"
+      },
+      "source_reference": "पृष्ठ 20"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

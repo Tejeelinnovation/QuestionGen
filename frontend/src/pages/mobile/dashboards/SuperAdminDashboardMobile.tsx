@@ -8,7 +8,7 @@ import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../../components/schools/BulkImportModal';
-import { ShieldCheck, Search, Edit2, Building2, Loader2, X, Users as UsersIcon, FileSpreadsheet, ShieldAlert, UserPlus, Database, UploadCloud, Sparkles } from 'lucide-react';
+import { ShieldCheck, Search, Edit2, Building2, Loader2, X, Users as UsersIcon, FileSpreadsheet, ShieldAlert, UserPlus, Database, UploadCloud, Sparkles, Cpu } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster } from '../../../components/ui/skeleton';
@@ -129,11 +129,20 @@ export const SuperAdminDashboardMobile: React.FC = () => {
       {/* ── Action Triggers Bar ── */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         <Link
-          to="/dataset-ingestion"
-          id="superadmin-mobile-dataset-ingestion-btn"
+          to="/superadmin/benchmark-results"
+          id="superadmin-mobile-slm-benchmarks-btn"
           className="px-3.5 py-2 rounded-pill bg-forest text-white text-xs font-heading font-semibold hover:bg-forest/90 transition-all flex items-center gap-1.5 shrink-0 active:scale-95 shadow-xs cursor-pointer"
         >
-          <UploadCloud className="w-3.5 h-3.5" />
+          <Cpu className="w-3.5 h-3.5 text-lime" />
+          <span>SLM Benchmarks</span>
+        </Link>
+
+        <Link
+          to="/dataset-ingestion"
+          id="superadmin-mobile-dataset-ingestion-btn"
+          className="px-3.5 py-2 rounded-pill border border-border bg-surface text-ink text-xs font-heading font-semibold hover:bg-surface-muted transition-all flex items-center gap-1.5 shrink-0 active:scale-95 shadow-xs cursor-pointer"
+        >
+          <UploadCloud className="w-3.5 h-3.5 text-forest" />
           <span>Dataset Ingestion</span>
         </Link>
 

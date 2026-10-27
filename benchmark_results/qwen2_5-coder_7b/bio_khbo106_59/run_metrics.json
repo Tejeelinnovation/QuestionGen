@@ -1,0 +1,14 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "dataset_slug": "bio_khbo106_59",
+  "subject": "Biology (Hindi)",
+  "client_wall_time_sec": 112.57,
+  "eval_count": 357,
+  "prompt_eval_count": 2050,
+  "eval_tokens_per_sec": 4.32,
+  "vram_mb": 2273,
+  "is_valid_json": true,
+  "compliance_pct": 0.0,
+  "error": null,
+  "timestamp": "2026-10-27T15:09:35.736046"
+}

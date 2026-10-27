@@ -1,0 +1,80 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "dataset": {
+    "slug": "acc_keac103_56",
+    "filename": "dataset_keac103_56.json",
+    "subject": "Accountancy / Economics",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:00:27.290405",
+  "raw_response": "```json\n[\n  {\n    \"question_text\": \"What does a transaction involve?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"B\",\n    \"options\": {\n      \"A\": \"A single payment\",\n      \"B\": \"A reciprocal exchange of two things\",\n      \"C\": \"A single purchase\",\n      \"D\": \"A single sale\"\n    },\n    \"source_reference\": \"3.1 Business Transactions and Source Document\"\n  },\n  {\n    \"question_text\": \"Which document provides evidence of a transaction?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"A\",\n    \"options\": {\n      \"A\": \"Source Document or Voucher\",\n      \"B\": \"Cash Memo\",\n      \"C\": \"Invoice\",\n      \"D\": \"Sales Bill\"\n    },\n    \"source_reference\": \"3.1 Business Transactions and Source Document\"\n  },\n  {\n    \"question_text\": \"What is the format of a Transaction Voucher?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"B\",\n    \"options\": {\n      \"A\": \"Debit Voucher\",\n      \"B\": \"Transaction Voucher\",\n      \"C\": \"Credit Voucher\",\n      \"D\": \"Journal Voucher\"\n    },\n    \"source_reference\": \"3.1.1 Preparation of Accounting Vouchers\"\n  },\n  {\n    \"question_text\": \"What does the accounting equation represent?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"Assets = Liabilities + Capital\",\n    \"options\": null,\n    \"source_reference\": \"3.2 Accounting Equation\"\n  },\n  {\n    \"question_text\": \"Explain the balance sheet equation.\",\n    \"question_type\": \"LONG_ANSWER\",\n    \"marks\": 2.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"The balance sheet equation is A = L + C, where A represents assets, L represents liabilities, and C represents capital. This equation signifies that the total assets of a business are always equal to the sum of its liabilities and capital. It is also known as the balance sheet equation because the equality of assets and liabilities justifies the name of the accounting equation.\",\n    \"options\": null,\n    \"source_reference\": \"3.2 Accounting Equation\"\n  }\n]\n```",
+  "parsed_questions": [
+    {
+      "question_text": "What does a transaction involve?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "B",
+      "options": {
+        "A": "A single payment",
+        "B": "A reciprocal exchange of two things",
+        "C": "A single purchase",
+        "D": "A single sale"
+      },
+      "source_reference": "3.1 Business Transactions and Source Document"
+    },
+    {
+      "question_text": "Which document provides evidence of a transaction?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "A",
+      "options": {
+        "A": "Source Document or Voucher",
+        "B": "Cash Memo",
+        "C": "Invoice",
+        "D": "Sales Bill"
+      },
+      "source_reference": "3.1 Business Transactions and Source Document"
+    },
+    {
+      "question_text": "What is the format of a Transaction Voucher?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "B",
+      "options": {
+        "A": "Debit Voucher",
+        "B": "Transaction Voucher",
+        "C": "Credit Voucher",
+        "D": "Journal Voucher"
+      },
+      "source_reference": "3.1.1 Preparation of Accounting Vouchers"
+    },
+    {
+      "question_text": "What does the accounting equation represent?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Assets = Liabilities + Capital",
+      "options": null,
+      "source_reference": "3.2 Accounting Equation"
+    },
+    {
+      "question_text": "Explain the balance sheet equation.",
+      "question_type": "LONG_ANSWER",
+      "marks": 2.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "The balance sheet equation is A = L + C, where A represents assets, L represents liabilities, and C represents capital. This equation signifies that the total assets of a business are always equal to the sum of its liabilities and capital. It is also known as the balance sheet equation because the equality of assets and liabilities justifies the name of the accounting equation.",
+      "options": null,
+      "source_reference": "3.2 Accounting Equation"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

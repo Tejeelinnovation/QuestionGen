@@ -1,0 +1,14 @@
+{
+  "model": "phi3.5:latest",
+  "dataset_slug": "soc_kesy101_60",
+  "subject": "Sociology",
+  "client_wall_time_sec": 153.87,
+  "eval_count": 932,
+  "prompt_eval_count": 2129,
+  "eval_tokens_per_sec": 6.8,
+  "vram_mb": 2311,
+  "is_valid_json": true,
+  "compliance_pct": 100.0,
+  "error": null,
+  "timestamp": "2026-10-27T14:46:45.519119"
+}

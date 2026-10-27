@@ -1,0 +1,14 @@
+{
+  "model": "llama3.2:3b",
+  "dataset_slug": "chem_kech201_58",
+  "subject": "Chemistry",
+  "client_wall_time_sec": 55.42,
+  "eval_count": 835,
+  "prompt_eval_count": 2557,
+  "eval_tokens_per_sec": 21.74,
+  "vram_mb": 2313,
+  "is_valid_json": true,
+  "compliance_pct": 100.0,
+  "error": null,
+  "timestamp": "2026-10-27T15:13:36.277635"
+}

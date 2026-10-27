@@ -1,0 +1,30 @@
+{
+  "model": "phi3.5:latest",
+  "dataset": {
+    "slug": "hindi_khat101_61",
+    "filename": "dataset_khat101_61.json",
+    "subject": "Hindi Literature",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T14:47:26.453685",
+  "raw_response": "[\n  {\n    \"question\": \"What is the main reason for Hadi's frustration during the village fair?\"\n  },\n  {\n    \"question\": \"How does Hadi's physical state change as he walks through the village fair, according to the text?\"\n  },\n  {\n    \"question\": \"What does Hadi observe about the behavior of the boys at the village fair?\"\n  },\n  {\n    \"question\": \"How does Hadi's perception of his own financial situation evolve throughout the narrative?\"\n  },\n  {\n    \"question\": \"What role does Hadi play in the village fair, and how does it affect his interactions with others?\"\n  }\n]",
+  "parsed_questions": [
+    {
+      "question": "What is the main reason for Hadi's frustration during the village fair?"
+    },
+    {
+      "question": "How does Hadi's physical state change as he walks through the village fair, according to the text?"
+    },
+    {
+      "question": "What does Hadi observe about the behavior of the boys at the village fair?"
+    },
+    {
+      "question": "How does Hadi's perception of his own financial situation evolve throughout the narrative?"
+    },
+    {
+      "question": "What role does Hadi play in the village fair, and how does it affect his interactions with others?"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

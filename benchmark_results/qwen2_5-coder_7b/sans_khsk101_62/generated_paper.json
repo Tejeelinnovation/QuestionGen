@@ -1,0 +1,70 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "dataset": {
+    "slug": "sans_khsk101_62",
+    "filename": "dataset_khsk101_62.json",
+    "subject": "Sanskrit (Shemushi)",
+    "class": "9"
+  },
+  "generated_at": "2026-10-27T15:11:49.987863",
+  "raw_response": "```json\n[\n    {\n        \"id\": 1,\n        \"question\": \"What should be the conduct of a king according to the given text?\",\n        \"options\": [\n            \"A king should be kind and just.\",\n            \"A king should be brave and fearless.\",\n            \"A king should be generous and give gifts.\",\n            \"A king should be wise and knowledgeable.\"\n        ],\n        \"correct_answer\": \"A king should be kind and just.\"\n    },\n    {\n        \"id\": 2,\n        \"question\": \"Which word in the given text means 'to understand'?\",\n        \"options\": [\n            \"व्याख्यायेताम्\",\n            \"विचक्षणः\",\n            \"प्रकृतिं\",\n            \"पृथव्फ\"\n        ],\n        \"correct_answer\": \"व्याख्यायेताम्\"\n    },\n    {\n        \"id\": 3,\n        \"question\": \"What is the purpose of the first sloka in the given text?\",\n        \"options\": [\n            \"It is a prayer for the king.\",\n            \"It is a description of the king's duties.\",\n            \"It is a request for the king's protection.\",\n            \"It is a warning to the king.\"\n        ],\n        \"correct_answer\": \"It is a description of the king's duties.\"\n    },\n    {\n        \"id\": 4,\n        \"question\": \"Which word in the given text means 'to write'?\",\n        \"options\": [\n            \"लिखत\",\n            \"प्रकृतिं\",\n            \"पृथव्फ\",\n            \"व्याख्यायेताम्\"\n        ],\n        \"correct_answer\": \"लिखत\"\n    },\n    {\n        \"id\": 5,\n        \"question\": \"What is the purpose of the sixth sloka in the given text?\",\n        \"options\": [\n            \"It is a description of the king's duties.\",\n            \"It is a prayer for the king.\",\n            \"It is a warning to the king.\",\n            \"It is a request for the king's protection.\"\n        ],\n        \"correct_answer\": \"It is a prayer for the king.\"\n    }\n]\n```",
+  "parsed_questions": [
+    {
+      "id": 1,
+      "question": "What should be the conduct of a king according to the given text?",
+      "options": [
+        "A king should be kind and just.",
+        "A king should be brave and fearless.",
+        "A king should be generous and give gifts.",
+        "A king should be wise and knowledgeable."
+      ],
+      "correct_answer": "A king should be kind and just."
+    },
+    {
+      "id": 2,
+      "question": "Which word in the given text means 'to understand'?",
+      "options": [
+        "व्याख्यायेताम्",
+        "विचक्षणः",
+        "प्रकृतिं",
+        "पृथव्फ"
+      ],
+      "correct_answer": "व्याख्यायेताम्"
+    },
+    {
+      "id": 3,
+      "question": "What is the purpose of the first sloka in the given text?",
+      "options": [
+        "It is a prayer for the king.",
+        "It is a description of the king's duties.",
+        "It is a request for the king's protection.",
+        "It is a warning to the king."
+      ],
+      "correct_answer": "It is a description of the king's duties."
+    },
+    {
+      "id": 4,
+      "question": "Which word in the given text means 'to write'?",
+      "options": [
+        "लिखत",
+        "प्रकृतिं",
+        "पृथव्फ",
+        "व्याख्यायेताम्"
+      ],
+      "correct_answer": "लिखत"
+    },
+    {
+      "id": 5,
+      "question": "What is the purpose of the sixth sloka in the given text?",
+      "options": [
+        "It is a description of the king's duties.",
+        "It is a prayer for the king.",
+        "It is a warning to the king.",
+        "It is a request for the king's protection."
+      ],
+      "correct_answer": "It is a prayer for the king."
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

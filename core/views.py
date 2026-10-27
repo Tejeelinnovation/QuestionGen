@@ -4,7 +4,10 @@ Views for the core app, including the Super Admin Audit & System Log API.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
+from django.conf import settings
 from django.db.models import Q, TextField
 from django.db.models.functions import Cast
 from rest_framework import status
@@ -298,5 +301,124 @@ class ApiRootView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class BenchmarkResultsView(APIView):
+    """
+    GET /api/benchmark-results/
+    
+    Provides Super Admin with local SLM empirical evaluation data:
+    - Summary Leaderboard
+    - Hardware operational parameters
+    - 35 per-run metrics and generated question papers
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        has_superadmin = (
+            user.is_superuser
+            or getattr(user, "role", "") == "SUPER_ADMIN"
+            or (hasattr(user, "has_capability") and user.has_capability("CREATE_SCHOOL"))
+        )
+        if not has_superadmin:
+            return Response(
+                {"detail": "Only Super Administrators can view local benchmark evaluation results."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        results_dir = settings.BASE_DIR / "benchmark_results"
+        state_file = results_dir / "progress_state.json"
+        
+        if not results_dir.exists() or not state_file.exists():
+            return Response({
+                "available": False,
+                "message": "No local SLM benchmark data found on this server."
+            }, status=status.HTTP_200_OK)
+
+        try:
+            with open(state_file, "r", encoding="utf-8") as f:
+                state_data = json.load(f)
+        except Exception as e:
+            return Response({
+                "available": False,
+                "error": f"Failed to load state file: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        completed_runs = state_data.get("completed_runs", {})
+        
+        # Load individual generated papers
+        runs = []
+        for run_key, m in completed_runs.items():
+            model_name = m.get("model", "")
+            dataset_slug = m.get("dataset_slug", "")
+            model_slug = model_name.replace(":", "_").replace(".", "_")
+            paper_path = results_dir / model_slug / dataset_slug / "generated_paper.json"
+            
+            paper_info = {}
+            if paper_path.exists():
+                try:
+                    with open(paper_path, "r", encoding="utf-8") as pf:
+                        paper_info = json.load(pf)
+                except Exception:
+                    pass
+            
+            runs.append({
+                "run_key": run_key,
+                "model": model_name,
+                "dataset_slug": dataset_slug,
+                "subject": m.get("subject", ""),
+                "client_wall_time_sec": m.get("client_wall_time_sec", 0.0),
+                "eval_count": m.get("eval_count", 0),
+                "prompt_eval_count": m.get("prompt_eval_count", 0),
+                "eval_tokens_per_sec": m.get("eval_tokens_per_sec", 0.0),
+                "vram_mb": m.get("vram_mb", 0),
+                "is_valid_json": m.get("is_valid_json", False),
+                "compliance_pct": m.get("compliance_pct", 0.0),
+                "error": m.get("error"),
+                "timestamp": m.get("timestamp"),
+                "questions": paper_info.get("parsed_questions") or [],
+                "raw_response": paper_info.get("raw_response") or "",
+                "validation_error": paper_info.get("validation_error") or "",
+            })
+
+        # Calculate model summaries in a consistent order
+        models = ["qwen2.5:3b", "llama3.2:3b", "qwen2.5-coder:7b", "qwen2.5:7b", "phi3.5:latest"]
+        summary = []
+        for mod in models:
+            mod_runs = [r for r in runs if r["model"] == mod]
+            total = len(mod_runs)
+            valid = sum(1 for r in mod_runs if r["is_valid_json"])
+            avg_tok_s = round(sum(r["eval_tokens_per_sec"] for r in mod_runs) / total, 1) if total else 0.0
+            avg_lat = round(sum(r["client_wall_time_sec"] for r in mod_runs) / total, 1) if total else 0.0
+            avg_comp = round(sum(r["compliance_pct"] for r in mod_runs) / total, 1) if total else 0.0
+            peak_vram = max((r["vram_mb"] for r in mod_runs), default=0)
+            
+            summary.append({
+                "model": mod,
+                "total_runs": total,
+                "valid_runs": valid,
+                "json_success_pct": round(valid / total * 100, 1) if total else 0.0,
+                "avg_tokens_per_sec": avg_tok_s,
+                "avg_latency_sec": avg_lat,
+                "avg_compliance_pct": avg_comp,
+                "peak_vram_mb": peak_vram,
+            })
+
+        return Response({
+            "available": True,
+            "hardware": {
+                "device": "ASUS TUF Gaming F15",
+                "gpu": "NVIDIA GeForce GTX 1650 (4.0 GB VRAM)",
+                "ram": "8.0 GB DDR4",
+                "quantization": "4-bit (Q4_K_M)",
+                "runtime": "Local Ollama Engine",
+            },
+            "last_updated": state_data.get("last_updated"),
+            "summary": summary,
+            "runs": runs,
+        }, status=status.HTTP_200_OK)
+
 
 

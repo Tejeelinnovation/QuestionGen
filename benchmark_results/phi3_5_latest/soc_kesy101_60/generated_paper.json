@@ -1,0 +1,60 @@
+{
+  "model": "phi3.5:latest",
+  "dataset": {
+    "slug": "soc_kesy101_60",
+    "filename": "dataset_kesy101_60.json",
+    "subject": "Sociology",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T14:46:45.518234",
+  "raw_response": "[\n  {\n    \"question_text\": \"Based on the sociological imagination, how does C. Wright Mills distinguish between 'the personal troubles of the milieu' and 'the public issues of social structure'?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"The personal troubles are individual troubles within immediate social relations, while public issues transcend these local environments and affect society at large.\",\n    \"source_reference\": \"C. Wright Mills' concept of sociological imagination\"\n  },\n  {\n    \"question_text\": \"Analyze the connection between the sociological imagination and understanding homelessness as a public issue. What role does the sociological imagination play in framing homelessness beyond individual circumstances?\",\n    \"question_type\": \"LONG_ANSWER\",\n    \"marks\": 2.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"The sociological imagination helps to understand homelessness as a public issue by linking personal troubles to broader social structures and historical contexts. It encourages looking at systemic factors like employment opportunities, migration patterns, and housing policies that contribute to homelessness, rather than viewing it as solely an individual's failure.\",\n    \"source_reference\": \"Application of sociological imagination to the issue of homelessness\"\n  },\n  {\n    \"question_text\": \"Discuss how the sociological imagination can be used to explore the relationship between individual biographies and historical facts. Provide an example from the text.\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"The sociological imagination allows us to see how individual lives, like a peasant becoming a worker during industrialization, are intertwined with broader historical processes. It helps us understand how personal experiences are shaped by societal changes.\",\n    \"source_reference\": \"C. Wright Mills' perspective on the relationship between individual biographies and history\"\n  },\n  {\n    \"question_text\": \"How does the Pradhan Mantri Awas Yojna-Gramin scheme illustrate the connection between personal problems and public issues as understood through the sociological imagination?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"The scheme addresses the personal problem of homelessness by providing financial and labor support for building pucca houses, framing it as a public issue that requires societal intervention and reflects the government's recognition of housing as a fundamental social structure.\",\n    \"source_reference\": \"Pradhan Mantri Awas Yojna-Gramin and its relation to sociological imagination\"\n  },\n  {\n    \"question_text\": \"Reflect on the role of sociology in understanding the relationship between individual choices in education and broader societal factors. What questions might a sociological perspective raise about the advice given to students in the chapter?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"A sociological perspective might question how societal factors like gender, socioeconomic background, and cultural expectations influence individual choices in education, and how these choices are shaped by the job market and government policies. It would also explore the notion of a 'good job' and how it varies across different societies.\",\n    \"source_reference\": \"Sociological examination of education choices and societal factors\"\n  }\n]\n",
+  "parsed_questions": [
+    {
+      "question_text": "Based on the sociological imagination, how does C. Wright Mills distinguish between 'the personal troubles of the milieu' and 'the public issues of social structure'?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "The personal troubles are individual troubles within immediate social relations, while public issues transcend these local environments and affect society at large.",
+      "source_reference": "C. Wright Mills' concept of sociological imagination"
+    },
+    {
+      "question_text": "Analyze the connection between the sociological imagination and understanding homelessness as a public issue. What role does the sociological imagination play in framing homelessness beyond individual circumstances?",
+      "question_type": "LONG_ANSWER",
+      "marks": 2.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "The sociological imagination helps to understand homelessness as a public issue by linking personal troubles to broader social structures and historical contexts. It encourages looking at systemic factors like employment opportunities, migration patterns, and housing policies that contribute to homelessness, rather than viewing it as solely an individual's failure.",
+      "source_reference": "Application of sociological imagination to the issue of homelessness"
+    },
+    {
+      "question_text": "Discuss how the sociological imagination can be used to explore the relationship between individual biographies and historical facts. Provide an example from the text.",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "The sociological imagination allows us to see how individual lives, like a peasant becoming a worker during industrialization, are intertwined with broader historical processes. It helps us understand how personal experiences are shaped by societal changes.",
+      "source_reference": "C. Wright Mills' perspective on the relationship between individual biographies and history"
+    },
+    {
+      "question_text": "How does the Pradhan Mantri Awas Yojna-Gramin scheme illustrate the connection between personal problems and public issues as understood through the sociological imagination?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "The scheme addresses the personal problem of homelessness by providing financial and labor support for building pucca houses, framing it as a public issue that requires societal intervention and reflects the government's recognition of housing as a fundamental social structure.",
+      "source_reference": "Pradhan Mantri Awas Yojna-Gramin and its relation to sociological imagination"
+    },
+    {
+      "question_text": "Reflect on the role of sociology in understanding the relationship between individual choices in education and broader societal factors. What questions might a sociological perspective raise about the advice given to students in the chapter?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "A sociological perspective might question how societal factors like gender, socioeconomic background, and cultural expectations influence individual choices in education, and how these choices are shaped by the job market and government policies. It would also explore the notion of a 'good job' and how it varies across different societies.",
+      "source_reference": "Sociological examination of education choices and societal factors"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

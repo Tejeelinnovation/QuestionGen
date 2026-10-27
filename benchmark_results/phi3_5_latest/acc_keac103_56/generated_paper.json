@@ -1,0 +1,72 @@
+{
+  "model": "phi3.5:latest",
+  "dataset": {
+    "slug": "acc_keac103_56",
+    "filename": "dataset_keac103_56.json",
+    "subject": "Accountancy / Economics",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T14:44:11.485613",
+  "raw_response": "[\n  {\n    \"question_text\": \"Describe the nature of a business transaction involving the purchase of a computer for cash, as illustrated in the provided material.\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"A business transaction involving the purchase of a computer for cash includes a give aspect (payment of cash) and a take aspect (receipt of the computer). It is an exchange of economic consideration between the buyer and seller, resulting in two-fold effects recorded in at least two accounts.\",\n    \"source_reference\": \"Figure 1, Section 3.1\"\n  },\n  {\n    \"question_text\": \"What are the essential elements that must be included in an accounting voucher according to the provided material?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"An accounting voucher must include the name of the firm, date of transaction, voucher number, names of accounts to be debited and credited, debit and credit amounts, a description of the transaction, the name and signature of the person who prepares the voucher, and the authorized person's name and signature.\",\n    \"source_reference\": \"Section 3.1, Paragraph 3\"\n  },\n  {\n    \"question_text\": \"Explain the accounting equation and its significance in the context of the balance sheet, as discussed in the provided material.\",\n    \"question_type\": \"LONG_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"The accounting equation, expressed as Assets (A) = Liabilities (L) + Capital (C), is fundamental to understanding the balance sheet. It signifies that the assets of a business are always equal to the sum of its liabilities and owner's equity. This relationship is crucial for analyzing how transactions affect the financial position of a business. The balance sheet equation helps in determining missing figures and ensures the accounting records accurately reflect the financial status of the entity at any given time.\",\n    \"source_reference\": \"Section 3.2\"\n  },\n  {\n    \"question_text\": \"Given the following transaction, prepare the appropriate accounting voucher in the format provided in the material: A company pays ` 50,000 for office supplies in cash. Use the details from the provided material to structure your voucher.\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"C\",\n    \"options\": {\n      \"A\": \"Cash Voucher: Debit Office Supplies Account ` 50,000, Credit Cash Account ` 50,000\",\n      \"B\": \"Credit Voucher: Debit Cash Account ` 50,000, Credit Office Supplies Account ` 50,000\",\n      \"C\": \"Cash Voucher: Debit Office Supplies Account ` 50,000, Credit Cash Account ` 50,000\",\n      \"D\": \"Journal Voucher: Debit Office Supplies Expense Account ` 50,000, Credit Cash Account ` 50,000\"\n    },\n    \"source_reference\": \"Section 3.1, Paragraph 3\"\n  },\n  {\n    \"question_text\": \"In the context of accounting transactions, what is the purpose of a source document, and how is it used in the accounting process as described in the provided material?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"A source document provides evidence of a transaction and is used as the basis for recording in the books of account. It is arranged in chronological order, serially numbered, and kept in a separate file. All recording in books of account is done on the basis of these vouchers.\",\n    \"options\": {\n      \"A\": \"To serve as a receipt for cash transactions only.\",\n      \"B\": \"To act as a legal contract between the buyer and seller.\",\n      \"C\": \"To provide evidence of transactions and serve as the basis for recording in accounting books.\",\n      \"D\": \"To calculate the final profit and loss of the business.\"\n    },\n    \"source_reference\": \"Section 3.1, Paragraph 2\"\n  }\n]\n\n",
+  "parsed_questions": [
+    {
+      "question_text": "Describe the nature of a business transaction involving the purchase of a computer for cash, as illustrated in the provided material.",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "A business transaction involving the purchase of a computer for cash includes a give aspect (payment of cash) and a take aspect (receipt of the computer). It is an exchange of economic consideration between the buyer and seller, resulting in two-fold effects recorded in at least two accounts.",
+      "source_reference": "Figure 1, Section 3.1"
+    },
+    {
+      "question_text": "What are the essential elements that must be included in an accounting voucher according to the provided material?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "An accounting voucher must include the name of the firm, date of transaction, voucher number, names of accounts to be debited and credited, debit and credit amounts, a description of the transaction, the name and signature of the person who prepares the voucher, and the authorized person's name and signature.",
+      "source_reference": "Section 3.1, Paragraph 3"
+    },
+    {
+      "question_text": "Explain the accounting equation and its significance in the context of the balance sheet, as discussed in the provided material.",
+      "question_type": "LONG_ANSWER",
+      "marks": 1.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "The accounting equation, expressed as Assets (A) = Liabilities (L) + Capital (C), is fundamental to understanding the balance sheet. It signifies that the assets of a business are always equal to the sum of its liabilities and owner's equity. This relationship is crucial for analyzing how transactions affect the financial position of a business. The balance sheet equation helps in determining missing figures and ensures the accounting records accurately reflect the financial status of the entity at any given time.",
+      "source_reference": "Section 3.2"
+    },
+    {
+      "question_text": "Given the following transaction, prepare the appropriate accounting voucher in the format provided in the material: A company pays ` 50,000 for office supplies in cash. Use the details from the provided material to structure your voucher.",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "C",
+      "options": {
+        "A": "Cash Voucher: Debit Office Supplies Account ` 50,000, Credit Cash Account ` 50,000",
+        "B": "Credit Voucher: Debit Cash Account ` 50,000, Credit Office Supplies Account ` 50,000",
+        "C": "Cash Voucher: Debit Office Supplies Account ` 50,000, Credit Cash Account ` 50,000",
+        "D": "Journal Voucher: Debit Office Supplies Expense Account ` 50,000, Credit Cash Account ` 50,000"
+      },
+      "source_reference": "Section 3.1, Paragraph 3"
+    },
+    {
+      "question_text": "In the context of accounting transactions, what is the purpose of a source document, and how is it used in the accounting process as described in the provided material?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "A source document provides evidence of a transaction and is used as the basis for recording in the books of account. It is arranged in chronological order, serially numbered, and kept in a separate file. All recording in books of account is done on the basis of these vouchers.",
+      "options": {
+        "A": "To serve as a receipt for cash transactions only.",
+        "B": "To act as a legal contract between the buyer and seller.",
+        "C": "To provide evidence of transactions and serve as the basis for recording in accounting books.",
+        "D": "To calculate the final profit and loss of the business."
+      },
+      "source_reference": "Section 3.1, Paragraph 2"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

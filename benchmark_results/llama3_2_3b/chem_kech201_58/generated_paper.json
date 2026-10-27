@@ -1,0 +1,73 @@
+{
+  "model": "llama3.2:3b",
+  "dataset": {
+    "slug": "chem_kech201_58",
+    "filename": "dataset_kech201_58.json",
+    "subject": "Chemistry",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:13:36.276766",
+  "raw_response": "[\n  {\n    \"question_text\": \"कौन सा तत्व ऑक्सीकरण के दौरान हाइड्रोजन की जगह लेता है?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"F\",\n    \"options\": {\"A\": \"हाइड्रोजन\", \"B\": \"कार्बन\", \"C\": \"नाइट्रोजन\", \"D\": \"फ्लोरीन\"}\n  },\n  {\n    \"question_text\": \"ऑक्सीकरण की परिभाषा क्या है?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"ऑक्सीकरण का अर्थ है किसी तत्व या पदार्थ को ऑक्सीजन या एक अन्य इलेक्ट्रोनगत तत्व से जोड़ना या हाइड्रोजन को छोड़ना\",\n    \"options\": {\"A\": \"ऑक्सीजन को जोड़ना\",\n               \"B\": \"हाइड्रोजन को छोड़ना\",\n               \"C\": \"ऑक्सीजन और हाइड्रोजन दोनों को जोड़ना\",\n               \"D\": \"किसी अन्य तत्व को जोड़ना\"}\n  },\n  {\n    \"question_text\": \"कौन सा प्रकार का ऑक्सीकरण हाइड्रोजन की जगह लेता है?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"हाइड्रोजन की जगह लेने वाला ऑक्सीकरण\",\n    \"options\": {\"A\": \"हाइड्रोजन की जगह लेने वाला ऑक्सीकरण\",\n                \"B\": \"ऑक्सीजन की जगह लेने वाला ऑक्सीकरण\",\n                \"C\": \"किसी अन्य तत्व की जगह लेने वाला ऑक्सीकरण\",\n                \"D\": \"ऑक्सीजन और हाइड्रोजन दोनों की जगह लेने वाला ऑक्सीकरण\"}\n  },\n  {\n    \"question_text\": \"ऑक्सीकरण की प्रक्रिया में क्या होता है?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 2.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"$\\\\mathrm{M} + O_2 \\\\rightarrow \\\\mathrm{M}O_2$\"\n  },\n  {\n    \"question_text\": \"ऑक्सीकरण की परिभाषा क्या है?\",\n    \"question_type\": \"LONG_ANSWER\",\n    \"marks\": 4.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"$\\\\mathrm{ऑक्सीकरण} का अर्थ है किसी तत्व या पदार्थ को ऑक्सीजन या एक अन्य इलेक्ट्रोनगत तत्व से जोड़ना या हाइड्रोजन को छोड़ना। ऑक्सीकरण की प्रक्रिया में किसी तत्व को ऑक्सीजन या एक अन्य इलेक्ट्रोनगत तत्व से जोड़ने के लिए हाइड्रोजन को छोड़ना होता है।\"\n  }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "कौन सा तत्व ऑक्सीकरण के दौरान हाइड्रोजन की जगह लेता है?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "F",
+      "options": {
+        "A": "हाइड्रोजन",
+        "B": "कार्बन",
+        "C": "नाइट्रोजन",
+        "D": "फ्लोरीन"
+      }
+    },
+    {
+      "question_text": "ऑक्सीकरण की परिभाषा क्या है?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "ऑक्सीकरण का अर्थ है किसी तत्व या पदार्थ को ऑक्सीजन या एक अन्य इलेक्ट्रोनगत तत्व से जोड़ना या हाइड्रोजन को छोड़ना",
+      "options": {
+        "A": "ऑक्सीजन को जोड़ना",
+        "B": "हाइड्रोजन को छोड़ना",
+        "C": "ऑक्सीजन और हाइड्रोजन दोनों को जोड़ना",
+        "D": "किसी अन्य तत्व को जोड़ना"
+      }
+    },
+    {
+      "question_text": "कौन सा प्रकार का ऑक्सीकरण हाइड्रोजन की जगह लेता है?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "हाइड्रोजन की जगह लेने वाला ऑक्सीकरण",
+      "options": {
+        "A": "हाइड्रोजन की जगह लेने वाला ऑक्सीकरण",
+        "B": "ऑक्सीजन की जगह लेने वाला ऑक्सीकरण",
+        "C": "किसी अन्य तत्व की जगह लेने वाला ऑक्सीकरण",
+        "D": "ऑक्सीजन और हाइड्रोजन दोनों की जगह लेने वाला ऑक्सीकरण"
+      }
+    },
+    {
+      "question_text": "ऑक्सीकरण की प्रक्रिया में क्या होता है?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 2.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "$\\mathrm{M} + O_2 \\rightarrow \\mathrm{M}O_2$"
+    },
+    {
+      "question_text": "ऑक्सीकरण की परिभाषा क्या है?",
+      "question_type": "LONG_ANSWER",
+      "marks": 4.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "$\\mathrm{ऑक्सीकरण} का अर्थ है किसी तत्व या पदार्थ को ऑक्सीजन या एक अन्य इलेक्ट्रोनगत तत्व से जोड़ना या हाइड्रोजन को छोड़ना। ऑक्सीकरण की प्रक्रिया में किसी तत्व को ऑक्सीजन या एक अन्य इलेक्ट्रोनगत तत्व से जोड़ने के लिए हाइड्रोजन को छोड़ना होता है।"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

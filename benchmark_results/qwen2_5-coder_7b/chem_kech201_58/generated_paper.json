@@ -1,0 +1,80 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "dataset": {
+    "slug": "chem_kech201_58",
+    "filename": "dataset_kech201_58.json",
+    "subject": "Chemistry",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T14:57:51.518154",
+  "raw_response": "```json\n[\n  {\n    \"question_text\": \"Which of the following reactions is an example of oxidation?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"A\",\n    \"options\": {\n      \"A\": \"2 Mg (s) + O2 (g) → 2 MgO (s)\",\n      \"B\": \"2 H2 (g) + O2 (g) → 2 H2O (g)\",\n      \"C\": \"Ca (s) + 2 HCl (aq) → CaCl2 (aq) + H2 (g)\",\n      \"D\": \"CaCO3 (s) + 2 HCl (aq) → CaCl2 (aq) + H2O (l) + CO2 (g)\"\n    },\n    \"source_reference\": \"7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS\"\n  },\n  {\n    \"question_text\": \"What is the oxidation number of sulfur in SO2?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"A\",\n    \"options\": {\n      \"A\": \"-2\",\n      \"B\": \"+2\",\n      \"C\": \"+4\",\n      \"D\": \"+6\"\n    },\n    \"source_reference\": \"7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS\"\n  },\n  {\n    \"question_text\": \"Which of the following is an example of a reduction reaction?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"B\",\n    \"options\": {\n      \"A\": \"2 H2O (g) → 2 H2 (g) + O2 (g)\",\n      \"B\": \"2 H2 (g) + O2 (g) → 2 H2O (g)\",\n      \"C\": \"CaCO3 (s) + 2 HCl (aq) → CaCl2 (aq) + H2O (l) + CO2 (g)\",\n      \"D\": \"CaCO3 (s) + 2 HCl (aq) → CaCl2 (aq) + H2O (l) + CO2 (g)\"\n    },\n    \"source_reference\": \"7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS\"\n  },\n  {\n    \"question_text\": \"What is the role of hydrogen in the reaction 2 H2 (g) + O2 (g) → 2 H2O (g)?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"Hydrogen is oxidized in this reaction.\",\n    \"options\": null,\n    \"source_reference\": \"7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS\"\n  },\n  {\n    \"question_text\": \"Balance the following redox reaction using the oxidation number method: 2 Fe (s) + 3 CuSO4 (aq) → Fe2(SO4)3 (aq) + 3 Cu (s)\",\n    \"question_type\": \"LONG_ANSWER\",\n    \"marks\": 2.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"To balance the given redox reaction using the oxidation number method, we first assign oxidation numbers to all atoms in the equation. Then, we identify the change in oxidation numbers for each element involved in the reaction. Finally, we balance the equation by adjusting the coefficients of the reactants and products.\",\n    \"options\": null,\n    \"source_reference\": \"7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS\"\n  }\n]\n```",
+  "parsed_questions": [
+    {
+      "question_text": "Which of the following reactions is an example of oxidation?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "A",
+      "options": {
+        "A": "2 Mg (s) + O2 (g) → 2 MgO (s)",
+        "B": "2 H2 (g) + O2 (g) → 2 H2O (g)",
+        "C": "Ca (s) + 2 HCl (aq) → CaCl2 (aq) + H2 (g)",
+        "D": "CaCO3 (s) + 2 HCl (aq) → CaCl2 (aq) + H2O (l) + CO2 (g)"
+      },
+      "source_reference": "7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS"
+    },
+    {
+      "question_text": "What is the oxidation number of sulfur in SO2?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "A",
+      "options": {
+        "A": "-2",
+        "B": "+2",
+        "C": "+4",
+        "D": "+6"
+      },
+      "source_reference": "7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS"
+    },
+    {
+      "question_text": "Which of the following is an example of a reduction reaction?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "B",
+      "options": {
+        "A": "2 H2O (g) → 2 H2 (g) + O2 (g)",
+        "B": "2 H2 (g) + O2 (g) → 2 H2O (g)",
+        "C": "CaCO3 (s) + 2 HCl (aq) → CaCl2 (aq) + H2O (l) + CO2 (g)",
+        "D": "CaCO3 (s) + 2 HCl (aq) → CaCl2 (aq) + H2O (l) + CO2 (g)"
+      },
+      "source_reference": "7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS"
+    },
+    {
+      "question_text": "What is the role of hydrogen in the reaction 2 H2 (g) + O2 (g) → 2 H2O (g)?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Hydrogen is oxidized in this reaction.",
+      "options": null,
+      "source_reference": "7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS"
+    },
+    {
+      "question_text": "Balance the following redox reaction using the oxidation number method: 2 Fe (s) + 3 CuSO4 (aq) → Fe2(SO4)3 (aq) + 3 Cu (s)",
+      "question_type": "LONG_ANSWER",
+      "marks": 2.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "To balance the given redox reaction using the oxidation number method, we first assign oxidation numbers to all atoms in the equation. Then, we identify the change in oxidation numbers for each element involved in the reaction. Finally, we balance the equation by adjusting the coefficients of the reactants and products.",
+      "options": null,
+      "source_reference": "7.1 CLASSICAL IDEA OF REDOX REACTIONS - OXIDATION AND REDUCTION REACTIONS"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

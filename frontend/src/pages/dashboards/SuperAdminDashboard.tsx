@@ -11,7 +11,7 @@ import { EditSchoolModal } from '../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../components/schools/BulkImportModal';
-import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, UserPlus, Users, ShieldAlert, Database } from 'lucide-react';
+import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, UserPlus, Users, ShieldAlert, Database, Cpu } from 'lucide-react';
 import type { User, School, UserStats } from '../../types';
 import { Pagination } from '../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonTable, Skeleton } from '../../components/ui/skeleton';
@@ -119,6 +119,14 @@ const SuperAdminDashboardDesktop: React.FC = () => {
           {/* Primary Action Buttons - Left aligned in a neat row */}
           <div className="flex flex-wrap items-center gap-2.5 pt-1">
             <Link
+              to="/superadmin/benchmark-results"
+              id="superadmin-slm-benchmarks-btn"
+              className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Cpu className="w-3.5 h-3.5 text-lime" />
+              <span>Offline SLM Benchmarks</span>
+            </Link>
+            <Link
               to="/dashboard/qbm"
               id="superadmin-qbm-engine-btn"
               className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-[#0F766E] text-white hover:bg-[#0F766E]/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
@@ -130,10 +138,10 @@ const SuperAdminDashboardDesktop: React.FC = () => {
               type="button"
               id="superadmin-create-school-btn"
               onClick={() => setIsCreateSchoolOpen(true)}
-              className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>Add School / Coaching Class & Admin</span>
+              <Building2 className="w-3.5 h-3.5 text-forest" />
+              <span>Add School / Coaching Class</span>
             </button>
             <button
               type="button"

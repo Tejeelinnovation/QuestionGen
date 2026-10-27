@@ -1,0 +1,84 @@
+{
+  "model": "qwen2.5:3b",
+  "dataset": {
+    "slug": "soc_kesy101_60",
+    "filename": "dataset_kesy101_60.json",
+    "subject": "Sociology",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T14:33:07.275214",
+  "raw_response": "[\n    {\n        \"question_text\": \"Which of the following statements best reflects the advice given to students in the introduction regarding their future prospects and personal effort?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"B\",\n        \"options:\": {\"A\": \"Individual effort is the only factor that determines success in life.\", \"B\": \"Success in life is determined by both individual effort and societal factors.\", \"C\": \"The job market and personal choice are the only factors in determining success.\", \"D\": \"Family background is the most important factor in determining success.\"},\n        \"source_reference\": \"INTRODUCTION\"\n    },\n    {\n        \"question_text\": \"According to the chapter, how does the concept of 'good job' vary across different societies?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"C\",\n        \"options:\": {\"A\": \"It is universally defined by economic criteria.\", \"B\": \"It is defined by cultural and social norms.\", \"C\": \"It is defined by cultural and social norms, and economic criteria.\", \"D\": \"It is not influenced by any societal factors.\"},\n        \"source_reference\": \"INTRODUCTION\"\n    },\n    {\n        \"question_text\": \"What does the sociological imagination enable us to understand better?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"A\",\n        \"options:\": {\"A\": \"The relationship between history and biography within society.\", \"B\": \"The relationship between personal troubles and public issues.\", \"C\": \"The relationship between individual effort and societal factors.\", \"D\": \"The relationship between economic policies and individual success.\"},\n        \"source_reference\": \"THE SOCIOLOGICAL IMAGINATION: THE PERSONAL PROBLEM AND THE PUBLIC ISSUE\"\n    },\n    {\n        \"question_text\": \"Which of the following is NOT a factor that can affect an individual's choice of subjects in the senior secondary school?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"D\",\n        \"options:\": {\"A\": \"Personal effort and societal factors.\", \"B\": \"Gender and family background.\", \"C\": \"Economic and political policies.\", \"D\": \"The need to join a family business.\"},\n        \"source_reference\": \"INTRODUCTION\"\n    },\n    {\n        \"question_text\": \"Which of the following statements best describes the Pradhan Mantri Awas Yojna-Gramin scheme?\",\n        \"question_type\": \"SHORT_ANSWER\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"The Pradhan Mantri Awas Yojna-Gramin scheme provides financial and labor support to houseless families and those living in dilapidated kutcha houses to build pucca houses.\",\n        \"source_reference\": \"THE SOCIOLOGICAL IMAGINATION: THE PERSONAL PROBLEM AND THE PUBLIC ISSUE\"\n    }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "Which of the following statements best reflects the advice given to students in the introduction regarding their future prospects and personal effort?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "B",
+      "source_reference": "INTRODUCTION",
+      "options": {
+        "A": "Individual effort is the only factor that determines success in life.",
+        "B": "Success in life is determined by both individual effort and societal factors.",
+        "C": "The job market and personal choice are the only factors in determining success.",
+        "D": "Family background is the most important factor in determining success."
+      }
+    },
+    {
+      "question_text": "According to the chapter, how does the concept of 'good job' vary across different societies?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "C",
+      "source_reference": "INTRODUCTION",
+      "options": {
+        "A": "It is universally defined by economic criteria.",
+        "B": "It is defined by cultural and social norms.",
+        "C": "It is defined by cultural and social norms, and economic criteria.",
+        "D": "It is not influenced by any societal factors."
+      }
+    },
+    {
+      "question_text": "What does the sociological imagination enable us to understand better?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "A",
+      "source_reference": "THE SOCIOLOGICAL IMAGINATION: THE PERSONAL PROBLEM AND THE PUBLIC ISSUE",
+      "options": {
+        "A": "The relationship between history and biography within society.",
+        "B": "The relationship between personal troubles and public issues.",
+        "C": "The relationship between individual effort and societal factors.",
+        "D": "The relationship between economic policies and individual success."
+      }
+    },
+    {
+      "question_text": "Which of the following is NOT a factor that can affect an individual's choice of subjects in the senior secondary school?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "D",
+      "source_reference": "INTRODUCTION",
+      "options": {
+        "A": "Personal effort and societal factors.",
+        "B": "Gender and family background.",
+        "C": "Economic and political policies.",
+        "D": "The need to join a family business."
+      }
+    },
+    {
+      "question_text": "Which of the following statements best describes the Pradhan Mantri Awas Yojna-Gramin scheme?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "The Pradhan Mantri Awas Yojna-Gramin scheme provides financial and labor support to houseless families and those living in dilapidated kutcha houses to build pucca houses.",
+      "source_reference": "THE SOCIOLOGICAL IMAGINATION: THE PERSONAL PROBLEM AND THE PUBLIC ISSUE"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

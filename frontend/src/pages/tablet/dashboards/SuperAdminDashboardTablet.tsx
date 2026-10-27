@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { usersApi } from '../../../api/users';
 import { useAuth } from '../../../auth/AuthContext';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
@@ -7,7 +8,7 @@ import { EditSchoolModal } from '../../../components/schools/EditSchoolModal';
 import { CreateUserDrawer } from '../../../components/users/CreateUserDrawer';
 import { UpdateUserModal } from '../../../components/users/UpdateUserModal';
 import { BulkImportModal } from '../../../components/schools/BulkImportModal';
-import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, ShieldAlert, Users as UsersIcon, UserPlus } from 'lucide-react';
+import { Edit2, Building2, Search, Loader2, X, FileSpreadsheet, ShieldAlert, Users as UsersIcon, UserPlus, Cpu } from 'lucide-react';
 import type { User, School, UserStats } from '../../../types';
 import { Pagination } from '../../../components/ui/pagination';
 import { SkeletonRoleDeck, SkeletonRoster, Skeleton } from '../../../components/ui/skeleton';
@@ -138,6 +139,13 @@ export const SuperAdminDashboardTablet: React.FC = () => {
 
         {/* Primary Actions */}
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/superadmin/benchmark-results"
+            className="px-3 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Cpu className="w-3.5 h-3.5 text-lime" />
+            <span>SLM Benchmarks</span>
+          </Link>
           <button
             type="button"
             id="superadmin-tablet-create-qbm-btn"
@@ -150,10 +158,10 @@ export const SuperAdminDashboardTablet: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsCreateSchoolOpen(true)}
-            className="px-3 py-2 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="px-3 py-2 text-xs font-heading font-semibold rounded-pill border border-border bg-surface text-ink hover:bg-surface-muted transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Add School & Admin</span>
+            <Building2 className="w-3.5 h-3.5 text-forest" />
+            <span>Add School</span>
           </button>
         </div>
       </div>

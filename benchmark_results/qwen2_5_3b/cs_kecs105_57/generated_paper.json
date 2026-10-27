@@ -1,0 +1,80 @@
+{
+  "model": "qwen2.5:3b",
+  "dataset": {
+    "slug": "cs_kecs105_57",
+    "filename": "dataset_kecs105_57.json",
+    "subject": "Computer Science (Python)",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T14:30:01.067700",
+  "raw_response": "[\n    {\n        \"question_text\": \"Python is a high-level language. What is the main reason for its popularity?\",\n        \"question_type\": \"SHORT_ANSWER\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"Python is a high-level language that is easy to understand and use, making it popular for various applications.\",\n        \"options\": null,\n        \"source_reference\": \"5.1.1 Features of Python\"\n    },\n    {\n        \"question_text\": \"What does the symbol >>> indicate in a Python interpreter?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"EASY\",\n        \"learner_level\": \"BEGINNER\",\n        \"correct_answer\": \"A\",\n        \"options:\": {\n            \"A\": \"The interpreter is ready to take instructions\",\n            \"B\": \"The program has finished executing\",\n            \"C\": \"The input is incorrect\",\n            \"D\": \"The interpreter is not installed\"\n        },\n        \"source_reference\": \"5.1.2 Working with Python\"\n    },\n    {\n        \"question_text\": \"Which of the following is a valid Python identifier for a function that calculates the average of three numbers?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"D\",\n        \"options\": {\n            \"A\": \"avg\",\n            \"B\": \"average\",\n            \"C\": \"avg1\",\n            \"D\": \"avg_1\"\n        },\n        \"source_reference\": \"5.3 Identifiers\"\n    },\n    {\n        \"question_text\": \"What is the difference between interactive mode and script mode in Python?\",\n        \"question_type\": \"SHORT_ANSWER\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"Interactive mode allows execution of individual statements instantaneously, while script mode allows writing and saving more than one instruction in a file that can be executed.\",\n        \"options\": null,\n        \"source_reference\": \"5.1.3 Execution Modes\"\n    },\n    {\n        \"question_text\": \"Which of the following is a valid Python keyword for a loop?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"B\",\n        \"options\": {\n            \"A\": \"for\",\n            \"B\": \"while\",\n            \"C\": \"if\",\n            \"D\": \"def\"\n        },\n        \"source_reference\": \"5.2 Python Keywords\"\n    }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "Python is a high-level language. What is the main reason for its popularity?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Python is a high-level language that is easy to understand and use, making it popular for various applications.",
+      "options": null,
+      "source_reference": "5.1.1 Features of Python"
+    },
+    {
+      "question_text": "What does the symbol >>> indicate in a Python interpreter?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "A",
+      "options:": {
+        "A": "The interpreter is ready to take instructions",
+        "B": "The program has finished executing",
+        "C": "The input is incorrect",
+        "D": "The interpreter is not installed"
+      },
+      "source_reference": "5.1.2 Working with Python"
+    },
+    {
+      "question_text": "Which of the following is a valid Python identifier for a function that calculates the average of three numbers?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "D",
+      "options": {
+        "A": "avg",
+        "B": "average",
+        "C": "avg1",
+        "D": "avg_1"
+      },
+      "source_reference": "5.3 Identifiers"
+    },
+    {
+      "question_text": "What is the difference between interactive mode and script mode in Python?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Interactive mode allows execution of individual statements instantaneously, while script mode allows writing and saving more than one instruction in a file that can be executed.",
+      "options": null,
+      "source_reference": "5.1.3 Execution Modes"
+    },
+    {
+      "question_text": "Which of the following is a valid Python keyword for a loop?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "B",
+      "options": {
+        "A": "for",
+        "B": "while",
+        "C": "if",
+        "D": "def"
+      },
+      "source_reference": "5.2 Python Keywords"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

@@ -1,0 +1,75 @@
+{
+  "model": "qwen2.5:7b",
+  "dataset": {
+    "slug": "acc_keac103_56",
+    "filename": "dataset_keac103_56.json",
+    "subject": "Accountancy / Economics",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:27:06.963153",
+  "raw_response": "[\n    {\n        \"question_text\": \"What is the term used for the document that provides evidence of a business transaction and is serially numbered and kept in a separate file?\", \n        \"question_type\": \"MCQ\", \n        \"marks\": 1.0, \n        \"difficulty\": \"EASY\", \n        \"learner_level\": \"BEGINNER\", \n        \"correct_answer\": \"B\", \n        \"options\": {\"A\": \"Journal\", \"B\": \"Source Document or Voucher\", \"C\": \"Ledger\", \"D\": \"Accounting Equation\"}, \n        \"source_reference\": \"3.1.1 Preparation of Accounting Vouchers\"\n    },\n    {\n        \"question_text\": \"Which of the following is not a type of accounting voucher?\", \n        \"question_type\": \"MCQ\", \n        \"marks\": 1.0, \n        \"difficulty\": \"MEDIUM\", \n        \"learner_level\": \"INTERMEDIATE\", \n        \"correct_answer\": \"D\", \n        \"options\": {\"A\": \"Transaction Voucher\", \"B\": \"Debit Voucher\", \"C\": \"Credit Voucher\", \"D\": \"Complex Voucher/Invoice\"}, \n        \"source_reference\": \"3.1.1 Preparation of Accounting Vouchers\"\n    },\n    {\n        \"question_text\": \"What is the formula of the accounting equation?\", \n        \"question_type\": \"SHORT_ANSWER\", \n        \"marks\": 1.0, \n        \"difficulty\": \"EASY\", \n        \"learner_level\": \"BEGINNER\", \n        \"correct_answer\": \"$A = L + C$\", \n        \"options\": null, \n        \"source_reference\": \"3.2 Accounting Equation\"\n    },\n    {\n        \"question_text\": \"Explain the concept of a complex transaction voucher and provide an example.\", \n        \"question_type\": \"LONG_ANSWER\", \n        \"marks\": 2.0, \n        \"difficulty\": \"HARD\", \n        \"learner_level\": \"ADVANCED\", \n        \"correct_answer\": \"A complex transaction voucher is used for transactions with multiple debits and multiple credits. An example of such a voucher would include multiple debit and credit accounts, with the amounts and descriptions of each transaction clearly specified.\", \n        \"options\": null, \n        \"source_reference\": \"3.1.1 Preparation of Accounting Vouchers\"\n    },\n    {\n        \"question_text\": \"Describe the essential elements that must be included in an accounting voucher.\", \n        \"question_type\": \"LONG_ANSWER\", \n        \"marks\": 2.0, \n        \"difficulty\": \"MEDIUM\", \n        \"learner_level\": \"INTERMEDIATE\", \n        \"correct_answer\": \"An accounting voucher must contain the following essential elements: it is written on a good quality paper, the name of the firm must be printed on the top, the date of transaction is filled up against the date, the number of the voucher is in a serial order, the name of the account to be debited or credited is mentioned, the debit and credit amount is to be written in figures against the amount, the description of the transaction is to be given account wise, the person who prepares the voucher must mention his name along with signature, and the name and signature of the authorised person are mentioned on the voucher.\", \n        \"options\": null, \n        \"source_reference\": \"3.1.1 Preparation of Accounting Vouchers\"\n    }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "What is the term used for the document that provides evidence of a business transaction and is serially numbered and kept in a separate file?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "B",
+      "options": {
+        "A": "Journal",
+        "B": "Source Document or Voucher",
+        "C": "Ledger",
+        "D": "Accounting Equation"
+      },
+      "source_reference": "3.1.1 Preparation of Accounting Vouchers"
+    },
+    {
+      "question_text": "Which of the following is not a type of accounting voucher?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "D",
+      "options": {
+        "A": "Transaction Voucher",
+        "B": "Debit Voucher",
+        "C": "Credit Voucher",
+        "D": "Complex Voucher/Invoice"
+      },
+      "source_reference": "3.1.1 Preparation of Accounting Vouchers"
+    },
+    {
+      "question_text": "What is the formula of the accounting equation?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "$A = L + C$",
+      "options": null,
+      "source_reference": "3.2 Accounting Equation"
+    },
+    {
+      "question_text": "Explain the concept of a complex transaction voucher and provide an example.",
+      "question_type": "LONG_ANSWER",
+      "marks": 2.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "A complex transaction voucher is used for transactions with multiple debits and multiple credits. An example of such a voucher would include multiple debit and credit accounts, with the amounts and descriptions of each transaction clearly specified.",
+      "options": null,
+      "source_reference": "3.1.1 Preparation of Accounting Vouchers"
+    },
+    {
+      "question_text": "Describe the essential elements that must be included in an accounting voucher.",
+      "question_type": "LONG_ANSWER",
+      "marks": 2.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "An accounting voucher must contain the following essential elements: it is written on a good quality paper, the name of the firm must be printed on the top, the date of transaction is filled up against the date, the number of the voucher is in a serial order, the name of the account to be debited or credited is mentioned, the debit and credit amount is to be written in figures against the amount, the description of the transaction is to be given account wise, the person who prepares the voucher must mention his name along with signature, and the name and signature of the authorised person are mentioned on the voucher.",
+      "options": null,
+      "source_reference": "3.1.1 Preparation of Accounting Vouchers"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

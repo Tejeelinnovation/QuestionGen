@@ -1,0 +1,14 @@
+{
+  "model": "phi3.5:latest",
+  "dataset_slug": "acc_keac103_56",
+  "subject": "Accountancy / Economics",
+  "client_wall_time_sec": 242.17,
+  "eval_count": 1174,
+  "prompt_eval_count": 2247,
+  "eval_tokens_per_sec": 5.44,
+  "vram_mb": 2311,
+  "is_valid_json": true,
+  "compliance_pct": 100.0,
+  "error": null,
+  "timestamp": "2026-10-27T14:44:11.488055"
+}

@@ -1,0 +1,14 @@
+{
+  "model": "llama3.2:3b",
+  "dataset_slug": "bio_khbo106_59",
+  "subject": "Biology (Hindi)",
+  "client_wall_time_sec": 15.23,
+  "eval_count": 2,
+  "prompt_eval_count": 2050,
+  "eval_tokens_per_sec": 49.75,
+  "vram_mb": 2313,
+  "is_valid_json": false,
+  "compliance_pct": 0.0,
+  "error": "Empty question array",
+  "timestamp": "2026-10-27T15:15:49.712887"
+}

@@ -1,0 +1,14 @@
+{
+  "model": "qwen2.5:3b",
+  "dataset_slug": "chem_kech201_58",
+  "subject": "Chemistry",
+  "client_wall_time_sec": 33.39,
+  "eval_count": 961,
+  "prompt_eval_count": 2559,
+  "eval_tokens_per_sec": 46.63,
+  "vram_mb": 2139,
+  "is_valid_json": true,
+  "compliance_pct": 100.0,
+  "error": null,
+  "timestamp": "2026-10-27T14:32:17.426733"
+}

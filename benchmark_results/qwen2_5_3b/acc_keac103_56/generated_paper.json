@@ -1,0 +1,70 @@
+{
+  "model": "qwen2.5:3b",
+  "dataset": {
+    "slug": "acc_keac103_56",
+    "filename": "dataset_keac103_56.json",
+    "subject": "Accountancy / Economics",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T14:32:40.476264",
+  "raw_response": "[\n  {\n    \"question_text\": \"What is the effect of a transaction where a business pays `35,000 for a computer, according to the accounting equation?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"Assets decrease by `35,000 and Liabilities decrease by `35,000\",\n    \"options\": null,\n    \"source_reference\": \"3.1 Business Transactions and Source Document\"\n  },\n  {\n    \"question_text\": \"Which type of voucher is used for recording a transaction with one debit and one credit?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"A\",\n    \"options\": {\n      \"A\": \"Transaction Voucher\",\n      \"B\": \"Debit Voucher\",\n      \"C\": \"Credit Voucher\",\n      \"D\": \"Complex Voucher\"\n    },\n    \"source_reference\": \"3.1.1 Preparation of Accounting Vouchers\"\n  },\n  {\n    \"question_text\": \"If the accounting equation is $A = L + C$, what would be the effect of a transaction that increases liabilities by `50,000 and decreases capital by `50,000?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"No change in Assets or Liabilities\",\n    \"options\": null,\n    \"source_reference\": \"3.2 Accounting Equation\"\n  },\n  {\n    \"question_text\": \"What is the difference between a debit voucher and a credit voucher?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"A debit voucher records a transaction that involves multiple debits and one credit, while a credit voucher records a transaction that involves multiple credits and one debit.\",\n    \"options\": null,\n    \"source_reference\": \"3.1.1 Preparation of Accounting Vouchers\"\n  },\n  {\n    \"question_text\": \"What must be written in figures against the amount in an accounting voucher?\",\n    \"question_type\": \"SHORT_ANSWER\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"Debit and credit amount\",\n    \"options\": null,\n    \"source_reference\": \"3.1.1 Preparation of Accounting Vouchers\"\n  }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "What is the effect of a transaction where a business pays `35,000 for a computer, according to the accounting equation?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Assets decrease by `35,000 and Liabilities decrease by `35,000",
+      "options": null,
+      "source_reference": "3.1 Business Transactions and Source Document"
+    },
+    {
+      "question_text": "Which type of voucher is used for recording a transaction with one debit and one credit?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "A",
+      "options": {
+        "A": "Transaction Voucher",
+        "B": "Debit Voucher",
+        "C": "Credit Voucher",
+        "D": "Complex Voucher"
+      },
+      "source_reference": "3.1.1 Preparation of Accounting Vouchers"
+    },
+    {
+      "question_text": "If the accounting equation is $A = L + C$, what would be the effect of a transaction that increases liabilities by `50,000 and decreases capital by `50,000?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "No change in Assets or Liabilities",
+      "options": null,
+      "source_reference": "3.2 Accounting Equation"
+    },
+    {
+      "question_text": "What is the difference between a debit voucher and a credit voucher?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "A debit voucher records a transaction that involves multiple debits and one credit, while a credit voucher records a transaction that involves multiple credits and one debit.",
+      "options": null,
+      "source_reference": "3.1.1 Preparation of Accounting Vouchers"
+    },
+    {
+      "question_text": "What must be written in figures against the amount in an accounting voucher?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "Debit and credit amount",
+      "options": null,
+      "source_reference": "3.1.1 Preparation of Accounting Vouchers"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

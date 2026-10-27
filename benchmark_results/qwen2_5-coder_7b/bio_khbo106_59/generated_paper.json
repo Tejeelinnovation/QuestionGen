@@ -1,0 +1,65 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "dataset": {
+    "slug": "bio_khbo106_59",
+    "filename": "dataset_khbo106_59.json",
+    "subject": "Biology (Hindi)",
+    "class": "10"
+  },
+  "generated_at": "2026-10-27T15:09:35.734687",
+  "raw_response": "```json\n[\n    {\n        \"question\": \"What are the structures that connect the jailum and frambulium bundles in a neuron?\",\n        \"options\": [\n            \"Axon\",\n            \"Synaptic cleft\",\n            \"Myelin sheath\",\n            \"Dendrite\"\n        ],\n        \"answer\": \"Synaptic cleft\"\n    },\n    {\n        \"question\": \"How many segments are typically found in a bibranchial branch?\",\n        \"options\": [\n            \"2\",\n            \"3\",\n            \"4\",\n            \"5\"\n        ],\n        \"answer\": \"3\"\n    },\n    {\n        \"question\": \"What is the term for the central part of a neuron that contains the nucleus?\",\n        \"options\": [\n            \"Axon\",\n            \"Synaptic cleft\",\n            \"Myelin sheath\",\n            \"Nucleus\"\n        ],\n        \"answer\": \"Nucleus\"\n    },\n    {\n        \"question\": \"Which of the following is a characteristic feature of a bibranchial branch?\",\n        \"options\": [\n            \"It has a single nucleus\",\n            \"It has a large, well-developed nucleus\",\n            \"It has a thin, flat surface\",\n            \"It has a thick, round surface\"\n        ],\n        \"answer\": \"It has a large, well-developed nucleus\"\n    },\n    {\n        \"question\": \"What is the term for the space between the presynaptic and postsynaptic neurons where neurotransmitters are released?\",\n        \"options\": [\n            \"Axon\",\n            \"Synaptic cleft\",\n            \"Myelin sheath\",\n            \"Dendrite\"\n        ],\n        \"answer\": \"Synaptic cleft\"\n    }\n]\n```",
+  "parsed_questions": [
+    {
+      "question": "What are the structures that connect the jailum and frambulium bundles in a neuron?",
+      "options": [
+        "Axon",
+        "Synaptic cleft",
+        "Myelin sheath",
+        "Dendrite"
+      ],
+      "answer": "Synaptic cleft"
+    },
+    {
+      "question": "How many segments are typically found in a bibranchial branch?",
+      "options": [
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "answer": "3"
+    },
+    {
+      "question": "What is the term for the central part of a neuron that contains the nucleus?",
+      "options": [
+        "Axon",
+        "Synaptic cleft",
+        "Myelin sheath",
+        "Nucleus"
+      ],
+      "answer": "Nucleus"
+    },
+    {
+      "question": "Which of the following is a characteristic feature of a bibranchial branch?",
+      "options": [
+        "It has a single nucleus",
+        "It has a large, well-developed nucleus",
+        "It has a thin, flat surface",
+        "It has a thick, round surface"
+      ],
+      "answer": "It has a large, well-developed nucleus"
+    },
+    {
+      "question": "What is the term for the space between the presynaptic and postsynaptic neurons where neurotransmitters are released?",
+      "options": [
+        "Axon",
+        "Synaptic cleft",
+        "Myelin sheath",
+        "Dendrite"
+      ],
+      "answer": "Synaptic cleft"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

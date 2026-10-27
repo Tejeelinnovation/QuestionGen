@@ -1,0 +1,14 @@
+{
+  "model": "llama3.2:3b",
+  "dataset": {
+    "slug": "bio_khbo106_59",
+    "filename": "dataset_khbo106_59.json",
+    "subject": "Biology (Hindi)",
+    "class": "10"
+  },
+  "generated_at": "2026-10-27T15:15:49.710624",
+  "raw_response": "[]",
+  "parsed_questions": [],
+  "is_valid_json": false,
+  "validation_error": "Empty question array"
+}

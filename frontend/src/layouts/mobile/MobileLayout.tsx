@@ -8,6 +8,7 @@ import {
   User as UserIcon,
   Database,
   UploadCloud,
+  Cpu,
 } from 'lucide-react';
 
 export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
@@ -38,6 +39,13 @@ export const MobileLayout: React.FC<{ children?: React.ReactNode }> = ({ childre
             icon: Database,
             path: '/dashboard/qbm',
             isActive: location.pathname.startsWith('/dashboard/qbm'),
+          },
+          {
+            id: 'slm-benchmarks',
+            label: 'AI Bench',
+            icon: Cpu,
+            path: '/superadmin/benchmark-results',
+            isActive: location.pathname.includes('benchmark'),
           },
         ]
       : []),

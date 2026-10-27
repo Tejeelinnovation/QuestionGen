@@ -44,6 +44,7 @@ const ProfilePage = React.lazy(() => import('./pages/profile/ProfilePage').then(
 const ResetPasswordPage = React.lazy(() => import('./pages/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })));
 const DemoLaunchPage = React.lazy(() => import('./pages/auth/DemoLaunchPage').then(m => ({ default: m.DemoLaunchPage })));
 const DatasetIngestionPage = React.lazy(() => import('./pages/ingestion/DatasetIngestionPage').then(m => ({ default: m.DatasetIngestionPage })));
+const BenchmarkResultsPage = React.lazy(() => import('./pages/benchmarks/BenchmarkResultsPage').then(m => ({ default: m.BenchmarkResultsPage })));
 
 /**
  * Root index redirector: resolves the starting dashboard based on the user's
@@ -105,6 +106,22 @@ export const routes: RouteObject[] = [
         element: (
           <RequireCapability capability="CREATE_SCHOOL">
             <SuperAdminDashboard />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'superadmin/benchmark-results',
+        element: (
+          <RequireCapability capability="CREATE_SCHOOL">
+            <BenchmarkResultsPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'benchmark-results',
+        element: (
+          <RequireCapability capability="CREATE_SCHOOL">
+            <BenchmarkResultsPage />
           </RequireCapability>
         ),
       },

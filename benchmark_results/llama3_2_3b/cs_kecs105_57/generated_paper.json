@@ -1,0 +1,79 @@
+{
+  "model": "llama3.2:3b",
+  "dataset": {
+    "slug": "cs_kecs105_57",
+    "filename": "dataset_kecs105_57.json",
+    "subject": "Computer Science (Python)",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:12:40.708022",
+  "raw_response": "[\n  {\n    \"question_text\": \"Kya Python ek high-level programming language hai?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"True\",\n    \"options\": {\n      \"A\": \"False\",\n      \"B\": \"True\",\n      \"C\": \"False\",\n      \"D\": \"True\"\n    }\n  },\n  {\n    \"question_text\": \"Python ki ek interpreter hai ya compiler?\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"Interpreted\",\n    \"options\": {\n      \"A\": \"Compiler\",\n      \"B\": \"Interpreted\",\n      \"C\": \"Both\",\n      \"D\": \"Neither\"\n    }\n  },\n  {\n    \"question_text\": \"Python ki ek free aur open source language hai.\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"HARD\",\n    \"learner_level\": \"ADVANCED\",\n    \"correct_answer\": \"True\",\n    \"options\": {\n      \"A\": \"False\",\n      \"B\": \"True\",\n      \"C\": \"False\",\n      \"D\": \"False\"\n    }\n  },\n  {\n    \"question_text\": \"Python ki ek portable aur platform-independent language hai.\",\n    \"question_type\": \"MCQ\",\n    \"marks\": 1.0,\n    \"difficulty\": \"EASY\",\n    \"learner_level\": \"BEGINNER\",\n    \"correct_answer\": \"True\",\n    \"options\": {\n      \"A\": \"False\",\n      \"B\": \"True\",\n      \"C\": \"False\",\n      \"D\": \"False\"\n    }\n  },\n  {\n    \"question_text\": \"Python mein kya kaam kiya jaata hai?\",\n    \"question_type\": \"LONG_ANSWER\",\n    \"marks\": 2.0,\n    \"difficulty\": \"MEDIUM\",\n    \"learner_level\": \"INTERMEDIATE\",\n    \"correct_answer\": \"Python mein programming ki ek high-level language hai jo ek interpreter ka upyog karta hai. Yeh ek free aur open source language hai jo ek portable aur platform-independent hai. Yeh ki ek versatile language hai jo ki web development, data analysis, machine learning, aur anya kshetron mein upyog ki jaati hai.\"\n  }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "Kya Python ek high-level programming language hai?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "True",
+      "options": {
+        "A": "False",
+        "B": "True",
+        "C": "False",
+        "D": "True"
+      }
+    },
+    {
+      "question_text": "Python ki ek interpreter hai ya compiler?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Interpreted",
+      "options": {
+        "A": "Compiler",
+        "B": "Interpreted",
+        "C": "Both",
+        "D": "Neither"
+      }
+    },
+    {
+      "question_text": "Python ki ek free aur open source language hai.",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "True",
+      "options": {
+        "A": "False",
+        "B": "True",
+        "C": "False",
+        "D": "False"
+      }
+    },
+    {
+      "question_text": "Python ki ek portable aur platform-independent language hai.",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "True",
+      "options": {
+        "A": "False",
+        "B": "True",
+        "C": "False",
+        "D": "False"
+      }
+    },
+    {
+      "question_text": "Python mein kya kaam kiya jaata hai?",
+      "question_type": "LONG_ANSWER",
+      "marks": 2.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Python mein programming ki ek high-level language hai jo ek interpreter ka upyog karta hai. Yeh ek free aur open source language hai jo ek portable aur platform-independent hai. Yeh ki ek versatile language hai jo ki web development, data analysis, machine learning, aur anya kshetron mein upyog ki jaati hai."
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}

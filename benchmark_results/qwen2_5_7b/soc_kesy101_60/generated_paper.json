@@ -1,0 +1,75 @@
+{
+  "model": "qwen2.5:7b",
+  "dataset": {
+    "slug": "soc_kesy101_60",
+    "filename": "dataset_kesy101_60.json",
+    "subject": "Sociology",
+    "class": "11"
+  },
+  "generated_at": "2026-10-27T15:29:51.229937",
+  "raw_response": "[\n    {\n        \"question_text\": \"Which of the following advice is NOT mentioned in the chapter regarding subject choices for students?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"EASY\",\n        \"learner_level\": \"BEGINNER\",\n        \"correct_answer\": \"D\",\n        \"options\": {\"A\": \"Study hard and you will do well in life.\", \"B\": \"Choosing the right subjects increases job prospects.\", \"C\": \"Gender and family background can influence subject choice.\", \"D\": \"You should choose subjects based on your family's business needs.\"},\n        \"source_reference\": \"INTRODUCTION\"\n    },\n    {\n        \"question_text\": \"According to the chapter, what does the first advice suggest about success in life?\",\n        \"question_type\": \"SHORT_ANSWER\",\n        \"marks\": 1.0,\n        \"difficulty\": \"EASY\",\n        \"learner_level\": \"BEGINNER\",\n        \"correct_answer\": \"Success in life is dependent on individual effort and hard work.\",\n        \"options\": null,\n        \"source_reference\": \"INTRODUCTION\"\n    },\n    {\n        \"question_text\": \"Which of the following is NOT a factor mentioned in the chapter that can influence a student's choice of subjects?\",\n        \"question_type\": \"MCQ\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"B\",\n        \"options\": {\"A\": \"Economic and political policies\", \"B\": \"Personal hobbies and interests\", \"C\": \"Socioeconomic background\", \"D\": \"Gender\"},\n        \"source_reference\": \"CHAPTER 1\"\n    },\n    {\n        \"question_text\": \"What does the sociological imagination help us understand according to C. Wright Mills?\",\n        \"question_type\": \"LONG_ANSWER\",\n        \"marks\": 1.0,\n        \"difficulty\": \"HARD\",\n        \"learner_level\": \"ADVANCED\",\n        \"correct_answer\": \"The sociological imagination helps us understand and explain personal troubles as public issues and the relations between the two within society. It enables us to grasp history and biography and the relations between the two within society.\",\n        \"options\": null,\n        \"source_reference\": \"THE SOCIOLOGICAL IMAGINATION: THE PERSONAL PROBLEM AND THE PUBLIC ISSUE\"\n    },\n    {\n        \"question_text\": \"Identify a public issue that can be linked to a personal problem in the context of the chapter.\",\n        \"question_type\": \"SHORT_ANSWER\",\n        \"marks\": 1.0,\n        \"difficulty\": \"MEDIUM\",\n        \"learner_level\": \"INTERMEDIATE\",\n        \"correct_answer\": \"Homelessness can be a personal problem for an individual, but it is also a public issue that requires concrete measures to be taken by the state.\",\n        \"options\": null,\n        \"source_reference\": \"THE SOCIOLOGICAL IMAGINATION: THE PERSONAL PROBLEM AND THE PUBLIC ISSUE\"\n    }\n]",
+  "parsed_questions": [
+    {
+      "question_text": "Which of the following advice is NOT mentioned in the chapter regarding subject choices for students?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "D",
+      "options": {
+        "A": "Study hard and you will do well in life.",
+        "B": "Choosing the right subjects increases job prospects.",
+        "C": "Gender and family background can influence subject choice.",
+        "D": "You should choose subjects based on your family's business needs."
+      },
+      "source_reference": "INTRODUCTION"
+    },
+    {
+      "question_text": "According to the chapter, what does the first advice suggest about success in life?",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "EASY",
+      "learner_level": "BEGINNER",
+      "correct_answer": "Success in life is dependent on individual effort and hard work.",
+      "options": null,
+      "source_reference": "INTRODUCTION"
+    },
+    {
+      "question_text": "Which of the following is NOT a factor mentioned in the chapter that can influence a student's choice of subjects?",
+      "question_type": "MCQ",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "B",
+      "options": {
+        "A": "Economic and political policies",
+        "B": "Personal hobbies and interests",
+        "C": "Socioeconomic background",
+        "D": "Gender"
+      },
+      "source_reference": "CHAPTER 1"
+    },
+    {
+      "question_text": "What does the sociological imagination help us understand according to C. Wright Mills?",
+      "question_type": "LONG_ANSWER",
+      "marks": 1.0,
+      "difficulty": "HARD",
+      "learner_level": "ADVANCED",
+      "correct_answer": "The sociological imagination helps us understand and explain personal troubles as public issues and the relations between the two within society. It enables us to grasp history and biography and the relations between the two within society.",
+      "options": null,
+      "source_reference": "THE SOCIOLOGICAL IMAGINATION: THE PERSONAL PROBLEM AND THE PUBLIC ISSUE"
+    },
+    {
+      "question_text": "Identify a public issue that can be linked to a personal problem in the context of the chapter.",
+      "question_type": "SHORT_ANSWER",
+      "marks": 1.0,
+      "difficulty": "MEDIUM",
+      "learner_level": "INTERMEDIATE",
+      "correct_answer": "Homelessness can be a personal problem for an individual, but it is also a public issue that requires concrete measures to be taken by the state.",
+      "options": null,
+      "source_reference": "THE SOCIOLOGICAL IMAGINATION: THE PERSONAL PROBLEM AND THE PUBLIC ISSUE"
+    }
+  ],
+  "is_valid_json": true,
+  "validation_error": ""
+}
