@@ -112,4 +112,14 @@ eval/scratch_media/
 PDF_Extraction_Architecture_Guide.html
 QuestionGen_PDF_Extraction_Architecture_Guide.pdf
 generate_architecture_pdf.py
+# Local testing JSON data
+JSON Data For Testing/
+"JSON Data For Testing/"
+
+# Local SLM Benchmark & Reports
+benchmark_results/
+benchmark_harness.py
+SLM_Fleet_Evaluation_Report.html
+SLM_Fleet_Evaluation_Report.pdf
+scripts/test_from_json.py
 
