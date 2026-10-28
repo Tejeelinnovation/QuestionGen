@@ -35,6 +35,7 @@ class QuestionDraft:
     topic_name: Optional[str] = None
     is_active: bool = True
     metadata: dict[str, Any] = field(default_factory=dict)
+    diagram: Optional[dict[str, Any]] = None  # Multimodal diagram attachment (Google Drive link, caption)
 
     def to_dict(self) -> dict[str, Any]:
         """
@@ -66,6 +67,7 @@ class QuestionDraft:
             topic_id=question.topic_id,
             topic_name=topic_name,
             is_active=question.is_active,
+            diagram=getattr(question, "diagram", None),
             metadata={
                 "source": "seeded_bank",
                 "original_question_id": question.id,

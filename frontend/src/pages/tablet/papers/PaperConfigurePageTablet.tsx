@@ -14,6 +14,7 @@ import {
   Trash2,
   AlertCircle,
   CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 import { MOTION } from '../../../lib/motion';
 
@@ -788,15 +789,40 @@ export const PaperConfigurePageTablet: React.FC = () => {
           </div>
         </div>
 
+        {isSubmitting && (
+          <div className="p-3.5 rounded-card bg-forest/5 border border-forest/20 flex items-center gap-3">
+            <Loader2 className="w-4 h-4 text-forest animate-spin shrink-0" />
+            <div className="text-xs">
+              <span className="font-heading font-semibold text-ink block">
+                {paper?.specifications?.source_mode === 'pdf'
+                  ? 'Formulating Questions from Chapter PDF & Rubric...'
+                  : 'Retrieving Questions from Question Bank...'}
+              </span>
+              <span className="text-ink/60 text-[11px]">
+                {paper?.specifications?.source_mode === 'pdf'
+                  ? 'Allocating diagrams and drafting STEM LaTeX formulas. Please wait ~5–8s...'
+                  : 'Filtering questions according to difficulty and rubric tiers...'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Submit Bar */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`py-3 px-6 rounded-pill bg-forest text-white font-heading font-bold text-xs hover:bg-forest/90 transition-all flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50 ${MOTION.touch.button.className}`}
+            className={`py-3 px-6 rounded-pill bg-forest text-white font-heading font-bold text-xs hover:bg-forest/90 transition-all flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-75 ${MOTION.touch.button.className}`}
           >
             {isSubmitting ? (
-              <span>Querying Question Bank...</span>
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>
+                  {paper?.specifications?.source_mode === 'pdf'
+                    ? 'Generating Questions...'
+                    : 'Querying Question Bank...'}
+                </span>
+              </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />

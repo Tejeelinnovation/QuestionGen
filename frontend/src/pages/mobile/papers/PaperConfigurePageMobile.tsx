@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from 'lucide-react';
 import { MOTION } from '../../../lib/motion';
 
@@ -767,10 +768,17 @@ export const PaperConfigurePageMobile: React.FC = () => {
               type="submit"
               id="mobile-paper-proceed-btn"
               disabled={isSubmitting}
-              className={`w-full py-3 px-4 rounded-pill bg-forest text-white font-heading font-bold text-sm hover:bg-forest/90 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50 min-h-[48px] ${MOTION.touch.button.className}`}
+              className={`w-full py-3 px-4 rounded-pill bg-forest text-white font-heading font-bold text-sm hover:bg-forest/90 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-75 min-h-[48px] ${MOTION.touch.button.className}`}
             >
               {isSubmitting ? (
-                <span>Generating Candidate Questions...</span>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>
+                    {paper?.specifications?.source_mode === 'pdf'
+                      ? 'Generating Exam Questions...'
+                      : 'Selecting Questions...'}
+                  </span>
+                </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 text-lime" />

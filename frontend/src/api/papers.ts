@@ -5,6 +5,7 @@ import type {
   PaperPrintData,
   PaperVersion,
   QuestionPreview,
+  PdfInspectionResult,
 } from '../types';
 
 export interface CreatePaperInput {
@@ -39,7 +40,8 @@ export interface SelectQuestionsConstraints {
 }
 
 export interface CreateVersionInput {
-  question_ids: number[];
+  question_ids?: number[];
+  questions_data?: any[];
   constraints_used?: Record<string, any>;
   status?: 'DRAFT' | 'FINALIZED';
   version_label?: string;
@@ -76,6 +78,17 @@ export const papersApi = {
 
   updatePaper: async (id: number, data: Partial<CreatePaperInput>): Promise<Paper> => {
     const response = await apiClient.patch<Paper>(`/api/papers/${id}/`, data);
+    return response.data;
+  },
+
+  inspectPdf: async (file: File): Promise<PdfInspectionResult> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<PdfInspectionResult>('/api/papers/inspect-pdf/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 

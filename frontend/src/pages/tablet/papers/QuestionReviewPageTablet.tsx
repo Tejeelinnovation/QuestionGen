@@ -4,6 +4,18 @@ import { papersApi } from '../../../api/papers';
 import type { QuestionPreview, Paper } from '../../../types';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { QuestionReplaceModal } from '../../../components/papers/QuestionReplaceModal';
+import { MathText } from '../../../components/ui/MathText';
+import { API_BASE_URL } from '../../../api/client';
+import { Layers } from 'lucide-react';
+import { organizeQuestionsIntoSections } from '../../../utils/paperSectionUtils';
+
+const resolveImageUrl = (url?: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
 
@@ -19,6 +31,7 @@ export const QuestionReviewPageTablet: React.FC = () => {
   const [constraints, setConstraints] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [replacingQuestion, setReplacingQuestion] = useState<{ question: QuestionPreview; index: number } | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string>('all');
 
   useEffect(() => {
     const loadPaper = async () => {
@@ -137,6 +150,11 @@ export const QuestionReviewPageTablet: React.FC = () => {
     0
   );
 
+  const sections = organizeQuestionsIntoSections(questions);
+  const visibleSections = activeSectionId === 'all'
+    ? sections
+    : sections.filter((s) => s.id === activeSectionId);
+
   const handleSaveAsVersion = async () => {
     if (questions.length === 0) {
       toast.warning('Please select at least one question before creating a version.');
@@ -152,10 +170,18 @@ export const QuestionReviewPageTablet: React.FC = () => {
           : {}),
       };
 
-      const newVersion = await papersApi.createVersion(paperId, {
-        question_ids: questions.map((q) => q.id),
-        constraints_used: updatedConstraints,
-      });
+      const isPdfMode = paper?.specifications?.source_mode === 'pdf';
+      const versionPayload = isPdfMode
+        ? {
+            questions_data: questions,
+            constraints_used: updatedConstraints,
+          }
+        : {
+            question_ids: questions.map((q) => q.id),
+            constraints_used: updatedConstraints,
+          };
+
+      const newVersion = await papersApi.createVersion(paperId, versionPayload);
 
       toast.success(`Exam Version ${newVersion.version_label} created successfully!`);
       sessionStorage.removeItem(`paper_${paperId}_review`);
@@ -243,82 +269,194 @@ export const QuestionReviewPageTablet: React.FC = () => {
         </button>
       </div>
 
-      {/* ── Question Cards with Enlarged Touch Controls ── */}
-      <div className="space-y-4">
-        {questions.map((q, idx) => (
-          <div
-            key={q.id}
-            className="bg-surface border border-border rounded-card p-5 sm:p-6 shadow-card space-y-3"
-          >
-            {/* Sequence & Controls Header */}
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-xs bg-bg border border-border px-2.5 py-1 rounded-sm">
-                  #{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
-                </span>
-                <span className="pill pill-forest text-[10px]">
-                  {q.question_type}
-                </span>
-                <span className="pill pill-muted text-[10px]">
-                  {q.difficulty}
-                </span>
-                <span className="font-mono text-xs font-bold text-forest ml-2">
-                  [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
-                </span>
-              </div>
+      {/* ── Section Navigator Strip ── */}
+      {sections.length > 0 && (
+        <div className="bg-surface border border-border rounded-card p-3.5 shadow-card space-y-2.5">
+          <div className="flex items-center justify-between text-xs font-heading font-semibold text-ink border-b border-border/70 pb-2">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-forest" />
+              <span>Examination Sections</span>
+            </div>
+            <span className="text-[10px] font-mono text-ink/60 bg-bg px-2 py-0.5 rounded border border-border">
+              {sections.length} Sections
+            </span>
+          </div>
 
-              {/* Touch Reorder & Remove Controls (min-h-[40px]) */}
-              <div className="flex items-center gap-1.5 bg-bg p-1 rounded-pill border border-border">
-                <button
-                  type="button"
-                  onClick={() => handleMoveUp(idx)}
-                  disabled={idx === 0 || isSaving}
-                  className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill hover:bg-surface disabled:opacity-30 cursor-pointer min-h-[36px] flex items-center"
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMoveDown(idx)}
-                  disabled={idx === questions.length - 1 || isSaving}
-                  className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill hover:bg-surface disabled:opacity-30 cursor-pointer min-h-[36px] flex items-center"
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReplacingQuestion({ question: q, index: idx })}
-                  disabled={isSaving}
-                  title="Replace question with matching alternative from question bank"
-                  className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill text-forest hover:bg-forest/10 cursor-pointer min-h-[36px] flex items-center gap-1"
-                >
-                  <span>🔄 Replace</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveQuestion(q.id)}
-                  disabled={isSaving}
-                  className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill text-ember hover:bg-ember/10 cursor-pointer min-h-[36px] flex items-center"
-                >
-                  Remove
-                </button>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+            <button
+              type="button"
+              onClick={() => setActiveSectionId('all')}
+              className={`px-3 py-1.5 rounded-pill text-xs font-heading font-semibold transition-all shrink-0 cursor-pointer ${
+                activeSectionId === 'all'
+                  ? 'bg-forest text-white'
+                  : 'bg-bg text-ink/70 hover:text-ink border border-border'
+              }`}
+            >
+              All Sections ({questions.length} Qs • {runningTotalMarks}M)
+            </button>
+
+            {sections.map((sec) => (
+              <button
+                key={sec.id}
+                type="button"
+                onClick={() => setActiveSectionId(sec.id)}
+                className={`px-3 py-1.5 rounded-pill text-xs font-heading font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  activeSectionId === sec.id
+                    ? 'bg-forest text-white'
+                    : 'bg-bg text-ink/70 hover:text-ink border border-border'
+                }`}
+              >
+                <span>Sec {sec.letter}</span>
+                <span className="text-[10px] opacity-75">
+                  ({sec.questionCount} Qs • {sec.totalMarks}M)
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sectioned Candidate Questions ── */}
+      <div className="space-y-6">
+        {visibleSections.map((sec) => (
+          <div key={sec.id} className="space-y-3">
+            {/* Section Header Banner */}
+            <div className="bg-surface border-2 border-forest/30 rounded-card p-3.5 sm:p-4 shadow-card space-y-1 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-forest" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-2.5 py-0.5 bg-forest text-white font-heading font-bold text-xs uppercase rounded-sm">
+                    SECTION {sec.letter}
+                  </span>
+                  <h2 className="font-heading font-bold text-sm sm:text-base text-ink">
+                    {sec.title}
+                  </h2>
+                </div>
+                <div className="text-xs font-mono font-semibold text-ink/70">
+                  {sec.questionCount} Qs • {sec.marksPerQuestion}M each ({sec.totalMarks}M)
+                </div>
               </div>
+              {sec.guideline && (
+                <p className="text-[11px] text-ink/70 font-body italic pt-1 border-t border-border/50">
+                  {sec.guideline}
+                </p>
+              )}
             </div>
 
-            <p className="font-body text-sm font-medium text-ink leading-relaxed">
-              {q.question_text}
-            </p>
+            {/* Questions List */}
+            <div className="space-y-3">
+              {sec.items.map((item) => {
+                const q = item.question;
+                const globalIdx = item.globalIndex;
 
-            {q.options && Object.keys(q.options).length > 0 && (
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                {Object.entries(q.options).map(([optKey, optVal]) => (
-                  <div key={optKey} className="p-2.5 rounded-card border border-border/80 bg-bg text-xs flex items-baseline gap-2">
-                    <span className="font-mono font-bold text-forest">({optKey})</span>
-                    <span className="text-ink/80">{optVal}</span>
+                return (
+                  <div
+                    key={q.id}
+                    className="bg-surface border border-border rounded-card p-4 sm:p-5 shadow-card space-y-3"
+                  >
+                    {/* Sequence & Controls Header */}
+                    <div className="flex items-center justify-between border-b border-border pb-3 flex-wrap gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-xs bg-forest/10 border border-forest/30 text-forest px-2.5 py-1 rounded-sm">
+                          Q{item.displayNumber < 10 ? `0${item.displayNumber}` : item.displayNumber}
+                        </span>
+                        <span className="text-[10px] font-mono text-ink/50">
+                          (Sec {sec.letter} • #{item.sectionIndex})
+                        </span>
+                        <span className="pill pill-forest text-[10px]">
+                          {q.question_type}
+                        </span>
+                        <span className="pill pill-muted text-[10px]">
+                          {q.difficulty}
+                        </span>
+                        <span className="font-mono text-xs font-bold text-forest ml-1">
+                          [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
+                        </span>
+                      </div>
+
+                      {/* Touch Reorder & Remove Controls */}
+                      <div className="flex items-center gap-1.5 bg-bg p-1 rounded-pill border border-border">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveUp(globalIdx)}
+                          disabled={globalIdx === 0 || isSaving}
+                          className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill hover:bg-surface disabled:opacity-30 cursor-pointer min-h-[36px] flex items-center"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveDown(globalIdx)}
+                          disabled={globalIdx === questions.length - 1 || isSaving}
+                          className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill hover:bg-surface disabled:opacity-30 cursor-pointer min-h-[36px] flex items-center"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReplacingQuestion({ question: q, index: globalIdx })}
+                          disabled={isSaving}
+                          title="Replace question"
+                          className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill text-forest hover:bg-forest/10 cursor-pointer min-h-[36px] flex items-center gap-1"
+                        >
+                          <span>🔄 Replace</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveQuestion(q.id)}
+                          disabled={isSaving}
+                          className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill text-ember hover:bg-ember/10 cursor-pointer min-h-[36px] flex items-center"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="font-body text-sm font-medium text-ink leading-relaxed">
+                      <MathText text={q.question_text || ''} as="div" />
+                    </div>
+
+                    {/* Attached Diagram / Visual Figure */}
+                    {q.diagram && q.diagram.image_url && (
+                      <div className="p-3 bg-bg border border-border/80 rounded-card flex items-center gap-3">
+                        <img
+                          src={resolveImageUrl(q.diagram.image_url)}
+                          alt={q.diagram.caption || 'Question Diagram'}
+                          className="w-16 h-16 object-contain rounded bg-surface border border-border/60 p-1 flex-shrink-0"
+                          onError={(e) => {
+                            const currentSrc = (e.currentTarget as HTMLImageElement).src;
+                            if (!currentSrc.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                              (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
+                            }
+                          }}
+                        />
+                        <div className="text-xs space-y-0.5">
+                          <span className="font-heading font-semibold text-ink block">
+                            {q.diagram.title || q.diagram.caption || 'Attached Diagram Figure'}
+                          </span>
+                          {q.diagram.caption && (
+                            <span className="font-mono text-[10px] text-ink/60">
+                              {q.diagram.caption}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {q.options && Object.keys(q.options).length > 0 && (
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        {Object.entries(q.options).map(([optKey, optVal]) => (
+                          <div key={optKey} className="p-2.5 rounded-card border border-border/80 bg-bg text-xs flex items-baseline gap-2">
+                            <span className="font-mono font-bold text-forest">({optKey})</span>
+                            <MathText text={optVal} as="span" className="text-ink/80" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
         ))}
 

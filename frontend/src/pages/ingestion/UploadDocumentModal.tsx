@@ -84,6 +84,11 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       formData.append('document_kind', documentKind);
     }
 
+    const isMobile = window.innerWidth < 768;
+    const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
+    const clientDevice = isMobile ? 'Mobile' : isTablet ? 'Tablet' : 'Desktop';
+    formData.append('client_device', clientDevice);
+
     try {
       const job = await createIngestionJob(formData);
       setIsUploading(false);

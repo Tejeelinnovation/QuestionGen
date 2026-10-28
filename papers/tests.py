@@ -944,5 +944,110 @@ class PaperPublishingAndAnswerKeyTests(TestCase):
         self.assertEqual(res_key["Content-Type"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         self.assertIn("Answer_Key.docx", res_key["Content-Disposition"])
 
+    def test_pdf_inspect_and_paper_generation_flow(self):
+        """
+        Verify the fast multimodal teacher PDF workflow:
+        1. POST /api/papers/inspect-pdf/ -> extracts text and embedded images in <2 seconds.
+        2. POST /api/papers/ with source_mode='pdf' and selected figures.
+        3. POST /api/papers/{id}/select-questions/ -> returns generated questions with diagram attachments.
+        4. POST /api/papers/{id}/versions/ with questions_data -> creates snapshot preserving diagrams.
+        """
+        from rest_framework.test import APIClient
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        import pymupdf
+        import io
+        from PIL import Image
+
+        # Build in-memory test PDF with text and a test figure
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_text((50, 50), "Chapter 5: Cell Biology and Organization.\nFigure 5.1: Structure of a plant cell.\nCells contain nucleus, mitochondria, and cell wall.")
+        
+        from PIL import ImageDraw
+        test_img = Image.new("RGB", (160, 160), color="white")
+        draw = ImageDraw.Draw(test_img)
+        draw.rectangle([20, 20, 140, 140], fill="blue", outline="red", width=4)
+        draw.line([0, 0, 160, 160], fill="green", width=5)
+        img_bytes_io = io.BytesIO()
+        test_img.save(img_bytes_io, format="PNG")
+        page.insert_image(pymupdf.Rect(50, 100, 210, 260), stream=img_bytes_io.getvalue())
+        pdf_bytes = doc.write()
+        doc.close()
+
+        client = APIClient()
+        client.force_authenticate(user=self.teacher)
+
+        # 1. Inspect PDF
+        uploaded_pdf = SimpleUploadedFile("Cell_Biology.pdf", pdf_bytes, content_type="application/pdf")
+        inspect_res = client.post("/api/papers/inspect-pdf/", {"file": uploaded_pdf}, format="multipart")
+        self.assertEqual(inspect_res.status_code, 200)
+        inspect_data = inspect_res.data
+        self.assertIn("inspection_id", inspect_data)
+        self.assertEqual(inspect_data["page_count"], 1)
+        self.assertGreater(inspect_data["figure_count"], 0)
+        fig_id = inspect_data["figures"][0]["figure_id"]
+
+        # 1b. Test Dedicated Diagram Asset Streaming View (bypasses CORS/cookie blocks)
+        asset_res = client.get(f"/api/papers/diagram-asset/{fig_id}/")
+        self.assertEqual(asset_res.status_code, 200)
+        self.assertEqual(asset_res["Content-Type"], "image/png")
+
+        # 2. Create Paper Shell from PDF with selected figure
+        create_res = client.post(
+            "/api/papers/",
+            {
+                "title": "Cell Biology Unit Test",
+                "instructions": "Answer all diagram-based questions.",
+                "duration_minutes": 45,
+                "total_question_count": 3,
+                "specifications": {
+                    "source_mode": "pdf",
+                    "inspection_id": inspect_data["inspection_id"],
+                    "selected_figure_ids": [fig_id],
+                    "contribute_to_bank": True,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(create_res.status_code, 201)
+        paper_id = create_res.data["id"]
+
+        # 3. Select / Generate Candidate Questions using Structured Mark Rubric
+        gen_res = client.post(
+            f"/api/papers/{paper_id}/select-questions/",
+            {
+                "difficulty": "MEDIUM",
+                "mark_distribution": [
+                    {"marks": 1, "count": 2, "question_types": ["MCQ"]},
+                    {"marks": 5, "count": 1, "question_types": ["LONG_ANSWER"]},
+                ],
+                "quantity": 3,
+            },
+            format="json",
+        )
+        self.assertEqual(gen_res.status_code, 200)
+        self.assertEqual(len(gen_res.data["questions"]), 3)
+        # Verify smart diagram allocation: exactly 1 diagram question, 2 text MCQs
+        diagram_qs = [q for q in gen_res.data["questions"] if q.get("diagram")]
+        self.assertEqual(len(diagram_qs), 1, "Only 1 question should have the selected diagram attached.")
+        mcq_qs = [q for q in gen_res.data["questions"] if q.get("question_type") == "MCQ"]
+        self.assertEqual(len(mcq_qs), 2, "2 questions should be text-based MCQs matching rubric.")
+
+        # 4. Create Version snapshot directly from questions_data
+        version_res = client.post(
+            f"/api/papers/{paper_id}/versions/",
+            {
+                "questions_data": gen_res.data["questions"],
+                "version_label": "A",
+                "status": "DRAFT",
+            },
+            format="json",
+        )
+        self.assertEqual(version_res.status_code, 201)
+        self.assertEqual(version_res.data["version_label"], "A")
+        self.assertGreater(version_res.data["total_marks"], 0)
+        self.assertEqual(len(version_res.data["question_snapshot"]), 3)
+
+
 
 

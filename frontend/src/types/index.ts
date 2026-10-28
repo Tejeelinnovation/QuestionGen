@@ -223,6 +223,34 @@ export interface QuestionValidationHistoryItem {
   created_at: string;
 }
 
+export interface QuestionDiagramAttachment {
+  figure_id?: string;
+  title?: string;
+  image_url?: string;
+  drive_file_id?: string;
+  page_number?: number;
+  caption?: string;
+}
+
+export interface PdfDetectedFigure {
+  figure_id: string;
+  page_number: number;
+  width: number;
+  height: number;
+  caption: string;
+  thumbnail_b64: string;
+}
+
+export interface PdfInspectionResult {
+  inspection_id: string;
+  filename: string;
+  page_count: number;
+  word_count: number;
+  figure_count: number;
+  figures: PdfDetectedFigure[];
+  text_preview: string;
+}
+
 export interface QuestionPreview {
   id: number;
   topic: number;
@@ -243,6 +271,7 @@ export interface QuestionPreview {
   correct_answer?: string;
   explanation?: string;
   source_reference?: string;
+  diagram?: QuestionDiagramAttachment | null;
 }
 
 export interface QuestionSnapshotItem {
@@ -261,6 +290,7 @@ export interface QuestionSnapshotItem {
   options?: Record<string, string> | null;
   correct_answer?: string;
   source_reference?: string;
+  diagram?: QuestionDiagramAttachment | null;
 }
 
 export interface PaperVersionSummary {

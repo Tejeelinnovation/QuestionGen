@@ -120,6 +120,11 @@ class IngestionJobListSerializer(serializers.ModelSerializer):
     queue_position = serializers.SerializerMethodField()
     duration_seconds = serializers.ReadOnlyField()
     duration_formatted = serializers.ReadOnlyField()
+    file_size_formatted = serializers.SerializerMethodField()
+    uploaded_by_name = serializers.SerializerMethodField()
+    uploaded_by_role = serializers.SerializerMethodField()
+    uploaded_by_email = serializers.SerializerMethodField()
+    device_info = serializers.SerializerMethodField()
 
     class Meta:
         model = IngestionJob
@@ -141,6 +146,12 @@ class IngestionJobListSerializer(serializers.ModelSerializer):
             "queue_position",
             "duration_seconds",
             "duration_formatted",
+            "file_size_bytes",
+            "file_size_formatted",
+            "uploaded_by_name",
+            "uploaded_by_role",
+            "uploaded_by_email",
+            "device_info",
             "error_message",
             "google_drive_file_id",
             "google_drive_url",
@@ -152,6 +163,57 @@ class IngestionJobListSerializer(serializers.ModelSerializer):
     def get_queue_position(self, obj):
         return get_job_queue_position(obj)
 
+    def get_file_size_formatted(self, obj) -> str:
+        bytes_val = obj.file_size_bytes or 0
+        if bytes_val <= 0 and obj.source_file:
+            try:
+                bytes_val = obj.source_file.size
+            except Exception:
+                bytes_val = 0
+        if bytes_val <= 0:
+            return ""
+        if bytes_val < 1024 * 1024:
+            return f"{bytes_val / 1024:.1f} KB"
+        return f"{bytes_val / (1024 * 1024):.1f} MB"
+
+    def get_uploaded_by_name(self, obj) -> str:
+        if obj.uploaded_by:
+            full_name = obj.uploaded_by.get_full_name().strip()
+            if full_name:
+                return full_name
+            return obj.uploaded_by.username or "Super Admin"
+        return "Super Admin"
+
+    def get_uploaded_by_role(self, obj) -> str:
+        if obj.uploaded_by:
+            if hasattr(obj.uploaded_by, "role") and obj.uploaded_by.role:
+                return obj.uploaded_by.role
+            if hasattr(obj.uploaded_by, "role_label"):
+                return obj.uploaded_by.role_label
+            if obj.uploaded_by.is_superuser:
+                return "Super Admin"
+            return "Teacher"
+        return "Teacher"
+
+    def get_uploaded_by_email(self, obj) -> str:
+        return obj.uploaded_by.email if obj.uploaded_by else ""
+
+    def get_device_info(self, obj) -> dict:
+        meta = obj.metadata if isinstance(obj.metadata, dict) else {}
+        device = meta.get("device")
+        if isinstance(device, dict):
+            return {
+                "device_type": device.get("device_type", "Desktop"),
+                "os": device.get("os", "Windows"),
+                "browser": device.get("browser", "Chrome"),
+            }
+        device_type = meta.get("device_type", "Desktop")
+        return {
+            "device_type": device_type,
+            "os": "Desktop",
+            "browser": "Browser",
+        }
+
 
 class IngestionJobDetailSerializer(serializers.ModelSerializer):
     chapters = ExtractedChapterSerializer(many=True, read_only=True)
@@ -160,6 +222,11 @@ class IngestionJobDetailSerializer(serializers.ModelSerializer):
     queue_position = serializers.SerializerMethodField()
     duration_seconds = serializers.ReadOnlyField()
     duration_formatted = serializers.ReadOnlyField()
+    file_size_formatted = serializers.SerializerMethodField()
+    uploaded_by_name = serializers.SerializerMethodField()
+    uploaded_by_role = serializers.SerializerMethodField()
+    uploaded_by_email = serializers.SerializerMethodField()
+    device_info = serializers.SerializerMethodField()
 
     class Meta:
         model = IngestionJob
@@ -181,6 +248,12 @@ class IngestionJobDetailSerializer(serializers.ModelSerializer):
             "queue_position",
             "duration_seconds",
             "duration_formatted",
+            "file_size_bytes",
+            "file_size_formatted",
+            "uploaded_by_name",
+            "uploaded_by_role",
+            "uploaded_by_email",
+            "device_info",
             "google_drive_file_id",
             "google_drive_url",
             "error_message",
@@ -197,6 +270,57 @@ class IngestionJobDetailSerializer(serializers.ModelSerializer):
 
     def get_queue_position(self, obj):
         return get_job_queue_position(obj)
+
+    def get_file_size_formatted(self, obj) -> str:
+        bytes_val = obj.file_size_bytes or 0
+        if bytes_val <= 0 and obj.source_file:
+            try:
+                bytes_val = obj.source_file.size
+            except Exception:
+                bytes_val = 0
+        if bytes_val <= 0:
+            return ""
+        if bytes_val < 1024 * 1024:
+            return f"{bytes_val / 1024:.1f} KB"
+        return f"{bytes_val / (1024 * 1024):.1f} MB"
+
+    def get_uploaded_by_name(self, obj) -> str:
+        if obj.uploaded_by:
+            full_name = obj.uploaded_by.get_full_name().strip()
+            if full_name:
+                return full_name
+            return obj.uploaded_by.username or "Super Admin"
+        return "Super Admin"
+
+    def get_uploaded_by_role(self, obj) -> str:
+        if obj.uploaded_by:
+            if hasattr(obj.uploaded_by, "role") and obj.uploaded_by.role:
+                return obj.uploaded_by.role
+            if hasattr(obj.uploaded_by, "role_label"):
+                return obj.uploaded_by.role_label
+            if obj.uploaded_by.is_superuser:
+                return "Super Admin"
+            return "Teacher"
+        return "Teacher"
+
+    def get_uploaded_by_email(self, obj) -> str:
+        return obj.uploaded_by.email if obj.uploaded_by else ""
+
+    def get_device_info(self, obj) -> dict:
+        meta = obj.metadata if isinstance(obj.metadata, dict) else {}
+        device = meta.get("device")
+        if isinstance(device, dict):
+            return {
+                "device_type": device.get("device_type", "Desktop"),
+                "os": device.get("os", "Windows"),
+                "browser": device.get("browser", "Chrome"),
+            }
+        device_type = meta.get("device_type", "Desktop")
+        return {
+            "device_type": device_type,
+            "os": "Desktop",
+            "browser": "Browser",
+        }
 
 
 class IngestionJobCreateSerializer(serializers.ModelSerializer):

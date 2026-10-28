@@ -116,9 +116,12 @@ class PaperCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         chapter = attrs.get("chapter")
         subjects = attrs.get("subjects")
-        if not chapter and not subjects:
+        specs = attrs.get("specifications") or {}
+        is_pdf_mode = specs.get("source_mode") == "pdf"
+
+        if not chapter and not subjects and not is_pdf_mode:
             raise serializers.ValidationError(
-                "Either a chapter or a list of subjects must be specified for the paper."
+                "Either a chapter, a list of subjects, or a PDF document source must be specified for the paper."
             )
         if chapter and not chapter.book.is_active:
             raise serializers.ValidationError("Cannot create a paper for an inactive book.")
@@ -291,8 +294,15 @@ class QuestionPreviewSerializer(serializers.ModelSerializer):
 class CreateVersionSerializer(serializers.Serializer):
     question_ids = serializers.ListField(
         child=serializers.IntegerField(),
+        required=False,
         allow_empty=False,
         help_text="Ordered list of question IDs to snapshot into this version.",
+    )
+    questions_data = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        allow_empty=False,
+        help_text="Direct list of question snapshot dictionaries (for PDF/AI-generated exams).",
     )
     constraints_used = serializers.JSONField(
         required=False,
@@ -310,14 +320,42 @@ class CreateVersionSerializer(serializers.Serializer):
         allow_blank=True,
     )
 
-    def validate_question_ids(self, value: list[int]) -> list[int]:
-        if not value:
-            raise serializers.ValidationError("Cannot create a version with zero questions.")
-        return value
-
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        question_ids = attrs["question_ids"]
+        question_ids = attrs.get("question_ids")
+        questions_data = attrs.get("questions_data")
+
+        if not question_ids and not questions_data:
+            raise serializers.ValidationError("Either question_ids or questions_data must be provided.")
+
         constraints = attrs.get("constraints_used", {})
+
+        if questions_data:
+            total_sum = 0.0
+            sanitized_data = []
+            for idx, q_dict in enumerate(questions_data):
+                q_text = str(q_dict.get("question_text", "")).strip()
+                if not q_text:
+                    raise serializers.ValidationError(f"Question at index {idx} has empty text.")
+                marks_val = float(q_dict.get("marks", 1.0))
+                total_sum += marks_val
+                sanitized_data.append({
+                    "question_id": q_dict.get("question_id", idx + 1),
+                    "question_text": q_text,
+                    "question_type": q_dict.get("question_type", "SHORT_ANSWER"),
+                    "marks": marks_val,
+                    "difficulty": q_dict.get("difficulty", "MEDIUM"),
+                    "learner_level": q_dict.get("learner_level", "INTERMEDIATE"),
+                    "options": q_dict.get("options"),
+                    "correct_answer": q_dict.get("correct_answer", ""),
+                    "explanation": q_dict.get("explanation", ""),
+                    "source_reference": q_dict.get("source_reference", ""),
+                    "diagram": q_dict.get("diagram"),
+                    "topic_name": q_dict.get("topic_name", ""),
+                    "chapter_title": q_dict.get("chapter_title", ""),
+                    "subject": q_dict.get("subject", ""),
+                })
+            attrs["snapshot_data"] = sanitized_data
+            return attrs
 
         # Fetch questions preserving order with joined topic, chapter, and book relations
         questions_by_id = {

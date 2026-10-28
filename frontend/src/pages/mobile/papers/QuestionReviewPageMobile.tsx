@@ -6,7 +6,19 @@ import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import { ChevronUp, ChevronDown, Trash2, CheckCircle2, RefreshCw } from 'lucide-react';
+import { MathText } from '../../../components/ui/MathText';
 import { QuestionReplaceModal } from '../../../components/papers/QuestionReplaceModal';
+import { API_BASE_URL } from '../../../api/client';
+import { Layers } from 'lucide-react';
+import { organizeQuestionsIntoSections } from '../../../utils/paperSectionUtils';
+
+const resolveImageUrl = (url?: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 export const QuestionReviewPageMobile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +32,7 @@ export const QuestionReviewPageMobile: React.FC = () => {
   const [constraints, setConstraints] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [replacingQuestion, setReplacingQuestion] = useState<{ question: QuestionPreview; index: number } | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string>('all');
 
   useEffect(() => {
     const loadPaper = async () => {
@@ -148,10 +161,18 @@ export const QuestionReviewPageMobile: React.FC = () => {
           : {}),
       };
 
-      const newVersion = await papersApi.createVersion(paperId, {
-        question_ids: questions.map((q) => q.id),
-        constraints_used: updatedConstraints,
-      });
+      const isPdfMode = paper?.specifications?.source_mode === 'pdf';
+      const versionPayload = isPdfMode
+        ? {
+            questions_data: questions,
+            constraints_used: updatedConstraints,
+          }
+        : {
+            question_ids: questions.map((q) => q.id),
+            constraints_used: updatedConstraints,
+          };
+
+      const newVersion = await papersApi.createVersion(paperId, versionPayload);
 
       toast.success(`Exam Version ${newVersion.version_label} created successfully!`);
       sessionStorage.removeItem(`paper_${paperId}_review`);
@@ -164,6 +185,10 @@ export const QuestionReviewPageMobile: React.FC = () => {
   };
 
   const totalMarks = questions.reduce((sum, q) => sum + (Number(q.marks) || 1), 0);
+  const sections = organizeQuestionsIntoSections(questions);
+  const visibleSections = activeSectionId === 'all'
+    ? sections
+    : sections.filter((s) => s.id === activeSectionId);
 
   return (
     <div className="space-y-4 font-body">
@@ -214,8 +239,55 @@ export const QuestionReviewPageMobile: React.FC = () => {
         </span>
       </div>
 
-      {/* Single-Column Question Cards */}
-      <div className="space-y-3">
+      {/* ── Mobile Section Filter Strip ── */}
+      {sections.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] font-heading font-semibold text-ink px-1">
+            <span className="flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-forest" />
+              <span>Exam Sections</span>
+            </span>
+            <span className="text-ink/60 font-mono text-[10px]">
+              {sections.length} Sections
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+            <button
+              type="button"
+              onClick={() => setActiveSectionId('all')}
+              className={`px-3 py-1.5 rounded-pill text-[11px] font-heading font-semibold transition-all shrink-0 cursor-pointer ${
+                activeSectionId === 'all'
+                  ? 'bg-forest text-white'
+                  : 'bg-surface text-ink/70 border border-border'
+              }`}
+            >
+              All ({questions.length})
+            </button>
+
+            {sections.map((sec) => (
+              <button
+                key={sec.id}
+                type="button"
+                onClick={() => setActiveSectionId(sec.id)}
+                className={`px-3 py-1.5 rounded-pill text-[11px] font-heading font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                  activeSectionId === sec.id
+                    ? 'bg-forest text-white'
+                    : 'bg-surface text-ink/70 border border-border'
+                }`}
+              >
+                <span>Sec {sec.letter}</span>
+                <span className="text-[9px] opacity-80">
+                  ({sec.questionCount})
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Single-Column Question Cards Grouped by Section */}
+      <div className="space-y-5">
         {questions.length === 0 ? (
           <div
             id="mobile-empty-review-state"
@@ -237,79 +309,157 @@ export const QuestionReviewPageMobile: React.FC = () => {
             </Link>
           </div>
         ) : (
-          questions.map((q, idx) => (
-            <div
-              key={q.id}
-              className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5"
-            >
-              {/* Top meta row */}
-              <div className="flex items-center justify-between gap-1 border-b border-border/50 pb-2">
-                <span className="font-mono font-bold text-xs text-forest">
-                  #{idx + 1}
-                </span>
-
-                <div className="flex items-center gap-1">
-                  <span className="pill pill-forest text-[10px] py-0.5 px-2">
-                    {q.marks || 1} mk{(Number(q.marks) || 1) === 1 ? '' : 's'}
-                  </span>
-                  <span className="pill pill-muted text-[10px] py-0.5 px-2">
-                    {q.question_type}
-                  </span>
-                  {q.difficulty && (
-                    <span className="pill pill-ember text-[10px] py-0.5 px-2">
-                      {q.difficulty}
+          visibleSections.map((sec) => (
+            <div key={sec.id} className="space-y-2.5">
+              {/* Section Header Banner */}
+              <div className="bg-surface border-l-4 border-forest rounded-card p-3 shadow-xs space-y-1">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 bg-forest text-white font-heading font-bold text-[10px] uppercase rounded-sm">
+                      SEC {sec.letter}
                     </span>
-                  )}
+                    <h2 className="font-heading font-bold text-xs text-ink">
+                      {sec.formatSummary}
+                    </h2>
+                  </div>
+                  <span className="text-[10px] font-mono text-ink/70">
+                    {sec.questionCount} Qs • {sec.marksPerQuestion}M ({sec.totalMarks}M)
+                  </span>
                 </div>
+                {sec.guideline && (
+                  <p className="text-[10px] text-ink/60 font-body italic">
+                    {sec.guideline}
+                  </p>
+                )}
               </div>
 
-              {/* Question text */}
-              <p className="text-xs sm:text-sm text-ink leading-relaxed font-body">
-                {q.question_text || (q as any).prompt}
-              </p>
+              {/* Questions */}
+              <div className="space-y-2.5">
+                {sec.items.map((item) => {
+                  const q = item.question;
+                  const globalIdx = item.globalIndex;
 
-              {/* Action controls row: Move Up, Move Down, Delete */}
-              <div className="flex items-center justify-between pt-1 border-t border-border/40">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleMoveUp(idx)}
-                    disabled={idx === 0}
-                    className="p-2 rounded-card border border-border bg-surface hover:bg-surface-muted active:scale-95 disabled:opacity-30 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
-                    aria-label="Move Up"
-                  >
-                    <ChevronUp className="w-4 h-4 text-ink" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMoveDown(idx)}
-                    disabled={idx === questions.length - 1}
-                    className="p-2 rounded-card border border-border bg-surface hover:bg-surface-muted active:scale-95 disabled:opacity-30 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
-                    aria-label="Move Down"
-                  >
-                    <ChevronDown className="w-4 h-4 text-ink" />
-                  </button>
+                  return (
+                    <div
+                      key={q.id}
+                      className="p-3.5 rounded-card bg-surface border border-border shadow-xs space-y-2.5"
+                    >
+                      {/* Top meta row */}
+                      <div className="flex items-center justify-between gap-1 border-b border-border/50 pb-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-xs bg-forest/10 text-forest px-2 py-0.5 rounded-sm border border-forest/20">
+                            Q{item.displayNumber < 10 ? `0${item.displayNumber}` : item.displayNumber}
+                          </span>
+                          <span className="text-[10px] font-mono text-ink/50">
+                            (Sec {sec.letter} • #{item.sectionIndex})
+                          </span>
+                        </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setReplacingQuestion({ question: q, index: idx })}
-                    disabled={isSaving}
-                    className="inline-flex items-center gap-1 text-[11px] font-heading font-semibold text-forest hover:bg-forest/10 p-2 rounded-card active:scale-95 transition-colors cursor-pointer min-h-[36px]"
-                    title="Replace question"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Replace</span>
-                  </button>
-                </div>
+                        <div className="flex items-center gap-1">
+                          <span className="pill pill-forest text-[10px] py-0.5 px-2">
+                            {q.marks || 1} mk{(Number(q.marks) || 1) === 1 ? '' : 's'}
+                          </span>
+                          <span className="pill pill-muted text-[10px] py-0.5 px-2">
+                            {q.question_type}
+                          </span>
+                          {q.difficulty && (
+                            <span className="pill pill-ember text-[10px] py-0.5 px-2">
+                              {q.difficulty}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleRemoveQuestion(q.id)}
-                  className="inline-flex items-center gap-1 text-[11px] font-heading font-semibold text-ember hover:bg-ember/10 p-2 rounded-card active:scale-95 transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove</span>
-                </button>
+                      {/* Question text with KaTeX LaTeX math support */}
+                      <div className="text-xs sm:text-sm text-ink leading-relaxed font-body">
+                        <MathText text={q.question_text || (q as any).prompt || ''} as="div" />
+                      </div>
+
+                      {/* Attached Diagram / Visual Figure */}
+                      {q.diagram && q.diagram.image_url && (
+                        <div className="p-2.5 bg-bg border border-border/80 rounded-card flex items-center gap-2.5">
+                          <img
+                            src={resolveImageUrl(q.diagram.image_url)}
+                            alt={q.diagram.caption || 'Question Diagram'}
+                            className="w-14 h-14 object-contain rounded bg-surface border border-border/60 p-1 flex-shrink-0"
+                            onError={(e) => {
+                              const currentSrc = (e.currentTarget as HTMLImageElement).src;
+                              if (!currentSrc.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                                (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
+                              }
+                            }}
+                          />
+                          <div className="text-xs space-y-0.5 overflow-hidden">
+                            <span className="font-heading font-semibold text-ink block truncate text-[11px]">
+                              {q.diagram.title || q.diagram.caption || 'Attached Diagram Figure'}
+                            </span>
+                            {q.diagram.caption && (
+                              <span className="font-mono text-[9px] text-ink/60 block truncate">
+                                {q.diagram.caption}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* MCQ Options */}
+                      {q.options && Object.keys(q.options).length > 0 && (
+                        <div className="grid grid-cols-1 gap-1.5 pt-0.5">
+                          {Object.entries(q.options).map(([optKey, optVal]) => (
+                            <div key={optKey} className="p-2 rounded-card border border-border/70 bg-bg text-xs flex items-baseline gap-1.5">
+                              <span className="font-mono font-bold text-forest">({optKey})</span>
+                              <MathText text={optVal} as="span" className="text-ink/80 text-xs" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Action controls row: Move Up, Move Down, Delete */}
+                      <div className="flex items-center justify-between pt-1 border-t border-border/40">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveUp(globalIdx)}
+                            disabled={globalIdx === 0}
+                            className="p-2 rounded-card border border-border bg-surface hover:bg-surface-muted active:scale-95 disabled:opacity-30 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+                            aria-label="Move Up"
+                          >
+                            <ChevronUp className="w-4 h-4 text-ink" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveDown(globalIdx)}
+                            disabled={globalIdx === questions.length - 1}
+                            className="p-2 rounded-card border border-border bg-surface hover:bg-surface-muted active:scale-95 disabled:opacity-30 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
+                            aria-label="Move Down"
+                          >
+                            <ChevronDown className="w-4 h-4 text-ink" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setReplacingQuestion({ question: q, index: globalIdx })}
+                            disabled={isSaving}
+                            className="inline-flex items-center gap-1 text-[11px] font-heading font-semibold text-forest hover:bg-forest/10 p-2 rounded-card active:scale-95 transition-colors cursor-pointer min-h-[36px]"
+                            title="Replace question"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Replace</span>
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveQuestion(q.id)}
+                          className="inline-flex items-center gap-1 text-[11px] font-heading font-semibold text-ember hover:bg-ember/10 p-2 rounded-card active:scale-95 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))

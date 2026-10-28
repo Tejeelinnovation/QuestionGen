@@ -11,7 +11,7 @@ import { PaperConfigurePageTablet } from '../tablet/papers/PaperConfigurePageTab
 import { PaperConfigurePageMobile } from '../mobile/papers/PaperConfigurePageMobile';
 import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { MOTION } from '../../lib/motion';
-import { Clock, CheckCircle2, Plus, Trash2, Sliders } from 'lucide-react';
+import { Clock, CheckCircle2, Plus, Trash2, Sliders, Loader2 } from 'lucide-react';
 
 export interface MarkTierConfig {
   id: string;
@@ -905,6 +905,24 @@ const PaperConfigurePageDesktop: React.FC = () => {
             </div>
           </div>
 
+          {isSubmitting && (
+            <div className="p-4 rounded-card bg-forest/5 border border-forest/20 flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-forest animate-spin shrink-0" />
+              <div className="text-xs space-y-0.5">
+                <p className="font-heading font-semibold text-ink">
+                  {paper?.specifications?.source_mode === 'pdf'
+                    ? 'Formulating Questions from Chapter PDF & Mark Rubric...'
+                    : 'Querying Matching Questions from Question Bank...'}
+                </p>
+                <p className="text-ink/60 font-mono text-[11px]">
+                  {paper?.specifications?.source_mode === 'pdf'
+                    ? 'Drafting STEM LaTeX formulas, balanced questions, and allocating diagrams. Please wait ~5–8s...'
+                    : 'Filtering questions according to difficulty, cognitive level, and rubric tiers...'}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             <Link
               to={`/papers/${paperId}`}
@@ -917,10 +935,23 @@ const PaperConfigurePageDesktop: React.FC = () => {
               type="submit"
               id="select-questions-submit-btn"
               disabled={isSubmitting}
-              className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-75 flex items-center gap-2"
             >
-              <span>{isSubmitting ? 'Querying Question Bank...' : 'Select & Review Questions'}</span>
-              <span>→</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>
+                    {paper?.specifications?.source_mode === 'pdf'
+                      ? 'Generating Exam...'
+                      : 'Selecting Questions...'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>Select & Review Questions</span>
+                  <span>→</span>
+                </>
+              )}
             </button>
           </div>
         </div>

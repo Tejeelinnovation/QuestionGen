@@ -326,6 +326,38 @@ class GoogleDriveClient:
                     pass
             return False
 
+    def download_bytes(self, file_id: str) -> Optional[bytes]:
+        """
+        Downloads a file directly into memory as bytes from Google Drive.
+        Returns bytes if successful, None otherwise.
+        """
+        if not file_id or file_id.startswith("local_"):
+            return None
+
+        creds = self.get_credentials()
+        if not creds:
+            logger.warning("No Google Drive credentials configured. Cannot download bytes.")
+            return None
+
+        try:
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaIoBaseDownload
+            import io
+
+            service = build("drive", "v3", credentials=creds)
+            request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
+            mem_buf = io.BytesIO()
+            downloader = MediaIoBaseDownload(mem_buf, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+
+            data = mem_buf.getvalue()
+            return data if data else None
+        except Exception as e:
+            logger.error(f"Google Drive download_bytes failed for file {file_id}: {e}")
+            return None
+
     def delete_file(self, file_id: str) -> bool:
         """
         Deletes a file from Google Drive given its file_id.

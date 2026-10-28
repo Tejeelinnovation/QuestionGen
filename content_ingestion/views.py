@@ -56,6 +56,52 @@ def is_super_admin(user) -> bool:
     )
 
 
+def parse_client_device(user_agent: str, client_hint: str = "") -> dict:
+    """
+    Extract device category (Desktop / Tablet / Mobile) along with OS and Browser.
+    """
+    ua_lower = (user_agent or "").lower()
+
+    if client_hint in ("Mobile", "Tablet", "Desktop"):
+        device_type = client_hint
+    elif "ipad" in ua_lower or ("android" in ua_lower and "mobile" not in ua_lower) or "tablet" in ua_lower:
+        device_type = "Tablet"
+    elif "mobile" in ua_lower or "iphone" in ua_lower:
+        device_type = "Mobile"
+    else:
+        device_type = "Desktop"
+
+    if "windows" in ua_lower:
+        os_name = "Windows"
+    elif "macintosh" in ua_lower or "mac os" in ua_lower:
+        os_name = "macOS"
+    elif "iphone" in ua_lower or "ipad" in ua_lower:
+        os_name = "iOS"
+    elif "android" in ua_lower:
+        os_name = "Android"
+    elif "linux" in ua_lower:
+        os_name = "Linux"
+    else:
+        os_name = "Desktop"
+
+    if "edg/" in ua_lower:
+        browser_name = "Edge"
+    elif "chrome/" in ua_lower:
+        browser_name = "Chrome"
+    elif "firefox/" in ua_lower:
+        browser_name = "Firefox"
+    elif "safari/" in ua_lower:
+        browser_name = "Safari"
+    else:
+        browser_name = "Browser"
+
+    return {
+        "device_type": device_type,
+        "os": os_name,
+        "browser": browser_name,
+    }
+
+
 class IngestionJobListCreateView(generics.ListCreateAPIView):
     """
     List existing ingestion jobs or upload a new PDF to initialize ingestion.
@@ -78,10 +124,10 @@ class IngestionJobListCreateView(generics.ListCreateAPIView):
 
         # Super Admin sees all materials across all schools
         if is_super_admin(user):
-            qs = IngestionJob.objects.all().prefetch_related("chapters")
+            qs = IngestionJob.objects.all().select_related("uploaded_by").prefetch_related("chapters")
         else:
             # Regular contributors see ONLY their own submitted materials
-            qs = IngestionJob.objects.filter(uploaded_by=user).prefetch_related("chapters")
+            qs = IngestionJob.objects.filter(uploaded_by=user).select_related("uploaded_by").prefetch_related("chapters")
 
         params = self.request.query_params
         board = params.get("board")
@@ -138,6 +184,16 @@ class IngestionJobListCreateView(generics.ListCreateAPIView):
             uploaded_by=user,
             school=user.school,
         )
+
+        # Detect client device and store in metadata
+        user_agent = request.META.get("HTTP_USER_AGENT", "")
+        client_hint = request.data.get("client_device") or ""
+        device_meta = parse_client_device(user_agent, client_hint)
+        if not isinstance(job.metadata, dict):
+            job.metadata = {}
+        job.metadata["device"] = device_meta
+        job.save(update_fields=["metadata"])
+
         service = IngestionService()
         service.initialize_job(job)
         job.refresh_from_db()
@@ -173,8 +229,8 @@ class IngestionJobDetailView(generics.RetrieveDestroyAPIView):
             raise PermissionDenied("You do not have permission to view this material.")
 
         if is_super_admin(user):
-            return IngestionJob.objects.all().prefetch_related("chapters")
-        return IngestionJob.objects.filter(uploaded_by=user).prefetch_related("chapters")
+            return IngestionJob.objects.all().select_related("uploaded_by").prefetch_related("chapters")
+        return IngestionJob.objects.filter(uploaded_by=user).select_related("uploaded_by").prefetch_related("chapters")
 
     def perform_destroy(self, instance):
         user = self.request.user

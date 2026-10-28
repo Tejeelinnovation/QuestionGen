@@ -13,7 +13,11 @@ import {
   HeartHandshake,
   RotateCcw,
   AlertCircle,
-  Sparkles,
+  User,
+  Calendar,
+  Laptop,
+  Smartphone,
+  Tablet,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -26,11 +30,11 @@ import {
   type IngestionJobSummary,
   exportJobJson,
 } from '../../api/ingestion';
+import { formatISTDateTime } from '../../utils/dateUtils';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
 import { ConfirmDeleteModal } from '../../components/ui/ConfirmDeleteModal';
 import { SkeletonIngestionList } from '../../components/ui/skeleton';
-import { JobDurationBadge } from '../../components/ui/JobDurationTimer';
 
 export const DatasetIngestionPageTablet: React.FC = () => {
   const { user, hasCapability } = useAuth();
@@ -281,82 +285,97 @@ export const DatasetIngestionPageTablet: React.FC = () => {
             return (
               <div key={job.id} className="p-4 rounded-xl border border-border bg-surface shadow-2xs space-y-3 overflow-hidden">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1.5 min-w-0">
+                  <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-forest/10 text-forest border border-forest/20">
-                        {job.board || 'Not specified'} {job.standard ? `· Class ${job.standard}` : ''}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-muted text-ink/70 border border-border/60">
-                        {job.subject || 'General'}
-                      </span>
-                      {job.document_kind && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-muted text-ink/70 border border-border/60">
-                          {job.document_kind}
-                        </span>
-                      )}
-                      {isSuperAdmin && (
-                        job.status === 'COMPLETED' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                            <CheckCircle2 className="w-2.5 h-2.5" /> Completed
-                          </span>
-                        ) : job.status === 'EXTRACTING' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-700 border border-blue-500/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Extracting
-                          </span>
-                        ) : job.status === 'PENDING' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-700 border border-amber-500/20">
-                            <Clock className="w-3 h-3" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Queued'}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-500/10 text-red-700 border border-red-500/20">
-                            Failed
-                          </span>
-                        )
-                      )}
-                      {!isSuperAdmin && (
-                        job.status === 'COMPLETED' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                            <CheckCircle2 className="w-3 h-3" /> Accepted
-                          </span>
-                        ) : job.status === 'EXTRACTING' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/10 text-blue-700 border border-blue-500/20">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Processing...
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-700 border border-amber-500/20">
-                            <Clock className="w-3 h-3" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Under Review'}
-                          </span>
-                        )
-                      )}
-
-                      {/* Extraction Engine Tag */}
-                      {job.metadata?.extraction_engine ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
-                          <Sparkles className="w-2.5 h-2.5 text-purple-600" />
-                          {job.metadata.extraction_engine}
-                        </span>
-                      ) : job.current_stage?.includes('Docling') || job.current_stage?.includes('Marker') ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
-                          <Sparkles className="w-2.5 h-2.5 text-purple-600" />
-                          Docling AI (DocLayNet)
+                      {/* Status Badge */}
+                      {job.status === 'COMPLETED' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-heading font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Completed
                         </span>
                       ) : job.status === 'EXTRACTING' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/10 text-purple-700 border border-purple-500/20 animate-pulse">
-                          <Sparkles className="w-2.5 h-2.5 text-purple-600" />
-                          Docling AI Engine
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-heading font-semibold bg-blue-500/10 text-blue-700 border border-blue-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Extracting
                         </span>
-                      ) : job.status === 'COMPLETED' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-muted text-ink/65 border border-border">
-                          Document AI Engine
+                      ) : job.status === 'PENDING' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-heading font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/20">
+                          <Clock className="w-3 h-3 text-amber-600" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Queued'}
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-heading font-semibold bg-red-500/10 text-red-700 border border-red-500/20">
+                          <AlertCircle className="w-3 h-3 text-red-600" /> Failed
+                        </span>
+                      )}
 
-                      {/* Total Extraction Duration Timer Badge */}
-                      <JobDurationBadge job={job} />
+                      {/* Board & Grade (only when specifically set) */}
+                      {(job.board || job.standard) && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-forest/10 text-forest border border-forest/20">
+                          {job.board || ''} {job.standard ? `· Class ${job.standard}` : ''}
+                        </span>
+                      )}
+
+                      {/* Subject (only when specifically set) */}
+                      {job.subject && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-muted text-ink/70 border border-border/60">
+                          {job.subject}
+                        </span>
+                      )}
                     </div>
+
                     <h3 className="text-sm font-heading font-bold text-ink leading-snug break-words">
                       {job.title}
                     </h3>
+
+                    {/* Rich Metadata Strip */}
+                    <div className="flex items-center gap-x-2.5 gap-y-1 text-[11px] text-ink/70 flex-wrap pt-0.5">
+                      <span className="inline-flex items-center gap-1">
+                        <User className="w-3 h-3 text-ink/50" />
+                        <span>Uploaded by <strong className="text-ink font-semibold">{job.uploaded_by_name || 'Super Admin'}</strong></span>
+                      </span>
+
+                      <span className="text-ink/30">•</span>
+
+                      <span className="inline-flex items-center gap-1" title="Uploaded timestamp in IST">
+                        <Calendar className="w-3 h-3 text-ink/50" />
+                        <span>{formatISTDateTime(job.created_at)}</span>
+                      </span>
+
+                      <span className="text-ink/30">•</span>
+
+                      <span className="inline-flex items-center gap-1">
+                        {job.device_info?.device_type === 'Mobile' ? (
+                          <Smartphone className="w-3 h-3 text-ink/50" />
+                        ) : job.device_info?.device_type === 'Tablet' ? (
+                          <Tablet className="w-3 h-3 text-ink/50" />
+                        ) : (
+                          <Laptop className="w-3 h-3 text-ink/50" />
+                        )}
+                        <span>{job.device_info?.device_type || 'Desktop'}</span>
+                      </span>
+
+                      {(job.total_pages > 0 || job.file_size_formatted) && (
+                        <>
+                          <span className="text-ink/30">•</span>
+                          <span className="inline-flex items-center gap-1">
+                            <FileText className="w-3 h-3 text-ink/50" />
+                            <span>
+                              {job.total_pages ? `${job.total_pages}p` : ''}
+                              {job.total_pages && job.file_size_formatted ? ' · ' : ''}
+                              {job.file_size_formatted || ''}
+                            </span>
+                          </span>
+                        </>
+                      )}
+
+                      {job.duration_formatted && (
+                        <>
+                          <span className="text-ink/30">•</span>
+                          <span className="inline-flex items-center gap-1 text-ink/60">
+                            <Clock className="w-3 h-3 text-ink/50" />
+                            <span>{job.duration_formatted}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Tablet Action Buttons (Touch friendly: 40px height) */}

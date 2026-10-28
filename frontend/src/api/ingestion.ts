@@ -21,6 +21,16 @@ export interface IngestionJobSummary {
   error_message?: string;
   google_drive_file_id?: string;
   google_drive_url: string;
+  file_size_bytes?: number;
+  file_size_formatted?: string;
+  uploaded_by_name?: string;
+  uploaded_by_role?: string;
+  uploaded_by_email?: string;
+  device_info?: {
+    device_type: 'Desktop' | 'Tablet' | 'Mobile';
+    os?: string;
+    browser?: string;
+  };
   metadata?: Record<string, any>;
   created_at: string;
   updated_at: string;

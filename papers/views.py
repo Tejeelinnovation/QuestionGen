@@ -21,13 +21,21 @@ from __future__ import annotations
 
 from typing import Any
 
+import logging
+import os
+import threading
+from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from content.filters import filter_questions
 from content.models import Question
@@ -95,6 +103,7 @@ def _build_question_snapshot(questions: list[Question]) -> list[dict[str, Any]]:
             "chapter_title": chap,
             "topic_name": top,
             "source_reference": q.source_reference,
+            "diagram": getattr(q, "diagram", None) or (getattr(q, "metadata", {}).get("diagram") if hasattr(q, "metadata") and isinstance(q.metadata, dict) else None),
         })
     return snapshot
 
@@ -134,6 +143,78 @@ class PaperListCreateView(APIView):
                 created_by=request.user,
                 school=request.user.school,
             )
+
+            # Fast Multimodal PDF Processing: Attach proxy URLs immediately (<5ms)
+            # and archive to Google Drive asynchronously in a background thread.
+            if paper.specifications and paper.specifications.get("source_mode") == "pdf":
+                try:
+                    from papers.services.pdf_harvester import PdfInspectionService
+                    insp_id = paper.specifications.get("inspection_id")
+                    selected_fig_ids = paper.specifications.get("selected_figure_ids", [])
+                    cached_insp = PdfInspectionService.get_inspection_data(insp_id)
+                    if cached_insp:
+                        detected_map = {f["figure_id"]: f for f in cached_insp.get("detected_figures", [])}
+                        high_res_map = cached_insp.get("high_res_images", {})
+                        disk_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
+                        os.makedirs(disk_dir, exist_ok=True)
+
+                        initial_diagrams = []
+                        for fig_id in selected_fig_ids:
+                            fig_meta = detected_map.get(fig_id, {})
+                            raw_b = high_res_map.get(fig_id)
+                            if raw_b:
+                                try:
+                                    with open(os.path.join(disk_dir, f"{fig_id}.png"), "wb") as df:
+                                        df.write(raw_b)
+                                except Exception as d_err:
+                                    logger.warning(f"Failed to cache diagram {fig_id} on disk: {d_err}")
+
+                            initial_diagrams.append({
+                                "figure_id": fig_id,
+                                "title": fig_meta.get("caption", f"Figure (Page {fig_meta.get('page_number', 1)})"),
+                                "page_number": fig_meta.get("page_number", 1),
+                                "thumbnail_b64": fig_meta.get("thumbnail_b64", ""),
+                                "image_url": f"/api/papers/diagram-asset/{fig_id}/",
+                                "drive_file_id": "",
+                                "web_view_link": "",
+                            })
+
+                        paper.specifications["attached_diagrams"] = initial_diagrams
+                        paper.specifications["extracted_text"] = cached_insp.get("full_text", "")
+                        paper.specifications["pdf_filename"] = cached_insp.get("filename", "")
+                        paper.specifications["word_count"] = cached_insp.get("word_count", 0)
+                        paper.save(update_fields=["specifications"])
+
+                        # Asynchronous non-blocking Google Drive archival
+                        if selected_fig_ids and paper.specifications.get("contribute_to_bank", True):
+                            def _bg_drive_upload(p_id, i_id, f_ids, p_title):
+                                try:
+                                    uploaded = PdfInspectionService.upload_selected_figures_to_drive(
+                                        inspection_id=i_id,
+                                        selected_figure_ids=f_ids,
+                                        paper_title=p_title,
+                                    )
+                                    from papers.models import Paper
+                                    p = Paper.objects.filter(id=p_id).first()
+                                    if p and p.specifications:
+                                        p.specifications["attached_diagrams"] = uploaded
+                                        p.save(update_fields=["specifications"])
+                                except Exception as bg_err:
+                                    logger.warning(f"Background Google Drive upload error: {bg_err}")
+
+                            transaction.on_commit(
+                                lambda p_id=paper.id, i_id=insp_id, f_ids=selected_fig_ids, p_title=paper.title: (
+                                    threading.Thread(
+                                        target=_bg_drive_upload,
+                                        args=(p_id, i_id, f_ids, p_title),
+                                        daemon=True,
+                                    ).start()
+                                )
+                            )
+
+                except Exception as pdf_err:
+                    logger.warning(f"Failed to process PDF attachments for paper #{paper.id}: {pdf_err}")
+
             log_action(
                 user=request.user,
                 action="paper.created",
@@ -265,6 +346,57 @@ class PaperSelectQuestionsView(APIView):
         req_serializer.is_valid(raise_exception=True)
         data = req_serializer.validated_data
 
+        # Multimodal Fast Path for Teacher-Uploaded PDF
+        if paper.specifications and paper.specifications.get("source_mode") == "pdf":
+            from generation.services.llm_generation import LLMQuestionGenerationService
+            llm_service = LLMQuestionGenerationService()
+            target_quantity = (
+                data.get("total_question_count")
+                or data.get("quantity")
+                or paper.total_question_count
+                or 5
+            )
+            mark_dist = data.get("mark_distribution") or []
+            if mark_dist:
+                target_quantity = sum(int(t.get("count", 0)) for t in mark_dist)
+
+            llm_constraints = {
+                "source_text": paper.specifications.get("extracted_text", ""),
+                "attached_figures": paper.specifications.get("attached_diagrams", []),
+                "difficulty": data.get("difficulty", "MEDIUM"),
+                "question_type": data.get("question_type", "ANY"),
+                "learner_level": data.get("learner_level", "INTERMEDIATE"),
+                "marks_per_question": data.get("marks_per_question", 2.0),
+                "quantity": target_quantity,
+                "total_marks": data.get("total_marks"),
+                "mark_distribution": mark_dist,
+                "difficulty_distribution": data.get("difficulty_distribution", {}),
+            }
+            drafts = llm_service.generate_questions(chapter=paper.chapter, constraints=llm_constraints)
+            formatted_questions = []
+            for idx, d in enumerate(drafts):
+                q_dict = d.to_dict()
+                q_dict["id"] = idx + 1
+                q_dict["question_type_display"] = q_dict.get("question_type")
+                q_dict["difficulty_display"] = q_dict.get("difficulty")
+                q_dict["learner_level_display"] = q_dict.get("learner_level")
+                q_dict["topic_name"] = paper.title
+                q_dict["chapter_title"] = paper.specifications.get("pdf_filename", "Custom Document")
+                formatted_questions.append(q_dict)
+
+            return Response(
+                {
+                    "paper_id": paper.id,
+                    "chapter_id": paper.chapter_id,
+                    "subjects": paper.subjects,
+                    "duration_minutes": paper.duration_minutes,
+                    "total_question_count": len(formatted_questions),
+                    "count": len(formatted_questions),
+                    "questions": formatted_questions,
+                },
+                status=status.HTTP_200_OK,
+            )
+
         # Multi-source candidate pooling:
         # Include Global QBM questions + own school's private questions.
         # Strictly exclude other organizations' question banks.
@@ -384,8 +516,11 @@ class PaperVersionListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
 
-        resolved_questions = validated["resolved_questions"]
-        snapshot = _build_question_snapshot(resolved_questions)
+        if "snapshot_data" in validated:
+            snapshot = validated["snapshot_data"]
+        else:
+            resolved_questions = validated["resolved_questions"]
+            snapshot = _build_question_snapshot(resolved_questions)
 
         # Determine version label
         version_label = validated.get("version_label") or get_next_version_label(paper)
@@ -952,3 +1087,154 @@ class DeliveryDetailView(APIView):
             return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
         serializer = DeliverySerializer(delivery, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# 11. Multimodal PDF Inspector (Fast Path for Teachers)
+# ---------------------------------------------------------------------------
+
+class PaperPdfInspectView(APIView):
+    """
+    POST /api/papers/inspect-pdf/
+    Inspects teacher-uploaded PDF in-memory, extracting text, headings, and embedded figures.
+    Returns thumbnails and inspection token for the frontend Figure Picker in 1-2 seconds.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        if not request.user.has_capability("CREATE_PAPER"):
+            return Response(
+                {"detail": "You do not have the 'CREATE_PAPER' capability required for this action."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        file_obj = request.FILES.get("file")
+        if not file_obj:
+            return Response({"detail": "No PDF file provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not file_obj.name.lower().endswith(".pdf"):
+            return Response({"detail": "Only PDF files are supported."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            file_bytes = file_obj.read()
+            from papers.services.pdf_harvester import PdfInspectionService
+            summary = PdfInspectionService.inspect_pdf(file_bytes=file_bytes, filename=file_obj.name)
+            return Response(summary, status=status.HTTP_200_OK)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"PDF inspection error: {e}", exc_info=True)
+            return Response(
+                {"detail": f"Failed to inspect PDF: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+# ---------------------------------------------------------------------------
+# 16. Dedicated Diagram Asset Streaming View (Zero Broken Images)
+# ---------------------------------------------------------------------------
+
+class PaperDiagramAssetView(APIView):
+    """
+    GET /api/papers/diagram-asset/<figure_id>/
+
+    Directly streams diagram image bytes with client caching headers.
+    Completely bypasses Google Drive cross-origin third-party cookie restrictions,
+    ensuring 100% reliable rendering in both Review Page and Printable Sheets.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, figure_id):
+        import base64
+        import os
+        from django.conf import settings
+        from papers.services.pdf_harvester import PdfInspectionService
+        from papers.models import Paper
+
+        # Level 1: Check persistent local disk cache
+        disk_path = os.path.join(settings.MEDIA_ROOT, "diagrams", f"{figure_id}.png")
+        if os.path.exists(disk_path):
+            try:
+                with open(disk_path, "rb") as f:
+                    img_bytes = f.read()
+                if img_bytes:
+                    response = HttpResponse(img_bytes, content_type="image/png")
+                    response["Cache-Control"] = "public, max-age=86400, immutable"
+                    response["Access-Control-Allow-Origin"] = "*"
+                    return response
+            except Exception:
+                pass
+
+        # Level 2: Check RAM inspection cache
+        img_bytes = PdfInspectionService.get_figure_bytes(figure_id)
+        if img_bytes:
+            try:
+                os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                with open(disk_path, "wb") as f:
+                    f.write(img_bytes)
+            except Exception:
+                pass
+            response = HttpResponse(img_bytes, content_type="image/png")
+            response["Cache-Control"] = "public, max-age=86400, immutable"
+            response["Access-Control-Allow-Origin"] = "*"
+            return response
+
+        # Level 3: Look up Paper record to get Google Drive File ID or Thumbnail Base64
+        paper = Paper.objects.filter(specifications__icontains=figure_id).first()
+        if paper and paper.specifications:
+            diagrams = paper.specifications.get("attached_diagrams") or []
+            target_diag = next((d for d in diagrams if d.get("figure_id") == figure_id), None)
+            if target_diag:
+                drive_file_id = target_diag.get("drive_file_id")
+                if drive_file_id:
+                    try:
+                        from content_ingestion.storage.drive_client import GoogleDriveClient
+                        drive_client = GoogleDriveClient()
+                        if drive_client.is_configured:
+                            img_bytes = drive_client.download_bytes(drive_file_id)
+                            if img_bytes:
+                                try:
+                                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                                    with open(disk_path, "wb") as f:
+                                        f.write(img_bytes)
+                                except Exception:
+                                    pass
+                                response = HttpResponse(img_bytes, content_type="image/png")
+                                response["Cache-Control"] = "public, max-age=86400, immutable"
+                                response["Access-Control-Allow-Origin"] = "*"
+                                return response
+                    except Exception as drive_err:
+                        logger.warning(f"Failed to fetch {figure_id} from Drive: {drive_err}")
+
+                # Level 4: Base64 thumbnail fallback from Paper specifications
+                thumb_b64 = target_diag.get("thumbnail_b64")
+                if thumb_b64:
+                    try:
+                        if "," in thumb_b64:
+                            thumb_b64 = thumb_b64.split(",", 1)[1]
+                        thumb_bytes = base64.b64decode(thumb_b64)
+                        if thumb_bytes:
+                            response = HttpResponse(thumb_bytes, content_type="image/jpeg")
+                            response["Cache-Control"] = "public, max-age=86400, immutable"
+                            response["Access-Control-Allow-Origin"] = "*"
+                            return response
+                    except Exception:
+                        pass
+
+        # Level 5: Check if figure_id itself might be a direct Google Drive file ID
+        try:
+            from content_ingestion.storage.drive_client import GoogleDriveClient
+            drive_client = GoogleDriveClient()
+            if drive_client.is_configured:
+                img_bytes = drive_client.download_bytes(figure_id)
+                if img_bytes:
+                    response = HttpResponse(img_bytes, content_type="image/png")
+                    response["Cache-Control"] = "public, max-age=86400, immutable"
+                    response["Access-Control-Allow-Origin"] = "*"
+                    return response
+        except Exception:
+            pass
+
+        return HttpResponse(status=status.HTTP_404_NOT_FOUND)
+

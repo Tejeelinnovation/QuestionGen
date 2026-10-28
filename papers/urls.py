@@ -18,9 +18,15 @@ from .views import (
     PaperVersionPrintView,
     PaperVersionAnswerKeyView,
     PaperVersionDocxExportView,
+    PaperPdfInspectView,
+    PaperDiagramAssetView,
 )
 
 urlpatterns = [
+    # Dedicated Diagram Asset Streaming: GET /api/papers/diagram-asset/<figure_id>/
+    path("papers/diagram-asset/<str:figure_id>/", PaperDiagramAssetView.as_view(), name="paper-diagram-asset"),
+    # Fast In-Memory PDF Inspector: POST /api/papers/inspect-pdf/
+    path("papers/inspect-pdf/", PaperPdfInspectView.as_view(), name="paper-pdf-inspect"),
     # Paper shell list & create: GET /api/papers/, POST /api/papers/
     path("papers/", PaperListCreateView.as_view(), name="paper-list-create"),
     # Paper detail: GET /api/papers/{id}/

@@ -1,5 +1,15 @@
 import React from 'react';
 import type { PaperPrintData } from '../../types';
+import { MathText } from '../ui/MathText';
+import { API_BASE_URL } from '../../api/client';
+
+const resolveImageUrl = (url?: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 interface PrintablePaperSheetProps {
   printData: PaperPrintData;
@@ -99,12 +109,34 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
               <div className="flex justify-between items-baseline gap-4">
                 <div className="text-sm font-medium leading-relaxed">
                   <span className="font-bold mr-1.5">{idx + 1}.</span>
-                  {q.question_text}
+                  <MathText text={q.question_text} as="span" />
                 </div>
                 <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
                   [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
                 </span>
               </div>
+
+              {/* Diagram / Visual Asset Display */}
+              {q.diagram && q.diagram.image_url && (
+                <div className="py-2.5 flex flex-col items-center justify-center pl-5">
+                  <img
+                    src={resolveImageUrl(q.diagram.image_url)}
+                    alt={q.diagram.title || 'Question Diagram'}
+                    className="max-h-60 max-w-md object-contain border border-gray-300 rounded p-1"
+                    onError={(e) => {
+                      const currentSrc = (e.currentTarget as HTMLImageElement).src;
+                      if (!currentSrc.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                        (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
+                      }
+                    }}
+                  />
+                  {q.diagram.title && (
+                    <span className="text-[11px] font-mono text-gray-600 mt-1 italic">
+                      {q.diagram.title}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* MCQ Options Display */}
               {q.options && Object.keys(q.options).length > 0 && (
@@ -112,7 +144,7 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
                   {Object.entries(q.options).map(([key, val]) => (
                     <div key={key} className="flex items-baseline gap-1.5">
                       <span className="font-bold font-mono">({key})</span>
-                      <span>{val}</span>
+                      <MathText text={val} as="span" />
                     </div>
                   ))}
                 </div>

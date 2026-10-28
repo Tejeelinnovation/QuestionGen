@@ -16,6 +16,11 @@ import {
   HeartHandshake,
   RotateCcw,
   AlertCircle,
+  User,
+  Calendar,
+  Laptop,
+  Smartphone,
+  Tablet,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -28,11 +33,11 @@ import {
   type IngestionJobSummary,
   exportJobJson,
 } from '../../api/ingestion';
+import { formatISTDateTime } from '../../utils/dateUtils';
 import { UploadDocumentModal } from './UploadDocumentModal';
 import { DatasetInspectionModal } from './DatasetInspectionModal';
 import { ConfirmDeleteModal } from '../../components/ui/ConfirmDeleteModal';
 import { SkeletonIngestionList } from '../../components/ui/skeleton';
-import { JobDurationBadge } from '../../components/ui/JobDurationTimer';
 
 export const DatasetIngestionPageDesktop: React.FC = () => {
   const { user, hasCapability } = useAuth();
@@ -316,95 +321,108 @@ export const DatasetIngestionPageDesktop: React.FC = () => {
               const isProcessing = processingJobIds.has(job.id);
               return (
                 <div key={job.id} className="p-5 hover:bg-surface-muted/30 transition-all space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="space-y-1">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      {/* Clean Badges: Status + Subject / Board if explicitly specified */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-forest/10 text-forest border border-forest/20">
-                          {job.board || 'Not specified'} {job.standard ? `· Class ${job.standard}` : ''}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-muted text-ink/70 border border-border">
-                          {job.subject || 'General'}
-                        </span>
-                        {job.document_kind && (
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
-                              ['NEWSPAPER', 'MAGAZINE', 'OTHER'].includes(job.document_kind)
-                                ? 'bg-purple-500/10 text-purple-700 border-purple-500/20'
-                                : job.document_kind === 'HANDWRITTEN_NOTES' || job.document_kind === 'NOTES'
-                                ? 'bg-amber-500/10 text-amber-700 border-amber-500/20'
-                                : 'bg-blue-500/10 text-blue-700 border-blue-500/20'
-                            }`}
-                            title={job.classification_evidence}
-                          >
-                            {job.document_kind}
-                            {job.classification_confidence !== undefined && job.classification_confidence !== null
-                              ? ` (${Math.round(job.classification_confidence * 100)}%)`
-                              : ''}
-                          </span>
-                        )}
-                        {/* Contributor Status Badge */}
-                        {!isSuperAdmin && (
-                          job.status === 'COMPLETED' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                              <CheckCircle2 className="w-3 h-3" /> Verified & Accepted
-                            </span>
-                          ) : job.status === 'EXTRACTING' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-700 border border-blue-500/20">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Processing...
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/20">
-                              <Clock className="w-3 h-3" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Queued'}
-                            </span>
-                          )
-                        )}
-                        {/* Super Admin Status Badge */}
-                        {isSuperAdmin && (
-                          job.status === 'COMPLETED' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                              <CheckCircle2 className="w-3 h-3" /> Completed
-                            </span>
-                          ) : job.status === 'EXTRACTING' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-500/10 text-blue-700 border border-blue-500/20">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Extracting
-                            </span>
-                          ) : job.status === 'PENDING' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/20">
-                              <Clock className="w-3 h-3" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Queued'}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-red-500/10 text-red-700 border border-red-500/20">
-                              Failed
-                            </span>
-                          )
-                        )}
-
-                        {/* Extraction Engine Tag */}
-                        {job.metadata?.extraction_engine ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
-                            <Sparkles className="w-2.5 h-2.5 text-purple-600" />
-                            {job.metadata.extraction_engine}
-                          </span>
-                        ) : job.current_stage?.includes('Docling') || job.current_stage?.includes('Marker') ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-500/10 text-purple-800 border border-purple-500/25">
-                            <Sparkles className="w-2.5 h-2.5 text-purple-600" />
-                            Docling AI (DocLayNet)
+                        {/* Status Badge */}
+                        {job.status === 'COMPLETED' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-heading font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Completed
                           </span>
                         ) : job.status === 'EXTRACTING' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-purple-500/10 text-purple-700 border border-purple-500/20 animate-pulse">
-                            <Sparkles className="w-2.5 h-2.5 text-purple-600" />
-                            Docling AI Engine
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-heading font-semibold bg-blue-500/10 text-blue-700 border border-blue-500/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Extracting
                           </span>
-                        ) : job.status === 'COMPLETED' ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-surface-muted text-ink/65 border border-border">
-                            Document AI Engine
+                        ) : job.status === 'PENDING' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-heading font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/20">
+                            <Clock className="w-3.5 h-3.5 text-amber-600" /> {job.queue_position ? `Queued (#${job.queue_position})` : 'Queued'}
                           </span>
-                        ) : null}
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-heading font-semibold bg-red-500/10 text-red-700 border border-red-500/20">
+                            <AlertCircle className="w-3.5 h-3.5 text-red-600" /> Failed
+                          </span>
+                        )}
 
-                        {/* Total Extraction Duration Timer Badge */}
-                        <JobDurationBadge job={job} />
+                        {/* Board & Grade (only when specifically set) */}
+                        {(job.board || job.standard) && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-forest/10 text-forest border border-forest/20">
+                            {job.board || ''} {job.standard ? `· Class ${job.standard}` : ''}
+                          </span>
+                        )}
+
+                        {/* Subject (only when specifically set) */}
+                        {job.subject && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-muted text-ink/70 border border-border">
+                            {job.subject}
+                          </span>
+                        )}
                       </div>
-                      <h3 className="text-sm font-heading font-bold text-ink">{job.title}</h3>
+
+                      {/* Document Title */}
+                      <h3 className="text-base font-heading font-bold text-ink">{job.title}</h3>
+
+                      {/* Rich Metadata Strip: Who, When in IST, Device, Pages/Size */}
+                      <div className="flex items-center gap-x-3 gap-y-1 text-xs text-ink/70 flex-wrap pt-0.5">
+                        {/* Uploader Full Name */}
+                        <span className="inline-flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-ink/50" />
+                          <span>
+                            Uploaded by <strong className="text-ink font-semibold">{job.uploaded_by_name || 'Super Admin'}</strong>
+                          </span>
+                        </span>
+
+                        <span className="text-ink/30">•</span>
+
+                        {/* When uploaded (IST timestamp) */}
+                        <span className="inline-flex items-center gap-1.5" title="Uploaded timestamp in IST">
+                          <Calendar className="w-3.5 h-3.5 text-ink/50" />
+                          <span>{formatISTDateTime(job.created_at)}</span>
+                        </span>
+
+                        <span className="text-ink/30">•</span>
+
+                        {/* Device Used */}
+                        <span className="inline-flex items-center gap-1.5">
+                          {job.device_info?.device_type === 'Mobile' ? (
+                            <Smartphone className="w-3.5 h-3.5 text-ink/50" />
+                          ) : job.device_info?.device_type === 'Tablet' ? (
+                            <Tablet className="w-3.5 h-3.5 text-ink/50" />
+                          ) : (
+                            <Laptop className="w-3.5 h-3.5 text-ink/50" />
+                          )}
+                          <span>
+                            {job.device_info?.device_type || 'Desktop'}
+                            {job.device_info?.os ? ` (${job.device_info.os})` : ''}
+                          </span>
+                        </span>
+
+                        {/* Pages and File Size */}
+                        {(job.total_pages > 0 || job.file_size_formatted) && (
+                          <>
+                            <span className="text-ink/30">•</span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5 text-ink/50" />
+                              <span>
+                                {job.total_pages ? `${job.total_pages} pages` : ''}
+                                {job.total_pages && job.file_size_formatted ? ' · ' : ''}
+                                {job.file_size_formatted || ''}
+                              </span>
+                            </span>
+                          </>
+                        )}
+
+                        {/* Total Extraction Duration */}
+                        {job.duration_formatted && (
+                          <>
+                            <span className="text-ink/30">•</span>
+                            <span className="inline-flex items-center gap-1.5 text-ink/60">
+                              <Clock className="w-3.5 h-3.5 text-ink/50" />
+                              <span>{job.duration_formatted}</span>
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     {/* Action Buttons */}
