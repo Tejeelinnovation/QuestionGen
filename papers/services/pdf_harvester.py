@@ -19,6 +19,10 @@ from django.core.cache import cache
 from PIL import Image, ImageStat
 
 from content_ingestion.storage.drive_client import GoogleDriveClient
+from document_ai_worker.engine.legacy_font_converter import (
+    convert_page_spans_to_unicode,
+    is_legacy_font,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +102,17 @@ class PdfInspectionService:
             page = doc[page_idx]
             page_num = page_idx + 1
 
-            # 1. Extract Page Text
-            page_text = page.get_text("text") or ""
+            # 1. Extract Page Text (with automatic legacy Indic font remapping for KrutiDev/Chanakya)
+            fonts = [f[3] for f in page.get_fonts()]
+            if any(is_legacy_font(f) for f in fonts):
+                try:
+                    converted, _ = convert_page_spans_to_unicode(page)
+                    page_text = converted if converted and converted.strip() else (page.get_text("text") or "")
+                except Exception as e:
+                    logger.warning(f"Error remapping legacy font on page {page_num}: {e}")
+                    page_text = page.get_text("text") or ""
+            else:
+                page_text = page.get_text("text") or ""
             words = page_text.split()
             total_words += len(words)
 

@@ -47,6 +47,7 @@ _GLYPH_TABLE: List[Tuple[str, TokenType, str]] = [
     ("Vf^;k", TokenType.LIGATURE, "टट्टिया"),
     ("<ªª", TokenType.LIGATURE, "ढ्र"),
     ("I+kQ", TokenType.CONSONANT, "फ़ा"),
+    ("foaQ", TokenType.LIGATURE, "किं"),
 
     # 3-character combinations (Chanakya / KrutiDev)
     ("\u201dksa", TokenType.LIGATURE, "ज़ें"),
@@ -60,6 +61,9 @@ _GLYPH_TABLE: List[Tuple[str, TokenType, str]] = [
     ("oqQ", TokenType.LIGATURE, "कु"),
     ("owQ", TokenType.LIGATURE, "कू"),
     ("osQ", TokenType.LIGATURE, "के"),
+    ("foQ", TokenType.LIGATURE, "कि"),
+    ("iaQ", TokenType.LIGATURE, "फं"),
+    ("oaQ", TokenType.LIGATURE, "कं"),
     ("fiQ", TokenType.LIGATURE, "फि"),
     ("iSQ", TokenType.LIGATURE, "फै"),
     ("iQk", TokenType.LIGATURE, "फा"),
@@ -80,6 +84,7 @@ _GLYPH_TABLE: List[Tuple[str, TokenType, str]] = [
     ("ks", TokenType.POST_MATRA, "ो"),
 
     # 2-character combinations
+    ("oQ", TokenType.CONSONANT, "क"),
     ("\u201dk", TokenType.CONSONANT, "ज़"),
     ("”k", TokenType.CONSONANT, "ज़"),
     ("\u201d;", TokenType.LIGATURE, "ज़्य"),

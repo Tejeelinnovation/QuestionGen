@@ -15,6 +15,11 @@ import re
 from typing import Any, Dict, List, Tuple
 import pymupdf as fitz
 
+from document_ai_worker.engine.legacy_font_converter import (
+    is_legacy_font,
+    remap_legacy_text,
+)
+
 
 
 class DigitalPdfExtractor:
@@ -57,6 +62,19 @@ class DigitalPdfExtractor:
         # block_type == 0 is text, block_type == 1 is image
         raw_blocks = page.get_text("blocks")
         text_blocks = [b for b in raw_blocks if b[6] == 0 and b[4].strip()]
+
+        # Remap legacy Indic fonts (KrutiDev / Chanakya / Walkman) to Unicode Devanagari
+        try:
+            fonts = [f[3] for f in page.get_fonts()]
+            if any(is_legacy_font(f) for f in fonts):
+                remapped_blocks = []
+                for b in text_blocks:
+                    remapped_text, _ = remap_legacy_text(b[4])
+                    remapped_blocks.append((b[0], b[1], b[2], b[3], remapped_text, b[5], b[6]))
+                text_blocks = remapped_blocks
+        except Exception:
+            pass
+
         raw_full_text = "\n\n".join(b[4].strip() for b in text_blocks)
 
         # 2. Extract embedded images on this page

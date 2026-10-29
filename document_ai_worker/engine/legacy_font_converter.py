@@ -30,6 +30,11 @@ _K2U_MAPPINGS: List[Tuple[str, str]] = [
     ("”", "ज़"),
 
     # Q-suffix and F-glyph ligatures (Chanakya & KrutiDev)
+    ("foaQ", "किं"),
+    ("foQ", "कि"),
+    ("iaQ", "फं"),
+    ("oaQ", "कं"),
+    ("oQ", "क"),
     ("oqQ", "कु"),
     ("owQ", "कू"),
     ("osQ", "के"),
