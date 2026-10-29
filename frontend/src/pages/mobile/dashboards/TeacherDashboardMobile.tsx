@@ -20,6 +20,9 @@ import {
   Lock,
   AlertCircle,
   X,
+  Search,
+  SlidersHorizontal,
+  RotateCcw,
 } from 'lucide-react';
 import {
   SkeletonPaperGrid,
@@ -57,35 +60,128 @@ export const TeacherDashboardMobile: React.FC = () => {
   const [studentsPage, setStudentsPage] = useState<number>(1);
   const STUDENTS_PER_PAGE = 5; // 5 students per page on mobile
 
+  // Filter & Search states
+  const [isPapersFilterOpen, setIsPapersFilterOpen] = useState(false);
+  const [papersSearch, setPapersSearch] = useState('');
+  const [papersSubjectFilter, setPapersSubjectFilter] = useState('ALL');
+  const [papersSortOrder, setPapersSortOrder] = useState<'NEWEST' | 'OLDEST' | 'TITLE'>('NEWEST');
+
+  const [isDeliveriesFilterOpen, setIsDeliveriesFilterOpen] = useState(false);
+  const [deliveriesSearch, setDeliveriesSearch] = useState('');
+  const [deliveriesModeFilter, setDeliveriesModeFilter] = useState<'ALL' | 'ONLINE' | 'PRINT'>('ALL');
+
+  const [isStudentsFilterOpen, setIsStudentsFilterOpen] = useState(false);
+  const [studentsSearch, setStudentsSearch] = useState('');
+
+  // Extract distinct subjects from papers
+  const distinctPaperSubjects = React.useMemo(() => {
+    const subs = new Set<string>();
+    papers.forEach((p) => {
+      if (p.subjects && Array.isArray(p.subjects)) {
+        p.subjects.forEach((s) => subs.add(s));
+      }
+    });
+    return Array.from(subs).sort();
+  }, [papers]);
+
+  const hasActivePapersFilter = Boolean(papersSearch.trim() || papersSubjectFilter !== 'ALL' || papersSortOrder !== 'NEWEST');
+  const hasActiveDeliveriesFilter = Boolean(deliveriesSearch.trim() || deliveriesModeFilter !== 'ALL');
+  const hasActiveStudentsFilter = Boolean(studentsSearch.trim());
+
+  const resetPapersFilters = () => {
+    setPapersSearch('');
+    setPapersSubjectFilter('ALL');
+    setPapersSortOrder('NEWEST');
+    setPapersPage(1);
+  };
+
+  const resetDeliveriesFilters = () => {
+    setDeliveriesSearch('');
+    setDeliveriesModeFilter('ALL');
+    setDeliveriesPage(1);
+  };
+
+  // Filtered & Sorted Papers
+  const filteredPapers = React.useMemo(() => {
+    let result = [...papers];
+    if (papersSearch.trim()) {
+      const q = papersSearch.toLowerCase();
+      result = result.filter((p) =>
+        (p.title || '').toLowerCase().includes(q) ||
+        (p.chapter_title || '').toLowerCase().includes(q) ||
+        String(p.id).includes(q)
+      );
+    }
+    if (papersSubjectFilter !== 'ALL') {
+      result = result.filter((p) => p.subjects && p.subjects.includes(papersSubjectFilter));
+    }
+    if (papersSortOrder === 'NEWEST') {
+      result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    } else if (papersSortOrder === 'OLDEST') {
+      result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    } else if (papersSortOrder === 'TITLE') {
+      result.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    }
+    return result;
+  }, [papers, papersSearch, papersSubjectFilter, papersSortOrder]);
+
+  // Filtered Deliveries
+  const filteredDeliveries = React.useMemo(() => {
+    let result = [...deliveries];
+    if (deliveriesSearch.trim()) {
+      const q = deliveriesSearch.toLowerCase();
+      result = result.filter((d) =>
+        (d.paper_title || '').toLowerCase().includes(q) ||
+        String(d.id).includes(q)
+      );
+    }
+    if (deliveriesModeFilter !== 'ALL') {
+      result = result.filter((d) => d.mode === deliveriesModeFilter);
+    }
+    return result;
+  }, [deliveries, deliveriesSearch, deliveriesModeFilter]);
+
+  // Filtered Students
+  const filteredStudents = React.useMemo(() => {
+    if (!studentsSearch.trim()) return students;
+    const q = studentsSearch.toLowerCase();
+    return students.filter((s) => {
+      const name = `${s.first_name || ''} ${s.last_name || ''}`.toLowerCase();
+      const username = (s.username || '').toLowerCase();
+      const email = (s.email || '').toLowerCase();
+      return name.includes(q) || username.includes(q) || email.includes(q);
+    });
+  }, [students, studentsSearch]);
+
   const paginatedPapers = React.useMemo(() => {
     const start = (papersPage - 1) * PAPERS_PER_PAGE;
-    return papers.slice(start, start + PAPERS_PER_PAGE);
-  }, [papers, papersPage]);
+    return filteredPapers.slice(start, start + PAPERS_PER_PAGE);
+  }, [filteredPapers, papersPage]);
 
   const paginatedDeliveries = React.useMemo(() => {
     const start = (deliveriesPage - 1) * DELIVERIES_PER_PAGE;
-    return deliveries.slice(start, start + DELIVERIES_PER_PAGE);
-  }, [deliveries, deliveriesPage]);
+    return filteredDeliveries.slice(start, start + DELIVERIES_PER_PAGE);
+  }, [filteredDeliveries, deliveriesPage]);
 
   const paginatedStudents = React.useMemo(() => {
     const start = (studentsPage - 1) * STUDENTS_PER_PAGE;
-    return students.slice(start, start + STUDENTS_PER_PAGE);
-  }, [students, studentsPage]);
+    return filteredStudents.slice(start, start + STUDENTS_PER_PAGE);
+  }, [filteredStudents, studentsPage]);
 
   useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(papers.length / PAPERS_PER_PAGE));
+    const maxPage = Math.max(1, Math.ceil(filteredPapers.length / PAPERS_PER_PAGE));
     if (papersPage > maxPage) setPapersPage(1);
-  }, [papers.length, papersPage]);
+  }, [filteredPapers.length, papersPage]);
 
   useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(deliveries.length / DELIVERIES_PER_PAGE));
+    const maxPage = Math.max(1, Math.ceil(filteredDeliveries.length / DELIVERIES_PER_PAGE));
     if (deliveriesPage > maxPage) setDeliveriesPage(1);
-  }, [deliveries.length, deliveriesPage]);
+  }, [filteredDeliveries.length, deliveriesPage]);
 
   useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(students.length / STUDENTS_PER_PAGE));
+    const maxPage = Math.max(1, Math.ceil(filteredStudents.length / STUDENTS_PER_PAGE));
     if (studentsPage > maxPage) setStudentsPage(1);
-  }, [students.length, studentsPage]);
+  }, [filteredStudents.length, studentsPage]);
 
   // Modal / Drawer state
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -209,9 +305,89 @@ export const TeacherDashboardMobile: React.FC = () => {
       {/* ── Question Papers Feed (Most Important Content First) ── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
-          <span>CURRICULUM PAPERS ({papers.length})</span>
-          <span className="text-[11px]">Blueprints & Question Banks</span>
+          <span>CURRICULUM PAPERS ({filteredPapers.length !== papers.length ? `${filteredPapers.length}/${papers.length}` : `${papers.length}`})</span>
+          <button
+            type="button"
+            onClick={() => setIsPapersFilterOpen(!isPapersFilterOpen)}
+            className={`px-2.5 py-1 rounded-pill border transition-all flex items-center gap-1 text-[11px] font-heading cursor-pointer min-h-[36px] ${
+              isPapersFilterOpen || hasActivePapersFilter
+                ? 'border-forest bg-forest/10 text-forest font-semibold'
+                : 'border-border bg-surface text-ink/70'
+            }`}
+          >
+            <SlidersHorizontal className="w-3 h-3" />
+            <span>Filter</span>
+            {hasActivePapersFilter && <span className="w-1.5 h-1.5 rounded-full bg-forest" />}
+          </button>
         </div>
+
+        {/* Mobile Micro-Toolbar for Papers */}
+        {isPapersFilterOpen && (
+          <div className="p-3 bg-surface border border-forest/30 rounded-card shadow-xs space-y-2.5 animate-fade-in text-xs">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={papersSearch}
+                onChange={(e) => {
+                  setPapersSearch(e.target.value);
+                  setPapersPage(1);
+                }}
+                placeholder="Search title or ID..."
+                className="w-full pl-8 pr-7 py-2 rounded-pill bg-surface-muted/50 border border-border text-xs focus:border-forest focus:outline-none min-h-[40px]"
+              />
+              {papersSearch && (
+                <button
+                  type="button"
+                  onClick={() => { setPapersSearch(''); setPapersPage(1); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink cursor-pointer p-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={papersSubjectFilter}
+                onChange={(e) => {
+                  setPapersSubjectFilter(e.target.value);
+                  setPapersPage(1);
+                }}
+                className="w-full px-2 py-1.5 rounded-pill bg-surface-muted/50 border border-border text-xs focus:border-forest focus:outline-none min-h-[38px]"
+              >
+                <option value="ALL">All Subjects</option>
+                {distinctPaperSubjects.map((sub) => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
+
+              <select
+                value={papersSortOrder}
+                onChange={(e) => {
+                  setPapersSortOrder(e.target.value as any);
+                  setPapersPage(1);
+                }}
+                className="w-full px-2 py-1.5 rounded-pill bg-surface-muted/50 border border-border text-xs focus:border-forest focus:outline-none min-h-[38px]"
+              >
+                <option value="NEWEST">Newest First</option>
+                <option value="OLDEST">Oldest First</option>
+                <option value="TITLE">Title (A-Z)</option>
+              </select>
+            </div>
+
+            {hasActivePapersFilter && (
+              <button
+                type="button"
+                onClick={resetPapersFilters}
+                className="w-full py-1.5 rounded-pill text-xs text-rose-600 bg-rose-50/50 hover:bg-rose-50 flex items-center justify-center gap-1 transition-colors min-h-[36px]"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset filters</span>
+              </button>
+            )}
+          </div>
+        )}
 
 
 
@@ -226,6 +402,17 @@ export const TeacherDashboardMobile: React.FC = () => {
             >
               Start your first paper →
             </Link>
+          </div>
+        ) : filteredPapers.length === 0 ? (
+          <div className="p-6 text-center text-xs text-ink/60 bg-surface border border-border rounded-card space-y-2">
+            <p>No question papers match your filters.</p>
+            <button
+              type="button"
+              onClick={resetPapersFilters}
+              className="text-xs text-forest font-semibold hover:underline cursor-pointer"
+            >
+              Clear filters
+            </button>
           </div>
         ) : (
           paginatedPapers.map((p, idx) => {
@@ -312,7 +499,7 @@ export const TeacherDashboardMobile: React.FC = () => {
 
         <Pagination
           currentPage={papersPage}
-          totalCount={papers.length}
+          totalCount={filteredPapers.length}
           pageSize={PAPERS_PER_PAGE}
           onPageChange={setPapersPage}
           itemName="papers"
@@ -323,14 +510,97 @@ export const TeacherDashboardMobile: React.FC = () => {
       {/* ── Active Test Deliveries Feed ── */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
-          <span>SCHEDULED DELIVERIES ({deliveries.length})</span>
+          <span>SCHEDULED DELIVERIES ({filteredDeliveries.length !== deliveries.length ? `${filteredDeliveries.length}/${deliveries.length}` : `${deliveries.length}`})</span>
+          <button
+            type="button"
+            onClick={() => setIsDeliveriesFilterOpen(!isDeliveriesFilterOpen)}
+            className={`px-2.5 py-1 rounded-pill border transition-all flex items-center gap-1 text-[11px] font-heading cursor-pointer min-h-[36px] ${
+              isDeliveriesFilterOpen || hasActiveDeliveriesFilter
+                ? 'border-ember bg-ember/10 text-ember font-semibold'
+                : 'border-border bg-surface text-ink/70'
+            }`}
+          >
+            <SlidersHorizontal className="w-3 h-3" />
+            <span>Filter</span>
+            {hasActiveDeliveriesFilter && <span className="w-1.5 h-1.5 rounded-full bg-ember" />}
+          </button>
         </div>
+
+        {/* Mobile Micro-Toolbar for Deliveries */}
+        {isDeliveriesFilterOpen && (
+          <div className="p-3 bg-surface border border-ember/30 rounded-card shadow-xs space-y-2.5 animate-fade-in text-xs">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={deliveriesSearch}
+                onChange={(e) => {
+                  setDeliveriesSearch(e.target.value);
+                  setDeliveriesPage(1);
+                }}
+                placeholder="Search title or ID..."
+                className="w-full pl-8 pr-7 py-2 rounded-pill bg-surface-muted/50 border border-border text-xs focus:border-ember focus:outline-none min-h-[40px]"
+              />
+              {deliveriesSearch && (
+                <button
+                  type="button"
+                  onClick={() => { setDeliveriesSearch(''); setDeliveriesPage(1); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink cursor-pointer p-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 bg-surface-muted p-1 rounded-pill border border-border justify-around">
+              {(['ALL', 'ONLINE', 'PRINT'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    setDeliveriesModeFilter(mode);
+                    setDeliveriesPage(1);
+                  }}
+                  className={`flex-1 py-1 rounded-pill text-[11px] font-medium transition-colors min-h-[32px] cursor-pointer ${
+                    deliveriesModeFilter === mode
+                      ? 'bg-ember text-white shadow-xs font-semibold'
+                      : 'text-ink/60 hover:text-ink'
+                  }`}
+                >
+                  {mode === 'ALL' ? 'All' : mode === 'ONLINE' ? 'Online' : 'Print'}
+                </button>
+              ))}
+            </div>
+
+            {hasActiveDeliveriesFilter && (
+              <button
+                type="button"
+                onClick={resetDeliveriesFilters}
+                className="w-full py-1.5 rounded-pill text-xs text-rose-600 bg-rose-50/50 hover:bg-rose-50 flex items-center justify-center gap-1 transition-colors min-h-[36px]"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset filters</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {isLoadingDeliveries ? (
           <SkeletonDeliveriesList count={2} />
         ) : deliveries.length === 0 ? (
           <div className="p-4 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
             No active test deliveries. Finalize a paper to schedule one.
+          </div>
+        ) : filteredDeliveries.length === 0 ? (
+          <div className="p-4 text-center text-xs text-ink/60 bg-surface border border-border rounded-card space-y-1">
+            <p>No deliveries match your filters.</p>
+            <button
+              type="button"
+              onClick={resetDeliveriesFilters}
+              className="text-xs text-ember font-semibold hover:underline cursor-pointer"
+            >
+              Clear filters
+            </button>
           </div>
         ) : (
           paginatedDeliveries.map((d, idx) => (
@@ -362,7 +632,7 @@ export const TeacherDashboardMobile: React.FC = () => {
 
         <Pagination
           currentPage={deliveriesPage}
-          totalCount={deliveries.length}
+          totalCount={filteredDeliveries.length}
           pageSize={DELIVERIES_PER_PAGE}
           onPageChange={setDeliveriesPage}
           itemName="deliveries"
@@ -375,18 +645,61 @@ export const TeacherDashboardMobile: React.FC = () => {
         <div className="flex items-center justify-between text-xs text-ink/60 px-1 font-mono">
           <div className="flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5 text-grape" />
-            <span>ENROLLED STUDENTS ({students.length})</span>
+            <span>ENROLLED STUDENTS ({filteredStudents.length !== students.length ? `${filteredStudents.length}/${students.length}` : `${students.length}`})</span>
           </div>
-          <button
-            type="button"
-            id="mobile-teacher-create-student-btn"
-            onClick={() => setIsCreateStudentOpen(true)}
-            className="px-2.5 py-1 rounded-pill bg-grape text-white text-[11px] font-heading font-semibold hover:bg-grape/90 transition-all flex items-center gap-1 cursor-pointer min-h-[36px]"
-          >
-            <Plus className="w-3 h-3" />
-            <span>Student</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsStudentsFilterOpen(!isStudentsFilterOpen)}
+              className={`p-1.5 rounded-pill border transition-all flex items-center justify-center text-xs cursor-pointer min-h-[36px] min-w-[36px] ${
+                isStudentsFilterOpen || hasActiveStudentsFilter
+                  ? 'border-grape bg-grape/10 text-grape font-semibold'
+                  : 'border-border bg-surface text-ink/70'
+              }`}
+              title="Search students"
+            >
+              <Search className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              id="mobile-teacher-create-student-btn"
+              onClick={() => setIsCreateStudentOpen(true)}
+              className="px-2.5 py-1 rounded-pill bg-grape text-white text-[11px] font-heading font-semibold hover:bg-grape/90 transition-all flex items-center gap-1 cursor-pointer min-h-[36px]"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Student</span>
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Micro-Search for Students */}
+        {isStudentsFilterOpen && (
+          <div className="p-2.5 bg-surface border border-grape/30 rounded-card shadow-xs flex items-center gap-2 animate-fade-in text-xs">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 text-ink/40 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={studentsSearch}
+                onChange={(e) => {
+                  setStudentsSearch(e.target.value);
+                  setStudentsPage(1);
+                }}
+                placeholder="Search name, username, email..."
+                className="w-full pl-8 pr-7 py-2 rounded-pill bg-surface-muted/50 border border-border text-xs focus:border-grape focus:outline-none min-h-[40px]"
+                autoFocus
+              />
+              {studentsSearch && (
+                <button
+                  type="button"
+                  onClick={() => { setStudentsSearch(''); setStudentsPage(1); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/40 hover:text-ink cursor-pointer p-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {isLoadingStudents ? (
           <SkeletonCompactList count={3} />
@@ -397,6 +710,17 @@ export const TeacherDashboardMobile: React.FC = () => {
         ) : students.length === 0 ? (
           <div className="p-4 text-center text-xs text-ink/60 bg-surface border border-border rounded-card">
             No enrolled students in your classroom yet.
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="p-4 text-center text-xs text-ink/60 bg-surface border border-border rounded-card space-y-1">
+            <p>No students match &ldquo;{studentsSearch}&rdquo;</p>
+            <button
+              type="button"
+              onClick={() => { setStudentsSearch(''); setStudentsPage(1); }}
+              className="text-xs text-grape font-semibold hover:underline cursor-pointer"
+            >
+              Clear search
+            </button>
           </div>
         ) : (
           <div className="space-y-2">
@@ -438,7 +762,7 @@ export const TeacherDashboardMobile: React.FC = () => {
 
             <Pagination
               currentPage={studentsPage}
-              totalCount={students.length}
+              totalCount={filteredStudents.length}
               pageSize={STUDENTS_PER_PAGE}
               onPageChange={setStudentsPage}
               itemName="students"
