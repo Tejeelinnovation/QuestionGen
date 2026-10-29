@@ -15,6 +15,8 @@ import {
 import { MOTION } from '../../lib/motion';
 import { AssignPaperModal } from './AssignPaperModal';
 import { SkeletonCompactList } from '../ui/skeleton';
+import { Pagination } from '../ui/pagination';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 
 interface TeacherClassesSectionProps {
   compact?: boolean;
@@ -36,6 +38,23 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
   const [isRosterLoading, setIsRosterLoading] = useState<boolean>(false);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [rosterSearch, setRosterSearch] = useState<string>('');
+
+  const breakpoint = useBreakpoint();
+  const [classesPage, setClassesPage] = useState<number>(1);
+  // Responsive: Desktop: 6 classes (2 rows x 3 cols), Tablet: 4 classes (2 rows x 2 cols), Mobile: 3 classes
+  const classesPageSize = compact || breakpoint === 'mobile' ? 3 : breakpoint === 'tablet' ? 4 : 6;
+
+  const paginatedSubjectAssignments = useMemo(() => {
+    const start = (classesPage - 1) * classesPageSize;
+    return subjectAssignments.slice(start, start + classesPageSize);
+  }, [subjectAssignments, classesPage, classesPageSize]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(subjectAssignments.length / classesPageSize));
+    if (classesPage > maxPage) {
+      setClassesPage(1);
+    }
+  }, [subjectAssignments.length, classesPageSize, classesPage]);
 
   // Assign paper modal state
   const [assignClassTarget, setAssignClassTarget] = useState<{
@@ -319,12 +338,13 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
                 No additional subject teaching assignments mapped.
               </div>
             ) : (
-              <div
-                className={`grid grid-cols-1 ${
-                  compact ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'
-                } gap-4`}
-              >
-                {subjectAssignments.map((sa) => (
+              <>
+                <div
+                  className={`grid grid-cols-1 ${
+                    compact ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'
+                  } gap-4`}
+                >
+                {paginatedSubjectAssignments.map((sa) => (
                   <div
                     key={`sa-${sa.id}`}
                     className={`bg-surface border border-border rounded-card p-4 shadow-card hover:border-grape flex flex-col justify-between transition-all ${MOTION.hoverLift.className}`}
@@ -398,6 +418,15 @@ export const TeacherClassesSection: React.FC<TeacherClassesSectionProps> = ({ co
                   </div>
                 ))}
               </div>
+                <Pagination
+                  currentPage={classesPage}
+                  totalCount={subjectAssignments.length}
+                  pageSize={classesPageSize}
+                  onPageChange={setClassesPage}
+                  itemName="classes"
+                  className="mt-3"
+                />
+              </>
             )}
           </div>
         </div>

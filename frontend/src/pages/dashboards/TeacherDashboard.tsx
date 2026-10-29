@@ -19,6 +19,7 @@ import {
   SkeletonCompactList,
 } from '../../components/ui/skeleton';
 import { TeacherClassesSection } from '../../components/teachers/TeacherClassesSection';
+import { Pagination } from '../../components/ui/pagination';
 
 const TeacherDashboardDesktop: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -38,6 +39,46 @@ const TeacherDashboardDesktop: React.FC = () => {
   const [isDeletingPaper, setIsDeletingPaper] = useState(false);
   const [deletePaperError, setDeletePaperError] = useState<string | null>(null);
   const [deletePaperSuccess, setDeletePaperSuccess] = useState<string | null>(null);
+
+  // Pagination states
+  const [papersPage, setPapersPage] = useState<number>(1);
+  const PAPERS_PER_PAGE = 6; // 2 rows x 3 columns on desktop
+
+  const [deliveriesPage, setDeliveriesPage] = useState<number>(1);
+  const DELIVERIES_PER_PAGE = 5; // 5 entries per page as requested
+
+  const [studentsPage, setStudentsPage] = useState<number>(1);
+  const STUDENTS_PER_PAGE = 6;
+
+  const paginatedPapers = React.useMemo(() => {
+    const start = (papersPage - 1) * PAPERS_PER_PAGE;
+    return papers.slice(start, start + PAPERS_PER_PAGE);
+  }, [papers, papersPage]);
+
+  const paginatedDeliveries = React.useMemo(() => {
+    const start = (deliveriesPage - 1) * DELIVERIES_PER_PAGE;
+    return deliveries.slice(start, start + DELIVERIES_PER_PAGE);
+  }, [deliveries, deliveriesPage]);
+
+  const paginatedStudents = React.useMemo(() => {
+    const start = (studentsPage - 1) * STUDENTS_PER_PAGE;
+    return students.slice(start, start + STUDENTS_PER_PAGE);
+  }, [students, studentsPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(papers.length / PAPERS_PER_PAGE));
+    if (papersPage > maxPage) setPapersPage(1);
+  }, [papers.length, papersPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(deliveries.length / DELIVERIES_PER_PAGE));
+    if (deliveriesPage > maxPage) setDeliveriesPage(1);
+  }, [deliveries.length, deliveriesPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(students.length / STUDENTS_PER_PAGE));
+    if (studentsPage > maxPage) setStudentsPage(1);
+  }, [students.length, studentsPage]);
 
   // Student create / edit modal states
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -211,7 +252,7 @@ const TeacherDashboardDesktop: React.FC = () => {
 
         {!isLoadingPapers && !papersError && papers.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {papers.map((p, idx) => {
+            {paginatedPapers.map((p, idx) => {
               return (
                 <div
                   key={p.id}
@@ -291,6 +332,15 @@ const TeacherDashboardDesktop: React.FC = () => {
             })}
           </div>
         )}
+
+        <Pagination
+          currentPage={papersPage}
+          totalCount={papers.length}
+          pageSize={PAPERS_PER_PAGE}
+          onPageChange={setPapersPage}
+          itemName="papers"
+          className="mt-3"
+        />
       </section>
 
       {/* Category 2 & 3: Asymmetric Split for Deliveries (Ember) and Enrolled Students (Grape) */}
@@ -330,7 +380,7 @@ const TeacherDashboardDesktop: React.FC = () => {
 
           {!isLoadingDeliveries && !deliveriesError && deliveries.length > 0 && (
             <div className="space-y-3">
-              {deliveries.map((d, idx) => (
+              {paginatedDeliveries.map((d, idx) => (
                 <div
                   key={d.id}
                   style={getStaggerDelay(idx)}
@@ -380,6 +430,15 @@ const TeacherDashboardDesktop: React.FC = () => {
               ))}
             </div>
           )}
+
+          <Pagination
+            currentPage={deliveriesPage}
+            totalCount={deliveries.length}
+            pageSize={DELIVERIES_PER_PAGE}
+            onPageChange={setDeliveriesPage}
+            itemName="deliveries"
+            className="mt-3"
+          />
         </section>
 
         {/* Category 3: Students Roster (Grape Block - 5 cols) */}
@@ -427,7 +486,7 @@ const TeacherDashboardDesktop: React.FC = () => {
                 </div>
               ) : (
                 <div className="divide-y divide-border/60">
-                  {students.map((s) => {
+                  {paginatedStudents.map((s) => {
                     const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
                     const canEdit = canEditUser(currentUser, s);
 
@@ -463,6 +522,15 @@ const TeacherDashboardDesktop: React.FC = () => {
                   })}
                 </div>
               )}
+
+              <Pagination
+                currentPage={studentsPage}
+                totalCount={students.length}
+                pageSize={STUDENTS_PER_PAGE}
+                onPageChange={setStudentsPage}
+                itemName="students"
+                className="mt-3"
+              />
             </div>
           )}
         </section>

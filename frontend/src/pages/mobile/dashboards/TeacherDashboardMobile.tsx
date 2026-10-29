@@ -27,6 +27,7 @@ import {
   SkeletonCompactList,
 } from '../../../components/ui/skeleton';
 import { TeacherClassesSection } from '../../../components/teachers/TeacherClassesSection';
+import { Pagination } from '../../../components/ui/pagination';
 import { useToast } from '../../../context/ToastContext';
 
 export const TeacherDashboardMobile: React.FC = () => {
@@ -45,6 +46,46 @@ export const TeacherDashboardMobile: React.FC = () => {
   const [paperToDelete, setPaperToDelete] = useState<Paper | null>(null);
   const [isDeletingPaper, setIsDeletingPaper] = useState<boolean>(false);
   const [deletePaperError, setDeletePaperError] = useState<string | null>(null);
+
+  // Pagination states
+  const [papersPage, setPapersPage] = useState<number>(1);
+  const PAPERS_PER_PAGE = 3; // 3 papers per page on mobile
+
+  const [deliveriesPage, setDeliveriesPage] = useState<number>(1);
+  const DELIVERIES_PER_PAGE = 4; // 4 deliveries per page on mobile
+
+  const [studentsPage, setStudentsPage] = useState<number>(1);
+  const STUDENTS_PER_PAGE = 5; // 5 students per page on mobile
+
+  const paginatedPapers = React.useMemo(() => {
+    const start = (papersPage - 1) * PAPERS_PER_PAGE;
+    return papers.slice(start, start + PAPERS_PER_PAGE);
+  }, [papers, papersPage]);
+
+  const paginatedDeliveries = React.useMemo(() => {
+    const start = (deliveriesPage - 1) * DELIVERIES_PER_PAGE;
+    return deliveries.slice(start, start + DELIVERIES_PER_PAGE);
+  }, [deliveries, deliveriesPage]);
+
+  const paginatedStudents = React.useMemo(() => {
+    const start = (studentsPage - 1) * STUDENTS_PER_PAGE;
+    return students.slice(start, start + STUDENTS_PER_PAGE);
+  }, [students, studentsPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(papers.length / PAPERS_PER_PAGE));
+    if (papersPage > maxPage) setPapersPage(1);
+  }, [papers.length, papersPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(deliveries.length / DELIVERIES_PER_PAGE));
+    if (deliveriesPage > maxPage) setDeliveriesPage(1);
+  }, [deliveries.length, deliveriesPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(students.length / STUDENTS_PER_PAGE));
+    if (studentsPage > maxPage) setStudentsPage(1);
+  }, [students.length, studentsPage]);
 
   // Modal / Drawer state
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -187,7 +228,7 @@ export const TeacherDashboardMobile: React.FC = () => {
             </Link>
           </div>
         ) : (
-          papers.map((p, idx) => {
+          paginatedPapers.map((p, idx) => {
             const isFinal = p.status === 'FINALIZED';
             return (
               <div
@@ -268,6 +309,15 @@ export const TeacherDashboardMobile: React.FC = () => {
             );
           })
         )}
+
+        <Pagination
+          currentPage={papersPage}
+          totalCount={papers.length}
+          pageSize={PAPERS_PER_PAGE}
+          onPageChange={setPapersPage}
+          itemName="papers"
+          className="mt-2"
+        />
       </div>
 
       {/* ── Active Test Deliveries Feed ── */}
@@ -283,7 +333,7 @@ export const TeacherDashboardMobile: React.FC = () => {
             No active test deliveries. Finalize a paper to schedule one.
           </div>
         ) : (
-          deliveries.map((d, idx) => (
+          paginatedDeliveries.map((d, idx) => (
             <div
               key={d.id}
               style={getStaggerDelay(idx, true)}
@@ -309,6 +359,15 @@ export const TeacherDashboardMobile: React.FC = () => {
             </div>
           ))
         )}
+
+        <Pagination
+          currentPage={deliveriesPage}
+          totalCount={deliveries.length}
+          pageSize={DELIVERIES_PER_PAGE}
+          onPageChange={setDeliveriesPage}
+          itemName="deliveries"
+          className="mt-2"
+        />
       </div>
 
       {/* ── Enrolled Students Section ── */}
@@ -341,7 +400,7 @@ export const TeacherDashboardMobile: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {students.map((s, idx) => {
+            {paginatedStudents.map((s, idx) => {
               const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
               const canEdit = canEditUser(currentUser, s);
 
@@ -376,6 +435,15 @@ export const TeacherDashboardMobile: React.FC = () => {
                 </div>
               );
             })}
+
+            <Pagination
+              currentPage={studentsPage}
+              totalCount={students.length}
+              pageSize={STUDENTS_PER_PAGE}
+              onPageChange={setStudentsPage}
+              itemName="students"
+              className="mt-2"
+            />
           </div>
         )}
       </div>

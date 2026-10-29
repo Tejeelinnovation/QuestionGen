@@ -15,6 +15,7 @@ import {
   SkeletonCompactList,
 } from '../../../components/ui/skeleton';
 import { TeacherClassesSection } from '../../../components/teachers/TeacherClassesSection';
+import { Pagination } from '../../../components/ui/pagination';
 import { useToast } from '../../../context/ToastContext';
 
 export const TeacherDashboardTablet: React.FC = () => {
@@ -35,6 +36,46 @@ export const TeacherDashboardTablet: React.FC = () => {
   const [isDeletingPaper, setIsDeletingPaper] = useState(false);
   const [deletePaperError, setDeletePaperError] = useState<string | null>(null);
   const [deletePaperSuccess, setDeletePaperSuccess] = useState<string | null>(null);
+
+  // Pagination states
+  const [papersPage, setPapersPage] = useState<number>(1);
+  const PAPERS_PER_PAGE = 4; // 2 rows x 2 columns on tablet
+
+  const [deliveriesPage, setDeliveriesPage] = useState<number>(1);
+  const DELIVERIES_PER_PAGE = 5; // 5 entries per page
+
+  const [studentsPage, setStudentsPage] = useState<number>(1);
+  const STUDENTS_PER_PAGE = 6;
+
+  const paginatedPapers = React.useMemo(() => {
+    const start = (papersPage - 1) * PAPERS_PER_PAGE;
+    return papers.slice(start, start + PAPERS_PER_PAGE);
+  }, [papers, papersPage]);
+
+  const paginatedDeliveries = React.useMemo(() => {
+    const start = (deliveriesPage - 1) * DELIVERIES_PER_PAGE;
+    return deliveries.slice(start, start + DELIVERIES_PER_PAGE);
+  }, [deliveries, deliveriesPage]);
+
+  const paginatedStudents = React.useMemo(() => {
+    const start = (studentsPage - 1) * STUDENTS_PER_PAGE;
+    return students.slice(start, start + STUDENTS_PER_PAGE);
+  }, [students, studentsPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(papers.length / PAPERS_PER_PAGE));
+    if (papersPage > maxPage) setPapersPage(1);
+  }, [papers.length, papersPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(deliveries.length / DELIVERIES_PER_PAGE));
+    if (deliveriesPage > maxPage) setDeliveriesPage(1);
+  }, [deliveries.length, deliveriesPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(students.length / STUDENTS_PER_PAGE));
+    if (studentsPage > maxPage) setStudentsPage(1);
+  }, [students.length, studentsPage]);
 
   // Modals state
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -191,7 +232,7 @@ export const TeacherDashboardTablet: React.FC = () => {
 
         {!isLoadingPapers && !papersError && papers.length > 0 && (
           <div className="grid grid-cols-2 gap-4">
-            {papers.map((p, idx) => (
+            {paginatedPapers.map((p, idx) => (
               <div
                 key={p.id}
                 style={getStaggerDelay(idx)}
@@ -267,6 +308,15 @@ export const TeacherDashboardTablet: React.FC = () => {
             ))}
           </div>
         )}
+
+        <Pagination
+          currentPage={papersPage}
+          totalCount={papers.length}
+          pageSize={PAPERS_PER_PAGE}
+          onPageChange={setPapersPage}
+          itemName="papers"
+          className="mt-3"
+        />
       </section>
 
       {/* ── Section 2: 2-Column Bento Reflow for Deliveries & Students ── */}
@@ -299,7 +349,7 @@ export const TeacherDashboardTablet: React.FC = () => {
 
           {!isLoadingDeliveries && !deliveriesError && (
             <div className="space-y-3">
-              {deliveries.map((d, idx) => (
+              {paginatedDeliveries.map((d, idx) => (
                 <div
                   key={d.id}
                   style={getStaggerDelay(idx)}
@@ -347,6 +397,15 @@ export const TeacherDashboardTablet: React.FC = () => {
                   </div>
                 </div>
               ))}
+
+              <Pagination
+                currentPage={deliveriesPage}
+                totalCount={deliveries.length}
+                pageSize={DELIVERIES_PER_PAGE}
+                onPageChange={setDeliveriesPage}
+                itemName="deliveries"
+                className="mt-3"
+              />
 
               {deliveries.length === 0 && (
                 <div className="bg-surface border border-border rounded-card p-6 text-center text-xs text-ink/60">
@@ -402,7 +461,7 @@ export const TeacherDashboardTablet: React.FC = () => {
                 </div>
               ) : (
                 <div className="divide-y divide-border/60 max-h-[400px] overflow-y-auto pr-1">
-                  {students.map((s) => {
+                  {paginatedStudents.map((s) => {
                     const fullName = [s.first_name, s.last_name].filter(Boolean).join(' ');
                     const canEdit = canEditUser(currentUser, s);
 
@@ -438,6 +497,15 @@ export const TeacherDashboardTablet: React.FC = () => {
                   })}
                 </div>
               )}
+
+              <Pagination
+                currentPage={studentsPage}
+                totalCount={students.length}
+                pageSize={STUDENTS_PER_PAGE}
+                onPageChange={setStudentsPage}
+                itemName="students"
+                className="mt-3"
+              />
             </div>
           )}
         </section>
