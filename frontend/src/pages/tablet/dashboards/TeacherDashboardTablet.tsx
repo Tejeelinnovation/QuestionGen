@@ -45,7 +45,7 @@ export const TeacherDashboardTablet: React.FC = () => {
   const DELIVERIES_PER_PAGE = 5; // 5 entries per page
 
   const [studentsPage, setStudentsPage] = useState<number>(1);
-  const STUDENTS_PER_PAGE = 6;
+  const STUDENTS_PER_PAGE = 8; // Vertically levels with the 5 Deliveries cards
 
   const paginatedPapers = React.useMemo(() => {
     const start = (papersPage - 1) * PAPERS_PER_PAGE;
