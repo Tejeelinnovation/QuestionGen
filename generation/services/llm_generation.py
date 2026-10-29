@@ -31,29 +31,51 @@ logger = logging.getLogger(__name__)
 
 
 SYSTEM_GENERATION_PROMPT = """
-You are an expert curriculum assessment creator and psychometric question author for school examinations.
+You are an expert curriculum assessment creator and psychometric question author for secondary and senior-secondary school examinations.
 Generate high-quality academic questions strictly aligned to the provided chapter content and constraints.
 
+SUBJECT-SPECIFIC RIGOR MANDATES:
+1. CHEMISTRY:
+   - All chemical formulas, ions, and reaction equations MUST be formatted in LaTeX notation (e.g. $\\text{MnO}_4^-$, $\\text{H}_2\\text{SO}_4$, $\\text{Fe}^{3+} + e^- \\rightarrow \\text{Fe}^{2+}$, $\\text{Cu}^{2+} + 2e^- \\rightarrow \\text{Cu}$, $\\text{Cr}_2\\text{O}_7^{2-}$).
+   - Explicitly write oxidation numbers with signs (e.g. $+7, +2, -1, 0$).
+   - For redox reactions and balancing questions, write full balanced chemical reactions with physical states ($s, l, g, aq$).
+2. MATHEMATICS & PHYSICS:
+   - Use rigorous LaTeX notation for formulas, fractions (\\frac{a}{b}), exponents, square roots (\\sqrt{x}), integrals (\\int), derivatives (\\frac{dy}{dx}), and vectors.
+   - Include realistic numerical problem statements with given parameters, units, and clear target quantities.
+3. ACCOUNTANCY & COMMERCE:
+   - Accounting entries MUST use clean Markdown tables with columns: Date | Particulars | L.F. | Debit (Rs.) | Credit (Rs.).
+   - Balance sheets and ledger accounts must present structured figures with realistic debit/credit balance.
+   - Questions on depreciation, partnership, shares, or ratios must provide explicit numeric details and calculations.
+4. BIOLOGY & LIFE SCIENCES:
+   - Use standard scientific terminology, taxonomic hierarchies (Kingdom, Phylum, Class, Order, Family, Genus, Species), binomial nomenclature rules, and precise physiological mechanisms.
+   - For diagram questions, ask students to identify anatomical structures, trace biochemical cycles, or distinguish cellular components.
+5. COMPUTER SCIENCE & INFORMATICS:
+   - Use formatted syntax blocks for code (Python/SQL/C++), boolean expressions, logic gate truth tables, and algorithm trace problems.
+6. LANGUAGE & MEDIUM FIDELITY (HINDI, SANSKRIT, URDU, REGIONAL):
+   - If the source textbook text is in Hindi, Sanskrit, or Urdu, formulate questions, options, and model solutions in that same language with accurate academic vocabulary.
+7. MULTIPLE CHOICE QUESTIONS (MCQs):
+   - Every MCQ MUST include exactly 4 distinct, plausible, academically rigorous options under keys "A", "B", "C", "D".
+   - Distractors must test plausible student misconceptions or common calculation pitfalls.
+   - STRICT PROHIBITION: NEVER use generic dummy placeholder options like "The inverse relation holds true", "None of the above statements are supported", or "Unverified assumption".
+8. SHORT & LONG ANSWERS:
+   - 'correct_answer' must contain the full model solution, key marking steps, and relevant equations.
+9. DIAGRAM-BASED QUESTIONS:
+   - When ATTACHED FIGURES are provided in the prompt, you MUST construct diagram-specific question(s) referencing the figure and include the exact 'diagram' object with 'figure_id', 'title', and 'image_url'.
+
 OUTPUT REQUIREMENTS:
-- Output MUST be valid, parseable JSON as an array of question objects (NO markdown code fences, NO preamble).
-- For MCQ: 'options' must be a JSON dictionary with keys "A", "B", "C", "D". 'correct_answer' must be the key (e.g. "B") or exact answer text.
-- For SHORT_ANSWER / LONG_ANSWER: 'options' must be null. 'correct_answer' must be the ideal model solution or key points.
-- Formulas and math expressions MUST use LaTeX notation (e.g. $x^2 + 5x + 6 = 0$, \\frac{a}{b}, \\int_0^1 f(x)dx).
-- Chemical equations MUST use standard notation or LaTeX (e.g. $\\ce{2H2 + O2 -> 2H2O}$).
-- Tables (Financial / Statistical) should be formatted in clean Markdown table format within 'question_text'.
-- When ATTACHED FIGURES are provided, you MUST construct diagram-based question(s) referencing the figure and include the 'diagram' field pointing to that figure.
+- Output MUST be valid, parseable JSON as an array of question objects (NO markdown code fences, NO introductory or concluding text).
 
 JSON SCHEMA:
 [
   {
-    "question_text": "Clear, rigorous question stem",
+    "question_text": "Clear, rigorous question stem with LaTeX equations where applicable",
     "question_type": "MCQ" | "SHORT_ANSWER" | "LONG_ANSWER" | "DIAGRAM_BASED",
     "marks": 1.0,
     "difficulty": "EASY" | "MEDIUM" | "HARD",
     "learner_level": "BEGINNER" | "INTERMEDIATE" | "ADVANCED",
     "correct_answer": "Model solution or correct option letter",
     "options": {"A": "Option 1", "B": "Option 2", "C": "Option 3", "D": "Option 4"} or null,
-    "source_reference": "Specific section, theorem, or page reference if available",
+    "source_reference": "Specific section, theorem, equation, or page reference",
     "diagram": {
       "figure_id": "fig_id_here",
       "title": "Figure caption or title",
@@ -82,8 +104,8 @@ class LLMQuestionGenerationService(QuestionGenerationService):
         )
         self.model_name = (
             model_name
-            or getattr(settings, "GEMINI_MODEL_NAME", "gemini-flash-latest")
-            or "gemini-flash-latest"
+            or getattr(settings, "GEMINI_MODEL_NAME", "gemini-3.5-flash-lite")
+            or "gemini-3.5-flash-lite"
         )
         self.fallback_service = fallback_service or SeededBankGenerationService()
         self.budget_manager = TokenBudgetManager()
@@ -95,13 +117,12 @@ class LLMQuestionGenerationService(QuestionGenerationService):
         constraints: Dict[str, Any],
     ) -> List[QuestionDraft]:
         """
-        Generate candidate questions using LLM with context budgeting, deduplication,
-        and fallback to SeededBankGenerationService.
+        Generate candidate questions using LLM with sectional batching, context budgeting,
+        deduplication, and multi-model fallback.
         """
-        # Resolve chapter instance and ID
         chapter_instance, chapter_id = self._resolve_chapter(chapter)
 
-        # 1. Check if LLM API is available. If no API key configured, route to appropriate fallback.
+        # 1. Check if LLM API is available.
         if not self.api_key:
             if constraints.get("source_text"):
                 logger.info("No LLM API key configured. Using heuristic generator for extracted source text.")
@@ -113,56 +134,63 @@ class LLMQuestionGenerationService(QuestionGenerationService):
         target_quantity = int(constraints.get("quantity") or 5)
         context_text = self._assemble_chapter_context(chapter_instance, chapter_id, constraints)
 
-        # 3. Calculate Token Budget
-        budget_report = self.budget_manager.calculate_budget(
-            model_name=self.model_name,
-            system_prompt=SYSTEM_GENERATION_PROMPT,
-            target_question_count=target_quantity,
-        )
+        # 3. Plan Sectional Batches to avoid prompt timeouts and JSON output truncation
+        batches = self._plan_batches(constraints, target_quantity)
+        logger.info(f"Sectional Batching: Generating {target_quantity} questions across {len(batches)} batch(es).")
 
-        # Safely fit context within available token budget
-        fitted_context, was_truncated = self.budget_manager.fit_context_text(
-            raw_text=context_text,
-            max_tokens=budget_report.context_budget_available,
-            model_name=self.model_name,
-        )
+        all_parsed_drafts: List[QuestionDraft] = []
+        for b_idx, b_spec in enumerate(batches):
+            b_qty = b_spec["quantity"]
+            b_constraints = b_spec["constraints"]
 
-        # 4. Formulate Prompt
-        user_prompt = self._build_user_prompt(
-            chapter_name=getattr(chapter_instance, "title", f"Chapter {chapter_id}"),
-            constraints=constraints,
-            context_text=fitted_context,
-            quantity=target_quantity,
-        )
-
-        # 5. Execute LLM Call with Provider Routing & Fallback
-        raw_response = self._call_llm_provider(user_prompt)
-        if not raw_response:
-            logger.warning(
-                f"LLM generation failed for Chapter {chapter_id}. Engaging fallback."
+            # Calculate Token Budget for this specific batch
+            budget_report = self.budget_manager.calculate_budget(
+                model_name=self.model_name,
+                system_prompt=SYSTEM_GENERATION_PROMPT,
+                target_question_count=b_qty,
             )
+
+            fitted_context, _ = self.budget_manager.fit_context_text(
+                raw_text=context_text,
+                max_tokens=budget_report.context_budget_available,
+                model_name=self.model_name,
+            )
+
+            user_prompt = self._build_user_prompt(
+                chapter_name=getattr(chapter_instance, "title", f"Chapter {chapter_id}"),
+                constraints=b_constraints,
+                context_text=fitted_context,
+                quantity=b_qty,
+            )
+
+            raw_response = self._call_llm_provider(user_prompt)
+            batch_drafts = []
+            if raw_response:
+                batch_drafts = self._parse_llm_response(raw_response, chapter_id, b_constraints)
+
+            if not batch_drafts:
+                logger.warning(
+                    f"Batch {b_idx + 1}/{len(batches)} (qty {b_qty}) failed or returned empty. Using source fallback for batch."
+                )
+                if constraints.get("source_text"):
+                    batch_drafts = self._generate_from_source_text_fallback(chapter_instance, b_constraints)
+                else:
+                    batch_drafts = self.fallback_service.generate_questions(chapter, b_constraints)
+
+            all_parsed_drafts.extend(batch_drafts)
+
+        if not all_parsed_drafts:
+            logger.warning(f"All generation batches failed for Chapter {chapter_id}. Engaging complete fallback.")
             if constraints.get("source_text"):
                 return self._generate_from_source_text_fallback(chapter_instance, constraints)
             return self.fallback_service.generate_questions(chapter, constraints)
 
-        # 6. Parse and Validate Questions
-        parsed_drafts = self._parse_llm_response(raw_response, chapter_id, constraints)
-        if not parsed_drafts:
-            logger.warning(
-                f"LLM generated unparseable response for Chapter {chapter_id}. Engaging fallback."
-            )
-            if constraints.get("source_text"):
-                return self._generate_from_source_text_fallback(chapter_instance, constraints)
-            return self.fallback_service.generate_questions(chapter, constraints)
-
-        # 7. Deduplication Guard: Remove internal batch duplicates
-        unique_drafts, batch_dups = self.duplicate_detector.filter_batch_duplicates(parsed_drafts)
+        # 4. Deduplication Guard: Remove internal batch duplicates
+        unique_drafts, batch_dups = self.duplicate_detector.filter_batch_duplicates(all_parsed_drafts)
         if batch_dups:
-            logger.info(
-                f"Deduplication Guard filtered {len(batch_dups)} duplicate questions from LLM batch."
-            )
+            logger.info(f"Deduplication Guard filtered {len(batch_dups)} duplicate questions.")
 
-        # 8. Check against existing questions in bank to prevent repeating already-saved questions
+        # 5. Check against existing questions in DB
         final_drafts: List[QuestionDraft] = []
         try:
             from content.models import Question
@@ -174,26 +202,76 @@ class LLMQuestionGenerationService(QuestionGenerationService):
             for draft in unique_drafts:
                 dup_match = self.duplicate_detector.check_against_existing(draft, existing_qs)
                 if dup_match and dup_match.is_duplicate and dup_match.similarity_score >= 0.90:
-                    logger.debug(f"Question matched existing bank question: {dup_match.matched_text[:60]}")
                     continue
                 final_drafts.append(draft)
         except Exception as e:
             logger.debug(f"Skipping existing question DB collision check: {e}")
             final_drafts = unique_drafts
 
-        # If deduplication left fewer items than desired, backfill from fallback bank or source text
-        if len(final_drafts) < target_quantity:
-            needed = target_quantity - len(final_drafts)
-            logger.info(f"Backfilling {needed} questions.")
-            fallback_constraints = dict(constraints)
-            fallback_constraints["quantity"] = needed
-            if constraints.get("source_text"):
-                fallback_drafts = self._generate_from_source_text_fallback(chapter_instance, fallback_constraints)
-            else:
-                fallback_drafts = self.fallback_service.generate_questions(chapter, fallback_constraints)
-            final_drafts.extend(fallback_drafts)
+        return final_drafts
 
-        return final_drafts[:target_quantity]
+    def _plan_batches(self, constraints: Dict[str, Any], target_quantity: int) -> List[Dict[str, Any]]:
+        """
+        Splits generation requests into manageable batches (max 10 questions each)
+        to prevent API timeouts, token truncation, and quality degradation.
+        """
+        mark_distribution = constraints.get("mark_distribution") or []
+        attached_figures = list(constraints.get("attached_figures") or [])
+        batches = []
+        fig_cursor = 0
+
+        if mark_distribution:
+            for tier in mark_distribution:
+                tier_marks = tier.get("marks", 1.0)
+                tier_count = int(tier.get("count", 0))
+                tier_types = tier.get("question_types") or [tier.get("question_type", "ANY")]
+                if isinstance(tier_types, str):
+                    tier_types = [tier_types]
+
+                remaining = tier_count
+                while remaining > 0:
+                    chunk_size = min(remaining, 10)
+                    remaining -= chunk_size
+
+                    # Assign diagrams if diagram-based or high marks
+                    assigned_figs = []
+                    if fig_cursor < len(attached_figures) and (
+                        "DIAGRAM_BASED" in tier_types or float(tier_marks) >= 3.0 or remaining == 0
+                    ):
+                        take_count = min(len(attached_figures) - fig_cursor, max(1, chunk_size // 2))
+                        assigned_figs = attached_figures[fig_cursor : fig_cursor + take_count]
+                        fig_cursor += take_count
+
+                    sub_tier = {
+                        "marks": tier_marks,
+                        "count": chunk_size,
+                        "question_types": tier_types,
+                    }
+                    b_constraints = dict(constraints)
+                    b_constraints["quantity"] = chunk_size
+                    b_constraints["mark_distribution"] = [sub_tier]
+                    b_constraints["attached_figures"] = assigned_figs
+                    b_constraints["marks"] = tier_marks
+                    b_constraints["question_type"] = tier_types[0] if len(tier_types) == 1 else "ANY"
+
+                    batches.append({"quantity": chunk_size, "constraints": b_constraints})
+        else:
+            remaining = target_quantity
+            while remaining > 0:
+                chunk_size = min(remaining, 10)
+                remaining -= chunk_size
+
+                assigned_figs = []
+                if fig_cursor < len(attached_figures):
+                    assigned_figs = [attached_figures[fig_cursor]]
+                    fig_cursor += 1
+
+                b_constraints = dict(constraints)
+                b_constraints["quantity"] = chunk_size
+                b_constraints["attached_figures"] = assigned_figs
+                batches.append({"quantity": chunk_size, "constraints": b_constraints})
+
+        return batches if batches else [{"quantity": target_quantity, "constraints": constraints}]
 
     def _resolve_chapter(self, chapter: Any) -> Tuple[Optional[Chapter], int]:
         """Extract Chapter model and integer ID safely."""
@@ -330,48 +408,136 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
 
     def _call_llm_provider(self, user_prompt: str) -> Optional[str]:
         """
-        Executes request against the primary LLM provider (Gemini Flash API).
-        Implements timeout protection and status handling.
+        Executes request against the primary LLM provider (Gemini API).
+        Implements multi-model fallback, retry logic, and 60s timeout.
         """
-        url = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
-            f"?key={self.api_key}"
+        import time
+
+        primary_model = self.model_name.replace("models/", "")
+        # Automatically upgrade deprecated model aliases to active production models
+        if primary_model in ("gemini-flash-latest", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"):
+            primary_model = "gemini-3.5-flash-lite"
+        models_to_try = [primary_model, "gemini-3.5-flash-lite", "gemini-3.5-flash"]
+        seen = set()
+        deduped_models = []
+        for m in models_to_try:
+            if m and m not in seen:
+                seen.add(m)
+                deduped_models.append(m)
+
+        for model in deduped_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+            payload = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [
+                            {"text": SYSTEM_GENERATION_PROMPT},
+                            {"text": user_prompt},
+                        ],
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "response_mime_type": "application/json",
+                },
+            }
+
+            for attempt in range(3):
+                try:
+                    resp = requests.post(url, json=payload, timeout=120)
+                    if resp.status_code == 200:
+                        res_data = resp.json()
+                        candidates = res_data.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            if parts:
+                                return parts[0].get("text", "")
+                    elif resp.status_code in (429, 503):
+                        logger.warning(f"Demand throttle (HTTP {resp.status_code}) on model {model}. Retrying after backoff...")
+                        time.sleep(3 * (attempt + 1))
+                        continue
+                    else:
+                        logger.warning(f"Model {model} returned status {resp.status_code}: {resp.text[:120]}")
+                        break
+                except requests.exceptions.RequestException as e:
+                    logger.warning(f"Network error on model {model} (attempt {attempt + 1}): {e}")
+                    time.sleep(2 * (attempt + 1))
+
+        return None
+
+    @classmethod
+    def _robust_latex_json_repair(cls, raw_str: str) -> Optional[Any]:
+        """
+        Repairs LLM-generated JSON strings containing mathematical/chemical LaTeX backslashes
+        (e.g. \\text, \\frac, \\rightarrow, \\ce, \\uparrow) that violate strict JSON escape rules.
+        """
+        try:
+            return json.loads(raw_str, strict=False)
+        except Exception:
+            pass
+
+        # 1. Fix invalid unicode escapes: \u not followed by 4 hex digits
+        s_fixed = re.sub(r'\\u(?![0-9a-fA-F]{4})', r'\\\\u', raw_str)
+
+        # 2. Fix unescaped backslashes before characters not in standard JSON escapes
+        s_fixed = re.sub(r'\\(?![/\"\\bfnrtu])', r'\\\\', s_fixed)
+
+        # 3. Fix common LaTeX commands starting with JSON escape letters (\text, \frac, \rightarrow, etc.)
+        latex_cmds = (
+            r'(?:text|times|theta|to|tau|frac|rightarrow|right|rho|beta|left|alpha|ce|cdot|Delta|'
+            r'omega|sigma|mu|lambda|pi|sqrt|infty|approx|pm|neq|leq|geq|uparrow|downarrow|over|sum|int|lim|partial)'
         )
-        payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [
-                        {"text": SYSTEM_GENERATION_PROMPT},
-                        {"text": user_prompt},
-                    ],
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.2,
-                "response_mime_type": "application/json",
-            },
-        }
+        s_fixed = re.sub(r'(?<!\\)\\(' + latex_cmds + r')\b', r'\\\\\1', s_fixed)
 
         try:
-            resp = requests.post(url, json=payload, timeout=25)
-            if resp.status_code == 200:
-                res_data = resp.json()
-                text = (
-                    res_data.get("candidates", [{}])[0]
-                    .get("content", {})
-                    .get("parts", [{}])[0]
-                    .get("text", "")
-                )
-                return text
-            elif resp.status_code == 429:
-                logger.warning("Gemini API rate limit exceeded (HTTP 429). Triggering fallback.")
-                return None
+            return json.loads(s_fixed, strict=False)
+        except Exception:
+            pass
+
+        # 4. Tokenizer-level string backslash sanitizer
+        out = []
+        in_str = False
+        i = 0
+        while i < len(raw_str):
+            c = raw_str[i]
+            if c == '"' and (i == 0 or raw_str[i - 1] != '\\'):
+                in_str = not in_str
+                out.append(c)
+                i += 1
+            elif in_str and c == '\\':
+                if i + 1 < len(raw_str):
+                    nxt = raw_str[i + 1]
+                    if nxt in ('"', '\\', '/'):
+                        out.append(c)
+                        out.append(nxt)
+                        i += 2
+                    elif nxt in ('b', 'f', 'n', 'r', 't'):
+                        sub = raw_str[i + 1 : i + 15]
+                        if re.match(r'^(?:text|times|theta|to|tau|frac|right|rho)\b', sub):
+                            out.append('\\\\')
+                            out.append(nxt)
+                            i += 2
+                        else:
+                            out.append(c)
+                            out.append(nxt)
+                            i += 2
+                    elif nxt == 'u' and i + 5 < len(raw_str) and re.match(r'^[0-9a-fA-F]{4}', raw_str[i + 2 : i + 6]):
+                        out.append(c)
+                        i += 1
+                    else:
+                        out.append('\\\\')
+                        i += 1
+                else:
+                    out.append('\\\\')
+                    i += 1
             else:
-                logger.warning(f"Gemini API returned status {resp.status_code}: {resp.text[:150]}")
-                return None
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Network error calling LLM API: {e}")
+                out.append(c)
+                i += 1
+
+        try:
+            return json.loads(''.join(out), strict=False)
+        except Exception:
             return None
 
     def _parse_llm_response(
@@ -393,18 +559,14 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
             clean = clean[:-3]
         clean = clean.strip()
 
-        try:
-            data = json.loads(clean)
-        except json.JSONDecodeError as e:
-            logger.warning(f"Direct JSON parse failed: {e}. Attempting regex array extraction.")
+        data = self._robust_latex_json_repair(clean)
+        if data is None:
             match = re.search(r"\[\s*\{.*\}\s*\]", clean, re.DOTALL)
             if match:
-                try:
-                    data = json.loads(match.group(0))
-                except Exception:
-                    return []
-            else:
-                return []
+                data = self._robust_latex_json_repair(match.group(0))
+
+        if not data:
+            return []
 
         if not isinstance(data, list):
             if isinstance(data, dict) and "questions" in data and isinstance(data["questions"], list):
@@ -564,9 +726,13 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
                             )
                         )
                     elif q_type == "MCQ":
+                        other_sentences = [s for s in pedagogical_sentences if s != sentence]
+                        dist1 = other_sentences[0][:110] if len(other_sentences) > 0 else "It represents an invariant constant across all states."
+                        dist2 = other_sentences[1][:110] if len(other_sentences) > 1 else "It applies exclusively under standard reference conditions."
+                        dist3 = other_sentences[2][:110] if len(other_sentences) > 2 else "It is strictly conserved during all transformations."
                         drafts.append(
                             QuestionDraft(
-                                question_text=f"Based on the chapter excerpt, which of the following statements is correct regarding: '{sentence[:90]}...'?",
+                                question_text=f"Which of the following statements accurately characterizes the principles discussed in the text regarding: '{sentence[:95]}...'?",
                                 question_type="MCQ",
                                 marks=tier_marks,
                                 difficulty=default_diff,
@@ -574,9 +740,9 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
                                 correct_answer="A",
                                 options={
                                     "A": sentence[:110],
-                                    "B": "The inverse relation holds true under baseline conditions.",
-                                    "C": "It is an unverified assumption without empirical basis.",
-                                    "D": "None of the above statements are supported.",
+                                    "B": dist1,
+                                    "C": dist2,
+                                    "D": dist3,
                                 },
                                 source_reference="Extracted Chapter Text",
                                 metadata={"source": "text_concept_fallback"},
@@ -660,9 +826,13 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
             sentence_idx += 1
 
             if len(drafts) % 2 == 0:
+                other_sentences = [s for s in pedagogical_sentences if s != sentence]
+                dist1 = other_sentences[0][:110] if len(other_sentences) > 0 else "It represents an invariant constant across all states."
+                dist2 = other_sentences[1][:110] if len(other_sentences) > 1 else "It applies exclusively under standard reference conditions."
+                dist3 = other_sentences[2][:110] if len(other_sentences) > 2 else "It is strictly conserved during all transformations."
                 drafts.append(
                     QuestionDraft(
-                        question_text=f"Based on the chapter excerpt, which of the following statements is correct regarding: '{sentence[:90]}...'?",
+                        question_text=f"Which of the following statements accurately characterizes the principles discussed in the text regarding: '{sentence[:95]}...'?",
                         question_type="MCQ",
                         marks=Decimal("1.0"),
                         difficulty=default_diff,
@@ -670,9 +840,9 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
                         correct_answer="A",
                         options={
                             "A": sentence[:110],
-                            "B": "The inverse relation holds true under baseline conditions.",
-                            "C": "It is an unverified assumption without empirical basis.",
-                            "D": "None of the above statements are supported.",
+                            "B": dist1,
+                            "C": dist2,
+                            "D": dist3,
                         },
                         source_reference="Extracted Chapter Text",
                         metadata={"source": "text_concept_fallback"},

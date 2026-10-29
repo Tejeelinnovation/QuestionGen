@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -22,6 +23,10 @@ from content_ingestion.storage.drive_client import GoogleDriveClient
 from document_ai_worker.engine.legacy_font_converter import (
     convert_page_spans_to_unicode,
     is_legacy_font,
+)
+from document_ai_worker.engine.text_cleaner import (
+    detect_caesar_shift,
+    unshift_ncert_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -113,6 +118,13 @@ class PdfInspectionService:
                     page_text = page.get_text("text") or ""
             else:
                 page_text = page.get_text("text") or ""
+
+            # Automatic unshifting for +3 Caesar cipher font encodings in NCERT/state board PDFs
+            if detect_caesar_shift(page_text):
+                try:
+                    page_text = unshift_ncert_text(page_text)
+                except Exception as c_err:
+                    logger.debug(f"Caesar unshift error on page {page_num}: {c_err}")
             words = page_text.split()
             total_words += len(words)
 
@@ -176,6 +188,118 @@ class PdfInspectionService:
                 except Exception as img_err:
                     logger.debug(f"Could not extract image xref {xref} on page {page_num}: {img_err}")
                     continue
+
+            # 3. Extract Vector & Composite Textbook Diagrams via Caption Anchors
+            # NCERT and textbook PDFs often draw diagrams using vector paths or composite gradient strips
+            try:
+                caption_regex = re.compile(
+                    r"^\s*(?:Fig(?:ure)?\.?|चित्र|आकृति|Diagram)\s*(\d+[\.\d]*)",
+                    re.IGNORECASE,
+                )
+                blocks = page.get_text("blocks")
+                for b in blocks:
+                    block_text = b[4].strip()
+                    m = caption_regex.match(block_text)
+                    if m:
+                        fig_num_tag = m.group(1).replace(".", "_")
+                        fig_id = f"fig_p{page_num}_comp_{fig_num_tag}"
+                        if fig_id in high_res_images:
+                            continue
+
+                        cap_box = pymupdf.Rect(b[:4])
+                        cap_text = " ".join(block_text.split()[:25])
+                        if detect_caesar_shift(cap_text):
+                            try:
+                                cap_text = unshift_ncert_text(cap_text)
+                            except Exception:
+                                pass
+
+                        # Collect all drawing and image bounding rects on this page
+                        elements = [d["rect"] for d in page.get_drawings()]
+                        for img in page.get_images():
+                            elements.extend(page.get_image_rects(img[0]))
+
+                        valid_elements = [
+                            r for r in elements
+                            if 20 < r.width < 580 and 10 < r.height < 650
+                        ]
+                        above = [r for r in valid_elements if r.y1 <= cap_box.y0 + 10 and r.y0 >= cap_box.y0 - 450]
+                        below = [r for r in valid_elements if r.y0 >= cap_box.y1 - 10 and r.y1 <= cap_box.y1 + 450]
+
+                        cand_rect = None
+                        if len(above) >= 2:
+                            cand_rect = above[0]
+                            for r in above[1:]:
+                                cand_rect = cand_rect | r
+                        elif len(below) >= 2:
+                            cand_rect = below[0]
+                            for r in below[1:]:
+                                cand_rect = cand_rect | r
+
+                        if cand_rect and cand_rect.width >= 70 and cand_rect.height >= 50:
+                            clip_rect = (
+                                pymupdf.Rect(
+                                    cand_rect.x0 - 6,
+                                    cand_rect.y0 - 6,
+                                    cand_rect.x1 + 6,
+                                    cand_rect.y1 + 6,
+                                )
+                                & page.rect
+                            )
+                            pix = page.get_pixmap(clip=clip_rect, dpi=180)
+                            comp_bytes = pix.tobytes("png")
+                            if cls._is_valid_diagram_image(comp_bytes, pix.width, pix.height):
+                                thumb_b64 = cls._generate_thumbnail_base64(comp_bytes)
+                                detected_figures.append(
+                                    {
+                                        "figure_id": fig_id,
+                                        "page_number": page_num,
+                                        "width": pix.width,
+                                        "height": pix.height,
+                                        "caption": cap_text,
+                                        "thumbnail_b64": thumb_b64,
+                                        "mime_type": "image/png",
+                                    }
+                                )
+                                high_res_images[fig_id] = comp_bytes
+                                cls._high_res_cache[fig_id] = comp_bytes
+            except Exception as comp_err:
+                logger.debug(f"Composite diagram detection error on page {page_num}: {comp_err}")
+
+        # 4. Scanned / Raster / Handwritten PDF Fallback via Gemini Vision OCR
+        if total_words < 50 and page_count > 0:
+            logger.info(f"PDF {filename} contains minimal selectable text ({total_words} words). Activating Gemini Vision OCR transcription for scanned/raster pages...")
+            try:
+                from document_ai_worker.engine.handwriting_pipeline import HandwritingPipeline
+                pipeline = HandwritingPipeline()
+                sample_pages = min(page_count, 8)
+                for p_idx in range(sample_pages):
+                    p_num = p_idx + 1
+                    page = doc[p_idx]
+                    pix = page.get_pixmap(dpi=120)
+                    img_bytes = pix.tobytes("png")
+                    b64_img = base64.b64encode(img_bytes).decode("utf-8")
+                    t_text = pipeline._transcribe_with_gemini(b64_img, p_num)
+                    if t_text and t_text.strip():
+                        full_text_parts.append(f"--- [Page {p_num} OCR] ---\n{t_text.strip()}")
+                        total_words += len(t_text.split())
+                        # If no figures detected yet, register the scanned page as a diagram asset
+                        if len(detected_figures) < 5:
+                            fig_id = f"fig_scan_p{p_num}"
+                            thumb_b64 = cls._generate_thumbnail_base64(img_bytes)
+                            detected_figures.append({
+                                "figure_id": fig_id,
+                                "page_number": p_num,
+                                "width": pix.width,
+                                "height": pix.height,
+                                "caption": f"Scanned page {p_num} reference",
+                                "thumbnail_b64": thumb_b64,
+                                "mime_type": "image/png",
+                            })
+                            high_res_images[fig_id] = img_bytes
+                            cls._high_res_cache[fig_id] = img_bytes
+            except Exception as ocr_err:
+                logger.warning(f"OCR transcription fallback error for {filename}: {ocr_err}")
 
         extracted_full_text = "\n\n".join(full_text_parts)
 
