@@ -28,6 +28,8 @@ class ModelProfile:
 
 
 DEFAULT_MODEL_PROFILES: Dict[str, ModelProfile] = {
+    "gemini-3.5-flash-lite": ModelProfile("gemini-3.5-flash-lite", max_context_window=32768, max_output_tokens=4096),
+    "gemini-3.5-flash": ModelProfile("gemini-3.5-flash", max_context_window=32768, max_output_tokens=4096),
     "gemini-2.0-flash": ModelProfile("gemini-2.0-flash", max_context_window=32768, max_output_tokens=4096),
     "gemini-1.5-flash": ModelProfile("gemini-1.5-flash", max_context_window=16384, max_output_tokens=3072),
     "gemini-3.8-flash": ModelProfile("gemini-3.8-flash", max_context_window=32768, max_output_tokens=4096),
@@ -149,9 +151,12 @@ class TokenBudgetManager:
         raw_text: str,
         max_tokens: int,
         model_name: str = "default",
+        offset_ratio: float = 0.0,
     ) -> Tuple[str, bool]:
         """
-        Fit a single block of raw text within a maximum token count.
+        Fit a block of raw text within a maximum token count.
+        Supports offset_ratio (0.0 to 1.0) for sliding context window allocation
+        across sequential examination batches to ensure wide syllabus coverage.
         Truncates gracefully at sentence boundaries with a notice.
         """
         current_tokens = self.estimate_tokens(raw_text, model_name)
@@ -161,7 +166,17 @@ class TokenBudgetManager:
         profile = self.get_profile(model_name)
         approx_max_chars = int(max_tokens * profile.chars_per_token_prose)
 
-        sliced = raw_text[:approx_max_chars]
+        total_chars = len(raw_text)
+        max_start = max(0, total_chars - approx_max_chars)
+        start_char = int(max_start * min(1.0, max(0.0, offset_ratio)))
+
+        # Find clean start boundary if starting mid-text
+        if start_char > 0:
+            next_boundary = raw_text.find("\n\n", start_char)
+            if next_boundary != -1 and next_boundary < start_char + 500:
+                start_char = next_boundary + 2
+
+        sliced = raw_text[start_char : start_char + approx_max_chars]
         # Find last sentence boundary
         last_period = max(sliced.rfind(". "), sliced.rfind("\n\n"), sliced.rfind(".\n"))
         if last_period > len(sliced) // 2:
@@ -169,7 +184,10 @@ class TokenBudgetManager:
         else:
             clean_slice = sliced.rstrip()
 
-        truncated_text = f"{clean_slice}\n\n[... Note: Subsequent context truncated due to token budget ...]"
+        prefix_notice = "[... Context excerpt begins at mid-chapter section ...]\n\n" if start_char > 0 else ""
+        suffix_notice = "\n\n[... Note: Subsequent context truncated due to token budget ...]" if (start_char + approx_max_chars) < total_chars else ""
+
+        truncated_text = f"{prefix_notice}{clean_slice}{suffix_notice}"
         return truncated_text, True
 
     def fit_educational_items(

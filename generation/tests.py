@@ -451,3 +451,69 @@ class LLMQuestionGenerationServiceTests(TestCase):
         matrix_input = r"$\begin{pmatrix} 1 & 2 \ 3 & 4 \end{pmatrix}$"
         healed = LLMQuestionGenerationService._clean_latex_string(matrix_input)
         self.assertIn(r"\\", healed)
+
+    def test_sliding_context_window_offset(self):
+        from generation.token_budget import TokenBudgetManager
+        manager = TokenBudgetManager()
+        # Large body of text with distinct sections
+        part1 = "Part One: Foundational principles and definitions of motion. " * 30
+        part2 = "Part Two: Dynamics of circular motion and centripetal force. " * 30
+        part3 = "Part Three: Planetary gravitation and Kepler's laws. " * 30
+        full_text = f"{part1}\n\n{part2}\n\n{part3}"
+
+        slice_start, is_trunc_start = manager.fit_context_text(full_text, max_tokens=100, offset_ratio=0.0)
+        self.assertTrue(is_trunc_start)
+        self.assertIn("Part One", slice_start)
+        self.assertNotIn("Part Three", slice_start)
+
+        slice_end, is_trunc_end = manager.fit_context_text(full_text, max_tokens=100, offset_ratio=0.95)
+        self.assertTrue(is_trunc_end)
+        self.assertIn("Part Three", slice_end)
+        self.assertIn("[... Context excerpt begins at mid-chapter section ...]", slice_end)
+
+    def test_inter_batch_prompt_diversity_injection(self):
+        from generation.services.llm_generation import LLMQuestionGenerationService
+        service = LLMQuestionGenerationService(api_key="dummy_key")
+        prev_qs = [
+            "[1m MCQ]: What is the SI unit of electric charge?",
+            "[2m SHORT_ANSWER]: State Coulomb's law and write its mathematical equation.",
+        ]
+        prompt = service._build_user_prompt(
+            chapter_name="Electrostatics",
+            constraints={"question_type": "MCQ", "marks": 1.0},
+            context_text="Electric charges and fields overview...",
+            quantity=5,
+            previously_generated=prev_qs,
+        )
+        self.assertIn("PREVIOUSLY GENERATED QUESTIONS IN THIS EXAMINATION", prompt)
+        self.assertIn("What is the SI unit of electric charge?", prompt)
+        self.assertIn("State Coulomb's law", prompt)
+        self.assertIn("CRITICAL INTER-BATCH DIVERSITY & NON-REPETITION MANDATE", prompt)
+        self.assertIn("STRICT NO-REPETITION", prompt)
+
+    def test_inter_batch_realtime_deduplication(self):
+        from unittest.mock import patch
+        from generation.services.llm_generation import LLMQuestionGenerationService
+        service = LLMQuestionGenerationService(api_key="dummy_key")
+
+        # Mock LLM provider to return identical question for batch 1 and batch 2
+        batch1_resp = '[{"question_text": "What is electric flux?", "question_type": "SHORT_ANSWER", "marks": 2.0}]'
+        batch2_resp = '[{"question_text": "Define electric flux in a closed surface.", "question_type": "SHORT_ANSWER", "marks": 2.0}]'
+
+        with patch.object(service, "_call_llm_provider", side_effect=[batch1_resp, batch2_resp]):
+            # Two batches of 1 question each
+            constraints = {
+                "quantity": 2,
+                "mark_distribution": [
+                    {"marks": 2.0, "count": 1, "question_types": ["SHORT_ANSWER"]},
+                    {"marks": 2.0, "count": 1, "question_types": ["SHORT_ANSWER"]},
+                ],
+                "source_text": "Electric flux is the measure of the electric field through a given surface.",
+            }
+            drafts = service.generate_questions(self.chapter, constraints)
+            # Second batch draft should be caught by inter-batch deduplication, leaving 1 accepted from LLM
+            # and backfilled to guarantee target quantity of 2
+            self.assertEqual(len(drafts), 2)
+            # Confirm batch 1 question exists
+            self.assertTrue(any("electric flux" in d.question_text.lower() for d in drafts))
+

@@ -140,6 +140,9 @@ class LLMQuestionGenerationService(QuestionGenerationService):
         logger.info(f"Sectional Batching: Generating {target_quantity} questions across {len(batches)} batch(es).")
 
         all_parsed_drafts: List[QuestionDraft] = []
+        covered_question_summaries: List[str] = []
+        total_batches = len(batches)
+
         for b_idx, b_spec in enumerate(batches):
             b_qty = b_spec["quantity"]
             b_constraints = b_spec["constraints"]
@@ -151,10 +154,13 @@ class LLMQuestionGenerationService(QuestionGenerationService):
                 target_question_count=b_qty,
             )
 
+            # Slide context window across batches so the entire chapter is examined
+            offset_ratio = (b_idx / total_batches) if total_batches > 1 else 0.0
             fitted_context, _ = self.budget_manager.fit_context_text(
                 raw_text=context_text,
                 max_tokens=budget_report.context_budget_available,
                 model_name=self.model_name,
+                offset_ratio=offset_ratio,
             )
 
             user_prompt = self._build_user_prompt(
@@ -162,6 +168,7 @@ class LLMQuestionGenerationService(QuestionGenerationService):
                 constraints=b_constraints,
                 context_text=fitted_context,
                 quantity=b_qty,
+                previously_generated=covered_question_summaries,
             )
 
             raw_response = self._call_llm_provider(user_prompt)
@@ -178,7 +185,26 @@ class LLMQuestionGenerationService(QuestionGenerationService):
                 else:
                     batch_drafts = self.fallback_service.generate_questions(chapter, b_constraints)
 
-            all_parsed_drafts.extend(batch_drafts)
+            # Real-time Inter-batch Deduplication Guard:
+            accepted_for_batch: List[QuestionDraft] = []
+            for draft in batch_drafts:
+                is_repeat = False
+                for prev in all_parsed_drafts:
+                    match = self.duplicate_detector.compare_questions(draft, prev, threshold=0.75)
+                    if match.is_duplicate:
+                        logger.info(
+                            f"Filtered inter-batch duplicate: '{draft.question_text[:60]}' "
+                            f"(reason: {match.reason}, score: {match.similarity_score})"
+                        )
+                        is_repeat = True
+                        break
+                if not is_repeat:
+                    accepted_for_batch.append(draft)
+                    covered_question_summaries.append(
+                        f"[{draft.marks}m {draft.question_type}]: {draft.question_text[:110].strip()}"
+                    )
+
+            all_parsed_drafts.extend(accepted_for_batch)
 
         if not all_parsed_drafts:
             logger.warning(f"All generation batches failed for Chapter {chapter_id}. Engaging complete fallback.")
@@ -284,6 +310,7 @@ class LLMQuestionGenerationService(QuestionGenerationService):
                     b_constraints["attached_figures"] = assigned_figs
                     b_constraints["marks"] = tier_marks
                     b_constraints["question_type"] = tier_types[0] if len(tier_types) == 1 else "ANY"
+                    b_constraints["sentence_offset"] = len(batches) * 10
 
                     batches.append({"quantity": chunk_size, "constraints": b_constraints})
         else:
@@ -300,6 +327,7 @@ class LLMQuestionGenerationService(QuestionGenerationService):
                 b_constraints = dict(constraints)
                 b_constraints["quantity"] = chunk_size
                 b_constraints["attached_figures"] = assigned_figs
+                b_constraints["sentence_offset"] = len(batches) * 10
                 batches.append({"quantity": chunk_size, "constraints": b_constraints})
 
         return batches if batches else [{"quantity": target_quantity, "constraints": constraints}]
@@ -374,6 +402,7 @@ class LLMQuestionGenerationService(QuestionGenerationService):
         constraints: Dict[str, Any],
         context_text: str,
         quantity: int,
+        previously_generated: Optional[List[str]] = None,
     ) -> str:
         """Construct the prompt sent to the LLM."""
         diff = constraints.get("difficulty", "ANY")
@@ -417,6 +446,23 @@ class LLMQuestionGenerationService(QuestionGenerationService):
                 + "4. DO NOT make all questions diagram-based! Balance the exam with pure text, LaTeX math, and conceptual questions.\n"
             )
 
+        diversity_section = ""
+        if previously_generated:
+            recent_items = previously_generated[-20:]
+            formatted_items = "\n".join(f"- {item}" for item in recent_items)
+            diversity_section = (
+                f"\nPREVIOUSLY GENERATED QUESTIONS IN THIS EXAMINATION ({len(previously_generated)} already created):\n"
+                f"{formatted_items}\n\n"
+                "CRITICAL INTER-BATCH DIVERSITY & NON-REPETITION MANDATE:\n"
+                "1. STRICT NO-REPETITION: DO NOT test the exact same concepts, definitions, formulas, reactions, or questions listed above!\n"
+                "2. WIDE SYLLABUS COVERAGE: Explore UNTOUCHED sections, subtopics, distinct theorems, different numerical parameters, or practical applications from the source material.\n"
+                f"3. COGNITIVE LEVEL ALIGNMENT: Ensure all questions in this batch strictly match the target tier [{marks} Marks]:\n"
+                "   - 1 Mark: Rapid identification, definition, direct unit, simple factual computation.\n"
+                "   - 2 Marks: 2 distinct points, short reasoning, brief cause-effect, simple formula application.\n"
+                "   - 3 Marks: Multi-step numerical calculation, derivation, comparative distinction matrix, or diagram analysis.\n"
+                "   - 4-5 Marks: Comprehensive case study, multi-part synthesis, complete experimental setup, or deep theoretical proof.\n"
+            )
+
         return f"""
 CHAPTER: {chapter_name}
 TARGET QUANTITY: {quantity} questions
@@ -429,6 +475,7 @@ CONSTRAINTS:
 - Cognitive Level (Bloom Taxonomy): {bloom}
 {rubric_section}
 {figures_section}
+{diversity_section}
 SOURCE CHAPTER MATERIAL:
 ---
 {context_text}
@@ -876,7 +923,7 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
                 "Experimental observations and foundational empirical equations.",
                 "Structural analysis, classification taxonomies, and functional mechanics.",
             ]
-        sentence_idx = 0
+        sentence_idx = int(constraints.get("sentence_offset") or 0)
 
         # Case A: Teacher configured a structured mark rubric distribution
         if mark_distribution:
