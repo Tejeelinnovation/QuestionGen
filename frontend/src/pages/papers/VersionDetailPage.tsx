@@ -85,7 +85,7 @@ const groupedSections = React.useMemo(() => {
       questions: Array<(typeof raw)[number] & { displayNum: number }>;
     }> = [];
 
-    const addSection = (title: string, inst: string, items: typeof raw) => {
+    const addSection = (baseTitle: string, baseInst: string, items: typeof raw) => {
       if (!items.length) return;
       const code = secCodes[codeIdx++];
       const totalMarks = items.reduce((sum, item) => sum + Number(item.marks || 0), 0);
@@ -93,18 +93,32 @@ const groupedSections = React.useMemo(() => {
         ...item,
         displayNum: runningQNum++,
       }));
+
+      const distinctMarks = Array.from(new Set(items.map((i) => Number(i.marks || 1))));
+      let titleWithMarks = baseTitle;
+      let inst = baseInst;
+
+      if (distinctMarks.length === 1) {
+        const m = distinctMarks[0];
+        const markLabel = m === 1 ? '1 Mark' : `${m} Marks`;
+        titleWithMarks = `${baseTitle} (${markLabel} Each)`;
+        inst = `Questions carry ${markLabel.toLowerCase()} each. ${baseInst}`;
+      } else {
+        inst = `Marks for each question are indicated against it. ${baseInst}`;
+      }
+
       result.push({
         code,
-        title: `Section ${code} — ${title}`,
+        title: `Section ${code} — ${titleWithMarks}`,
         instructions: inst,
         totalMarks: Math.round(totalMarks * 10) / 10,
         questions: itemsWithNum,
       });
     };
 
-    addSection('Multiple Choice Questions', 'All questions are compulsory. Select the single best option.', mcq);
-    addSection('Very Short Answer Questions (2 Marks Each)', 'Answer concisely in 30–50 words with balanced equations or formulas.', vsa);
-    addSection('Short Answer Questions (3 Marks Each)', 'Answer in 50–80 words with step-by-step working and units.', sa);
+    addSection('Multiple Choice Questions', 'Select the single best option.', mcq);
+    addSection('Very Short Answer Questions', 'Answer concisely in 30–50 words with balanced equations or formulas where applicable.', vsa);
+    addSection('Short Answer Questions', 'Answer in 50–80 words with step-by-step working and units.', sa);
     addSection('Long Answer & Analytical Questions', 'Provide detailed explanations, complete derivations, or diagrams.', la);
 
     if (result.length <= 1) {

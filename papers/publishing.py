@@ -128,11 +128,11 @@ class PaperPublishingService:
                 "items": [],
             },
             "vsa": {
-                "base_title": "Section {code} — Very Short Answer Questions (2 Marks Each)",
+                "base_title": "Section {code} — Very Short Answer Questions",
                 "items": [],
             },
             "sa": {
-                "base_title": "Section {code} — Short Answer Questions (3 Marks Each)",
+                "base_title": "Section {code} — Short Answer Questions",
                 "items": [],
             },
             "la": {
@@ -172,30 +172,33 @@ class PaperPublishingService:
             start_q = global_num
             end_q = global_num + len(b_items) - 1
 
-            sec_title = b_info["base_title"].format(code=sec_code)
+            distinct_marks = sorted(list({float(it.get("marks", 1.0) or 1.0) for it in b_items}))
+            base_t = b_info["base_title"].format(code=sec_code)
+
+            if len(distinct_marks) == 1:
+                m = distinct_marks[0]
+                m_label = f"{m:g} Mark" if m == 1 else f"{m:g} Marks"
+                sec_title = f"{base_t} ({m_label} Each)" if key != "mcq" or m != 1 else base_t
+                if start_q == end_q:
+                    inst_prefix = f"Question {start_q} carries {m_label.lower()}."
+                else:
+                    inst_prefix = f"Questions {start_q} to {end_q} carry {m_label.lower()} each."
+            else:
+                sec_title = base_t
+                if start_q == end_q:
+                    inst_prefix = f"Question {start_q}."
+                else:
+                    inst_prefix = f"Questions {start_q} to {end_q}. Marks for each question are indicated against it."
 
             # Dynamic question range instructions matching formal academic standards
             if key == "mcq":
-                if start_q == end_q:
-                    inst = f"Question {start_q} carries 1 mark. Select the single best option."
-                else:
-                    inst = f"Questions {start_q} to {end_q} carry 1 mark each. All questions are compulsory. Select the single best option."
+                inst = f"{inst_prefix} All questions are compulsory. Select the single best option."
             elif key == "vsa":
-                if start_q == end_q:
-                    inst = f"Question {start_q} carries 2 marks. Answer concisely in 30–50 words with balanced equations/steps where applicable."
-                else:
-                    inst = f"Questions {start_q} to {end_q} carry 2 marks each. Answer concisely in 30–50 words with balanced equations/steps where applicable."
+                inst = f"{inst_prefix} Answer concisely in 30–50 words with balanced equations/steps where applicable."
             elif key == "sa":
-                if start_q == end_q:
-                    inst = f"Question {start_q} carries 3 marks. Show step-by-step working and units where applicable."
-                else:
-                    inst = f"Questions {start_q} to {end_q} carry 3 marks each. Answer in 50–80 words with step-by-step working and units."
+                inst = f"{inst_prefix} Show step-by-step working and units where applicable."
             else:
-                avg_m = sum(float(it.get("marks", 5.0) or 5.0) for it in b_items) / len(b_items)
-                if start_q == end_q:
-                    inst = f"Question {start_q} carries {round(avg_m)} marks. Provide detailed derivations, explanations, or labelled diagrams."
-                else:
-                    inst = f"Questions {start_q} to {end_q} carry {round(avg_m)} marks each. Provide detailed derivations, explanations, or labelled diagrams."
+                inst = f"{inst_prefix} Provide detailed derivations, explanations, or labelled diagrams."
 
             sec = ExamSection(
                 section_code=sec_code,

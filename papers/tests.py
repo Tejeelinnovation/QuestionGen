@@ -1049,5 +1049,90 @@ class PaperPublishingAndAnswerKeyTests(TestCase):
         self.assertEqual(len(version_res.data["question_snapshot"]), 3)
 
 
+class ModalityRendererAndSectionHeaderTests(TestCase):
+    """
+    Tests for Bug 7 (Modality Renderers - Tables & Code Blocks)
+    and Bug 8 (Dynamic Section Header Marks & Instructions).
+    """
+
+    def test_docx_export_content_blocks_parsing(self):
+        from papers.docx_export import ExamPaperDocxService
+        service = ExamPaperDocxService()
+
+        # Test mixed text + table + code
+        raw_text = (
+            "From the following ledger details:\n"
+            "| Date | Particulars | Debit | Credit |\n"
+            "| --- | --- | --- | --- |\n"
+            "| 2024-01-01 | Cash A/c | 50000 | 0 |\n"
+            "| 2024-01-02 | Capital A/c | 0 | 50000 |\n"
+            "Execute the following python script:\n"
+            "```python\n"
+            "def balance(cr, dr):\n"
+            "    return cr - dr\n"
+            "```\n"
+            "State the final net balance."
+        )
+
+        blocks = service._parse_content_blocks(raw_text)
+        self.assertEqual(len(blocks), 5)
+        self.assertEqual(blocks[0]["type"], "text")
+        self.assertEqual(blocks[1]["type"], "table")
+        self.assertEqual(len(blocks[1]["headers"]), 4)
+        self.assertEqual(len(blocks[1]["rows"]), 2)
+        self.assertEqual(blocks[2]["type"], "text")
+        self.assertEqual(blocks[3]["type"], "code")
+        self.assertEqual(blocks[3]["lang"], "python")
+        self.assertIn("def balance", blocks[3]["content"])
+        self.assertEqual(blocks[4]["type"], "text")
+
+    def test_section_headers_uniform_vs_heterogeneous_marks(self):
+        from papers.publishing import PaperPublishingService
+        from papers.models import PaperVersion, Paper
+        from schools.models import School
+        from users.models import User
+
+        school = School.objects.create(name="Header Test School")
+        user = User.objects.create_user(username="test_head_teacher", password="pw", school=school)
+        paper = Paper.objects.create(title="Mark Test Paper", created_by=user, school=school)
+
+        # Case 1: Uniform 2-mark questions in VSA
+        uniform_vsa_snapshot = [
+            {"id": "q1", "question_text": "What is goodwill?", "question_type": "SHORT_ANSWER", "marks": 2.0},
+            {"id": "q2", "question_text": "Define sacrificing ratio.", "question_type": "SHORT_ANSWER", "marks": 2.0},
+        ]
+        version_uniform = PaperVersion.objects.create(
+            paper=paper,
+            version_label="A",
+            total_marks=4.0,
+            question_snapshot=uniform_vsa_snapshot,
+        )
+
+        service = PaperPublishingService()
+        sections_uniform = service.compile_sections(version_uniform)
+        self.assertEqual(len(sections_uniform), 1)
+        self.assertIn("(2 Marks Each)", sections_uniform[0].title)
+        self.assertIn("carry 2 marks each", sections_uniform[0].instructions)
+
+        # Case 2: Heterogeneous/varied marks in VSA (e.g. 1.5 marks and 2.0 marks)
+        varied_vsa_snapshot = [
+            {"id": "q1", "question_text": "Short definition 1", "question_type": "SHORT_ANSWER", "marks": 1.5},
+            {"id": "q2", "question_text": "Short definition 2", "question_type": "SHORT_ANSWER", "marks": 2.0},
+        ]
+        version_varied = PaperVersion.objects.create(
+            paper=paper,
+            version_label="B",
+            total_marks=3.5,
+            question_snapshot=varied_vsa_snapshot,
+        )
+
+        sections_varied = service.compile_sections(version_varied)
+        self.assertEqual(len(sections_varied), 1)
+        self.assertNotIn("(2 Marks Each)", sections_varied[0].title)
+        self.assertNotIn("carry 2 marks each", sections_varied[0].instructions)
+        self.assertIn("Marks for each question are indicated against it", sections_varied[0].instructions)
+
+
+
 
 

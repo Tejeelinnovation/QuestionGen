@@ -76,13 +76,16 @@ function renderKatexHtml(math: string, displayMode: boolean): string {
 }
 
 /**
- * Renders plain text with code block and inline code formatting.
+ * Renders plain text with code block, inline code, and structured Markdown table formatting.
  */
-function renderTextWithCode(text: string, keyPrefix: string): React.ReactNode[] {
+function renderTextWithMarkdownElements(text: string, keyPrefix: string): React.ReactNode[] {
   if (!text) return [];
 
-  // Match fenced code blocks ```lang\ncode\n``` or ```code```
-  const parts = text.split(/(```[\s\S]*?```|`[^`\n]+?`)/g);
+  // Match:
+  // 1. Fenced code blocks ```lang\ncode\n```
+  // 2. Inline code `...`
+  // 3. Markdown tables: continuous rows starting and ending with pipes including a divider row | --- |
+  const parts = text.split(/(```[\s\S]*?```|`[^`\n]+?`|(?:(?:^|\n)[ \t]*\|[^\n]+\|[ \t]*(?:\r?\n[ \t]*\|(?:\s*:?-+:?\s*\|)+)+(?:\r?\n[ \t]*\|[^\n]+\|[ \t]*)+))/g);
 
   return parts.map((part, pIdx) => {
     if (!part) return null;
@@ -115,6 +118,48 @@ function renderTextWithCode(text: string, keyPrefix: string): React.ReactNode[] 
       );
     }
 
+    // Structured Markdown Table (Financial Journals, Ledgers, Accounting, Scientific Data)
+    if (part.trim().startsWith('|') && part.includes('\n') && /\|(?:\s*:?-+:?\s*\|)+/.test(part)) {
+      const lines = part.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length >= 2) {
+        const parseRow = (line: string) => {
+          const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+          return trimmed.split('|').map((c) => c.trim());
+        };
+        const headers = parseRow(lines[0]);
+        const sepIdx = lines.findIndex((l, idx) => idx > 0 && /^\s*\|?(?:\s*:?-+:?\s*\|)+\s*$/.test(l));
+        const dataLines = sepIdx !== -1 ? lines.slice(sepIdx + 1) : lines.slice(1);
+        const dataRows = dataLines.map(parseRow);
+
+        return (
+          <div key={`${keyPrefix}-table-${pIdx}`} className="overflow-x-auto my-3 block clear-both">
+            <table className="min-w-full border-collapse border border-gray-300 text-xs font-mono text-left bg-white print:border-black shadow-xs">
+              <thead className="bg-gray-100 print:bg-gray-100/90 border-b-2 border-gray-300 print:border-black font-heading font-bold text-gray-900">
+                <tr>
+                  {headers.map((h, hIdx) => (
+                    <th key={hIdx} className="border border-gray-300 print:border-black px-3 py-1.5 text-center">
+                      <MathText text={h} as="span" />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dataRows.map((row, rIdx) => (
+                  <tr key={rIdx} className={rIdx % 2 === 1 ? 'bg-gray-50/70 print:bg-transparent' : 'bg-white'}>
+                    {row.map((cell, cIdx) => (
+                      <td key={cIdx} className="border border-gray-300 print:border-black px-3 py-1.5 align-middle">
+                        <MathText text={cell} as="span" />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+    }
+
     return <React.Fragment key={`${keyPrefix}-txt-${pIdx}`}>{part}</React.Fragment>;
   });
 }
@@ -137,9 +182,10 @@ export const MathText: React.FC<MathTextProps> = ({
     const hasDelimiters = /(\$\$[\s\S]*?\$\$|\$[^\$]+?\$|\\\[[\s\S]*?\\\]|\\\([^\)]+?\\\))/.test(text);
     const hasLatexCommands = /\\[a-zA-Z]+|\^\{|_\{/.test(text);
     const hasCodeBlocks = /```|`[^`\n]+?`/.test(text);
+    const hasMarkdownTable = /\|[^\n]+\|/.test(text);
 
-    // If completely plain text with no math indicators or code blocks, return raw text
-    if (!hasDelimiters && !hasLatexCommands && !hasCodeBlocks) {
+    // If completely plain text with no math indicators, code blocks, or tables, return raw text
+    if (!hasDelimiters && !hasLatexCommands && !hasCodeBlocks && !hasMarkdownTable) {
       return text;
     }
 
@@ -223,8 +269,8 @@ export const MathText: React.FC<MathTextProps> = ({
         );
       }
 
-      // Regular text segment with code block parsing
-      return renderTextWithCode(token, `seg-${index}`);
+      // Regular text segment with code block and markdown table parsing
+      return renderTextWithMarkdownElements(token, `seg-${index}`);
     });
   }, [text, block]);
 

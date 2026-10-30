@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 from typing import Any, Dict, List, Optional, Union
 
 import docx
@@ -337,6 +338,248 @@ class ExamPaperDocxService:
             r_inst.font.size = Pt(8.5)
             r_inst.font.color.rgb = self.COLOR_MUTED
 
+    def _parse_content_blocks(self, text: str) -> List[Dict[str, Any]]:
+        """
+        Parses question text into structured blocks:
+        - 'text': standard prose
+        - 'code': fenced code block
+        - 'table': markdown table
+        """
+        if not text:
+            return []
+
+        pattern = re.compile(
+            r'(```[a-zA-Z0-9_-]*\r?\n[\s\S]*?```|'
+            r'(?:^|\n)[ \t]*\|[^\n]+\|[ \t]*(?:\r?\n[ \t]*\|(?:\s*:?-+:?\s*\|)+)+(?:\r?\n[ \t]*\|[^\n]+\|[ \t]*)+)',
+            re.MULTILINE,
+        )
+
+        parts = pattern.split(text)
+        blocks: List[Dict[str, Any]] = []
+
+        for part in parts:
+            if not part:
+                continue
+            trimmed = part.strip()
+            if not trimmed:
+                continue
+
+            if trimmed.startswith('```') and trimmed.endswith('```'):
+                lines = trimmed.splitlines()
+                first_line = lines[0][3:].strip()
+                lang = first_line if first_line else ""
+                code_lines = lines[1:-1] if len(lines) >= 2 else []
+                code_content = "\n".join(code_lines)
+                blocks.append({
+                    'type': 'code',
+                    'lang': lang,
+                    'content': code_content,
+                })
+                continue
+
+            if trimmed.startswith('|') and '\n' in trimmed and re.search(r'\|(?:\s*:?-+:?\s*\|)+', trimmed):
+                lines = [l.strip() for l in trimmed.splitlines() if l.strip()]
+                if len(lines) >= 2:
+                    def parse_row(line: str) -> List[str]:
+                        line = line.strip()
+                        if line.startswith('|'):
+                            line = line[1:]
+                        if line.endswith('|'):
+                            line = line[:-1]
+                        return [c.strip() for c in line.split('|')]
+
+                    headers = parse_row(lines[0])
+                    sep_idx = -1
+                    for idx, l in enumerate(lines[1:], start=1):
+                        clean = l.replace('|', '').replace('-', '').replace(':', '').replace(' ', '')
+                        if clean == '':
+                            sep_idx = idx
+                            break
+
+                    data_lines = lines[sep_idx + 1:] if sep_idx != -1 else lines[1:]
+                    data_rows = [parse_row(dl) for dl in data_lines]
+                    blocks.append({
+                        'type': 'table',
+                        'headers': headers,
+                        'rows': data_rows,
+                    })
+                    continue
+
+            blocks.append({
+                'type': 'text',
+                'content': trimmed,
+            })
+
+        return blocks
+
+    def _render_code_block(self, doc: docx.Document, code: str, lang: str = "") -> None:
+        """Render a formatted, shaded code block callout container."""
+        tbl = doc.add_table(rows=1, cols=1)
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tbl.autofit = False
+
+        cell = tbl.cell(0, 0)
+        cell.width = Inches(6.5)
+
+        borders = parse_xml(
+            f'<w:tcBorders {nsdecls("w")}>'
+            f'  <w:top w:val="single" w:sz="6" w:space="0" w:color="CBD5E1"/>'
+            f'  <w:left w:val="single" w:sz="18" w:space="0" w:color="4338CA"/>'
+            f'  <w:bottom w:val="single" w:sz="6" w:space="0" w:color="CBD5E1"/>'
+            f'  <w:right w:val="single" w:sz="6" w:space="0" w:color="CBD5E1"/>'
+            f'</w:tcBorders>'
+        )
+        cell._tc.get_or_add_tcPr().append(borders)
+        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F8FAFC"/>')
+        cell._tc.get_or_add_tcPr().append(shd)
+
+        mar = parse_xml(
+            f'<w:tcMar {nsdecls("w")}>'
+            f'  <w:top w:w="120" w:type="dxa"/>'
+            f'  <w:left w:w="160" w:type="dxa"/>'
+            f'  <w:bottom w:w="120" w:type="dxa"/>'
+            f'  <w:right w:w="160" w:type="dxa"/>'
+            f'</w:tcMar>'
+        )
+        cell._tc.get_or_add_tcPr().append(mar)
+
+        cp = cell.paragraphs[0]
+        cp.paragraph_format.space_before = Pt(3)
+        cp.paragraph_format.space_after = Pt(3)
+
+        lines = code.split("\n")
+        for i, line in enumerate(lines):
+            r = cp.add_run(line)
+            r.font.name = "Consolas"
+            r.font.size = Pt(8.5)
+            r.font.color.rgb = RGBColor(30, 41, 59)
+            if i < len(lines) - 1:
+                cp.add_run("\n")
+
+    def _render_markdown_table(self, doc: docx.Document, headers: List[str], data_rows: List[List[str]]) -> None:
+        """Render a styled tabular dataset (Accounting Journals, Ledgers, Data Tables)."""
+        if not headers:
+            return
+        num_cols = len(headers)
+        table = doc.add_table(rows=len(data_rows) + 1, cols=num_cols)
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.autofit = True
+
+        hdr_cells = table.rows[0].cells
+        for i, h_text in enumerate(headers):
+            cell = hdr_cells[i]
+            shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F1F5F9"/>')
+            cell._tc.get_or_add_tcPr().append(shd)
+
+            borders = parse_xml(
+                f'<w:tcBorders {nsdecls("w")}>'
+                f'  <w:top w:val="single" w:sz="6" w:space="0" w:color="94A3B8"/>'
+                f'  <w:left w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+                f'  <w:bottom w:val="single" w:sz="12" w:space="0" w:color="475569"/>'
+                f'  <w:right w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+                f'</w:tcBorders>'
+            )
+            cell._tc.get_or_add_tcPr().append(borders)
+
+            cp = cell.paragraphs[0]
+            cp.paragraph_format.space_before = Pt(2)
+            cp.paragraph_format.space_after = Pt(2)
+            r = cp.add_run(h_text)
+            r.bold = True
+            r.font.size = Pt(9)
+            r.font.color.rgb = RGBColor(15, 23, 42)
+
+        for r_idx, row_data in enumerate(data_rows, start=1):
+            row_cells = table.rows[r_idx].cells
+            bg_color = "F8FAFC" if r_idx % 2 == 0 else "FFFFFF"
+            for c_idx in range(num_cols):
+                cell = row_cells[c_idx]
+                val = row_data[c_idx] if c_idx < len(row_data) else ""
+                if bg_color != "FFFFFF":
+                    shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{bg_color}"/>')
+                    cell._tc.get_or_add_tcPr().append(shd)
+
+                borders = parse_xml(
+                    f'<w:tcBorders {nsdecls("w")}>'
+                    f'  <w:top w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/>'
+                    f'  <w:left w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+                    f'  <w:bottom w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/>'
+                    f'  <w:right w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+                    f'</w:tcBorders>'
+                )
+                cell._tc.get_or_add_tcPr().append(borders)
+
+                cp = cell.paragraphs[0]
+                cp.paragraph_format.space_before = Pt(2)
+                cp.paragraph_format.space_after = Pt(2)
+                r = cp.add_run(val)
+                r.font.size = Pt(8.5)
+                r.font.name = "Consolas" if any(c in val for c in ["0","1","2","3","4","5","6","7","8","9"]) else "Calibri"
+
+    def _render_question_content(
+        self,
+        doc: docx.Document,
+        p_q: Any,
+        question_text: str,
+        marks_str: str,
+        text_color: RGBColor,
+        marks_color: RGBColor,
+    ) -> None:
+        """Render question content with support for markdown tables, code blocks, and prose."""
+        blocks = self._parse_content_blocks(question_text)
+        if not blocks:
+            r_text = p_q.add_run(question_text)
+            r_text.font.size = Pt(10)
+            r_text.font.color.rgb = text_color
+            r_marks = p_q.add_run(marks_str)
+            r_marks.bold = True
+            r_marks.font.size = Pt(9)
+            r_marks.font.color.rgb = marks_color
+            return
+
+        last_p = p_q
+        first_block = blocks[0]
+
+        if first_block["type"] == "text":
+            r_text = p_q.add_run(first_block["content"])
+            r_text.font.size = Pt(10)
+            r_text.font.color.rgb = text_color
+            remaining_blocks = blocks[1:]
+        else:
+            remaining_blocks = blocks
+
+        for block in remaining_blocks:
+            if block["type"] == "table":
+                self._render_markdown_table(doc, block["headers"], block["rows"])
+                last_p = None
+            elif block["type"] == "code":
+                self._render_code_block(doc, block["content"], block.get("lang", ""))
+                last_p = None
+            elif block["type"] == "text":
+                p = doc.add_paragraph()
+                p.paragraph_format.left_indent = Inches(0.25)
+                p.paragraph_format.space_before = Pt(2)
+                p.paragraph_format.space_after = Pt(3)
+                r = p.add_run(block["content"])
+                r.font.size = Pt(10)
+                r.font.color.rgb = text_color
+                last_p = p
+
+        if last_p is not None:
+            r_marks = last_p.add_run(marks_str)
+            r_marks.bold = True
+            r_marks.font.size = Pt(9)
+            r_marks.font.color.rgb = marks_color
+        else:
+            p_m = doc.add_paragraph()
+            p_m.paragraph_format.left_indent = Inches(0.25)
+            p_m.paragraph_format.space_before = Pt(2)
+            p_m.paragraph_format.space_after = Pt(3)
+            r_marks = p_m.add_run(marks_str.strip())
+            r_marks.bold = True
+            r_marks.font.size = Pt(9)
+            r_marks.font.color.rgb = marks_color
+
     def _add_student_question(
         self,
         doc: docx.Document,
@@ -356,17 +599,16 @@ class ExamPaperDocxService:
         r_num.font.size = Pt(10)
         r_num.font.color.rgb = self.COLOR_PRIMARY
 
-        # Question Text
-        r_text = p_q.add_run(q.question_text)
-        r_text.font.size = Pt(10)
-        r_text.font.color.rgb = self.COLOR_PRIMARY
-
-        # Marks tag
+        # Question Text & Marks
         marks_str = f"  [{q.marks:g} {'Mark' if q.marks == 1 else 'Marks'}]"
-        r_marks = p_q.add_run(marks_str)
-        r_marks.bold = True
-        r_marks.font.size = Pt(9)
-        r_marks.font.color.rgb = self.COLOR_INDIGO
+        self._render_question_content(
+            doc,
+            p_q,
+            q.question_text,
+            marks_str,
+            self.COLOR_PRIMARY,
+            self.COLOR_INDIGO,
+        )
 
         # Render Question Diagram if present
         if q.diagram:
@@ -501,13 +743,15 @@ class ExamPaperDocxService:
         r_num.bold = True
         r_num.font.size = Pt(10)
 
-        r_text = p_q.add_run(q.question_text)
-        r_text.font.size = Pt(10)
-
-        r_marks = p_q.add_run(f"  [{q.marks:g} Marks]")
-        r_marks.bold = True
-        r_marks.font.size = Pt(9)
-        r_marks.font.color.rgb = self.COLOR_MUTED
+        marks_str = f"  [{q.marks:g} {'Mark' if q.marks == 1 else 'Marks'}]"
+        self._render_question_content(
+            doc,
+            p_q,
+            q.question_text,
+            marks_str,
+            self.COLOR_PRIMARY,
+            self.COLOR_MUTED,
+        )
 
         # Correct Answer block
         p_ans = doc.add_paragraph()
