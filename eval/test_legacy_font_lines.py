@@ -158,6 +158,62 @@ class TestLegacyFontLines(unittest.TestCase):
         self.assertFalse(unmapped)
         self.assertEqual(unicodedata.normalize("NFC", converted), "सारणी 12.1")
 
+    def test_devanagari_matra_deduplication(self):
+        """Verifies deduplication of repeated Devanagari vowel signs (matras), diacritics, and visarga."""
+        from document_ai_worker.engine.legacy_font_converter import deduplicate_devanagari_marks
+
+        # 1. Direct matra deduplication on corrupted Unicode words
+        corrupted_pairs = [
+            ("काा", "का"),
+            ("केे", "के"),
+            ("कीी", "की"),
+            ("कृृ", "कृ"),
+            ("कुु", "कु"),
+            ("कूू", "कू"),
+            ("कैै", "कै"),
+            ("कोो", "को"),
+            ("कौौ", "कौ"),
+            ("किि", "कि"),
+            ("अतःः", "अतः"),
+            ("अतः ः", "अतः"),
+            ("कंंं", "कं"),
+            ("कँँ", "कँ"),
+            ("क््", "क्"),
+            ("कोे", "को"),
+            ("विद्यार्थीी", "विद्यार्थी"),
+            ("पुस्तकेे", "पुस्तके"),
+            ("नमःः शिवाय", "नमः शिवाय"),
+        ]
+        for corrupted, expected in corrupted_pairs:
+            healed = deduplicate_devanagari_marks(corrupted)
+            self.assertEqual(healed, expected, f"Failed deduplication for {corrupted!r}")
+
+        # 2. Devanagari input passed through remap_legacy_text
+        for corrupted, expected in corrupted_pairs:
+            healed, unmapped = remap_legacy_text(corrupted)
+            self.assertFalse(unmapped)
+            self.assertEqual(healed, expected, f"remap_legacy_text failed on {corrupted!r}")
+
+        # 3. Legacy font input with doubled keystrokes/glyphs
+        legacy_doubled = [
+            ("dkk", "का"),
+            ("dss", "के"),
+            ("dhh", "की"),
+            ("vr%%", "अतः"),
+        ]
+        for raw, expected in legacy_doubled:
+            healed, unmapped = remap_legacy_text(raw)
+            self.assertFalse(unmapped)
+            self.assertEqual(healed, expected, f"remap_legacy_text failed on legacy doubled {raw!r}")
+
+        # 4. Legitimate Sanskrit formatting preserved
+        shloka = "धर्मेे चार्थेे च कामेे च मोक्षेे च भरतर्षभ। यदिहास्ति तदन्यत्र यन्नेहास्ति न तत्क्वचित्॥"
+        expected_shloka = "धर्मे चार्थे च कामे च मोक्षे च भरतर्षभ। यदिहास्ति तदन्यत्र यन्नेहास्ति न तत्क्वचित्॥"
+        self.assertEqual(deduplicate_devanagari_marks(shloka), expected_shloka)
+
+        # 5. Legitimate double avagraha preserved
+        self.assertEqual(deduplicate_devanagari_marks("सोऽऽहम्"), "सोऽऽहम्")
+
 
 if __name__ == "__main__":
     unittest.main()

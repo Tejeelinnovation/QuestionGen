@@ -125,6 +125,12 @@ class PdfInspectionService:
                     page_text = unshift_ncert_text(page_text)
                 except Exception as c_err:
                     logger.debug(f"Caesar unshift error on page {page_num}: {c_err}")
+
+            # Deduplicate Devanagari matras, diacritics, and visarga if present
+            if any("\u0900" <= c <= "\u097f" for c in page_text):
+                from document_ai_worker.engine.legacy_font_converter import deduplicate_devanagari_marks
+                page_text = deduplicate_devanagari_marks(page_text)
+
             words = page_text.split()
             total_words += len(words)
 

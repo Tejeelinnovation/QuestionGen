@@ -12,6 +12,7 @@ in sub-millisecond execution. Accuracy is measured against hand-verified ground 
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
 _K2U_MAPPINGS: List[Tuple[str, str]] = [
@@ -312,6 +313,35 @@ def is_legacy_font(font_name: str) -> bool:
     return False
 
 
+def deduplicate_devanagari_marks(text: str) -> str:
+    """
+    Cleans duplicated and malformed Devanagari vowel signs (matras), diacritics, and visarga.
+    Prevents errors like केे -> के, काा -> का, कीी -> की, कृृ -> कृ, अतःः -> अतः, etc.
+    Safely preserves legitimate double virams (॥), avagraha (ऽऽ), and danda (।).
+    """
+    if not text:
+        return text
+
+    # Canonical Unicode NFC Normalization first (combines decomposed sequences like \u093e + \u0947 -> \u094b)
+    text = unicodedata.normalize("NFC", text)
+
+    # 1. Deduplicate identical consecutive dependent vowel signs (matras) and diacritics
+    matra_diacritic_chars = "[\u0901-\u0903\u093c\u093e-\u094f\u0955-\u0957\u0962\u0963]"
+    text = re.sub(rf"({matra_diacritic_chars})\1+", r"\1", text)
+
+    # 2. Fix conflicting stacked vowel signs:
+    # e.g., 'ोे' -> 'ो', 'ौे' -> 'ौ', 'ेै' -> 'ै'
+    text = re.sub(r"([\u094b\u094c])[\u0947\u0948]", r"\1", text)
+    text = re.sub(r"\u0947\u0948", "\u0948", text)
+
+    # 3. Deduplicate multiple visargas separated by whitespace:
+    # e.g., 'अतः ः' -> 'अतः'
+    text = re.sub(r"(\u0903)\s*\u0903+", r"\1", text)
+
+    # Final canonical Unicode NFC normalization
+    return unicodedata.normalize("NFC", text)
+
+
 def remap_legacy_text(text: str) -> Tuple[str, bool]:
     """
     Converts 8-bit ASCII legacy font text (KrutiDev, Chanakya, Walkman)
@@ -323,13 +353,14 @@ def remap_legacy_text(text: str) -> Tuple[str, bool]:
     if not text:
         return text, False
 
-    # If text already contains valid Devanagari, don't corrupt it
+    # If text already contains valid Devanagari, heal any duplicate matras directly
     if any("\u0900" <= c <= "\u097f" for c in text):
-        return text, False
+        return deduplicate_devanagari_marks(text), False
 
     try:
         from .ast_font_engine import ASTFontEngine
-        return ASTFontEngine.get_instance().convert_text(text)
+        res, unmapped = ASTFontEngine.get_instance().convert_text(text)
+        return deduplicate_devanagari_marks(res), unmapped
     except Exception:
         pass
 
@@ -380,6 +411,9 @@ def remap_legacy_text(text: str) -> Tuple[str, bool]:
 
     # Decimal point fix
     converted = re.sub(r"(\d)ण्(\d)", r"\1.\2", converted)
+
+    # Deduplicate Devanagari vowel signs & diacritics
+    converted = deduplicate_devanagari_marks(converted)
 
     # Detect unmapped legacy bytes (residual ASCII letters or replacement glyphs in legacy span)
     has_unmapped_bytes = bool(re.search(r"[a-zA-Z\ufffd]", converted))
@@ -439,7 +473,10 @@ def convert_page_spans_to_unicode(fitz_page: Any) -> Tuple[Optional[str], bool]:
                         line_pieces.append(remapped)
                     has_remapped_content = True
                 else:
-                    line_pieces.append(text)
+                    if any("\u0900" <= c <= "\u097f" for c in text):
+                        line_pieces.append(deduplicate_devanagari_marks(text))
+                    else:
+                        line_pieces.append(text)
 
             if line_pieces:
                 b_lines.append(" ".join(line_pieces))

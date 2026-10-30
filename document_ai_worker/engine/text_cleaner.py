@@ -653,6 +653,14 @@ def clean_page_text(
         flags.append("math_normalized")
         stats["math_normalized"] = math_count
 
+    # Step 5.6: Deduplicate Devanagari matras, diacritics, and visarga
+    if any("\u0900" <= c <= "\u097f" for c in current_text):
+        from .legacy_font_converter import deduplicate_devanagari_marks
+        deduped = deduplicate_devanagari_marks(current_text)
+        if deduped != current_text:
+            flags.append("matras_deduplicated")
+            current_text = deduped
+
     # Step 6: Non-destructive glued words detection & flagging
     remaining_glued = detect_glued_words(current_text)
     if remaining_glued:

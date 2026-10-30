@@ -457,6 +457,10 @@ def parse_and_reorder_tokens(tokens: List[Token]) -> str:
     # 4. Slash between digits (e.g. 123/2026, 12/03/2026)
     result = re.sub(r"(\d)ध(\d)", r"\1/\2", result)
 
+    # 5. Deduplicate Devanagari vowel signs & diacritics
+    from .legacy_font_converter import deduplicate_devanagari_marks
+    result = deduplicate_devanagari_marks(result)
+
     # Canonical Unicode NFC Normalization
     return unicodedata.normalize("NFC", result)
 
@@ -509,7 +513,8 @@ class ASTFontEngine:
 
         # If text is already mostly Devanagari, don't corrupt it
         if any("\u0900" <= c <= "\u097f" for c in text):
-            return text, False
+            from .legacy_font_converter import deduplicate_devanagari_marks
+            return deduplicate_devanagari_marks(text), False
 
         # Pre-pass: detect and segment mathematical expressions
         matches = list(_COMBINED_MATH_RE.finditer(text))
