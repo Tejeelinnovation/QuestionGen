@@ -1131,8 +1131,89 @@ class ModalityRendererAndSectionHeaderTests(TestCase):
         self.assertNotIn("(2 Marks Each)", sections_varied[0].title)
         self.assertNotIn("carry 2 marks each", sections_varied[0].instructions)
         self.assertIn("Marks for each question are indicated against it", sections_varied[0].instructions)
+    def test_rtl_urdu_docx_formatting(self):
+        from papers.docx_export import ExamPaperDocxService
+        import docx
 
+        service = ExamPaperDocxService()
+        urdu_text = "کھاتہ داری کی تعریف کریں اور اس کے بنیادی اصول بیان کریں۔"
+        self.assertTrue(service._is_rtl_text(urdu_text))
+        self.assertFalse(service._is_rtl_text("Define accounting and its basic principles."))
 
+        doc = docx.Document()
+        p = doc.add_paragraph()
+        service._set_paragraph_rtl(p)
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        self.assertEqual(p.alignment, WD_ALIGN_PARAGRAPH.RIGHT)
+        self.assertIsNotNone(p._p.pPr.find(docx.oxml.ns.qn("w:bidi")))
 
+    def test_two_column_match_table_parsing(self):
+        from papers.docx_export import ExamPaperDocxService
 
+        service = ExamPaperDocxService()
+        match_text = (
+            "Match the following items in Column I with Column II:\n\n"
+            "Column I              Column II\n"
+            "(a) Igneous rock      (p) Granite\n"
+            "(b) Sedimentary       (q) Sandstone\n"
+            "(c) Metamorphic       (r) Marble\n\n"
+            "Choose the correct option code:"
+        )
+        blocks = service._parse_content_blocks(match_text)
+        self.assertEqual(len(blocks), 3)
+        self.assertEqual(blocks[0]["type"], "text")
+        self.assertEqual(blocks[1]["type"], "table")
+        self.assertEqual(blocks[1]["headers"], ["Column I", "Column II"])
+        self.assertEqual(len(blocks[1]["rows"]), 3)
+        self.assertIn("(a) Igneous rock", blocks[1]["rows"][0][0])
+        self.assertIn("(p) Granite", blocks[1]["rows"][0][1])
+        self.assertEqual(blocks[2]["type"], "text")
+
+    def test_case_study_shared_passage_deduplication(self):
+        from papers.publishing import PaperPublishingService
+        from papers.models import PaperVersion, Paper
+        from schools.models import School
+        from users.models import User
+
+        school = School.objects.create(name="Passage Test School")
+        user = User.objects.create_user(username="test_passage_teacher", password="pw", school=school)
+        paper = Paper.objects.create(title="Case Study Test Paper", created_by=user, school=school)
+
+        shared_passage = (
+            "Read the following case study carefully and answer the questions that follow:\n"
+            "Greenwood Ltd. is a manufacturing firm producing sustainable packaging products. "
+            "In the financial year 2025-26, the company achieved a total revenue of 10 crores. "
+            "The operating costs were 6 crores and interest charges were 50 lakhs."
+        )
+
+        q1_text = f"{shared_passage}\n\nWhat is the operating profit of Greenwood Ltd. for the year?"
+        q2_text = f"{shared_passage}\n\nCalculate the net interest coverage ratio of the company."
+
+        raw_snapshot = [
+            {"id": "q1", "question_text": q1_text, "question_type": "SHORT_ANSWER", "marks": 4.0},
+            {"id": "q2", "question_text": q2_text, "question_type": "SHORT_ANSWER", "marks": 4.0},
+        ]
+
+        version = PaperVersion.objects.create(
+            paper=paper,
+            version_label="A",
+            total_marks=8.0,
+            question_snapshot=raw_snapshot,
+        )
+
+        service = PaperPublishingService()
+        sections = service.compile_sections(version)
+        self.assertEqual(len(sections), 1)
+        qs = sections[0].questions
+        self.assertEqual(len(qs), 2)
+
+        # First question carries the shared passage
+        self.assertIn("Greenwood Ltd.", qs[0].case_study_passage)
+        self.assertIn("What is the operating profit", qs[0].question_text)
+        self.assertNotIn("Read the following case study", qs[0].question_text)
+
+        # Second question does not repeat the passage in question_text
+        self.assertEqual(qs[1].case_study_passage, "")
+        self.assertIn("Calculate the net interest coverage", qs[1].question_text)
+        self.assertNotIn("Read the following case study", qs[1].question_text)
 

@@ -142,7 +142,7 @@ const PrintViewPageDesktop: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
             <Link
               to={`/papers/${paperId}/versions/${vId}`}
               className="px-3 py-1.5 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors"

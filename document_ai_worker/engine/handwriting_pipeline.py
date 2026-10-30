@@ -43,7 +43,6 @@ class HandwritingPipeline:
         if not self.gemini_api_key:
             return None
         import requests
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={self.gemini_api_key}"
         prompt = (
             "Transcribe all educational content, text, questions, definitions, formulas, and diagrams on this page. "
             "If the text is in Urdu, Arabic, Hindi, Sanskrit, or another language, transcribe it accurately in its native script and vocabulary with correct Unicode characters. "
@@ -71,26 +70,28 @@ class HandwritingPipeline:
             },
         }
         import time
-        for attempt in range(3):
-            try:
-                res = requests.post(url, json=payload, timeout=120)
-                if res.status_code == 200:
-                    data = res.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        if parts:
-                            return parts[0].get("text", "").strip()
-                elif res.status_code in (429, 503):
-                    logger.warning(f"Gemini Flash API rate/spike (HTTP {res.status_code}) on page {page_num}. Retrying ({attempt + 1}/3)...")
-                    time.sleep(3 * (attempt + 1))
-                    continue
-                else:
-                    logger.warning(f"Gemini Flash API returned HTTP {res.status_code}: {res.text[:120]}")
-                    break
-            except Exception as gemini_err:
-                logger.warning(f"Gemini Flash request error on page {page_num} (attempt {attempt + 1}/3): {gemini_err}")
-                time.sleep(2 * (attempt + 1))
+        models = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]
+        for model in models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.gemini_api_key}"
+            for attempt in range(2):
+                try:
+                    res = requests.post(url, json=payload, timeout=90)
+                    if res.status_code == 200:
+                        data = res.json()
+                        candidates = data.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            if parts:
+                                return parts[0].get("text", "").strip()
+                    elif res.status_code in (429, 503):
+                        logger.warning(f"Model {model} rate/spike (HTTP {res.status_code}) on page {page_num}. Retrying ({attempt + 1}/2)...")
+                        time.sleep(2 * (attempt + 1))
+                        continue
+                    else:
+                        break
+                except Exception as gemini_err:
+                    logger.debug(f"Model {model} request error on page {page_num}: {gemini_err}")
+                    time.sleep(1)
         return None
 
     def _transcribe_with_tesseract(self, img_path: str) -> Optional[str]:

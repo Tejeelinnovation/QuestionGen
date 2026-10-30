@@ -135,6 +135,19 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
                   return (
                     <div key={qId} className="space-y-3 break-inside-avoid">
+                      {(q as any).case_study_passage && (
+                        <div
+                          className={`p-3.5 mb-2 rounded-card bg-sky-50 border-l-4 border-sky-600 text-xs text-ink/85 italic leading-relaxed break-words [overflow-wrap:anywhere] ${
+                            isRtl ? 'border-l-0 border-r-4 text-right' : ''
+                          }`}
+                          dir={isRtl ? 'rtl' : 'ltr'}
+                        >
+                          <strong className="block not-italic font-heading font-semibold text-sky-900 mb-1">
+                            {isRtl ? 'مطالعہ عبارت / CASE STUDY PASSAGE:' : 'CASE STUDY / COMPREHENSION PASSAGE:'}
+                          </strong>
+                          <MathText text={(q as any).case_study_passage} />
+                        </div>
+                      )}
                       <div
                         className={`flex justify-between items-baseline gap-4 ${isRtl ? 'flex-row-reverse text-right' : ''}`}
                         dir={isRtl ? 'rtl' : 'ltr'}
@@ -269,6 +282,19 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
             return (
               <div key={q.question_id || idx} className="space-y-3 break-inside-avoid">
+                {(q as any).case_study_passage && (
+                  <div
+                    className={`p-3.5 mb-2 rounded-card bg-sky-50 border-l-4 border-sky-600 text-xs text-ink/85 italic leading-relaxed break-words [overflow-wrap:anywhere] ${
+                      isRtl ? 'border-l-0 border-r-4 text-right' : ''
+                    }`}
+                    dir={isRtl ? 'rtl' : 'ltr'}
+                  >
+                    <strong className="block not-italic font-heading font-semibold text-sky-900 mb-1">
+                      {isRtl ? 'مطالعہ عبارت / CASE STUDY PASSAGE:' : 'CASE STUDY / COMPREHENSION PASSAGE:'}
+                    </strong>
+                    <MathText text={(q as any).case_study_passage} />
+                  </div>
+                )}
                 <div
                   className={`flex justify-between items-baseline gap-4 ${isRtl ? 'flex-row-reverse text-right' : ''}`}
                   dir={isRtl ? 'rtl' : 'ltr'}

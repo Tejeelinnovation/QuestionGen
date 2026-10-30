@@ -64,8 +64,8 @@ export const PaperWorkflowNavMobile: React.FC<PaperWorkflowNavMobileProps> = ({
           {meta.label}
         </h2>
         {paperTitle && (
-          <span className="text-[11px] text-ink/60 truncate max-w-[150px]">
-            {paperTitle}
+          <span className="text-[11px] text-ink/60 truncate max-w-[150px]" title={paperTitle}>
+            {paperTitle.replace(/_/g, ' ')}
           </span>
         )}
       </div>

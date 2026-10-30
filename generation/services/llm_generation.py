@@ -463,10 +463,13 @@ class LLMQuestionGenerationService(QuestionGenerationService):
                 "   - 4-5 Marks: Comprehensive case study, multi-part synthesis, complete experimental setup, or deep theoretical proof.\n"
             )
 
+        extra_inst = constraints.get("extra_instructions") or constraints.get("language_rules") or ""
+        extra_section = f"\nSPECIAL SUBJECT & MODALITY INSTRUCTIONS:\n{extra_inst}\n" if extra_inst else ""
+
         return f"""
 CHAPTER: {chapter_name}
 TARGET QUANTITY: {quantity} questions
-
+{extra_section}
 CONSTRAINTS:
 - Question Type: {qtype}
 - Difficulty: {diff}
@@ -495,7 +498,7 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
         # Automatically upgrade deprecated model aliases to active production models
         if primary_model in ("gemini-flash-latest", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"):
             primary_model = "gemini-3.5-flash-lite"
-        models_to_try = [primary_model, "gemini-3.5-flash-lite", "gemini-3.5-flash"]
+        models_to_try = [primary_model, "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
         seen = set()
         deduped_models = []
         for m in models_to_try:

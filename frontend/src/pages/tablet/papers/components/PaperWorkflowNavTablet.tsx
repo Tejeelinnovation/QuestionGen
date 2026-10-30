@@ -66,10 +66,10 @@ export const PaperWorkflowNavTablet: React.FC<PaperWorkflowNavTabletProps> = ({
             Tablet Studio
           </span>
           {paperTitle && (
-            <span className="font-heading font-bold text-ink truncate text-xs">
-              {paperTitle}
+            <span className="font-heading font-bold text-ink truncate text-xs" title={paperTitle}>
+              {paperTitle.replace(/_/g, ' ')}
               {chapterTitle && (
-                <span className="font-normal text-ink/50 ml-1">({chapterTitle})</span>
+                <span className="font-normal text-ink/50 ml-1">({chapterTitle.replace(/_/g, ' ')})</span>
               )}
             </span>
           )}

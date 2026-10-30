@@ -33,6 +33,7 @@ class FormattedExamQuestion:
     source_reference: str = ""
     topic_name: str = ""
     diagram: Optional[Dict[str, Any]] = None
+    case_study_passage: str = ""
 
     def to_student_dict(self) -> Dict[str, Any]:
         """Student exam paper representation (omits correct answer & marking scheme)."""
@@ -46,6 +47,7 @@ class FormattedExamQuestion:
             "marks": self.marks,
             "options": self.options,
             "diagram": self.diagram,
+            "case_study_passage": self.case_study_passage,
         }
 
     def to_teacher_dict(self) -> Dict[str, Any]:
@@ -69,6 +71,7 @@ class FormattedExamQuestion:
             "source_reference": self.source_reference,
             "topic_name": self.topic_name,
             "diagram": self.diagram,
+            "case_study_passage": self.case_study_passage,
         }
 
 
@@ -107,6 +110,49 @@ class PaperPublishingService:
     Transforms an immutable PaperVersion question snapshot into publication-grade
     student question papers and synchronized teacher answer keys.
     """
+
+    @staticmethod
+    def _extract_shared_passages(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Detects and extracts shared case study / reading comprehension passages
+        across consecutive questions so the passage is not redundantly repeated.
+        """
+        if len(items) < 2:
+            return items
+
+        result = [dict(it) for it in items]
+        i = 0
+        while i < len(result):
+            txt_i = result[i].get("question_text", "")
+            if "\n\n" in txt_i or "\n" in txt_i:
+                parts = txt_i.split("\n\n", 1) if "\n\n" in txt_i else txt_i.split("\n", 1)
+                candidate_passage = parts[0].strip()
+                if len(candidate_passage) >= 50 and any(
+                    kw in candidate_passage.lower()
+                    for kw in ["read", "case", "study", "passage", "following", "comprehension", "संदर्भ", "गद्यांश", "عبارت", "مطالعہ"]
+                ):
+                    group_end = i
+                    for j in range(i + 1, len(result)):
+                        txt_j = result[j].get("question_text", "")
+                        if txt_j.startswith(candidate_passage):
+                            group_end = j
+                        else:
+                            break
+
+                    if group_end > i:
+                        result[i]["case_study_passage"] = candidate_passage
+                        result[i]["question_text"] = parts[1].strip() if len(parts) > 1 and parts[1].strip() else result[i]["question_text"]
+                        for k in range(i + 1, group_end + 1):
+                            txt_k = result[k].get("question_text", "")
+                            remainder = txt_k[len(candidate_passage):].strip()
+                            remainder = remainder.lstrip(":\n- ")
+                            if remainder:
+                                result[k]["question_text"] = remainder
+                        i = group_end + 1
+                        continue
+            i += 1
+
+        return result
 
     def compile_sections(self, version: PaperVersion) -> List[ExamSection]:
         """
@@ -162,7 +208,7 @@ class PaperPublishingService:
         global_num = 1
 
         for key, b_info in buckets.items():
-            b_items = b_info["items"]
+            b_items = self._extract_shared_passages(b_info["items"])
             if not b_items:
                 continue
 
@@ -227,6 +273,7 @@ class PaperPublishingService:
                     source_reference=str(item.get("source_reference", "")),
                     topic_name=str(item.get("topic_name", "")),
                     diagram=item.get("diagram"),
+                    case_study_passage=str(item.get("case_study_passage", "")),
                 )
                 sec.questions.append(q_obj)
                 sec.total_marks += m_val

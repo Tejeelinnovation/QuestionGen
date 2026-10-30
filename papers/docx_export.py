@@ -338,6 +338,82 @@ class ExamPaperDocxService:
             r_inst.font.size = Pt(8.5)
             r_inst.font.color.rgb = self.COLOR_MUTED
 
+    def _is_rtl_text(self, text: str) -> bool:
+        """Detect if text contains Arabic/Urdu/Persian script."""
+        if not text:
+            return False
+        return bool(re.search(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]", text))
+
+    def _set_paragraph_rtl(self, paragraph: docx.text.paragraph.Paragraph) -> None:
+        """Enable right-to-left bidi rendering in Word."""
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        pPr = paragraph._p.get_or_add_pPr()
+        if pPr.find(qn("w:bidi")) is None:
+            pPr.append(parse_xml(f'<w:bidi {nsdecls("w")}/>'))
+
+    def _set_run_rtl(self, run: docx.text.run.Run) -> None:
+        """Enable right-to-left run bidi rendering in Word."""
+        rPr = run._r.get_or_add_rPr()
+        if rPr.find(qn("w:rtl")) is None:
+            rPr.append(parse_xml(f'<w:rtl {nsdecls("w")}/>'))
+
+    def _render_case_study_box(self, doc: docx.Document, passage: str, is_rtl: bool = False) -> None:
+        """Render a dedicated, highlighted callout box for a shared case study / reading comprehension passage."""
+        tbl = doc.add_table(rows=1, cols=1)
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tbl.autofit = False
+
+        cell = tbl.cell(0, 0)
+        cell.width = Inches(6.5)
+
+        left_color = "0284C7" if not is_rtl else "CBD5E1"
+        right_color = "0284C7" if is_rtl else "CBD5E1"
+        left_sz = "24" if not is_rtl else "6"
+        right_sz = "24" if is_rtl else "6"
+
+        borders = parse_xml(
+            f'<w:tcBorders {nsdecls("w")}>'
+            f'  <w:top w:val="single" w:sz="6" w:space="0" w:color="CBD5E1"/>'
+            f'  <w:left w:val="single" w:sz="{left_sz}" w:space="0" w:color="{left_color}"/>'
+            f'  <w:bottom w:val="single" w:sz="6" w:space="0" w:color="CBD5E1"/>'
+            f'  <w:right w:val="single" w:sz="{right_sz}" w:space="0" w:color="{right_color}"/>'
+            f'</w:tcBorders>'
+        )
+        cell._tc.get_or_add_tcPr().append(borders)
+        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F0F9FF"/>')
+        cell._tc.get_or_add_tcPr().append(shd)
+
+        mar = parse_xml(
+            f'<w:tcMar {nsdecls("w")}>'
+            f'  <w:top w:w="120" w:type="dxa"/>'
+            f'  <w:left w:w="160" w:type="dxa"/>'
+            f'  <w:bottom w:w="120" w:type="dxa"/>'
+            f'  <w:right w:w="160" w:type="dxa"/>'
+            f'</w:tcMar>'
+        )
+        cell._tc.get_or_add_tcPr().append(mar)
+
+        cp = cell.paragraphs[0]
+        if is_rtl:
+            self._set_paragraph_rtl(cp)
+        cp.paragraph_format.space_before = Pt(2)
+        cp.paragraph_format.space_after = Pt(3)
+
+        hdr_text = "مطالعہ عبارت / CASE STUDY PASSAGE:\n" if is_rtl else "CASE STUDY / COMPREHENSION PASSAGE:\n"
+        r_hdr = cp.add_run(hdr_text)
+        r_hdr.bold = True
+        r_hdr.font.size = Pt(9.5)
+        r_hdr.font.color.rgb = RGBColor(3, 105, 161)
+        if is_rtl:
+            self._set_run_rtl(r_hdr)
+
+        r_txt = cp.add_run(passage.strip())
+        r_txt.font.size = Pt(9.5)
+        r_txt.italic = True
+        r_txt.font.color.rgb = RGBColor(30, 41, 59)
+        if is_rtl:
+            self._set_run_rtl(r_txt)
+
     def _parse_content_blocks(self, text: str) -> List[Dict[str, Any]]:
         """
         Parses question text into structured blocks:
@@ -404,6 +480,68 @@ class ExamPaperDocxService:
                         'rows': data_rows,
                     })
                     continue
+
+            # Check for two-column match rows inside text (e.g. Column I / Column II or (a)... (p)...)
+            match_row_pattern = re.compile(
+                r"^\s*(\([a-zA-Z0-9ivxLCDM]+\)|[a-zA-Z0-9ivxLCDM]+[\.\)])\s*(.+?)\s{2,}(\([a-zA-Z0-9ivxLCDM]+\)|[a-zA-Z0-9ivxLCDM]+[\.\)])\s*(.+)$"
+            )
+            hdr_pattern = re.compile(
+                r"^\s*(?:Column|List|ستون|सूची)\s*([A-Za-z0-9IV]+|[I|1])\s{2,}(?:Column|List|ستون|सूची)\s*([A-Za-z0-9IV]+|[II|2])\s*$",
+                re.IGNORECASE
+            )
+
+            lines = [l.rstrip() for l in trimmed.splitlines()]
+            start_idx = None
+            end_idx = None
+            matched_count = 0
+
+            for idx, l in enumerate(lines):
+                if match_row_pattern.match(l.strip()):
+                    matched_count += 1
+                    if start_idx is None:
+                        if idx > 0 and hdr_pattern.match(lines[idx - 1].strip()):
+                            start_idx = idx - 1
+                        else:
+                            start_idx = idx
+                    end_idx = idx + 1
+                else:
+                    if start_idx is not None and not (idx > 0 and hdr_pattern.match(lines[idx - 1].strip())):
+                        break
+
+            if matched_count >= 2 and start_idx is not None and end_idx is not None:
+                before_txt = "\n".join(lines[:start_idx]).strip()
+                if before_txt:
+                    blocks.append({'type': 'text', 'content': before_txt})
+
+                tbl_lines = [l.strip() for l in lines[start_idx:end_idx] if l.strip()]
+                has_hdr = bool(hdr_pattern.match(tbl_lines[0]))
+                headers = ["Column I", "Column II"]
+                data_rows = []
+
+                if has_hdr:
+                    m_hdr = hdr_pattern.match(tbl_lines[0])
+                    headers = [f"Column {m_hdr.group(1)}", f"Column {m_hdr.group(2)}"]
+                    data_lines = tbl_lines[1:]
+                else:
+                    data_lines = tbl_lines
+
+                for dl in data_lines:
+                    m_row = match_row_pattern.match(dl)
+                    if m_row:
+                        data_rows.append([f"{m_row.group(1)} {m_row.group(2).strip()}", f"{m_row.group(3)} {m_row.group(4).strip()}"])
+                    else:
+                        data_rows.append([dl, ""])
+
+                blocks.append({
+                    'type': 'table',
+                    'headers': headers,
+                    'rows': data_rows,
+                })
+
+                after_txt = "\n".join(lines[end_idx:]).strip()
+                if after_txt:
+                    blocks.append({'type': 'text', 'content': after_txt})
+                continue
 
             blocks.append({
                 'type': 'text',
@@ -524,6 +662,7 @@ class ExamPaperDocxService:
         marks_str: str,
         text_color: RGBColor,
         marks_color: RGBColor,
+        is_rtl: bool = False,
     ) -> None:
         """Render question content with support for markdown tables, code blocks, and prose."""
         blocks = self._parse_content_blocks(question_text)
@@ -544,6 +683,8 @@ class ExamPaperDocxService:
             r_text = p_q.add_run(first_block["content"])
             r_text.font.size = Pt(10)
             r_text.font.color.rgb = text_color
+            if is_rtl:
+                self._set_run_rtl(r_text)
             remaining_blocks = blocks[1:]
         else:
             remaining_blocks = blocks
@@ -557,12 +698,17 @@ class ExamPaperDocxService:
                 last_p = None
             elif block["type"] == "text":
                 p = doc.add_paragraph()
-                p.paragraph_format.left_indent = Inches(0.25)
+                if is_rtl:
+                    self._set_paragraph_rtl(p)
+                else:
+                    p.paragraph_format.left_indent = Inches(0.25)
                 p.paragraph_format.space_before = Pt(2)
                 p.paragraph_format.space_after = Pt(3)
                 r = p.add_run(block["content"])
                 r.font.size = Pt(10)
                 r.font.color.rgb = text_color
+                if is_rtl:
+                    self._set_run_rtl(r)
                 last_p = p
 
         if last_p is not None:
@@ -593,11 +739,21 @@ class ExamPaperDocxService:
         p_q.paragraph_format.space_after = Pt(3)
         p_q.paragraph_format.keep_with_next = True
 
+        # Case Study / Shared Reading Comprehension Passage Callout
+        if getattr(q, "case_study_passage", None):
+            self._render_case_study_box(doc, q.case_study_passage, is_rtl=self._is_rtl_text(q.case_study_passage))
+
+        is_rtl = self._is_rtl_text(q.question_text)
+        if is_rtl:
+            self._set_paragraph_rtl(p_q)
+
         # Question Number
         r_num = p_q.add_run(f"Q{q.global_question_number}.  ")
         r_num.bold = True
         r_num.font.size = Pt(10)
         r_num.font.color.rgb = self.COLOR_PRIMARY
+        if is_rtl:
+            self._set_run_rtl(r_num)
 
         # Question Text & Marks
         marks_str = f"  [{q.marks:g} {'Mark' if q.marks == 1 else 'Marks'}]"
@@ -608,6 +764,7 @@ class ExamPaperDocxService:
             marks_str,
             self.COLOR_PRIMARY,
             self.COLOR_INDIGO,
+            is_rtl=is_rtl,
         )
 
         # Render Question Diagram if present
@@ -709,11 +866,17 @@ class ExamPaperDocxService:
                         cp = cell.paragraphs[0]
                         cp.paragraph_format.space_before = Pt(1)
                         cp.paragraph_format.space_after = Pt(2)
+                        if is_rtl:
+                            self._set_paragraph_rtl(cp)
                         r_k = cp.add_run(f"({k}) ")
                         r_k.bold = True
                         r_k.font.size = Pt(9.5)
+                        if is_rtl:
+                            self._set_run_rtl(r_k)
                         r_v = cp.add_run(str(v))
                         r_v.font.size = Pt(9.5)
+                        if is_rtl:
+                            self._set_run_rtl(r_v)
 
         # Ruled Blank Answer Lines
         if blank_lines > 0:
@@ -739,9 +902,19 @@ class ExamPaperDocxService:
         p_q.paragraph_format.space_after = Pt(2)
         p_q.paragraph_format.keep_with_next = True
 
+        # Case Study / Shared Reading Comprehension Passage Callout
+        if getattr(q, "case_study_passage", None):
+            self._render_case_study_box(doc, q.case_study_passage, is_rtl=self._is_rtl_text(q.case_study_passage))
+
+        is_rtl = self._is_rtl_text(q.question_text) or self._is_rtl_text(q.correct_answer)
+        if is_rtl:
+            self._set_paragraph_rtl(p_q)
+
         r_num = p_q.add_run(f"Q{q.global_question_number}.  ")
         r_num.bold = True
         r_num.font.size = Pt(10)
+        if is_rtl:
+            self._set_run_rtl(r_num)
 
         marks_str = f"  [{q.marks:g} {'Mark' if q.marks == 1 else 'Marks'}]"
         self._render_question_content(
@@ -751,18 +924,25 @@ class ExamPaperDocxService:
             marks_str,
             self.COLOR_PRIMARY,
             self.COLOR_MUTED,
+            is_rtl=is_rtl,
         )
 
         # Correct Answer block
         p_ans = doc.add_paragraph()
-        p_ans.paragraph_format.left_indent = Inches(0.25)
+        if is_rtl:
+            self._set_paragraph_rtl(p_ans)
+        else:
+            p_ans.paragraph_format.left_indent = Inches(0.25)
         p_ans.paragraph_format.space_before = Pt(2)
         p_ans.paragraph_format.space_after = Pt(2)
 
-        r_ans_label = p_ans.add_run("CORRECT ANSWER: ")
+        ans_label_str = "صحیح جواب / CORRECT ANSWER: " if is_rtl else "CORRECT ANSWER: "
+        r_ans_label = p_ans.add_run(ans_label_str)
         r_ans_label.bold = True
         r_ans_label.font.size = Pt(9.5)
         r_ans_label.font.color.rgb = self.COLOR_CORRECT
+        if is_rtl:
+            self._set_run_rtl(r_ans_label)
 
         if q.question_type == "MCQ" and q.options:
             correct_key = q.correct_answer.strip().upper()
@@ -774,6 +954,8 @@ class ExamPaperDocxService:
         r_ans_val.bold = True
         r_ans_val.font.size = Pt(9.5)
         r_ans_val.font.color.rgb = self.COLOR_CORRECT
+        if is_rtl:
+            self._set_run_rtl(r_ans_val)
 
         # Source / Topic info
         if q.topic_name or q.source_reference:

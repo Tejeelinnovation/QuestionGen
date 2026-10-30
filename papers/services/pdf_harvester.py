@@ -295,7 +295,8 @@ class PdfInspectionService:
             has_caption = bool(re.search(r"\b(?:fig|figure|diagram|chart|graph|चित्र|आकृति|सारणी|تصویر|شکل|خاکہ)\b", page_text, re.I))
 
             vision_handled = False
-            if (has_drawings or has_images or has_caption) and len(detected_figures) < 20:
+            max_vision_pages = 6 if total_words < 50 else 12
+            if (has_drawings or has_images or has_caption) and page_num <= max_vision_pages and len(detected_figures) < 15:
                 v_figs = cls._detect_diagrams_with_vision(page, page_num)
                 if v_figs:
                     vision_handled = True
@@ -463,7 +464,7 @@ class PdfInspectionService:
             try:
                 from document_ai_worker.engine.handwriting_pipeline import HandwritingPipeline
                 pipeline = HandwritingPipeline()
-                sample_pages = min(page_count, 8)
+                sample_pages = min(page_count, 5)
                 for p_idx in range(sample_pages):
                     p_num = p_idx + 1
                     page = doc[p_idx]
