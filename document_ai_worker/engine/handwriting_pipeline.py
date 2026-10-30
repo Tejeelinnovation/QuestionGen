@@ -30,7 +30,12 @@ class HandwritingPipeline:
 
     def __init__(self, media_dir: str = "/tmp/extracted_assets", gemini_api_key: str = ""):
         self.media_dir = media_dir
-        self.gemini_api_key = gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
+        try:
+            from django.conf import settings
+            django_key = getattr(settings, "GEMINI_API_KEY", "") if settings.configured else ""
+        except Exception:
+            django_key = ""
+        self.gemini_api_key = gemini_api_key or django_key or os.environ.get("GEMINI_API_KEY", "")
         os.makedirs(self.media_dir, exist_ok=True)
         self._reader = None
 
@@ -40,8 +45,9 @@ class HandwritingPipeline:
         import requests
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={self.gemini_api_key}"
         prompt = (
-            "Transcribe all handwritten notes, formulas, equations, definitions, and questions on this page. "
-            "Output clear structured text in natural reading order. "
+            "Transcribe all educational content, text, questions, definitions, formulas, and diagrams on this page. "
+            "If the text is in Urdu, Arabic, Hindi, Sanskrit, or another language, transcribe it accurately in its native script and vocabulary with correct Unicode characters. "
+            "Output clear structured text in natural reading order (RTL for Urdu/Arabic, LTR for others). "
             "Convert any mathematical or chemical expressions to LaTeX notation enclosed in dollar signs (e.g. $E=mc^2$)."
         )
         pure_b64 = b64_img.split(",", 1)[-1] if "," in b64_img else b64_img

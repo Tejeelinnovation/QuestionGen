@@ -199,7 +199,7 @@ class PdfInspectionService:
             # NCERT and textbook PDFs often draw diagrams using vector paths or composite gradient strips
             try:
                 caption_regex = re.compile(
-                    r"^\s*(?:Fig(?:ure)?\.?|चित्र|आकृति|Diagram)\s*(\d+[\.\d]*)",
+                    r"^\s*(?:Fig(?:ure)?\.?|चित्र|आकृति|सारणी|تصویر|شکل|خاکہ|جدول|باکس|Diagram)\s*([0-9۰-۹०-९]+(?:[\.\-][0-9۰-۹०-९]+)*)",
                     re.IGNORECASE,
                 )
                 blocks = page.get_text("blocks")
@@ -273,8 +273,10 @@ class PdfInspectionService:
                 logger.debug(f"Composite diagram detection error on page {page_num}: {comp_err}")
 
         # 4. Scanned / Raster / Handwritten PDF Fallback via Gemini Vision OCR
-        if total_words < 50 and page_count > 0:
-            logger.info(f"PDF {filename} contains minimal selectable text ({total_words} words). Activating Gemini Vision OCR transcription for scanned/raster pages...")
+        avg_words_per_page = total_words / max(page_count, 1)
+        needs_vision_ocr = page_count > 0 and (total_words < 50 or (page_count > 1 and avg_words_per_page < 25))
+        if needs_vision_ocr:
+            logger.info(f"PDF {filename} contains minimal selectable text ({total_words} words across {page_count} pages, avg {avg_words_per_page:.1f} wpp). Activating Gemini Vision OCR transcription for scanned/raster pages...")
             try:
                 from document_ai_worker.engine.handwriting_pipeline import HandwritingPipeline
                 pipeline = HandwritingPipeline()
@@ -290,7 +292,7 @@ class PdfInspectionService:
                         full_text_parts.append(f"--- [Page {p_num} OCR] ---\n{t_text.strip()}")
                         total_words += len(t_text.split())
                         # If no figures detected yet, register the scanned page as a diagram asset
-                        if len(detected_figures) < 5:
+                        if len(detected_figures) == 0:
                             fig_id = f"fig_scan_p{p_num}"
                             thumb_b64 = cls._generate_thumbnail_base64(img_bytes)
                             detected_figures.append({
@@ -475,10 +477,16 @@ class PdfInspectionService:
         Scans page text for standard academic figure captions like:
         'Fig. 2.1: Human Heart', 'Figure 4 - Structure of atom', 'Chart 1: Sales Distribution'
         """
+        academic_prefixes = (
+            "fig.", "figure", "diagram", "chart", "table", "illus",
+            "चित्र", "आकृति", "सारणी",
+            "تصویر", "شکل", "خاکہ", "جدول", "باکس"
+        )
         lines = page_text.splitlines()
         for line in lines:
             trimmed = line.strip()
-            if any(trimmed.lower().startswith(prefix) for prefix in ("fig.", "figure", "diagram", "chart", "table", "illus")):
+            trimmed_lower = trimmed.lower()
+            if any(trimmed_lower.startswith(prefix) for prefix in academic_prefixes):
                 if len(trimmed) < 120:
                     return trimmed
 

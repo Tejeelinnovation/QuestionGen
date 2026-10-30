@@ -6,6 +6,16 @@ import type { PaperVersion, QuestionSnapshotItem } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { Lock, Send, Printer, CheckCircle2, Copy, Loader2 } from 'lucide-react';
 import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
+import { MathText } from '../../../components/ui/MathText';
+import { API_BASE_URL } from '../../../api/client';
+
+const resolveImgUrl = (url?: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 export const VersionDetailPageMobile: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -216,7 +226,7 @@ export const VersionDetailPageMobile: React.FC = () => {
           questions.map((q, idx) => (
             <div
               key={q.question_id || idx}
-              className="p-3 rounded-card bg-surface border border-border shadow-xs space-y-1.5"
+              className="p-3 rounded-card bg-surface border border-border shadow-xs space-y-2"
             >
               <div className="flex items-center justify-between text-[11px]">
                 <span className="font-mono font-bold text-forest">Q{idx + 1}</span>
@@ -224,9 +234,47 @@ export const VersionDetailPageMobile: React.FC = () => {
                   {q.marks || 1} mark{(q.marks || 1) === 1 ? '' : 's'}
                 </span>
               </div>
-              <p className="text-xs text-ink leading-relaxed font-body">
-                {q.question_text}
-              </p>
+              <div className="text-xs text-ink leading-relaxed font-body">
+                <MathText text={q.question_text} as="p" />
+              </div>
+
+              {/* Diagram Display if attached */}
+              {q.diagram && q.diagram.image_url && (
+                <div className="py-2 flex flex-col items-center justify-center bg-bg/50 border border-border/60 rounded p-1.5">
+                  <img
+                    src={resolveImgUrl(q.diagram.image_url)}
+                    alt={q.diagram.title || 'Question Diagram'}
+                    className="max-h-40 max-w-full object-contain border border-border rounded"
+                    onError={(e) => {
+                      const cur = (e.currentTarget as HTMLImageElement).src;
+                      if (!cur.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                        (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
+                      }
+                    }}
+                  />
+                  {q.diagram.title && (
+                    <span className="text-[10px] font-mono text-ink/60 mt-0.5 italic">
+                      {q.diagram.title}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Options for MCQ */}
+              {q.options && Object.keys(q.options).length > 0 && (
+                <div className="grid grid-cols-1 gap-1.5 pt-1">
+                  {Object.entries(q.options).map(([optKey, optVal]) => (
+                    <div
+                      key={optKey}
+                      className="p-1.5 rounded border border-border/70 bg-bg text-[11px] flex items-baseline gap-1.5"
+                      dir="auto"
+                    >
+                      <span className="font-mono font-bold text-forest">({optKey})</span>
+                      <MathText text={optVal} as="span" />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))
         )}

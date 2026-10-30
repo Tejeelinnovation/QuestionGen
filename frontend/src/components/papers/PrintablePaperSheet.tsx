@@ -11,6 +11,9 @@ const resolveImageUrl = (url?: string): string => {
   return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
+const RTL_REGEX = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const isRtlText = (text?: string): boolean => !!text && RTL_REGEX.test(text);
+
 interface PrintablePaperSheetProps {
   printData: PaperPrintData;
   linesPerMark?: number;
@@ -126,12 +129,16 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
                   const currentLines = isOverridden
                     ? questionLineOverrides[qId]
                     : defaultLines;
+                  const isRtl = isRtlText(q.question_text);
 
                   return (
                     <div key={qId} className="space-y-3 break-inside-avoid">
-                      <div className="flex justify-between items-baseline gap-4">
+                      <div
+                        className={`flex justify-between items-baseline gap-4 ${isRtl ? 'flex-row-reverse text-right' : ''}`}
+                        dir={isRtl ? 'rtl' : 'ltr'}
+                      >
                         <div className="text-sm font-medium leading-relaxed">
-                          <span className="font-bold mr-1.5">{displayNum}.</span>
+                          <span className={`font-bold ${isRtl ? 'ml-1.5' : 'mr-1.5'}`}>{displayNum}.</span>
                           <MathText text={q.question_text} as="span" />
                         </div>
                         <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
@@ -141,7 +148,7 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
                       {/* Diagram / Visual Asset Display */}
                       {q.diagram && q.diagram.image_url && (
-                        <div className="py-2.5 flex flex-col items-center justify-center pl-5">
+                        <div className="py-2.5 flex flex-col items-center justify-center px-5">
                           <img
                             src={resolveImageUrl(q.diagram.image_url)}
                             alt={q.diagram.title || 'Question Diagram'}
@@ -163,9 +170,12 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
                       {/* MCQ Options Display */}
                       {q.options && Object.keys(q.options).length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pl-5 pt-1">
+                        <div
+                          className={`grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs ${isRtl ? 'pr-5 text-right' : 'pl-5'} pt-1`}
+                          dir={isRtl ? 'rtl' : 'ltr'}
+                        >
                           {Object.entries(q.options).map(([key, val]) => (
-                            <div key={key} className="flex items-baseline gap-1.5">
+                            <div key={key} className={`flex items-baseline gap-1.5 ${isRtl ? 'flex-row-reverse' : ''}`}>
                               <span className="font-bold font-mono">({key})</span>
                               <MathText text={val} as="span" />
                             </div>
@@ -175,7 +185,7 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
                       {/* Lined writing space for answers */}
                       {currentLines > 0 && (
-                        <div className="pt-2 space-y-3 pl-5">
+                        <div className={`pt-2 space-y-3 ${isRtl ? 'pr-5' : 'pl-5'}`}>
                           {Array.from({ length: currentLines }).map((_, lIdx) => (
                             <div
                               key={lIdx}
@@ -253,12 +263,16 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
             const currentLines = isOverridden
               ? questionLineOverrides[qId]
               : defaultLines;
+            const isRtl = isRtlText(q.question_text);
 
             return (
               <div key={q.question_id || idx} className="space-y-3 break-inside-avoid">
-                <div className="flex justify-between items-baseline gap-4">
+                <div
+                  className={`flex justify-between items-baseline gap-4 ${isRtl ? 'flex-row-reverse text-right' : ''}`}
+                  dir={isRtl ? 'rtl' : 'ltr'}
+                >
                   <div className="text-sm font-medium leading-relaxed">
-                    <span className="font-bold mr-1.5">{idx + 1}.</span>
+                    <span className={`font-bold ${isRtl ? 'ml-1.5' : 'mr-1.5'}`}>{idx + 1}.</span>
                     <MathText text={q.question_text} as="span" />
                   </div>
                   <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
@@ -268,7 +282,7 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
                 {/* Diagram / Visual Asset Display */}
                 {q.diagram && q.diagram.image_url && (
-                  <div className="py-2.5 flex flex-col items-center justify-center pl-5">
+                  <div className="py-2.5 flex flex-col items-center justify-center px-5">
                     <img
                       src={resolveImageUrl(q.diagram.image_url)}
                       alt={q.diagram.title || 'Question Diagram'}
@@ -290,9 +304,12 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
                 {/* MCQ Options Display */}
                 {q.options && Object.keys(q.options).length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pl-5 pt-1">
+                  <div
+                    className={`grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs ${isRtl ? 'pr-5 text-right' : 'pl-5'} pt-1`}
+                    dir={isRtl ? 'rtl' : 'ltr'}
+                  >
                     {Object.entries(q.options).map(([key, val]) => (
-                      <div key={key} className="flex items-baseline gap-1.5">
+                      <div key={key} className={`flex items-baseline gap-1.5 ${isRtl ? 'flex-row-reverse' : ''}`}>
                         <span className="font-bold font-mono">({key})</span>
                         <MathText text={val} as="span" />
                       </div>
@@ -302,7 +319,7 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
                 {/* Lined writing space for answers */}
                 {currentLines > 0 && (
-                  <div className="pt-2 space-y-3 pl-5">
+                  <div className={`pt-2 space-y-3 ${isRtl ? 'pr-5' : 'pl-5'}`}>
                     {Array.from({ length: currentLines }).map((_, lIdx) => (
                       <div
                         key={lIdx}

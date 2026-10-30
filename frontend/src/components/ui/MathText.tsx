@@ -7,6 +7,7 @@ interface MathTextProps {
   className?: string;
   as?: 'span' | 'div' | 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'label';
   block?: boolean;
+  dir?: 'auto' | 'ltr' | 'rtl';
 }
 
 /**
@@ -127,6 +128,7 @@ export const MathText: React.FC<MathTextProps> = ({
   className = '',
   as: Component = 'span',
   block = false,
+  dir = 'auto',
 }) => {
   const renderedContent = useMemo(() => {
     if (!text) return null;
@@ -226,5 +228,5 @@ export const MathText: React.FC<MathTextProps> = ({
     });
   }, [text, block]);
 
-  return <Component className={className}>{renderedContent}</Component>;
+  return <Component className={className} dir={dir}>{renderedContent}</Component>;
 };

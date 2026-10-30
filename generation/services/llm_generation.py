@@ -209,6 +209,27 @@ class LLMQuestionGenerationService(QuestionGenerationService):
             logger.debug(f"Skipping existing question DB collision check: {e}")
             final_drafts = unique_drafts
 
+        # 6. Backfill any shortfall caused by deduplication or batch dropouts
+        if len(final_drafts) < target_quantity:
+            needed = target_quantity - len(final_drafts)
+            logger.info(f"Backfilling {needed} question(s) to fulfill target quantity ({target_quantity}).")
+            try:
+                if constraints.get("source_text"):
+                    bf_constraints = dict(constraints)
+                    bf_constraints["quantity"] = needed
+                    used_fig_ids = {d.diagram.get("figure_id") for d in final_drafts if d.diagram}
+                    bf_constraints["attached_figures"] = [
+                        f for f in (constraints.get("attached_figures") or [])
+                        if f.get("figure_id") not in used_fig_ids
+                    ]
+                    backfills = self._generate_from_source_text_fallback(chapter_instance, bf_constraints)
+                    final_drafts.extend(backfills[:needed])
+                else:
+                    backfills = self.fallback_service.generate_questions(chapter, {**constraints, "quantity": needed})
+                    final_drafts.extend(backfills[:needed])
+            except Exception as bf_err:
+                logger.warning(f"Shortfall backfill error: {bf_err}")
+
         return final_drafts
 
     def _plan_batches(self, constraints: Dict[str, Any], target_quantity: int) -> List[Dict[str, Any]]:
@@ -222,6 +243,12 @@ class LLMQuestionGenerationService(QuestionGenerationService):
         fig_cursor = 0
 
         if mark_distribution:
+            has_high_mark_or_diag_tier = any(
+                "DIAGRAM_BASED" in (t.get("question_types") or [t.get("question_type", "")])
+                or float(t.get("marks", 1.0)) >= 3.0
+                for t in mark_distribution
+            )
+
             for tier in mark_distribution:
                 tier_marks = tier.get("marks", 1.0)
                 tier_count = int(tier.get("count", 0))
@@ -235,10 +262,13 @@ class LLMQuestionGenerationService(QuestionGenerationService):
                     remaining -= chunk_size
 
                     # Assign diagrams if diagram-based or high marks
+                    is_eligible_tier = (
+                        "DIAGRAM_BASED" in tier_types
+                        or float(tier_marks) >= 3.0
+                        or (not has_high_mark_or_diag_tier and float(tier_marks) == max(float(t.get("marks", 1.0)) for t in mark_distribution))
+                    )
                     assigned_figs = []
-                    if fig_cursor < len(attached_figures) and (
-                        "DIAGRAM_BASED" in tier_types or float(tier_marks) >= 3.0 or remaining == 0
-                    ):
+                    if fig_cursor < len(attached_figures) and is_eligible_tier:
                         take_count = min(len(attached_figures) - fig_cursor, max(1, chunk_size // 2))
                         assigned_figs = attached_figures[fig_cursor : fig_cursor + take_count]
                         fig_cursor += take_count
@@ -737,31 +767,38 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
             diagram_dict = None
             if isinstance(diag_obj, dict) and (diag_obj.get("image_url") or diag_obj.get("figure_id") or diag_obj.get("title")):
                 fig_id = str(diag_obj.get("figure_id", ""))
-                matching_fig = next((f for f in attached_figures if f.get("figure_id") == fig_id), None) if attached_figures else None
+                matching_fig = next(
+                    (f for f in attached_figures if f.get("figure_id") == fig_id or (f.get("title") and f.get("title") == diag_obj.get("title"))),
+                    None
+                ) if attached_figures else None
 
-                drive_id = str(diag_obj.get("drive_file_id", ""))
-                if not drive_id and matching_fig:
-                    drive_id = matching_fig.get("drive_file_id", "")
+                # Discard hallucinated diagrams if this batch has no attached figures or figure ID does not match
+                if not attached_figures or not matching_fig:
+                    diagram_dict = None
+                else:
+                    drive_id = str(diag_obj.get("drive_file_id", ""))
+                    if not drive_id and matching_fig:
+                        drive_id = matching_fig.get("drive_file_id", "")
 
-                img_url = str(diag_obj.get("image_url", ""))
-                if (not img_url or img_url.startswith("http")) and matching_fig and matching_fig.get("image_url"):
-                    img_url = matching_fig.get("image_url")
-                elif not img_url and fig_id:
-                    img_url = f"/api/papers/diagram-asset/{fig_id}/"
+                    img_url = str(diag_obj.get("image_url", ""))
+                    if (not img_url or img_url.startswith("http")) and matching_fig and matching_fig.get("image_url"):
+                        img_url = matching_fig.get("image_url")
+                    elif not img_url and fig_id:
+                        img_url = f"/api/papers/diagram-asset/{fig_id}/"
 
-                thumb_b64 = str(diag_obj.get("thumbnail_b64", ""))
-                if not thumb_b64 and matching_fig:
-                    thumb_b64 = matching_fig.get("thumbnail_b64", "")
+                    thumb_b64 = str(diag_obj.get("thumbnail_b64", ""))
+                    if not thumb_b64 and matching_fig:
+                        thumb_b64 = matching_fig.get("thumbnail_b64", "")
 
-                diagram_dict = {
-                    "figure_id": fig_id,
-                    "title": str(diag_obj.get("title", "")),
-                    "image_url": img_url,
-                    "drive_file_id": drive_id,
-                    "thumbnail_b64": thumb_b64,
-                }
-                if q_type != "MCQ":
-                    q_type = "DIAGRAM_BASED"
+                    diagram_dict = {
+                        "figure_id": matching_fig.get("figure_id", fig_id),
+                        "title": str(diag_obj.get("title") or matching_fig.get("title", "")),
+                        "image_url": img_url,
+                        "drive_file_id": drive_id,
+                        "thumbnail_b64": thumb_b64,
+                    }
+                    if q_type != "MCQ":
+                        q_type = "DIAGRAM_BASED"
 
             # Handle options for MCQ
             options = item.get("options")

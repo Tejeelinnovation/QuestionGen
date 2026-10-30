@@ -7,6 +7,16 @@ import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { Loader2, Copy } from 'lucide-react';
 import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 import { useToast } from '../../../context/ToastContext';
+import { MathText } from '../../../components/ui/MathText';
+import { API_BASE_URL } from '../../../api/client';
+
+const resolveImgUrl = (url?: string): string => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 export const VersionDetailPageTablet: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -314,16 +324,38 @@ export const VersionDetailPageTablet: React.FC = () => {
               </span>
             </div>
 
-            <p className="font-body text-sm font-medium text-ink leading-relaxed">
-              {q.question_text}
-            </p>
+            <div className="font-body text-sm font-medium text-ink leading-relaxed">
+              <MathText text={q.question_text} as="p" />
+            </div>
+
+            {/* Diagram Display if attached */}
+            {q.diagram && q.diagram.image_url && (
+              <div className="py-2.5 flex flex-col items-center justify-center bg-bg/50 border border-border/60 rounded-card p-2">
+                <img
+                  src={resolveImgUrl(q.diagram.image_url)}
+                  alt={q.diagram.title || 'Question Diagram'}
+                  className="max-h-56 max-w-sm object-contain border border-border rounded"
+                  onError={(e) => {
+                    const cur = (e.currentTarget as HTMLImageElement).src;
+                    if (!cur.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                      (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
+                    }
+                  }}
+                />
+                {q.diagram.title && (
+                  <span className="text-[11px] font-mono text-ink/60 mt-1 italic">
+                    {q.diagram.title}
+                  </span>
+                )}
+              </div>
+            )}
 
             {q.options && Object.keys(q.options).length > 0 && (
               <div className="grid grid-cols-2 gap-2 pt-1 pl-2">
                 {Object.entries(q.options).map(([optKey, optVal]) => (
-                  <div key={optKey} className="p-2 rounded-card border border-border/70 bg-bg text-xs flex items-baseline gap-1.5">
+                  <div key={optKey} className="p-2 rounded-card border border-border/70 bg-bg text-xs flex items-baseline gap-1.5" dir="auto">
                     <span className="font-mono font-bold text-forest">({optKey})</span>
-                    <span className="text-ink/80">{optVal}</span>
+                    <MathText text={optVal} as="span" />
                   </div>
                 ))}
               </div>
