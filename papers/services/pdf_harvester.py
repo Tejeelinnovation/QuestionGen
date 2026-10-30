@@ -172,54 +172,67 @@ class PdfInspectionService:
             for idx, item in enumerate(items):
                 if not isinstance(item, dict):
                     continue
-                box = item.get("box_2d")
-                if not box or not isinstance(box, list):
-                    continue
+                try:
+                    box = item.get("box_2d")
+                    if not box:
+                        continue
 
-                coords = box[0] if len(box) == 1 and isinstance(box[0], list) else box
-                if len(coords) != 4:
-                    continue
+                    # Robustly flatten any nested lists/tuples in coordinates
+                    flat_coords = []
+                    def _flatten_box(val):
+                        if isinstance(val, (list, tuple)):
+                            for v in val:
+                                _flatten_box(v)
+                        else:
+                            flat_coords.append(val)
+                    _flatten_box(box)
 
-                ymin, xmin, ymax, xmax = [float(c) for c in coords]
-                if ymax <= ymin + 15 or xmax <= xmin + 15:
-                    continue
+                    if len(flat_coords) != 4:
+                        continue
 
-                # Add 5pt padding to avoid clipping labels
-                pad_y = 5.0
-                pad_x = 5.0
-                clip_rect = (
-                    pymupdf.Rect(
-                        max(0.0, (xmin * page.rect.width / 1000.0) - pad_x),
-                        max(0.0, (ymin * page.rect.height / 1000.0) - pad_y),
-                        min(page.rect.width, (xmax * page.rect.width / 1000.0) + pad_x),
-                        min(page.rect.height, (ymax * page.rect.height / 1000.0) + pad_y),
+                    ymin, xmin, ymax, xmax = [float(c) for c in flat_coords]
+                    if ymax <= ymin + 15 or xmax <= xmin + 15:
+                        continue
+
+                    # Add 5pt padding to avoid clipping labels
+                    pad_y = 5.0
+                    pad_x = 5.0
+                    clip_rect = (
+                        pymupdf.Rect(
+                            max(0.0, (xmin * page.rect.width / 1000.0) - pad_x),
+                            max(0.0, (ymin * page.rect.height / 1000.0) - pad_y),
+                            min(page.rect.width, (xmax * page.rect.width / 1000.0) + pad_x),
+                            min(page.rect.height, (ymax * page.rect.height / 1000.0) + pad_y),
+                        )
+                        & page.rect
                     )
-                    & page.rect
-                )
 
-                if clip_rect.width < 50 or clip_rect.height < 40:
+                    if clip_rect.width < 50 or clip_rect.height < 40:
+                        continue
+
+                    cropped_pix = page.get_pixmap(clip=clip_rect, dpi=200)
+                    cropped_bytes = cropped_pix.tobytes("png")
+
+                    if not cls._is_valid_diagram_image(cropped_bytes, cropped_pix.width, cropped_pix.height):
+                        continue
+
+                    fig_id = f"fig_p{page_num}_vdiag_{idx + 1}"
+                    caption = str(item.get("caption") or f"Figure {page_num}.{idx + 1}")
+                    thumb_b64 = cls._generate_thumbnail_base64(cropped_bytes)
+
+                    results.append({
+                        "figure_id": fig_id,
+                        "page_number": page_num,
+                        "width": cropped_pix.width,
+                        "height": cropped_pix.height,
+                        "caption": caption,
+                        "diagram_type": str(item.get("diagram_type", "DIAGRAM")),
+                        "thumbnail_b64": thumb_b64,
+                        "image_bytes": cropped_bytes,
+                    })
+                except Exception as item_err:
+                    logger.debug(f"Error parsing vision item {idx} on page {page_num}: {item_err}")
                     continue
-
-                cropped_pix = page.get_pixmap(clip=clip_rect, dpi=200)
-                cropped_bytes = cropped_pix.tobytes("png")
-
-                if not cls._is_valid_diagram_image(cropped_bytes, cropped_pix.width, cropped_pix.height):
-                    continue
-
-                fig_id = f"fig_p{page_num}_vdiag_{idx + 1}"
-                caption = str(item.get("caption") or f"Figure {page_num}.{idx + 1}")
-                thumb_b64 = cls._generate_thumbnail_base64(cropped_bytes)
-
-                results.append({
-                    "figure_id": fig_id,
-                    "page_number": page_num,
-                    "width": cropped_pix.width,
-                    "height": cropped_pix.height,
-                    "caption": caption,
-                    "diagram_type": str(item.get("diagram_type", "DIAGRAM")),
-                    "thumbnail_b64": thumb_b64,
-                    "image_bytes": cropped_bytes,
-                })
 
             return results
         except Exception as v_err:
@@ -500,6 +513,8 @@ class PdfInspectionService:
             "filename": filename,
             "page_count": page_count,
             "word_count": total_words,
+            "full_text": extracted_full_text,
+            "extracted_text": extracted_full_text,
             "figure_count": len(detected_figures),
             "figures": [
                 {
@@ -512,6 +527,7 @@ class PdfInspectionService:
                 }
                 for fig in detected_figures
             ],
+            "detected_figures": detected_figures,
         }
 
     @classmethod
