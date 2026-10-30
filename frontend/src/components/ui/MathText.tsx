@@ -10,11 +10,33 @@ interface MathTextProps {
 }
 
 /**
- * Clean up common OCR / ingestion quirks in LaTeX formulas.
+ * HTML entity escaper to guarantee zero unescaped HTML/XML injection into DOM.
+ */
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Clean up common OCR, ingestion quirks, and collapsed JSON escape artifacts in LaTeX formulas.
  */
 function cleanLatex(formula: string): string {
   if (!formula) return '';
   let s = formula.trim();
+
+  // Repair collapsed LaTeX commands caused by JSON escape collision (\t, \r, \f)
+  s = s.replace(/(?:[\t\x09]|\b)ext\{/g, '\\text{');
+  s = s.replace(/(?:[\r\x0d]|\b)ightarrow\b/g, '\\rightarrow ');
+  s = s.replace(/(?:[\x0c]|\b)rac\{/g, '\\frac{');
+  s = s.replace(/(?:[\t\x09]|\b)imes\b/g, '\\times ');
+  s = s.replace(/(?:[\t\x09]|\b)heta\b/g, '\\theta ');
+  s = s.replace(/(?:[\r\x0d]|\b)ho\b/g, '\\rho ');
+  s = s.replace(/(?:[\r\x0d]|\b)ight\b/g, '\\right');
 
   // Normalize reaction arrows and dashes
   s = s.replace(/→/g, '\\rightarrow ').replace(/⇌/g, '\\rightleftharpoons ');
@@ -33,7 +55,7 @@ function cleanLatex(formula: string): string {
 }
 
 /**
- * Safely render a LaTeX segment using KaTeX without throwing.
+ * Safely render a LaTeX segment using KaTeX with HTML-escaped fallback to prevent DOM pollution.
  */
 function renderKatexHtml(math: string, displayMode: boolean): string {
   try {
@@ -47,14 +69,58 @@ function renderKatexHtml(math: string, displayMode: boolean): string {
     });
   } catch (err) {
     console.warn('KaTeX rendering error:', err);
-    // Graceful fallback to escaped text
-    return `<span class="katex-fallback font-mono text-xs">${math}</span>`;
+    // Escape HTML to prevent broken tags (<noscript>, <script>) from corrupting DOM
+    return `<span class="katex-fallback font-mono text-xs">${escapeHtml(math)}</span>`;
   }
 }
 
 /**
+ * Renders plain text with code block and inline code formatting.
+ */
+function renderTextWithCode(text: string, keyPrefix: string): React.ReactNode[] {
+  if (!text) return [];
+
+  // Match fenced code blocks ```lang\ncode\n``` or ```code```
+  const parts = text.split(/(```[\s\S]*?```|`[^`\n]+?`)/g);
+
+  return parts.map((part, pIdx) => {
+    if (!part) return null;
+
+    // Fenced code block ```...```
+    if (part.startsWith('```') && part.endsWith('```') && part.length >= 6) {
+      const inner = part.slice(3, -3);
+      // Strip optional leading language identifier (e.g. javascript\n or python\n)
+      const codeContent = inner.replace(/^[a-zA-Z0-9_-]+\r?\n/, '');
+      return (
+        <pre
+          key={`${keyPrefix}-code-block-${pIdx}`}
+          className="my-2 p-2.5 bg-gray-50 print:bg-gray-100/80 border border-gray-200 rounded font-mono text-xs overflow-x-auto whitespace-pre text-left block text-gray-900"
+        >
+          <code>{codeContent}</code>
+        </pre>
+      );
+    }
+
+    // Inline code block `...`
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+      const codeContent = part.slice(1, -1);
+      return (
+        <code
+          key={`${keyPrefix}-code-inline-${pIdx}`}
+          className="px-1.5 py-0.5 bg-gray-100 print:bg-gray-100/90 border border-gray-200 rounded font-mono text-xs text-indigo-700 print:text-black font-semibold"
+        >
+          {codeContent}
+        </code>
+      );
+    }
+
+    return <React.Fragment key={`${keyPrefix}-txt-${pIdx}`}>{part}</React.Fragment>;
+  });
+}
+
+/**
  * Component to seamlessly render mixed text, inline LaTeX ($...$, \(...\)),
- * block LaTeX ($$...$$, \[...\]), and standalone math expressions.
+ * block LaTeX ($$...$$, \[...\]), code snippets, and standalone math expressions.
  */
 export const MathText: React.FC<MathTextProps> = ({
   text,
@@ -68,14 +134,15 @@ export const MathText: React.FC<MathTextProps> = ({
     // Check if the text contains any LaTeX indicators: delimiters or backslashes
     const hasDelimiters = /(\$\$[\s\S]*?\$\$|\$[^\$]+?\$|\\\[[\s\S]*?\\\]|\\\([^\)]+?\\\))/.test(text);
     const hasLatexCommands = /\\[a-zA-Z]+|\^\{|_\{/.test(text);
+    const hasCodeBlocks = /```|`[^`\n]+?`/.test(text);
 
-    // If completely plain text with no math indicators, return raw text for maximum speed
-    if (!hasDelimiters && !hasLatexCommands) {
+    // If completely plain text with no math indicators or code blocks, return raw text
+    if (!hasDelimiters && !hasLatexCommands && !hasCodeBlocks) {
       return text;
     }
 
     // If whole string is wrapped in display math delimiters or block mode is requested for entire math string
-    if (block && !hasDelimiters && hasLatexCommands) {
+    if (block && !hasDelimiters && hasLatexCommands && !hasCodeBlocks) {
       const html = renderKatexHtml(text, true);
       return <div className="katex-display-container my-2 overflow-x-auto" dangerouslySetInnerHTML={{ __html: html }} />;
     }
@@ -154,8 +221,8 @@ export const MathText: React.FC<MathTextProps> = ({
         );
       }
 
-      // Regular text segment
-      return <React.Fragment key={`text-${index}`}>{token}</React.Fragment>;
+      // Regular text segment with code block parsing
+      return renderTextWithCode(token, `seg-${index}`);
     });
   }, [text, block]);
 
