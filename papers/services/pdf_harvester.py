@@ -383,8 +383,19 @@ class PdfInspectionService:
         drive_client = GoogleDriveClient()
         uploaded_diagrams: List[Dict[str, Any]] = []
 
-        sanitized_title = "".join(c for c in paper_title if c.isalnum() or c in (" ", "_", "-")).rstrip()
-        sanitized_title = sanitized_title.replace(" ", "_")[:30]
+        # Derive isolated folder per paper / PDF to keep Google Drive clean and organized
+        pdf_filename = cached_data.get("filename", "")
+        clean_title = "".join(c for c in paper_title if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")[:35]
+        clean_pdf = ""
+        if pdf_filename:
+            base_pdf = os.path.splitext(os.path.basename(pdf_filename))[0]
+            clean_pdf = "".join(c for c in base_pdf if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")[:35]
+
+        folder_name = clean_title or clean_pdf or f"Paper_{inspection_id[:8]}"
+        drive_folder_path = ["paper_creation_diagrams", folder_name]
+
+        from django.conf import settings
+        store_local = getattr(settings, "STORE_DIAGRAMS_LOCAL", settings.DEBUG)
 
         for fig_id in selected_figure_ids:
             img_bytes = high_res_images.get(fig_id)
@@ -392,9 +403,9 @@ class PdfInspectionService:
                 continue
 
             fig_meta = detected_figures.get(fig_id, {})
-            dest_name = f"{sanitized_title}_{fig_id}.png"
+            dest_name = f"{folder_name}_{fig_id}.png"
 
-            # Archive to Google Drive if configured
+            # Archive to Google Drive in paper-specific isolated folder
             file_id = ""
             web_view_link = ""
             if drive_client.is_configured:
@@ -403,7 +414,7 @@ class PdfInspectionService:
                         data=img_bytes,
                         destination_name=dest_name,
                         mime_type="image/png",
-                        subfolder_name="paper_creation_diagrams",
+                        folder_path=drive_folder_path,
                     )
                     file_id = upload_result.get("file_id", "")
                     web_view_link = upload_result.get("web_view_link", "")
@@ -413,16 +424,15 @@ class PdfInspectionService:
             # Local proxy endpoint ensures 100% reliable image loading without cross-origin cookie blocks
             local_proxy_url = f"/api/papers/diagram-asset/{fig_id}/"
 
-            # Cache high-res image to disk media/diagrams/ so it survives server reloads
-            try:
-                import os
-                from django.conf import settings
-                disk_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
-                os.makedirs(disk_dir, exist_ok=True)
-                with open(os.path.join(disk_dir, f"{fig_id}.png"), "wb") as f_disk:
-                    f_disk.write(img_bytes)
-            except Exception as disk_err:
-                logger.debug(f"Failed to cache diagram {fig_id} on disk: {disk_err}")
+            # Cache high-res image to disk media/diagrams/ only if local storage is permitted (dev)
+            if store_local:
+                try:
+                    disk_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
+                    os.makedirs(disk_dir, exist_ok=True)
+                    with open(os.path.join(disk_dir, f"{fig_id}.png"), "wb") as f_disk:
+                        f_disk.write(img_bytes)
+                except Exception as disk_err:
+                    logger.debug(f"Failed to cache diagram {fig_id} on disk: {disk_err}")
 
             uploaded_diagrams.append(
                 {

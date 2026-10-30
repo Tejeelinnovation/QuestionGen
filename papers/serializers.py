@@ -612,3 +612,4 @@ class PaperPrintSerializer(serializers.Serializer):
     total_marks = serializers.IntegerField()
     question_count = serializers.IntegerField()
     questions = serializers.ListField(child=serializers.DictField())
+    sections = serializers.ListField(child=serializers.DictField(), required=False, default=list)

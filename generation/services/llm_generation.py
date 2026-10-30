@@ -578,6 +578,7 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
         default_type = constraints.get("question_type") or "MCQ"
         default_level = constraints.get("learner_level") or "INTERMEDIATE"
         default_marks = constraints.get("marks") or constraints.get("marks_per_question") or 1.0
+        attached_figures = constraints.get("attached_figures") or []
 
         drafts: List[QuestionDraft] = []
         for item in data:
@@ -595,11 +596,29 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
             diag_obj = item.get("diagram")
             diagram_dict = None
             if isinstance(diag_obj, dict) and (diag_obj.get("image_url") or diag_obj.get("figure_id") or diag_obj.get("title")):
+                fig_id = str(diag_obj.get("figure_id", ""))
+                matching_fig = next((f for f in attached_figures if f.get("figure_id") == fig_id), None) if attached_figures else None
+
+                drive_id = str(diag_obj.get("drive_file_id", ""))
+                if not drive_id and matching_fig:
+                    drive_id = matching_fig.get("drive_file_id", "")
+
+                img_url = str(diag_obj.get("image_url", ""))
+                if (not img_url or img_url.startswith("http")) and matching_fig and matching_fig.get("image_url"):
+                    img_url = matching_fig.get("image_url")
+                elif not img_url and fig_id:
+                    img_url = f"/api/papers/diagram-asset/{fig_id}/"
+
+                thumb_b64 = str(diag_obj.get("thumbnail_b64", ""))
+                if not thumb_b64 and matching_fig:
+                    thumb_b64 = matching_fig.get("thumbnail_b64", "")
+
                 diagram_dict = {
-                    "figure_id": str(diag_obj.get("figure_id", "")),
+                    "figure_id": fig_id,
                     "title": str(diag_obj.get("title", "")),
-                    "image_url": str(diag_obj.get("image_url", "")),
-                    "drive_file_id": str(diag_obj.get("drive_file_id", "")),
+                    "image_url": img_url,
+                    "drive_file_id": drive_id,
+                    "thumbnail_b64": thumb_b64,
                 }
                 if q_type != "MCQ":
                     q_type = "DIAGRAM_BASED"

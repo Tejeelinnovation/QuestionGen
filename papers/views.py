@@ -155,14 +155,16 @@ class PaperListCreateView(APIView):
                     if cached_insp:
                         detected_map = {f["figure_id"]: f for f in cached_insp.get("detected_figures", [])}
                         high_res_map = cached_insp.get("high_res_images", {})
-                        disk_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
-                        os.makedirs(disk_dir, exist_ok=True)
+                        store_local = getattr(settings, "STORE_DIAGRAMS_LOCAL", settings.DEBUG)
+                        if store_local:
+                            disk_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
+                            os.makedirs(disk_dir, exist_ok=True)
 
                         initial_diagrams = []
                         for fig_id in selected_fig_ids:
                             fig_meta = detected_map.get(fig_id, {})
                             raw_b = high_res_map.get(fig_id)
-                            if raw_b:
+                            if raw_b and store_local:
                                 try:
                                     with open(os.path.join(disk_dir, f"{fig_id}.png"), "wb") as df:
                                         df.write(raw_b)
@@ -917,6 +919,7 @@ class PaperVersionPrintView(APIView):
                 "question_type": q_data.get("question_type"),
                 "marks": q_data.get("marks"),
                 "options": q_data.get("options"),
+                "diagram": q_data.get("diagram"),
             })
 
         school_name = ""
@@ -1150,11 +1153,13 @@ class PaperDiagramAssetView(APIView):
         import os
         from django.conf import settings
         from papers.services.pdf_harvester import PdfInspectionService
-        from papers.models import Paper
+        from papers.models import Paper, PaperVersion
 
-        # Level 1: Check persistent local disk cache
+        store_local = getattr(settings, "STORE_DIAGRAMS_LOCAL", settings.DEBUG)
         disk_path = os.path.join(settings.MEDIA_ROOT, "diagrams", f"{figure_id}.png")
-        if os.path.exists(disk_path):
+
+        # Level 1: Check persistent local disk cache (if local storage enabled)
+        if store_local and os.path.exists(disk_path):
             try:
                 with open(disk_path, "rb") as f:
                     img_bytes = f.read()
@@ -1169,58 +1174,76 @@ class PaperDiagramAssetView(APIView):
         # Level 2: Check RAM inspection cache
         img_bytes = PdfInspectionService.get_figure_bytes(figure_id)
         if img_bytes:
-            try:
-                os.makedirs(os.path.dirname(disk_path), exist_ok=True)
-                with open(disk_path, "wb") as f:
-                    f.write(img_bytes)
-            except Exception:
-                pass
+            if store_local:
+                try:
+                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                    with open(disk_path, "wb") as f:
+                        f.write(img_bytes)
+                except Exception:
+                    pass
             response = HttpResponse(img_bytes, content_type="image/png")
             response["Cache-Control"] = "public, max-age=86400, immutable"
             response["Access-Control-Allow-Origin"] = "*"
             return response
 
-        # Level 3: Look up Paper record to get Google Drive File ID or Thumbnail Base64
+        # Level 3: Look up Paper or PaperVersion record to get Google Drive File ID or Thumbnail Base64
+        drive_file_id = ""
+        thumb_b64 = ""
+
         paper = Paper.objects.filter(specifications__icontains=figure_id).first()
         if paper and paper.specifications:
             diagrams = paper.specifications.get("attached_diagrams") or []
             target_diag = next((d for d in diagrams if d.get("figure_id") == figure_id), None)
             if target_diag:
-                drive_file_id = target_diag.get("drive_file_id")
-                if drive_file_id:
-                    try:
-                        from content_ingestion.storage.drive_client import GoogleDriveClient
-                        drive_client = GoogleDriveClient()
-                        if drive_client.is_configured:
-                            img_bytes = drive_client.download_bytes(drive_file_id)
-                            if img_bytes:
-                                try:
-                                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
-                                    with open(disk_path, "wb") as f:
-                                        f.write(img_bytes)
-                                except Exception:
-                                    pass
-                                response = HttpResponse(img_bytes, content_type="image/png")
-                                response["Cache-Control"] = "public, max-age=86400, immutable"
-                                response["Access-Control-Allow-Origin"] = "*"
-                                return response
-                    except Exception as drive_err:
-                        logger.warning(f"Failed to fetch {figure_id} from Drive: {drive_err}")
+                drive_file_id = target_diag.get("drive_file_id") or ""
+                thumb_b64 = target_diag.get("thumbnail_b64") or ""
 
-                # Level 4: Base64 thumbnail fallback from Paper specifications
-                thumb_b64 = target_diag.get("thumbnail_b64")
-                if thumb_b64:
-                    try:
-                        if "," in thumb_b64:
-                            thumb_b64 = thumb_b64.split(",", 1)[1]
-                        thumb_bytes = base64.b64decode(thumb_b64)
-                        if thumb_bytes:
-                            response = HttpResponse(thumb_bytes, content_type="image/jpeg")
-                            response["Cache-Control"] = "public, max-age=86400, immutable"
-                            response["Access-Control-Allow-Origin"] = "*"
-                            return response
-                    except Exception:
-                        pass
+        # If not in paper specifications, search PaperVersion question snapshots
+        if not drive_file_id and not thumb_b64:
+            p_ver = PaperVersion.objects.filter(question_snapshot__icontains=figure_id).first()
+            if p_ver and p_ver.question_snapshot:
+                for q in p_ver.question_snapshot:
+                    d = q.get("diagram")
+                    if d and d.get("figure_id") == figure_id:
+                        drive_file_id = d.get("drive_file_id") or d.get("file_id") or ""
+                        thumb_b64 = d.get("thumbnail_b64") or ""
+                        break
+
+        # Stream directly from Google Drive (cloud storage in production)
+        if drive_file_id:
+            try:
+                from content_ingestion.storage.drive_client import GoogleDriveClient
+                drive_client = GoogleDriveClient()
+                if drive_client.is_configured:
+                    img_bytes = drive_client.download_bytes(drive_file_id)
+                    if img_bytes:
+                        if store_local:
+                            try:
+                                os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                                with open(disk_path, "wb") as f:
+                                    f.write(img_bytes)
+                            except Exception:
+                                pass
+                        response = HttpResponse(img_bytes, content_type="image/png")
+                        response["Cache-Control"] = "public, max-age=86400, immutable"
+                        response["Access-Control-Allow-Origin"] = "*"
+                        return response
+            except Exception as drive_err:
+                logger.warning(f"Failed to fetch {figure_id} from Drive: {drive_err}")
+
+        # Level 4: Base64 thumbnail fallback from stored metadata
+        if thumb_b64:
+            try:
+                if "," in thumb_b64:
+                    thumb_b64 = thumb_b64.split(",", 1)[1]
+                thumb_bytes = base64.b64decode(thumb_b64)
+                if thumb_bytes:
+                    response = HttpResponse(thumb_bytes, content_type="image/jpeg")
+                    response["Cache-Control"] = "public, max-age=86400, immutable"
+                    response["Access-Control-Allow-Origin"] = "*"
+                    return response
+            except Exception:
+                pass
 
         # Level 5: Check if figure_id itself might be a direct Google Drive file ID
         try:

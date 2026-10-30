@@ -32,6 +32,7 @@ class FormattedExamQuestion:
     correct_answer: str = ""
     source_reference: str = ""
     topic_name: str = ""
+    diagram: Optional[Dict[str, Any]] = None
 
     def to_student_dict(self) -> Dict[str, Any]:
         """Student exam paper representation (omits correct answer & marking scheme)."""
@@ -44,6 +45,7 @@ class FormattedExamQuestion:
             "question_type": self.question_type,
             "marks": self.marks,
             "options": self.options,
+            "diagram": self.diagram,
         }
 
     def to_teacher_dict(self) -> Dict[str, Any]:
@@ -66,6 +68,7 @@ class FormattedExamQuestion:
             "correct_option_text": correct_option_text,
             "source_reference": self.source_reference,
             "topic_name": self.topic_name,
+            "diagram": self.diagram,
         }
 
 
@@ -156,6 +159,7 @@ class PaperPublishingService:
                 correct_answer=str(item.get("correct_answer", "")),
                 source_reference=str(item.get("source_reference", "")),
                 topic_name=str(item.get("topic_name", "")),
+                diagram=item.get("diagram"),
             )
             target_sec.questions.append(q_obj)
             target_sec.total_marks += marks_val

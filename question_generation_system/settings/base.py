@@ -231,6 +231,8 @@ GEMINI_MODEL_NAME = env("GEMINI_MODEL_NAME", default="gemini-3.5-flash-lite")
 GOOGLE_DRIVE_FOLDER_ID = env("GOOGLE_DRIVE_FOLDER_ID", default="")
 GOOGLE_DRIVE_USER_TOKEN_FILE = env("GOOGLE_DRIVE_USER_TOKEN_FILE", default="google_drive_token.json")
 GOOGLE_DRIVE_USER_TOKEN_JSON = env("GOOGLE_DRIVE_USER_TOKEN_JSON", default="")
+# Diagram storage policy: False in production (pure Google Drive, zero local disk footprint)
+STORE_DIAGRAMS_LOCAL = env.bool("STORE_DIAGRAMS_LOCAL", default=DEBUG)
 
 # ---------------------------------------------------------------------------
 # Default primary key type

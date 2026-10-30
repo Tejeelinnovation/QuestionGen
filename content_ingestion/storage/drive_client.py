@@ -217,15 +217,37 @@ class GoogleDriveClient:
 
         return parent
 
+    def get_or_create_folder_path(
+        self,
+        service: Any,
+        path_segments: List[str],
+        base_parent_id: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Ensures a nested hierarchy of folders exists, e.g. ["paper_creation_diagrams", "Chemistry_Chapter_1"].
+        Returns the ID of the leaf folder.
+        """
+        current_parent = base_parent_id or self.folder_id
+        for segment in path_segments:
+            cleaned = segment.strip().replace("/", "_").replace("\\", "_")
+            if not cleaned:
+                continue
+            created_id = self.get_or_create_subfolder(service, cleaned, parent_id=current_parent)
+            if created_id:
+                current_parent = created_id
+        return current_parent
+
     def upload_bytes(
         self,
         data: bytes,
         destination_name: str,
         mime_type: str = "image/png",
         subfolder_name: str = "Extracted-Diagrams",
+        folder_path: Optional[Union[str, List[str]]] = None,
     ) -> Dict[str, str]:
         """
         Uploads in-memory image bytes directly to a subfolder inside Google Drive without touching local disk.
+        Supports nested folder hierarchy (e.g. folder_path=["paper_creation_diagrams", "Class_12_Chemistry"]).
         Returns {'file_id': ..., 'web_view_link': ..., 'direct_url': ...}.
         """
         creds = self.get_credentials()
@@ -237,9 +259,16 @@ class GoogleDriveClient:
 
                 service = build("drive", "v3", credentials=creds)
 
-                # Route into dedicated subfolder (e.g. 'Extracted-Diagrams')
+                # Determine target folder ID (supports nested folder paths)
                 target_folder_id = self.folder_id
-                if subfolder_name:
+                if folder_path:
+                    if isinstance(folder_path, str):
+                        segments = [s.strip() for s in folder_path.replace("\\", "/").split("/") if s.strip()]
+                    else:
+                        segments = [str(s).strip() for s in folder_path if str(s).strip()]
+                    if segments:
+                        target_folder_id = self.get_or_create_folder_path(service, segments, base_parent_id=self.folder_id)
+                elif subfolder_name:
                     sub_id = self.get_or_create_subfolder(service, subfolder_name, parent_id=self.folder_id)
                     if sub_id:
                         target_folder_id = sub_id

@@ -15,6 +15,7 @@ Supports:
 from __future__ import annotations
 
 import io
+import logging
 from typing import Any, Dict, List, Optional, Union
 
 import docx
@@ -26,6 +27,8 @@ from docx.shared import Inches, Pt, RGBColor
 
 from papers.models import PaperVersion
 from papers.publishing import ExamSection, FormattedExamQuestion, PaperPublishingService
+
+logger = logging.getLogger(__name__)
 
 
 class ExamPaperDocxService:
@@ -364,6 +367,47 @@ class ExamPaperDocxService:
         r_marks.bold = True
         r_marks.font.size = Pt(9)
         r_marks.font.color.rgb = self.COLOR_INDIGO
+
+        # Render Question Diagram if present
+        if q.diagram:
+            fig_id = q.diagram.get("figure_id")
+            if fig_id:
+                try:
+                    from papers.services.pdf_harvester import PdfInspectionService
+                    img_bytes = PdfInspectionService.get_figure_bytes(fig_id)
+                    if not img_bytes:
+                        # Check Drive or Paper specifications
+                        paper = getattr(q, "paper", None)
+                        if not img_bytes:
+                            from content_ingestion.storage.drive_client import GoogleDriveClient
+                            drive_client = GoogleDriveClient()
+                            drive_file_id = q.diagram.get("drive_file_id")
+                            if drive_file_id and drive_client.is_configured:
+                                img_bytes = drive_client.download_bytes(drive_file_id)
+
+                    if img_bytes:
+                        p_img = doc.add_paragraph()
+                        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        p_img.paragraph_format.space_before = Pt(4)
+                        p_img.paragraph_format.space_after = Pt(4)
+                        p_img.paragraph_format.keep_with_next = True
+                        r_img = p_img.add_run()
+                        r_img.add_picture(io.BytesIO(img_bytes), width=Inches(3.8))
+
+                        # Caption
+                        cap = q.diagram.get("title")
+                        if cap:
+                            p_cap = doc.add_paragraph()
+                            p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            p_cap.paragraph_format.space_before = Pt(0)
+                            p_cap.paragraph_format.space_after = Pt(4)
+                            p_cap.paragraph_format.keep_with_next = True
+                            r_cap = p_cap.add_run(cap)
+                            r_cap.italic = True
+                            r_cap.font.size = Pt(8.5)
+                            r_cap.font.color.rgb = self.COLOR_MUTED
+                except Exception as img_err:
+                    logger.debug(f"Could not embed diagram image into DOCX: {img_err}")
 
         # MCQ Options
         if q.options and isinstance(q.options, dict):
