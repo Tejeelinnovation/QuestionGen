@@ -33,16 +33,18 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
     ? printData.school_name.toUpperCase()
     : 'INSTITUTIONAL EXAMINATION PAPER';
 
+  const formattedTitle = (printData.title || '').replace(/_/g, ' ');
+
   return (
-    <div className="printable-paper-sheet bg-white text-black border border-border print:border-none p-6 sm:p-12 rounded-card print:rounded-none print:p-0 shadow-card print:shadow-none space-y-8 font-body">
+    <div className="printable-paper-sheet bg-white text-black border border-border print:border-none p-6 sm:p-12 rounded-card print:rounded-none print:p-0 shadow-card print:shadow-none space-y-8 font-body min-w-0 max-w-full overflow-hidden">
       {/* Formal Institutional Header */}
-      <div className="border-b-2 border-black pb-5 text-center space-y-2.5">
-        <div className="text-xs sm:text-sm font-heading font-bold tracking-widest uppercase text-black">
+      <div className="border-b-2 border-black pb-5 text-center space-y-2.5 min-w-0">
+        <div className="text-xs sm:text-sm font-heading font-bold tracking-widest uppercase text-black break-words [overflow-wrap:anywhere]">
           {institutionName}
         </div>
 
-        <h1 className="font-heading font-bold text-2xl sm:text-3xl tracking-tight text-black uppercase">
-          {printData.title}
+        <h1 className="font-heading font-bold text-2xl sm:text-3xl tracking-tight text-black uppercase break-words [overflow-wrap:anywhere]">
+          {formattedTitle}
         </h1>
 
         <div className="flex flex-wrap justify-between items-center text-xs font-mono pt-3 border-t border-gray-300 font-semibold text-black gap-2">
@@ -55,13 +57,13 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
         </div>
 
         {printData.subjects && printData.subjects.length > 0 && (
-          <div className="text-xs font-mono font-medium text-black text-center pt-1">
+          <div className="text-xs font-mono font-medium text-black text-center pt-1 break-words [overflow-wrap:anywhere]">
             SUBJECTS: {printData.subjects.join(' • ')}
           </div>
         )}
 
         {printData.instructions && (
-          <div className="pt-2 text-left text-xs italic text-gray-800 border-t border-dashed border-gray-300">
+          <div className="pt-2 text-left text-xs italic text-gray-800 border-t border-dashed border-gray-300 break-words [overflow-wrap:anywhere]">
             <strong className="font-mono not-italic uppercase text-[10px] text-black">
               Candidate Instructions:
             </strong>{' '}
@@ -102,11 +104,11 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
               {/* Formal Academic Section Banner with Instructions */}
               <div className="border-t-2 border-b-2 border-black py-2.5 px-3 bg-gray-100/70 print:bg-transparent flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 break-after-avoid">
                 <div className="space-y-1">
-                  <div className="text-xs sm:text-sm font-heading font-bold uppercase tracking-wider text-black">
+                  <div className="text-xs sm:text-sm font-heading font-bold uppercase tracking-wider text-black break-words [overflow-wrap:anywhere]">
                     {sec.title}
                   </div>
                   {sec.instructions && (
-                    <div className="text-[11px] sm:text-xs font-serif italic text-gray-800">
+                    <div className="text-[11px] sm:text-xs font-serif italic text-gray-800 break-words [overflow-wrap:anywhere]">
                       {sec.instructions}
                     </div>
                   )}
@@ -137,7 +139,7 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
                         className={`flex justify-between items-baseline gap-4 ${isRtl ? 'flex-row-reverse text-right' : ''}`}
                         dir={isRtl ? 'rtl' : 'ltr'}
                       >
-                        <div className="text-sm font-medium leading-relaxed">
+                        <div className="text-sm font-medium leading-relaxed break-words [overflow-wrap:anywhere]">
                           <span className={`font-bold ${isRtl ? 'ml-1.5' : 'mr-1.5'}`}>{displayNum}.</span>
                           <MathText text={q.question_text} as="span" />
                         </div>

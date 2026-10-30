@@ -375,15 +375,43 @@ class ExamPaperDocxService:
                 try:
                     from papers.services.pdf_harvester import PdfInspectionService
                     img_bytes = PdfInspectionService.get_figure_bytes(fig_id)
+
+                    # Tier 2: Check persistent local media storage
                     if not img_bytes:
-                        # Check Drive or Paper specifications
-                        paper = getattr(q, "paper", None)
-                        if not img_bytes:
+                        try:
+                            from django.conf import settings
+                            local_path = os.path.join(settings.MEDIA_ROOT, "diagrams", f"{fig_id}.png")
+                            if os.path.exists(local_path):
+                                with open(local_path, "rb") as lf:
+                                    img_bytes = lf.read()
+                        except Exception:
+                            pass
+
+                    # Tier 3: Check base64 data URI in image_url
+                    if not img_bytes and str(q.diagram.get("image_url", "")).startswith("data:image/"):
+                        try:
+                            b64_part = q.diagram["image_url"].split(",", 1)[-1]
+                            img_bytes = base64.b64decode(b64_part)
+                        except Exception:
+                            pass
+
+                    # Tier 4: Check thumbnail base64
+                    if not img_bytes and q.diagram.get("thumbnail_b64"):
+                        try:
+                            img_bytes = base64.b64decode(q.diagram["thumbnail_b64"])
+                        except Exception:
+                            pass
+
+                    # Tier 5: Google Drive download
+                    if not img_bytes:
+                        try:
                             from content_ingestion.storage.drive_client import GoogleDriveClient
                             drive_client = GoogleDriveClient()
                             drive_file_id = q.diagram.get("drive_file_id")
                             if drive_file_id and drive_client.is_configured:
                                 img_bytes = drive_client.download_bytes(drive_file_id)
+                        except Exception:
+                            pass
 
                     if img_bytes:
                         p_img = doc.add_paragraph()
@@ -406,6 +434,15 @@ class ExamPaperDocxService:
                             r_cap.italic = True
                             r_cap.font.size = Pt(8.5)
                             r_cap.font.color.rgb = self.COLOR_MUTED
+                    else:
+                        # Graceful callout if image bytes could not be located
+                        cap = q.diagram.get("title") or "Refer to diagram attached with question"
+                        p_cap = doc.add_paragraph()
+                        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        r_cap = p_cap.add_run(f"[Diagram: {cap}]")
+                        r_cap.italic = True
+                        r_cap.font.size = Pt(9)
+                        r_cap.font.color.rgb = self.COLOR_INDIGO
                 except Exception as img_err:
                     logger.debug(f"Could not embed diagram image into DOCX: {img_err}")
 

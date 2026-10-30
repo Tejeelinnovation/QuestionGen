@@ -65,12 +65,12 @@ export const PaperDetailPageMobile: React.FC = () => {
       {/* Overview Card */}
       <div className="p-4 rounded-card bg-surface border border-border shadow-xs space-y-2.5">
         <div className="flex items-start justify-between gap-2">
-          <div className="space-y-0.5">
-            <h1 className="font-heading font-bold text-lg text-ink">
+          <div className="space-y-0.5 min-w-0">
+            <h1 className="font-heading font-bold text-lg text-ink break-words [overflow-wrap:anywhere]">
               {paper.title}
             </h1>
             <div className="text-xs text-ink/60 font-mono">
-              Chapter: {paper.chapter_title || `#${paper.chapter}`}
+              {paper.chapter_title || (paper.chapter ? `Chapter #${paper.chapter}` : (paper.subjects && paper.subjects.length > 0 ? paper.subjects.join(', ') : 'Comprehensive Syllabus'))}
             </div>
           </div>
           <span

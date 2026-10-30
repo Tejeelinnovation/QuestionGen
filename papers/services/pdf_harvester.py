@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import base64
 import io
+import json
+import os
 import logging
 import re
 import uuid
@@ -88,6 +90,143 @@ class PdfInspectionService:
             return True
 
     @classmethod
+    def _detect_diagrams_with_vision(cls, page: pymupdf.Page, page_num: int) -> List[Dict[str, Any]]:
+        """
+        Uses Gemini Vision to semantically detect genuine educational figures and precise bounding boxes.
+        Strictly excludes advertisements, promotional download banners, Table of Contents,
+        logos, barcodes, and decorative elements.
+        """
+        try:
+            from django.conf import settings
+            django_key = getattr(settings, "GEMINI_API_KEY", "") if settings.configured else ""
+        except Exception:
+            django_key = ""
+        api_key = django_key or os.environ.get("GEMINI_API_KEY", "")
+        if not api_key:
+            return []
+
+        try:
+            import requests
+            pix = page.get_pixmap(dpi=130)
+            b64_img = base64.b64encode(pix.tobytes("jpeg")).decode("utf-8")
+
+            prompt = (
+                "Analyze this educational/textbook page. Identify all genuine educational/pedagogical diagrams, scientific figures, "
+                "circuit diagrams, apparatus, chemical structures, biological illustrations, mathematical curves/graphs, "
+                "flowcharts, and coordinate geometry figures.\n"
+                "CRITICAL FILTERING RULES:\n"
+                "1. Strictly EXCLUDE all promotional banners, website URLs, download links, Telegram links, YouTube links, "
+                "and social media handles.\n"
+                "2. Strictly EXCLUDE publisher logos, watermarks, barcodes, QR codes, ISBN blocks, decorative header/footer bars, "
+                "and Table of Contents / chapter index boxes.\n"
+                "3. For each genuine educational figure, provide a JSON object with:\n"
+                "   - 'caption': clean academic title/caption\n"
+                "   - 'diagram_type': e.g., 'CIRCUIT', 'APPARATUS', 'BIOLOGY', 'GRAPH', 'GEOMETRY', 'FLOWCHART', 'CHEMICAL'\n"
+                "   - 'box_2d': [ymin, xmin, ymax, xmax] normalized coordinates from 0 to 1000 bounding the diagram and its key labels.\n"
+                "Return ONLY a JSON array of objects. If no genuine educational figures exist on this page, return an empty array []."
+            )
+
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": prompt},
+                            {"inline_data": {"mime_type": "image/jpeg", "data": b64_img}},
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "response_mime_type": "application/json"
+                },
+            }
+
+            models_to_try = ["gemini-3.5-flash-lite", "gemini-3.5-flash"]
+            res = None
+            for model in models_to_try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+                try:
+                    res = requests.post(url, json=payload, timeout=20)
+                    if res.status_code == 200:
+                        break
+                except Exception as net_err:
+                    logger.debug(f"Vision model {model} timeout/error: {net_err}")
+                    continue
+
+            if not res or res.status_code != 200:
+                return []
+
+            resp_json = res.json()
+            candidates = resp_json.get("candidates", [])
+            if not candidates:
+                return []
+
+            raw_text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+            if not raw_text:
+                return []
+
+            items = json.loads(raw_text)
+            if not isinstance(items, list):
+                return []
+
+            results = []
+            for idx, item in enumerate(items):
+                if not isinstance(item, dict):
+                    continue
+                box = item.get("box_2d")
+                if not box or not isinstance(box, list):
+                    continue
+
+                coords = box[0] if len(box) == 1 and isinstance(box[0], list) else box
+                if len(coords) != 4:
+                    continue
+
+                ymin, xmin, ymax, xmax = [float(c) for c in coords]
+                if ymax <= ymin + 15 or xmax <= xmin + 15:
+                    continue
+
+                # Add 5pt padding to avoid clipping labels
+                pad_y = 5.0
+                pad_x = 5.0
+                clip_rect = (
+                    pymupdf.Rect(
+                        max(0.0, (xmin * page.rect.width / 1000.0) - pad_x),
+                        max(0.0, (ymin * page.rect.height / 1000.0) - pad_y),
+                        min(page.rect.width, (xmax * page.rect.width / 1000.0) + pad_x),
+                        min(page.rect.height, (ymax * page.rect.height / 1000.0) + pad_y),
+                    )
+                    & page.rect
+                )
+
+                if clip_rect.width < 50 or clip_rect.height < 40:
+                    continue
+
+                cropped_pix = page.get_pixmap(clip=clip_rect, dpi=200)
+                cropped_bytes = cropped_pix.tobytes("png")
+
+                if not cls._is_valid_diagram_image(cropped_bytes, cropped_pix.width, cropped_pix.height):
+                    continue
+
+                fig_id = f"fig_p{page_num}_vdiag_{idx + 1}"
+                caption = str(item.get("caption") or f"Figure {page_num}.{idx + 1}")
+                thumb_b64 = cls._generate_thumbnail_base64(cropped_bytes)
+
+                results.append({
+                    "figure_id": fig_id,
+                    "page_number": page_num,
+                    "width": cropped_pix.width,
+                    "height": cropped_pix.height,
+                    "caption": caption,
+                    "diagram_type": str(item.get("diagram_type", "DIAGRAM")),
+                    "thumbnail_b64": thumb_b64,
+                    "image_bytes": cropped_bytes,
+                })
+
+            return results
+        except Exception as v_err:
+            logger.warning(f"Vision diagram extraction exception on page {page_num}: {v_err}")
+            return []
+
+    @classmethod
     def inspect_pdf(cls, file_bytes: bytes, filename: str) -> Dict[str, Any]:
         """
         Inspects PDF in memory and extracts text, metadata, and detected figures.
@@ -137,140 +276,171 @@ class PdfInspectionService:
             if page_text.strip():
                 full_text_parts.append(f"--- [Page {page_num}] ---\n{page_text.strip()}")
 
-            # 2. Extract Embedded Images with True Colorspace Conversion
-            image_list = page.get_images(full=True)
-            for img_idx, img_info in enumerate(image_list):
-                xref = img_info[0]
-                try:
-                    pix = pymupdf.Pixmap(doc, xref)
+            # 2. Vision Diagram Detector (AI Visual Semantic Classifier)
+            has_drawings = len(page.get_drawings()) > 10
+            has_images = len(page.get_images()) > 0
+            has_caption = bool(re.search(r"\b(?:fig|figure|diagram|chart|graph|चित्र|आकृति|सारणी|تصویر|شکل|خاکہ)\b", page_text, re.I))
 
-                    # Convert CMYK, Separation, or Grayscale pixmaps to standard RGB
-                    if pix.n >= 5 or pix.colorspace != pymupdf.csRGB:
-                        try:
-                            pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
-                        except Exception:
-                            pass
-
-                    width = pix.width
-                    height = pix.height
-
-                    # Filter out tiny icons, decorative lines, or logos
-                    if width < cls.MIN_IMAGE_WIDTH or height < cls.MIN_IMAGE_HEIGHT:
-                        continue
-
-                    img_bytes = pix.tobytes("png")
-                    if not img_bytes:
-                        continue
-
-                    # Filter out solid black/blank/monochrome background boxes
-                    if not cls._is_valid_diagram_image(img_bytes, width, height):
-                        continue
-
-                    # Generate unique ID for this figure
-                    fig_id = f"fig_p{page_num}_{img_idx + 1}_{xref}"
-
-                    # Detect nearby caption from page text
-                    caption = cls._detect_caption(page_text, page_num, img_idx + 1)
-
-                    # Create lightweight thumbnail for instant browser display
-                    thumb_b64 = cls._generate_thumbnail_base64(img_bytes)
-
-                    detected_figures.append(
-                        {
+            vision_handled = False
+            if (has_drawings or has_images or has_caption) and len(detected_figures) < 20:
+                v_figs = cls._detect_diagrams_with_vision(page, page_num)
+                if v_figs:
+                    vision_handled = True
+                    for vf in v_figs:
+                        fig_id = vf["figure_id"]
+                        detected_figures.append({
                             "figure_id": fig_id,
                             "page_number": page_num,
-                            "width": width,
-                            "height": height,
-                            "caption": caption,
-                            "thumbnail_b64": thumb_b64,
+                            "width": vf["width"],
+                            "height": vf["height"],
+                            "caption": vf["caption"],
+                            "thumbnail_b64": vf["thumbnail_b64"],
                             "mime_type": "image/png",
-                        }
-                    )
+                        })
+                        high_res_images[fig_id] = vf["image_bytes"]
+                        cls._high_res_cache[fig_id] = vf["image_bytes"]
 
-                    # Store original high-res bytes for instant proxy serving & Drive archival
-                    high_res_images[fig_id] = img_bytes
-                    cls._high_res_cache[fig_id] = img_bytes
+            # 3. Fallback: Extract Embedded Images with True Colorspace Conversion if Vision did not run
+            if not vision_handled:
+                image_list = page.get_images(full=True)
+                for img_idx, img_info in enumerate(image_list):
+                    xref = img_info[0]
+                    try:
+                        pix = pymupdf.Pixmap(doc, xref)
 
-                except Exception as img_err:
-                    logger.debug(f"Could not extract image xref {xref} on page {page_num}: {img_err}")
-                    continue
-
-            # 3. Extract Vector & Composite Textbook Diagrams via Caption Anchors
-            # NCERT and textbook PDFs often draw diagrams using vector paths or composite gradient strips
-            try:
-                caption_regex = re.compile(
-                    r"^\s*(?:Fig(?:ure)?\.?|चित्र|आकृति|सारणी|تصویر|شکل|خاکہ|جدول|باکس|Diagram)\s*([0-9۰-۹०-९]+(?:[\.\-][0-9۰-۹०-९]+)*)",
-                    re.IGNORECASE,
-                )
-                blocks = page.get_text("blocks")
-                for b in blocks:
-                    block_text = b[4].strip()
-                    m = caption_regex.match(block_text)
-                    if m:
-                        fig_num_tag = m.group(1).replace(".", "_")
-                        fig_id = f"fig_p{page_num}_comp_{fig_num_tag}"
-                        if fig_id in high_res_images:
-                            continue
-
-                        cap_box = pymupdf.Rect(b[:4])
-                        cap_text = " ".join(block_text.split()[:25])
-                        if detect_caesar_shift(cap_text):
+                        # Convert CMYK, Separation, or Grayscale pixmaps to standard RGB
+                        if pix.n >= 5 or pix.colorspace != pymupdf.csRGB:
                             try:
-                                cap_text = unshift_ncert_text(cap_text)
+                                pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
                             except Exception:
                                 pass
 
-                        # Collect all drawing and image bounding rects on this page
-                        elements = [d["rect"] for d in page.get_drawings()]
-                        for img in page.get_images():
-                            elements.extend(page.get_image_rects(img[0]))
+                        width = pix.width
+                        height = pix.height
 
-                        valid_elements = [
-                            r for r in elements
-                            if 20 < r.width < 580 and 10 < r.height < 650
-                        ]
-                        above = [r for r in valid_elements if r.y1 <= cap_box.y0 + 10 and r.y0 >= cap_box.y0 - 450]
-                        below = [r for r in valid_elements if r.y0 >= cap_box.y1 - 10 and r.y1 <= cap_box.y1 + 450]
+                        # Filter out tiny icons, decorative lines, or logos
+                        if width < cls.MIN_IMAGE_WIDTH or height < cls.MIN_IMAGE_HEIGHT:
+                            continue
 
-                        cand_rect = None
-                        if len(above) >= 2:
-                            cand_rect = above[0]
-                            for r in above[1:]:
-                                cand_rect = cand_rect | r
-                        elif len(below) >= 2:
-                            cand_rect = below[0]
-                            for r in below[1:]:
-                                cand_rect = cand_rect | r
+                        # Filter out extreme banner strips (aspect ratio > 4.5 or < 0.22)
+                        aspect = width / max(height, 1)
+                        if aspect > 4.5 or aspect < 0.22:
+                            continue
 
-                        if cand_rect and cand_rect.width >= 70 and cand_rect.height >= 50:
-                            clip_rect = (
-                                pymupdf.Rect(
-                                    cand_rect.x0 - 6,
-                                    cand_rect.y0 - 6,
-                                    cand_rect.x1 + 6,
-                                    cand_rect.y1 + 6,
+                        img_bytes = pix.tobytes("png")
+                        if not img_bytes:
+                            continue
+
+                        # Filter out solid black/blank/monochrome background boxes
+                        if not cls._is_valid_diagram_image(img_bytes, width, height):
+                            continue
+
+                        # Generate unique ID for this figure
+                        fig_id = f"fig_p{page_num}_{img_idx + 1}_{xref}"
+
+                        # Detect nearby caption from page text
+                        caption = cls._detect_caption(page_text, page_num, img_idx + 1)
+
+                        # Create lightweight thumbnail for instant browser display
+                        thumb_b64 = cls._generate_thumbnail_base64(img_bytes)
+
+                        detected_figures.append(
+                            {
+                                "figure_id": fig_id,
+                                "page_number": page_num,
+                                "width": width,
+                                "height": height,
+                                "caption": caption,
+                                "thumbnail_b64": thumb_b64,
+                                "mime_type": "image/png",
+                            }
+                        )
+
+                        # Store original high-res bytes for instant proxy serving & Drive archival
+                        high_res_images[fig_id] = img_bytes
+                        cls._high_res_cache[fig_id] = img_bytes
+
+                    except Exception as img_err:
+                        logger.debug(f"Could not extract image xref {xref} on page {page_num}: {img_err}")
+                        continue
+
+            # 4. Extract Vector & Composite Textbook Diagrams via Caption Anchors (if not already handled by vision)
+            if not vision_handled:
+                # NCERT and textbook PDFs often draw diagrams using vector paths or composite gradient strips
+                try:
+                    caption_regex = re.compile(
+                        r"^\s*(?:Fig(?:ure)?\.?|चित्र|आकृति|सारणी|تصویر|شکل|خاکہ|جدول|باکس|Diagram)\s*([0-9۰-۹०-९]+(?:[\.\-][0-9۰-۹०-९]+)*)",
+                        re.IGNORECASE,
+                    )
+                    blocks = page.get_text("blocks")
+                    for b in blocks:
+                        block_text = b[4].strip()
+                        m = caption_regex.match(block_text)
+                        if m:
+                            fig_num_tag = m.group(1).replace(".", "_")
+                            fig_id = f"fig_p{page_num}_comp_{fig_num_tag}"
+                            if fig_id in high_res_images:
+                                continue
+    
+                            cap_box = pymupdf.Rect(b[:4])
+                            cap_text = " ".join(block_text.split()[:25])
+                            if detect_caesar_shift(cap_text):
+                                try:
+                                    cap_text = unshift_ncert_text(cap_text)
+                                except Exception:
+                                    pass
+    
+                            # Collect all drawing and image bounding rects on this page
+                            elements = [d["rect"] for d in page.get_drawings()]
+                            for img in page.get_images():
+                                elements.extend(page.get_image_rects(img[0]))
+    
+                            valid_elements = [
+                                r for r in elements
+                                if 20 < r.width < 580 and 10 < r.height < 650
+                            ]
+                            above = [r for r in valid_elements if r.y1 <= cap_box.y0 + 10 and r.y0 >= cap_box.y0 - 450]
+                            below = [r for r in valid_elements if r.y0 >= cap_box.y1 - 10 and r.y1 <= cap_box.y1 + 450]
+    
+                            cand_rect = None
+                            if len(above) >= 2:
+                                cand_rect = above[0]
+                                for r in above[1:]:
+                                    cand_rect = cand_rect | r
+                            elif len(below) >= 2:
+                                cand_rect = below[0]
+                                for r in below[1:]:
+                                    cand_rect = cand_rect | r
+    
+                            if cand_rect and cand_rect.width >= 70 and cand_rect.height >= 50:
+                                clip_rect = (
+                                    pymupdf.Rect(
+                                        cand_rect.x0 - 6,
+                                        cand_rect.y0 - 6,
+                                        cand_rect.x1 + 6,
+                                        cand_rect.y1 + 6,
+                                    )
+                                    & page.rect
                                 )
-                                & page.rect
-                            )
-                            pix = page.get_pixmap(clip=clip_rect, dpi=180)
-                            comp_bytes = pix.tobytes("png")
-                            if cls._is_valid_diagram_image(comp_bytes, pix.width, pix.height):
-                                thumb_b64 = cls._generate_thumbnail_base64(comp_bytes)
-                                detected_figures.append(
-                                    {
-                                        "figure_id": fig_id,
-                                        "page_number": page_num,
-                                        "width": pix.width,
-                                        "height": pix.height,
-                                        "caption": cap_text,
-                                        "thumbnail_b64": thumb_b64,
-                                        "mime_type": "image/png",
-                                    }
-                                )
-                                high_res_images[fig_id] = comp_bytes
-                                cls._high_res_cache[fig_id] = comp_bytes
-            except Exception as comp_err:
-                logger.debug(f"Composite diagram detection error on page {page_num}: {comp_err}")
+                                pix = page.get_pixmap(clip=clip_rect, dpi=180)
+                                comp_bytes = pix.tobytes("png")
+                                if cls._is_valid_diagram_image(comp_bytes, pix.width, pix.height):
+                                    thumb_b64 = cls._generate_thumbnail_base64(comp_bytes)
+                                    detected_figures.append(
+                                        {
+                                            "figure_id": fig_id,
+                                            "page_number": page_num,
+                                            "width": pix.width,
+                                            "height": pix.height,
+                                            "caption": cap_text,
+                                            "thumbnail_b64": thumb_b64,
+                                            "mime_type": "image/png",
+                                        }
+                                    )
+                                    high_res_images[fig_id] = comp_bytes
+                                    cls._high_res_cache[fig_id] = comp_bytes
+                except Exception as comp_err:
+                    logger.debug(f"Composite diagram detection error on page {page_num}: {comp_err}")
 
         # 4. Scanned / Raster / Handwritten PDF Fallback via Gemini Vision OCR
         avg_words_per_page = total_words / max(page_count, 1)

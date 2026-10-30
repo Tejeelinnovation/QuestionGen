@@ -78,17 +78,17 @@ export const PaperDetailPageTablet: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         
         {/* Column 1: Blueprint Overview Card */}
-        <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-4">
-          <div className="space-y-1.5">
+        <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-4 min-w-0 overflow-hidden">
+          <div className="space-y-1.5 min-w-0">
             <span className="pill pill-forest text-[10px]">
               Blueprint #{paper.id}
             </span>
-            <h1 className="font-heading font-bold text-2xl text-ink tracking-tight">
+            <h1 className="font-heading font-bold text-2xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
               {paper.title}
             </h1>
             <div className="text-xs text-ink/70 flex items-center gap-1.5 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-forest" />
-              <span>{paper.chapter_title || `Chapter #${paper.chapter}`}</span>
+              <span className="break-words">{paper.chapter_title || (paper.chapter ? `Chapter #${paper.chapter}` : (paper.subjects && paper.subjects.length > 0 ? paper.subjects.join(', ') : 'Comprehensive Syllabus'))}</span>
             </div>
           </div>
 
@@ -126,7 +126,7 @@ export const PaperDetailPageTablet: React.FC = () => {
         </div>
 
         {/* Column 2: Stacked Version Cards */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <div className="flex items-center justify-between border-b border-border pb-2">
             <h2 className="font-heading font-bold text-lg text-ink">
               Generated Versions

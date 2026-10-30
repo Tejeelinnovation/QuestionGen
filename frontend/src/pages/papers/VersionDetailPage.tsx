@@ -51,6 +51,76 @@ const VersionDetailPageDesktop: React.FC = () => {
     }
   }, [paperId, vId]);
 
+const groupedSections = React.useMemo(() => {
+    const raw = version?.question_snapshot || [];
+    if (!raw.length) return [];
+
+    const mcq: typeof raw = [];
+    const vsa: typeof raw = [];
+    const sa: typeof raw = [];
+    const la: typeof raw = [];
+
+    raw.forEach((q) => {
+      const marks = Number(q.marks || 1);
+      const qType = String(q.question_type || '').toUpperCase();
+      if (qType === 'MCQ' || (marks <= 1 && q.options && Object.keys(q.options).length > 0)) {
+        mcq.push(q);
+      } else if (marks <= 2 && qType !== 'LONG_ANSWER') {
+        vsa.push(q);
+      } else if (marks <= 3.5 && qType !== 'LONG_ANSWER') {
+        sa.push(q);
+      } else {
+        la.push(q);
+      }
+    });
+
+    const secCodes = ['A', 'B', 'C', 'D'];
+    let codeIdx = 0;
+    let runningQNum = 1;
+    const result: Array<{
+      code: string;
+      title: string;
+      instructions: string;
+      totalMarks: number;
+      questions: Array<(typeof raw)[number] & { displayNum: number }>;
+    }> = [];
+
+    const addSection = (title: string, inst: string, items: typeof raw) => {
+      if (!items.length) return;
+      const code = secCodes[codeIdx++];
+      const totalMarks = items.reduce((sum, item) => sum + Number(item.marks || 0), 0);
+      const itemsWithNum = items.map((item) => ({
+        ...item,
+        displayNum: runningQNum++,
+      }));
+      result.push({
+        code,
+        title: `Section ${code} — ${title}`,
+        instructions: inst,
+        totalMarks: Math.round(totalMarks * 10) / 10,
+        questions: itemsWithNum,
+      });
+    };
+
+    addSection('Multiple Choice Questions', 'All questions are compulsory. Select the single best option.', mcq);
+    addSection('Very Short Answer Questions (2 Marks Each)', 'Answer concisely in 30–50 words with balanced equations or formulas.', vsa);
+    addSection('Short Answer Questions (3 Marks Each)', 'Answer in 50–80 words with step-by-step working and units.', sa);
+    addSection('Long Answer & Analytical Questions', 'Provide detailed explanations, complete derivations, or diagrams.', la);
+
+    if (result.length <= 1) {
+      return [{
+        code: 'A',
+        title: 'All Examination Questions',
+        instructions: 'Read all questions carefully before attempting.',
+        totalMarks: raw.reduce((sum, item) => sum + Number(item.marks || 0), 0),
+        questions: raw.map((item, idx) => ({ ...item, displayNum: idx + 1 })),
+      }];
+    }
+
+    return result;
+  }, [version?.question_snapshot]);
+
+
   const handleFinalize = async () => {
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -124,69 +194,6 @@ const VersionDetailPageDesktop: React.FC = () => {
     );
   }
 
-  const groupedSections = React.useMemo(() => {
-    const raw = version?.question_snapshot || [];
-    if (!raw.length) return [];
-
-    const mcq: typeof raw = [];
-    const vsa: typeof raw = [];
-    const sa: typeof raw = [];
-    const la: typeof raw = [];
-
-    raw.forEach((q) => {
-      const marks = Number(q.marks || 1);
-      const qType = String(q.question_type || '').toUpperCase();
-      if (qType === 'MCQ' || (marks <= 1 && q.options && Object.keys(q.options).length > 0)) {
-        mcq.push(q);
-      } else if (marks <= 2 && qType !== 'LONG_ANSWER') {
-        vsa.push(q);
-      } else if (marks <= 3.5 && qType !== 'LONG_ANSWER') {
-        sa.push(q);
-      } else {
-        la.push(q);
-      }
-    });
-
-    const secCodes = ['A', 'B', 'C', 'D'];
-    let codeIdx = 0;
-    const result: Array<{
-      code: string;
-      title: string;
-      instructions: string;
-      totalMarks: number;
-      questions: typeof raw;
-    }> = [];
-
-    const addSection = (title: string, inst: string, items: typeof raw) => {
-      if (!items.length) return;
-      const code = secCodes[codeIdx++];
-      const totalMarks = items.reduce((sum, item) => sum + Number(item.marks || 0), 0);
-      result.push({
-        code,
-        title: `Section ${code} — ${title}`,
-        instructions: inst,
-        totalMarks: Math.round(totalMarks * 10) / 10,
-        questions: items,
-      });
-    };
-
-    addSection('Multiple Choice Questions', 'All questions are compulsory. Select the single best option.', mcq);
-    addSection('Very Short Answer Questions (2 Marks Each)', 'Answer concisely in 30–50 words with balanced equations or formulas.', vsa);
-    addSection('Short Answer Questions (3 Marks Each)', 'Answer in 50–80 words with step-by-step working and units.', sa);
-    addSection('Long Answer & Analytical Questions', 'Provide detailed explanations, complete derivations, or diagrams.', la);
-
-    if (result.length <= 1) {
-      return [{
-        code: 'A',
-        title: 'All Examination Questions',
-        instructions: 'Read all questions carefully before attempting.',
-        totalMarks: raw.reduce((sum, item) => sum + Number(item.marks || 0), 0),
-        questions: raw,
-      }];
-    }
-
-    return result;
-  }, [version?.question_snapshot]);
 
   const resolveImgUrl = (url?: string): string => {
     if (!url) return '';
@@ -232,7 +239,7 @@ const VersionDetailPageDesktop: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-lime" />
                 LOCKED IMMUTABLE SNAPSHOT
               </div>
-              <h1 className="font-heading font-bold text-3xl sm:text-4xl text-white tracking-tight">
+              <h1 className="font-heading font-bold text-3xl sm:text-4xl text-white tracking-tight break-words [overflow-wrap:anywhere]">
                 {version.paper_title || `Paper #${paperId}`}
               </h1>
               <p className="text-white/80 text-sm max-w-xl">
@@ -310,7 +317,7 @@ const VersionDetailPageDesktop: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-ember animate-pulse" />
                 DRAFT IN PROGRESS • UNLOCKED
               </div>
-              <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight">
+              <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
                 {version.paper_title || `Paper #${paperId}`}
               </h1>
               <p className="text-ink/70 text-sm max-w-xl">
@@ -471,7 +478,7 @@ const VersionDetailPageDesktop: React.FC = () => {
                     <div className="flex items-center justify-between text-xs border-b border-border/70 pb-2.5">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold text-xs bg-bg border border-border px-2 py-0.5 rounded-sm">
-                          Q{qIdx + 1 < 10 ? `0${qIdx + 1}` : qIdx + 1}
+                          Q{(q.displayNum || (qIdx + 1)) < 10 ? `0${q.displayNum || (qIdx + 1)}` : (q.displayNum || (qIdx + 1))}
                         </span>
                         <span
                           className={`pill text-[10px] ${

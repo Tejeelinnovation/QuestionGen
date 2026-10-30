@@ -82,24 +82,24 @@ const PaperDetailPageDesktop: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Left Column: Blueprint Metadata Card & Action (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-5">
-            <div className="space-y-2">
+        <div className="lg:col-span-4 space-y-6 min-w-0">
+          <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-5 overflow-hidden">
+            <div className="space-y-2 min-w-0">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-bg border border-border text-xs font-semibold text-forest">
                 <span className="w-2 h-2 rounded-full bg-forest" />
                 Paper Blueprint #{paper.id}
               </div>
-              <h1 className="font-heading font-bold text-2xl text-ink tracking-tight">
+              <h1 className="font-heading font-bold text-2xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
                 {paper.title}
               </h1>
               <div className="text-xs text-ink/70 flex items-center gap-1.5 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-forest" />
-                <span>{paper.chapter_title || `Chapter #${paper.chapter}`}</span>
+                <span className="break-words">{paper.chapter_title || (paper.chapter ? `Chapter #${paper.chapter}` : (paper.subjects && paper.subjects.length > 0 ? paper.subjects.join(', ') : 'Comprehensive Syllabus'))}</span>
               </div>
             </div>
 
             {paper.instructions && (
-              <div className="p-3.5 bg-bg rounded-card border border-border/80 text-xs text-ink/75 leading-relaxed">
+              <div className="p-3.5 bg-bg rounded-card border border-border/80 text-xs text-ink/75 leading-relaxed break-words [overflow-wrap:anywhere]">
                 <span className="font-heading font-semibold block text-ink mb-1">
                   Examination Guidelines:
                 </span>
@@ -141,7 +141,7 @@ const PaperDetailPageDesktop: React.FC = () => {
         </div>
 
         {/* Right Column: Stacked Version Cards (Ref: 09_blog_cards.jpg - 8 cols) */}
-        <div className="lg:col-span-8 space-y-4">
+        <div className="lg:col-span-8 space-y-4 min-w-0">
           <div className="flex items-center justify-between border-b border-border/80 pb-3">
             <div>
               <h2 className="font-heading font-bold text-xl text-ink">
@@ -166,7 +166,7 @@ const PaperDetailPageDesktop: React.FC = () => {
                   style={getStaggerDelay(idx)}
                   className={`animate-card-enter bg-surface border border-border rounded-card p-5 shadow-card hover:border-forest flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${MOTION.hoverLift.className} ${MOTION.touch.card.className}`}
                 >
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <div className="flex items-center gap-2.5">
                       <span className="font-heading font-bold text-lg text-ink">
                         Version {v.version_label}

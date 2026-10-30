@@ -165,7 +165,7 @@ export const VersionDetailPageTablet: React.FC = () => {
           </div>
 
           <div>
-            <h1 className="font-heading font-bold text-2xl sm:text-3xl text-white tracking-tight">
+            <h1 className="font-heading font-bold text-2xl sm:text-3xl text-white tracking-tight break-words [overflow-wrap:anywhere]">
               {version.paper_title || `Paper #${paperId}`}
             </h1>
             <p className="text-white/80 text-xs mt-1">
@@ -230,7 +230,7 @@ export const VersionDetailPageTablet: React.FC = () => {
           </div>
 
           <div>
-            <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight">
+            <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
               {version.paper_title || `Paper #${paperId}`}
             </h1>
             <p className="text-ink/70 text-xs mt-1">
