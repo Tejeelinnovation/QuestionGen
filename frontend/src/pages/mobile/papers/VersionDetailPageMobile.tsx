@@ -124,7 +124,7 @@ export const VersionDetailPageMobile: React.FC = () => {
               Version {version.version_label}
             </h1>
             <div className="text-xs text-ink/60 break-words [overflow-wrap:anywhere]">
-              {version.paper_title}
+              {(version.paper_title || '').replace(/_/g, ' ')}
             </div>
           </div>
           <span

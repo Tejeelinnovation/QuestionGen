@@ -73,7 +73,7 @@ export const PaperWorkflowNav: React.FC<PaperWorkflowNavProps> = ({
           {paperTitle ? (
             <span className="font-heading font-semibold text-ink flex items-center gap-1.5 truncate max-w-md">
               <span className="w-2 h-2 rounded-full bg-forest shrink-0" />
-              {paperTitle}
+              {paperTitle?.replace(/_/g, ' ')}
               {chapterTitle && (
                 <span className="font-normal text-ink/60 text-[11px]">
                   ({chapterTitle})

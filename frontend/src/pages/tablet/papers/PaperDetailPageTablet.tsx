@@ -70,7 +70,7 @@ export const PaperDetailPageTablet: React.FC = () => {
       <PaperWorkflowNavTablet
         currentStep="version"
         paperId={paperId}
-        paperTitle={paper.title}
+        paperTitle={(paper.title || '').replace(/_/g, ' ')}
         chapterTitle={paper.chapter_title}
       />
 
@@ -84,7 +84,7 @@ export const PaperDetailPageTablet: React.FC = () => {
               Blueprint #{paper.id}
             </span>
             <h1 className="font-heading font-bold text-2xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
-              {paper.title}
+              {(paper.title || '').replace(/_/g, ' ')}
             </h1>
             <div className="text-xs text-ink/70 flex items-center gap-1.5 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-forest" />

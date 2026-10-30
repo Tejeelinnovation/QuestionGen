@@ -89,8 +89,8 @@ const PaperDetailPageDesktop: React.FC = () => {
                 <span className="w-2 h-2 rounded-full bg-forest" />
                 Paper Blueprint #{paper.id}
               </div>
-              <h1 className="font-heading font-bold text-2xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
-                {paper.title}
+              <h1 className="font-heading font-bold text-2xl text-ink tracking-tight break-words break-all [overflow-wrap:anywhere]">
+                {(paper.title || '').replace(/_/g, ' ')}
               </h1>
               <div className="text-xs text-ink/70 flex items-center gap-1.5 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-forest" />

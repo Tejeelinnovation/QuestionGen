@@ -166,7 +166,7 @@ export const VersionDetailPageTablet: React.FC = () => {
 
           <div>
             <h1 className="font-heading font-bold text-2xl sm:text-3xl text-white tracking-tight break-words [overflow-wrap:anywhere]">
-              {version.paper_title || `Paper #${paperId}`}
+              {(version.paper_title || `Paper #${paperId}`).replace(/_/g, ' ')}
             </h1>
             <p className="text-white/80 text-xs mt-1">
               Version {version.version_label} is locked and ready for deployment.
@@ -231,7 +231,7 @@ export const VersionDetailPageTablet: React.FC = () => {
 
           <div>
             <h1 className="font-heading font-bold text-2xl sm:text-3xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
-              {version.paper_title || `Paper #${paperId}`}
+              {(version.paper_title || `Paper #${paperId}`).replace(/_/g, ' ')}
             </h1>
             <p className="text-ink/70 text-xs mt-1">
               Version {version.version_label} is in draft status. Review questions before finalizing.

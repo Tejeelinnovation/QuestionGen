@@ -254,7 +254,7 @@ const groupedSections = React.useMemo(() => {
                 LOCKED IMMUTABLE SNAPSHOT
               </div>
               <h1 className="font-heading font-bold text-3xl sm:text-4xl text-white tracking-tight break-words [overflow-wrap:anywhere]">
-                {version.paper_title || `Paper #${paperId}`}
+                {(version.paper_title || `Paper #${paperId}`).replace(/_/g, ' ')}
               </h1>
               <p className="text-white/80 text-sm max-w-xl">
                 Version <span className="font-bold text-lime">{version.version_label}</span> is finalized. Questions and marks are permanently locked for grading fidelity.
@@ -332,7 +332,7 @@ const groupedSections = React.useMemo(() => {
                 DRAFT IN PROGRESS • UNLOCKED
               </div>
               <h1 className="font-heading font-bold text-3xl sm:text-4xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
-                {version.paper_title || `Paper #${paperId}`}
+                {(version.paper_title || `Paper #${paperId}`).replace(/_/g, ' ')}
               </h1>
               <p className="text-ink/70 text-sm max-w-xl">
                 Version <span className="font-bold text-forest">{version.version_label}</span> is in draft status. Review the candidate questions below before committing to a finalized state.

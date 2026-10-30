@@ -126,7 +126,7 @@ const PrintViewPageDesktop: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-6 font-body">
       {/* ── NON-PRINTED CONTROL BAR (Document-forward framing, print:hidden) ── */}
       <div className="print:hidden bg-surface border border-border rounded-card p-4 shadow-card space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-forest" />
