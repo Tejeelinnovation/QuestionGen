@@ -10,6 +10,8 @@ import { VersionDetailPageTablet } from '../tablet/papers/VersionDetailPageTable
 import { VersionDetailPageMobile } from '../mobile/papers/VersionDetailPageMobile';
 import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { Loader2, Copy } from 'lucide-react';
+import { API_BASE_URL } from '../../api/client';
+import { MathText } from '../../components/ui/MathText';
 
 const VersionDetailPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -121,6 +123,78 @@ const VersionDetailPageDesktop: React.FC = () => {
       </div>
     );
   }
+
+  const groupedSections = React.useMemo(() => {
+    const raw = version?.question_snapshot || [];
+    if (!raw.length) return [];
+
+    const mcq: typeof raw = [];
+    const vsa: typeof raw = [];
+    const sa: typeof raw = [];
+    const la: typeof raw = [];
+
+    raw.forEach((q) => {
+      const marks = Number(q.marks || 1);
+      const qType = String(q.question_type || '').toUpperCase();
+      if (qType === 'MCQ' || (marks <= 1 && q.options && Object.keys(q.options).length > 0)) {
+        mcq.push(q);
+      } else if (marks <= 2 && qType !== 'LONG_ANSWER') {
+        vsa.push(q);
+      } else if (marks <= 3.5 && qType !== 'LONG_ANSWER') {
+        sa.push(q);
+      } else {
+        la.push(q);
+      }
+    });
+
+    const secCodes = ['A', 'B', 'C', 'D'];
+    let codeIdx = 0;
+    const result: Array<{
+      code: string;
+      title: string;
+      instructions: string;
+      totalMarks: number;
+      questions: typeof raw;
+    }> = [];
+
+    const addSection = (title: string, inst: string, items: typeof raw) => {
+      if (!items.length) return;
+      const code = secCodes[codeIdx++];
+      const totalMarks = items.reduce((sum, item) => sum + Number(item.marks || 0), 0);
+      result.push({
+        code,
+        title: `Section ${code} — ${title}`,
+        instructions: inst,
+        totalMarks: Math.round(totalMarks * 10) / 10,
+        questions: items,
+      });
+    };
+
+    addSection('Multiple Choice Questions', 'All questions are compulsory. Select the single best option.', mcq);
+    addSection('Very Short Answer Questions (2 Marks Each)', 'Answer concisely in 30–50 words with balanced equations or formulas.', vsa);
+    addSection('Short Answer Questions (3 Marks Each)', 'Answer in 50–80 words with step-by-step working and units.', sa);
+    addSection('Long Answer & Analytical Questions', 'Provide detailed explanations, complete derivations, or diagrams.', la);
+
+    if (result.length <= 1) {
+      return [{
+        code: 'A',
+        title: 'All Examination Questions',
+        instructions: 'Read all questions carefully before attempting.',
+        totalMarks: raw.reduce((sum, item) => sum + Number(item.marks || 0), 0),
+        questions: raw,
+      }];
+    }
+
+    return result;
+  }, [version?.question_snapshot]);
+
+  const resolveImgUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+    return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
 
   const isFinalized = version.status === 'FINALIZED';
   const canCreatePaper = hasCapability('CREATE_PAPER');
@@ -367,53 +441,100 @@ const VersionDetailPageDesktop: React.FC = () => {
           </span>
         </div>
 
-        <div className="space-y-3">
-          {version.question_snapshot?.map((q, idx) => (
-            <div
-              key={q.question_id || idx}
-              className="bg-surface border border-border rounded-card p-5 shadow-card space-y-3"
-            >
-              <div className="flex items-center justify-between text-xs border-b border-border/70 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-xs bg-bg border border-border px-2 py-0.5 rounded-sm">
-                    Q{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
-                  </span>
-                  <span
-                    className={`pill text-[10px] ${
-                      q.question_type === 'MCQ'
-                        ? 'pill-forest'
-                        : q.question_type === 'SHORT_ANSWER'
-                        ? 'pill-ember'
-                        : 'pill-grape'
-                    }`}
-                  >
-                    {q.question_type}
-                  </span>
-                  <span className="pill pill-muted text-[10px]">{q.difficulty}</span>
+        <div className="space-y-6">
+          {groupedSections.map((sec) => (
+            <div key={sec.code} className="space-y-3">
+              {/* Section Header Banner */}
+              <div className="border border-border/90 bg-surface-muted/60 rounded-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+                <div>
+                  <h3 className="font-heading font-bold text-base text-ink tracking-tight">
+                    {sec.title}
+                  </h3>
+                  {sec.instructions && (
+                    <p className="text-xs text-ink/70 italic mt-0.5 font-serif">
+                      {sec.instructions}
+                    </p>
+                  )}
                 </div>
-
-                <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-pill">
-                  {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
-                </span>
+                <div className="text-xs font-mono font-bold text-forest bg-forest/10 border border-forest/20 px-3 py-1 rounded-pill shrink-0">
+                  {sec.questions.length} {sec.questions.length === 1 ? 'Question' : 'Questions'} • {sec.totalMarks} Marks
+                </div>
               </div>
 
-              <p className="font-body text-sm font-medium text-ink leading-relaxed">
-                {q.question_text}
-              </p>
+              {/* Questions within this section */}
+              <div className="space-y-3 pl-0 sm:pl-2">
+                {sec.questions.map((q, qIdx) => (
+                  <div
+                    key={q.question_id || qIdx}
+                    className="bg-surface border border-border rounded-card p-5 shadow-card space-y-3 hover:border-forest/40 transition-colors"
+                  >
+                    <div className="flex items-center justify-between text-xs border-b border-border/70 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs bg-bg border border-border px-2 py-0.5 rounded-sm">
+                          Q{qIdx + 1 < 10 ? `0${qIdx + 1}` : qIdx + 1}
+                        </span>
+                        <span
+                          className={`pill text-[10px] ${
+                            q.question_type === 'MCQ'
+                              ? 'pill-forest'
+                              : q.question_type === 'SHORT_ANSWER'
+                              ? 'pill-ember'
+                              : 'pill-grape'
+                          }`}
+                        >
+                          {q.question_type}
+                        </span>
+                        <span className="pill pill-muted text-[10px]">{q.difficulty}</span>
+                      </div>
 
-              {q.options && Object.keys(q.options).length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 pl-2">
-                  {Object.entries(q.options).map(([optKey, optVal]) => (
-                    <div
-                      key={optKey}
-                      className="p-2 rounded-card border border-border/70 bg-bg text-xs flex items-baseline gap-2"
-                    >
-                      <span className="font-mono font-bold text-forest">({optKey})</span>
-                      <span className="text-ink/80">{optVal}</span>
+                      <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-pill">
+                        {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    <div className="font-body text-sm font-medium text-ink leading-relaxed">
+                      <MathText text={q.question_text} as="p" />
+                    </div>
+
+                    {/* Diagram Display if attached */}
+                    {q.diagram && q.diagram.image_url && (
+                      <div className="py-2.5 flex flex-col items-center justify-center bg-bg/50 border border-border/60 rounded-card p-2">
+                        <img
+                          src={resolveImgUrl(q.diagram.image_url)}
+                          alt={q.diagram.title || 'Question Diagram'}
+                          className="max-h-56 max-w-sm object-contain border border-border rounded"
+                          onError={(e) => {
+                            const cur = (e.currentTarget as HTMLImageElement).src;
+                            if (!cur.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                              (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
+                            }
+                          }}
+                        />
+                        {q.diagram.title && (
+                          <span className="text-[11px] font-mono text-ink/60 mt-1 italic">
+                            {q.diagram.title}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Options for MCQ */}
+                    {q.options && Object.keys(q.options).length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 pl-2">
+                        {Object.entries(q.options).map(([optKey, optVal]) => (
+                          <div
+                            key={optKey}
+                            className="p-2 rounded-card border border-border/70 bg-bg text-xs flex items-baseline gap-2"
+                          >
+                            <span className="font-mono font-bold text-forest">({optKey})</span>
+                            <MathText text={optVal} as="span" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
 

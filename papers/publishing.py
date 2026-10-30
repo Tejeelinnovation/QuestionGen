@@ -111,64 +111,127 @@ class PaperPublishingService:
     def compile_sections(self, version: PaperVersion) -> List[ExamSection]:
         """
         Group the version's question snapshot into standard academic exam sections:
-        - Section A: Multiple Choice Questions (Objective)
-        - Section B: Short Answer Questions (2-3 marks)
-        - Section C: Long Answer Questions (4+ marks)
+        - Section A: Multiple Choice Questions (1 mark)
+        - Section B: Very Short Answer Questions (2 marks)
+        - Section C: Short Answer Questions (3 marks)
+        - Section D: Long Answer & Analytical Questions (4+ marks)
+        Dynamic section codes (A, B, C...) and question range instructions are applied.
         """
         raw_items = version.question_snapshot or []
+        if not raw_items:
+            return []
 
-        sec_a = ExamSection(
-            section_code="A",
-            title="Section A — Multiple Choice Questions",
-            instructions="All questions are compulsory. Choose the single best option.",
-        )
-        sec_b = ExamSection(
-            section_code="B",
-            title="Section B — Short Answer Questions",
-            instructions="Answer all questions with necessary steps and formulas.",
-        )
-        sec_c = ExamSection(
-            section_code="C",
-            title="Section C — Long Answer & Analytical Questions",
-            instructions="Provide detailed derivations, explanations, or step-by-step calculations.",
-        )
+        # Sort / bucket questions logically so questions of the same type/mark are grouped together
+        buckets: Dict[str, Dict[str, Any]] = {
+            "mcq": {
+                "base_title": "Section {code} — Multiple Choice Questions",
+                "items": [],
+            },
+            "vsa": {
+                "base_title": "Section {code} — Very Short Answer Questions (2 Marks Each)",
+                "items": [],
+            },
+            "sa": {
+                "base_title": "Section {code} — Short Answer Questions (3 Marks Each)",
+                "items": [],
+            },
+            "la": {
+                "base_title": "Section {code} — Long Answer & Analytical Questions",
+                "items": [],
+            },
+        }
 
-        global_num = 1
         for item in raw_items:
             q_type = str(item.get("question_type", "")).upper()
             raw_marks = item.get("marks", 1.0)
             marks_val = float(raw_marks) if raw_marks is not None else 1.0
 
-            if q_type == "MCQ":
-                target_sec = sec_a
-            elif q_type == "SHORT_ANSWER" or marks_val <= 3.0:
-                target_sec = sec_b
+            if q_type == "MCQ" or (marks_val <= 1.0 and item.get("options")):
+                buckets["mcq"]["items"].append(item)
+            elif marks_val <= 2.0 and q_type != "LONG_ANSWER":
+                buckets["vsa"]["items"].append(item)
+            elif marks_val <= 3.5 and q_type != "LONG_ANSWER":
+                buckets["sa"]["items"].append(item)
             else:
-                target_sec = sec_c
+                buckets["la"]["items"].append(item)
 
-            q_obj = FormattedExamQuestion(
-                section=target_sec.section_code,
-                section_question_number=len(target_sec.questions) + 1,
-                global_question_number=global_num,
-                question_id=item.get("question_id") or global_num,
-                question_text=str(item.get("question_text", "")),
-                question_type=q_type,
-                marks=marks_val,
-                difficulty=str(item.get("difficulty", "MEDIUM")),
-                options=item.get("options"),
-                correct_answer=str(item.get("correct_answer", "")),
-                source_reference=str(item.get("source_reference", "")),
-                topic_name=str(item.get("topic_name", "")),
-                diagram=item.get("diagram"),
+        # Assemble active sections
+        active_sections: List[ExamSection] = []
+        section_codes = ["A", "B", "C", "D", "E"]
+        code_idx = 0
+        global_num = 1
+
+        for key, b_info in buckets.items():
+            b_items = b_info["items"]
+            if not b_items:
+                continue
+
+            sec_code = section_codes[code_idx] if code_idx < len(section_codes) else chr(65 + code_idx)
+            code_idx += 1
+
+            start_q = global_num
+            end_q = global_num + len(b_items) - 1
+
+            sec_title = b_info["base_title"].format(code=sec_code)
+
+            # Dynamic question range instructions matching formal academic standards
+            if key == "mcq":
+                if start_q == end_q:
+                    inst = f"Question {start_q} carries 1 mark. Select the single best option."
+                else:
+                    inst = f"Questions {start_q} to {end_q} carry 1 mark each. All questions are compulsory. Select the single best option."
+            elif key == "vsa":
+                if start_q == end_q:
+                    inst = f"Question {start_q} carries 2 marks. Answer concisely in 30–50 words with balanced equations/steps where applicable."
+                else:
+                    inst = f"Questions {start_q} to {end_q} carry 2 marks each. Answer concisely in 30–50 words with balanced equations/steps where applicable."
+            elif key == "sa":
+                if start_q == end_q:
+                    inst = f"Question {start_q} carries 3 marks. Show step-by-step working and units where applicable."
+                else:
+                    inst = f"Questions {start_q} to {end_q} carry 3 marks each. Answer in 50–80 words with step-by-step working and units."
+            else:
+                avg_m = sum(float(it.get("marks", 5.0) or 5.0) for it in b_items) / len(b_items)
+                if start_q == end_q:
+                    inst = f"Question {start_q} carries {round(avg_m)} marks. Provide detailed derivations, explanations, or labelled diagrams."
+                else:
+                    inst = f"Questions {start_q} to {end_q} carry {round(avg_m)} marks each. Provide detailed derivations, explanations, or labelled diagrams."
+
+            sec = ExamSection(
+                section_code=sec_code,
+                title=sec_title,
+                instructions=inst,
+                total_marks=0.0,
+                questions=[],
             )
-            target_sec.questions.append(q_obj)
-            target_sec.total_marks += marks_val
-            global_num += 1
 
-        # Return only sections that contain at least one question
-        active_sections = [s for s in [sec_a, sec_b, sec_c] if len(s.questions) > 0]
+            for sec_idx, item in enumerate(b_items, start=1):
+                raw_m = item.get("marks", 1.0)
+                m_val = float(raw_m) if raw_m is not None else 1.0
+                q_type = str(item.get("question_type", "")).upper()
 
-        # If all questions fall in one section, re-label as general section
+                q_obj = FormattedExamQuestion(
+                    section=sec_code,
+                    section_question_number=sec_idx,
+                    global_question_number=global_num,
+                    question_id=item.get("question_id") or global_num,
+                    question_text=str(item.get("question_text", "")),
+                    question_type=q_type,
+                    marks=m_val,
+                    difficulty=str(item.get("difficulty", "MEDIUM")),
+                    options=item.get("options"),
+                    correct_answer=str(item.get("correct_answer", "")),
+                    source_reference=str(item.get("source_reference", "")),
+                    topic_name=str(item.get("topic_name", "")),
+                    diagram=item.get("diagram"),
+                )
+                sec.questions.append(q_obj)
+                sec.total_marks += m_val
+                global_num += 1
+
+            active_sections.append(sec)
+
+        # If all questions fall into one single section, keep code clean
         if len(active_sections) == 1 and active_sections[0].section_code != "A":
             active_sections[0].title = "Questions"
 

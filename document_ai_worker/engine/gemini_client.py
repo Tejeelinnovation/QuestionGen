@@ -30,7 +30,7 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 # Default model recommended by Google Gemini API (March 2026+)
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 
 
 

@@ -91,130 +91,281 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
         </div>
       </div>
 
-      {/* Questions Body */}
-      <div className="space-y-8 pt-2">
-        {printData.questions?.map((q, idx) => {
-          const qId = q.question_id || idx + 1;
-          const isOverridden = questionLineOverrides && qId in questionLineOverrides;
-          const defaultLines =
-            q.question_type === 'MCQ'
-              ? 0
-              : Math.max(0, Math.round(q.marks * (linesPerMark ?? 2)));
-          const currentLines = isOverridden
-            ? questionLineOverrides[qId]
-            : defaultLines;
-
-          return (
-            <div key={q.question_id || idx} className="space-y-3 break-inside-avoid">
-              <div className="flex justify-between items-baseline gap-4">
-                <div className="text-sm font-medium leading-relaxed">
-                  <span className="font-bold mr-1.5">{idx + 1}.</span>
-                  <MathText text={q.question_text} as="span" />
-                </div>
-                <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
-                  [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
-                </span>
-              </div>
-
-              {/* Diagram / Visual Asset Display */}
-              {q.diagram && q.diagram.image_url && (
-                <div className="py-2.5 flex flex-col items-center justify-center pl-5">
-                  <img
-                    src={resolveImageUrl(q.diagram.image_url)}
-                    alt={q.diagram.title || 'Question Diagram'}
-                    className="max-h-60 max-w-md object-contain border border-gray-300 rounded p-1"
-                    onError={(e) => {
-                      const currentSrc = (e.currentTarget as HTMLImageElement).src;
-                      if (!currentSrc.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
-                        (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
-                      }
-                    }}
-                  />
-                  {q.diagram.title && (
-                    <span className="text-[11px] font-mono text-gray-600 mt-1 italic">
-                      {q.diagram.title}
-                    </span>
+      {/* Questions Body: Section-Wise or Flat Fallback */}
+      {printData.sections && printData.sections.length > 0 ? (
+        <div className="space-y-10 pt-2">
+          {printData.sections.map((sec) => (
+            <div key={sec.section_code} className="space-y-6 pt-2">
+              {/* Formal Academic Section Banner with Instructions */}
+              <div className="border-t-2 border-b-2 border-black py-2.5 px-3 bg-gray-100/70 print:bg-transparent flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 break-after-avoid">
+                <div className="space-y-1">
+                  <div className="text-xs sm:text-sm font-heading font-bold uppercase tracking-wider text-black">
+                    {sec.title}
+                  </div>
+                  {sec.instructions && (
+                    <div className="text-[11px] sm:text-xs font-serif italic text-gray-800">
+                      {sec.instructions}
+                    </div>
                   )}
                 </div>
-              )}
+                <div className="text-xs font-mono font-bold shrink-0 text-black">
+                  [{sec.question_count} {sec.question_count === 1 ? 'Question' : 'Questions'} • {sec.total_marks} Marks]
+                </div>
+              </div>
 
-              {/* MCQ Options Display */}
-              {q.options && Object.keys(q.options).length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pl-5 pt-1">
-                  {Object.entries(q.options).map(([key, val]) => (
-                    <div key={key} className="flex items-baseline gap-1.5">
-                      <span className="font-bold font-mono">({key})</span>
-                      <MathText text={val} as="span" />
+              {/* Section Questions */}
+              <div className="space-y-8 pt-1">
+                {sec.questions.map((q, idx) => {
+                  const displayNum = (q as any).question_number || (q as any).global_question_number || idx + 1;
+                  const qId = q.question_id || (q as any).id || displayNum;
+                  const isOverridden = questionLineOverrides && qId in questionLineOverrides;
+                  const defaultLines =
+                    q.question_type === 'MCQ'
+                      ? 0
+                      : Math.max(0, Math.round(q.marks * (linesPerMark ?? 2)));
+                  const currentLines = isOverridden
+                    ? questionLineOverrides[qId]
+                    : defaultLines;
+
+                  return (
+                    <div key={qId} className="space-y-3 break-inside-avoid">
+                      <div className="flex justify-between items-baseline gap-4">
+                        <div className="text-sm font-medium leading-relaxed">
+                          <span className="font-bold mr-1.5">{displayNum}.</span>
+                          <MathText text={q.question_text} as="span" />
+                        </div>
+                        <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
+                          [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
+                        </span>
+                      </div>
+
+                      {/* Diagram / Visual Asset Display */}
+                      {q.diagram && q.diagram.image_url && (
+                        <div className="py-2.5 flex flex-col items-center justify-center pl-5">
+                          <img
+                            src={resolveImageUrl(q.diagram.image_url)}
+                            alt={q.diagram.title || 'Question Diagram'}
+                            className="max-h-60 max-w-md object-contain border border-gray-300 rounded p-1"
+                            onError={(e) => {
+                              const currentSrc = (e.currentTarget as HTMLImageElement).src;
+                              if (!currentSrc.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                                (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
+                              }
+                            }}
+                          />
+                          {q.diagram.title && (
+                            <span className="text-[11px] font-mono text-gray-600 mt-1 italic">
+                              {q.diagram.title}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* MCQ Options Display */}
+                      {q.options && Object.keys(q.options).length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pl-5 pt-1">
+                          {Object.entries(q.options).map(([key, val]) => (
+                            <div key={key} className="flex items-baseline gap-1.5">
+                              <span className="font-bold font-mono">({key})</span>
+                              <MathText text={val} as="span" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Lined writing space for answers */}
+                      {currentLines > 0 && (
+                        <div className="pt-2 space-y-3 pl-5">
+                          {Array.from({ length: currentLines }).map((_, lIdx) => (
+                            <div
+                              key={lIdx}
+                              className="h-4 border-b border-dashed border-gray-300 w-full"
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Interactive Per-Question Line Stepper (Non-printed) */}
+                      {interactive && onOverrideChange && (
+                        <div className="print:hidden flex flex-wrap items-center justify-between text-xs text-ink/60 bg-surface-muted/60 border border-border/80 rounded-card px-3 py-1.5 mt-2 gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-heading font-medium text-[11px] text-ink/70">
+                              Answer lines:
+                            </span>
+                            <div className="flex items-center border border-border rounded-pill overflow-hidden bg-surface shadow-xs">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onOverrideChange(qId, Math.max(0, currentLines - 1))
+                                }
+                                className="px-2.5 py-0.5 hover:bg-surface-muted text-ink font-bold text-xs cursor-pointer select-none"
+                                title="Decrease lines"
+                              >
+                                −
+                              </button>
+                              <span className="px-2 py-0.5 font-mono text-[11px] font-semibold text-ink bg-surface border-x border-border min-w-[55px] text-center">
+                                {currentLines} {currentLines === 1 ? 'line' : 'lines'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => onOverrideChange(qId, currentLines + 1)}
+                                className="px-2.5 py-0.5 hover:bg-surface-muted text-ink font-bold text-xs cursor-pointer select-none"
+                                title="Increase lines"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            {isOverridden && (
+                              <span className="text-[10px] bg-forest/10 text-forest font-semibold px-2 py-0.5 rounded-pill border border-forest/20">
+                                Custom
+                              </span>
+                            )}
+                          </div>
+
+                          {isOverridden && (
+                            <button
+                              type="button"
+                              onClick={() => onOverrideChange(qId, defaultLines)}
+                              className="text-[11px] font-heading font-medium text-ink/50 hover:text-ink underline cursor-pointer"
+                            >
+                              Reset to default ({defaultLines})
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-8 pt-2">
+          {printData.questions?.map((q, idx) => {
+            const qId = q.question_id || idx + 1;
+            const isOverridden = questionLineOverrides && qId in questionLineOverrides;
+            const defaultLines =
+              q.question_type === 'MCQ'
+                ? 0
+                : Math.max(0, Math.round(q.marks * (linesPerMark ?? 2)));
+            const currentLines = isOverridden
+              ? questionLineOverrides[qId]
+              : defaultLines;
 
-              {/* Lined writing space for answers */}
-              {currentLines > 0 && (
-                <div className="pt-2 space-y-3 pl-5">
-                  {Array.from({ length: currentLines }).map((_, lIdx) => (
-                    <div
-                      key={lIdx}
-                      className="h-4 border-b border-dashed border-gray-300 w-full"
-                    />
-                  ))}
+            return (
+              <div key={q.question_id || idx} className="space-y-3 break-inside-avoid">
+                <div className="flex justify-between items-baseline gap-4">
+                  <div className="text-sm font-medium leading-relaxed">
+                    <span className="font-bold mr-1.5">{idx + 1}.</span>
+                    <MathText text={q.question_text} as="span" />
+                  </div>
+                  <span className="font-mono font-bold text-xs shrink-0 whitespace-nowrap">
+                    [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
+                  </span>
                 </div>
-              )}
 
-              {/* Interactive Per-Question Line Stepper (Non-printed) */}
-              {interactive && onOverrideChange && (
-                <div className="print:hidden flex flex-wrap items-center justify-between text-xs text-ink/60 bg-surface-muted/60 border border-border/80 rounded-card px-3 py-1.5 mt-2 gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-heading font-medium text-[11px] text-ink/70">
-                      Answer lines:
-                    </span>
-                    <div className="flex items-center border border-border rounded-pill overflow-hidden bg-surface shadow-xs">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onOverrideChange(qId, Math.max(0, currentLines - 1))
+                {/* Diagram / Visual Asset Display */}
+                {q.diagram && q.diagram.image_url && (
+                  <div className="py-2.5 flex flex-col items-center justify-center pl-5">
+                    <img
+                      src={resolveImageUrl(q.diagram.image_url)}
+                      alt={q.diagram.title || 'Question Diagram'}
+                      className="max-h-60 max-w-md object-contain border border-gray-300 rounded p-1"
+                      onError={(e) => {
+                        const currentSrc = (e.currentTarget as HTMLImageElement).src;
+                        if (!currentSrc.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                          (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
                         }
-                        className="px-2.5 py-0.5 hover:bg-surface-muted text-ink font-bold text-xs cursor-pointer select-none"
-                        title="Decrease lines"
-                      >
-                        −
-                      </button>
-                      <span className="px-2 py-0.5 font-mono text-[11px] font-semibold text-ink bg-surface border-x border-border min-w-[55px] text-center">
-                        {currentLines} {currentLines === 1 ? 'line' : 'lines'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onOverrideChange(qId, currentLines + 1)}
-                        className="px-2.5 py-0.5 hover:bg-surface-muted text-ink font-bold text-xs cursor-pointer select-none"
-                        title="Increase lines"
-                      >
-                        +
-                      </button>
-                    </div>
-
-                    {isOverridden && (
-                      <span className="text-[10px] bg-forest/10 text-forest font-semibold px-2 py-0.5 rounded-pill border border-forest/20">
-                        Custom
+                      }}
+                    />
+                    {q.diagram.title && (
+                      <span className="text-[11px] font-mono text-gray-600 mt-1 italic">
+                        {q.diagram.title}
                       </span>
                     )}
                   </div>
+                )}
 
-                  {isOverridden && (
-                    <button
-                      type="button"
-                      onClick={() => onOverrideChange(qId, defaultLines)}
-                      className="text-[11px] font-heading font-medium text-ink/50 hover:text-ink underline cursor-pointer"
-                    >
-                      Reset to default ({defaultLines})
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {/* MCQ Options Display */}
+                {q.options && Object.keys(q.options).length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pl-5 pt-1">
+                    {Object.entries(q.options).map(([key, val]) => (
+                      <div key={key} className="flex items-baseline gap-1.5">
+                        <span className="font-bold font-mono">({key})</span>
+                        <MathText text={val} as="span" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Lined writing space for answers */}
+                {currentLines > 0 && (
+                  <div className="pt-2 space-y-3 pl-5">
+                    {Array.from({ length: currentLines }).map((_, lIdx) => (
+                      <div
+                        key={lIdx}
+                        className="h-4 border-b border-dashed border-gray-300 w-full"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Interactive Per-Question Line Stepper (Non-printed) */}
+                {interactive && onOverrideChange && (
+                  <div className="print:hidden flex flex-wrap items-center justify-between text-xs text-ink/60 bg-surface-muted/60 border border-border/80 rounded-card px-3 py-1.5 mt-2 gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-heading font-medium text-[11px] text-ink/70">
+                        Answer lines:
+                      </span>
+                      <div className="flex items-center border border-border rounded-pill overflow-hidden bg-surface shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onOverrideChange(qId, Math.max(0, currentLines - 1))
+                          }
+                          className="px-2.5 py-0.5 hover:bg-surface-muted text-ink font-bold text-xs cursor-pointer select-none"
+                          title="Decrease lines"
+                        >
+                          −
+                        </button>
+                        <span className="px-2 py-0.5 font-mono text-[11px] font-semibold text-ink bg-surface border-x border-border min-w-[55px] text-center">
+                          {currentLines} {currentLines === 1 ? 'line' : 'lines'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onOverrideChange(qId, currentLines + 1)}
+                          className="px-2.5 py-0.5 hover:bg-surface-muted text-ink font-bold text-xs cursor-pointer select-none"
+                          title="Increase lines"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {isOverridden && (
+                        <span className="text-[10px] bg-forest/10 text-forest font-semibold px-2 py-0.5 rounded-pill border border-forest/20">
+                          Custom
+                        </span>
+                      )}
+                    </div>
+
+                    {isOverridden && (
+                      <button
+                        type="button"
+                        onClick={() => onOverrideChange(qId, defaultLines)}
+                        className="text-[11px] font-heading font-medium text-ink/50 hover:text-ink underline cursor-pointer"
+                      >
+                        Reset to default ({defaultLines})
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* End of Examination Marker */}
       <div className="text-center font-mono text-[11px] text-gray-500 border-t border-black pt-6">

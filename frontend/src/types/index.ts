@@ -339,6 +339,15 @@ export interface PaperVersion {
   updated_at: string;
 }
 
+export interface PrintSection {
+  section_code: string;
+  title: string;
+  instructions: string;
+  total_marks: number;
+  question_count: number;
+  questions: QuestionSnapshotItem[];
+}
+
 export interface PaperPrintData {
   paper_id: number;
   title: string;
@@ -351,6 +360,9 @@ export interface PaperPrintData {
   total_marks: number;
   question_count: number;
   questions: QuestionSnapshotItem[];
+  sections?: PrintSection[];
+  watermark?: string;
+  student_metadata_fields?: Array<{ label: string; blank_line: boolean }>;
 }
 
 export interface StudentAttemptSummary {
