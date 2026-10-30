@@ -402,3 +402,52 @@ class LLMQuestionGenerationServiceTests(TestCase):
         self.assertEqual(drafts[0].marks, Decimal("1.0"))
         self.assertEqual(drafts[0].options["B"], "Volt")
         self.assertEqual(drafts[0].metadata["source"], "llm_pipeline")
+
+    def test_robust_latex_json_repair_colliding_escapes(self):
+        from generation.services.llm_generation import LLMQuestionGenerationService
+        # Raw JSON from LLM containing single backslashes for commands that collide with JSON escapes:
+        # \text (\t), \frac (\f), \rightarrow (\r), \beta (\b), \neq (\n)
+        raw_json = (
+            r'[{"question_text": "Calculate $\frac{a}{b}$ where $\text{Output} = 5$ '
+            r'and $\rightarrow$ denotes transition with $\beta = 1$ and $\neq 0$.", '
+            r'"question_type": "SHORT_ANSWER", "marks": 2.0}]'
+        )
+        data = LLMQuestionGenerationService._robust_latex_json_repair(raw_json)
+        self.assertIsNotNone(data)
+        self.assertEqual(len(data), 1)
+        q = data[0]["question_text"]
+        # Verify backslashes are preserved intact and not converted to control characters
+        self.assertIn(r"\text", q)
+        self.assertIn(r"\frac", q)
+        self.assertIn(r"\rightarrow", q)
+        self.assertIn(r"\beta", q)
+        self.assertIn(r"\neq", q)
+        self.assertNotIn("\x09", q)  # No tab character
+        self.assertNotIn("\x0c", q)  # No form feed
+        self.assertNotIn("\x0d", q)  # No carriage return
+        self.assertNotIn("\x08", q)  # No backspace
+
+    def test_robust_latex_json_repair_trailing_commas_and_truncated(self):
+        from generation.services.llm_generation import LLMQuestionGenerationService
+        # Trailing comma
+        comma_json = r'[{"question_text": "Solve $\alpha + \beta = 0$", "marks": 2.0,},]'
+        data = LLMQuestionGenerationService._robust_latex_json_repair(comma_json)
+        self.assertIsNotNone(data)
+        self.assertEqual(len(data), 1)
+
+        # Truncated JSON array
+        trunc_json = (
+            r'[{"question_text": "Question 1", "marks": 1.0}, '
+            r'{"question_text": "Question 2", "marks": 2.0}, '
+            r'{"question_text": "Question 3", "marks": '
+        )
+        data_trunc = LLMQuestionGenerationService._robust_latex_json_repair(trunc_json)
+        self.assertIsNotNone(data_trunc)
+        self.assertEqual(len(data_trunc), 2)
+
+    def test_clean_latex_string_matrix_row_breaks(self):
+        from generation.services.llm_generation import LLMQuestionGenerationService
+        # In a pmatrix, a single \ between cells should be healed to \\
+        matrix_input = r"$\begin{pmatrix} 1 & 2 \ 3 & 4 \end{pmatrix}$"
+        healed = LLMQuestionGenerationService._clean_latex_string(matrix_input)
+        self.assertIn(r"\\", healed)

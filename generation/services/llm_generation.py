@@ -64,6 +64,7 @@ SUBJECT-SPECIFIC RIGOR MANDATES:
 
 OUTPUT REQUIREMENTS:
 - Output MUST be valid, parseable JSON as an array of question objects (NO markdown code fences, NO introductory or concluding text).
+- In JSON strings, all LaTeX mathematical/chemical backslashes should be properly escaped (e.g. "\\frac{a}{b}", "\\text{...}", "\\rightarrow", "\\beta", "\\neq").
 
 JSON SCHEMA:
 [
@@ -99,8 +100,8 @@ class LLMQuestionGenerationService(QuestionGenerationService):
     ):
         self.api_key = (
             api_key
-            or getattr(settings, "GEMINI_API_KEY", "")
-            or os.getenv("GEMINI_API_KEY", "")
+            if api_key is not None
+            else (getattr(settings, "GEMINI_API_KEY", "") or os.getenv("GEMINI_API_KEY", ""))
         )
         self.model_name = (
             model_name
@@ -467,78 +468,217 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
         return None
 
     @classmethod
-    def _robust_latex_json_repair(cls, raw_str: str) -> Optional[Any]:
+    def _sanitize_json_latex_backslashes(cls, raw_str: str) -> str:
+        r"""
+        Sanitizes raw JSON string from LLM by escaping unescaped LaTeX backslashes
+        while strictly preserving valid JSON escapes (\", \\, \/, \n, \r, \t, \uXXXX).
+        Prevents JSON decoder from collapsing \text -> tab, \rightarrow -> CR,
+        \frac -> form feed, \beta -> backspace, and \neq -> newline.
         """
+        colliding_cmd_pattern = re.compile(
+            r'^(?:'
+            # t-commands:
+            r'text(?:bf|it|tt|normal|rm|sf)?|times|theta|Theta|to|tau|tan|tanh|tilde|top|triangle|triangleq|tag|tfrac|'
+            # r-commands:
+            r'rightarrow|Rightarrow|rightleftharpoons|right|rho|rangle|real|root|Re|varrho|'
+            # f-commands:
+            r'frac|dfrac|tfrac|forall|flat|frown|'
+            # b-commands:
+            r'beta|bar|binom|begin|bf|mathbf|boldsymbol|mathbb|bullet|bot|box|bowtie|brace|bmod|Big|big|Bigg|bigg|bm|'
+            # n-commands:
+            r'neq|ne|nu|nabla|notin|not|nearrow|nwarrow|natural|neg|nsubset|nsubseteq|norm'
+            r')(?:[^a-zA-Z]|$)'
+        )
+
+        out = []
+        in_string = False
+        i = 0
+        n = len(raw_str)
+
+        while i < n:
+            c = raw_str[i]
+
+            if not in_string:
+                if c == '"':
+                    in_string = True
+                out.append(c)
+                i += 1
+                continue
+
+            # We are inside a JSON string literal
+            if c == '"':
+                in_string = False
+                out.append(c)
+                i += 1
+                continue
+
+            if c == '\\':
+                if i + 1 >= n:
+                    out.append('\\\\')
+                    i += 1
+                    continue
+
+                nxt = raw_str[i + 1]
+
+                # 1. Escaped double quote \" -> preserve
+                if nxt == '"':
+                    out.append('\\"')
+                    i += 2
+                    continue
+
+                # 2. Escaped backslash \\ -> preserve
+                if nxt == '\\':
+                    out.append('\\\\')
+                    i += 2
+                    continue
+
+                # 3. Escaped forward slash \/ -> preserve
+                if nxt == '/':
+                    out.append('\\/')
+                    i += 2
+                    continue
+
+                # 4. Unicode escape \uXXXX
+                if nxt == 'u':
+                    hex_part = raw_str[i + 2 : i + 6]
+                    if len(hex_part) == 4 and re.match(r'^[0-9a-fA-F]{4}$', hex_part):
+                        out.append('\\u')
+                        out.append(hex_part)
+                        i += 6
+                        continue
+                    else:
+                        out.append('\\\\')
+                        i += 1
+                        continue
+
+                # 5. Colliding JSON escape letters (b, f, n, r, t)
+                if nxt in ('b', 'f', 'n', 'r', 't'):
+                    remainder = raw_str[i + 1 : i + 35]
+                    if colliding_cmd_pattern.match(remainder):
+                        out.append('\\\\')
+                        i += 1
+                        continue
+                    else:
+                        out.append(c)
+                        out.append(nxt)
+                        i += 2
+                        continue
+
+                # 6. Any other character after \ is INVALID in JSON (e.g. \alpha, \sqrt, \int, \{, \})
+                out.append('\\\\')
+                i += 1
+                continue
+
+            out.append(c)
+            i += 1
+
+        return ''.join(out)
+
+    @classmethod
+    def _clean_latex_string(cls, s: str) -> str:
+        """
+        Post-decoding sanitizer for LaTeX expressions:
+        1. Heals collapsed control characters caused by legacy JSON decode collisions.
+        2. Restores double backslashes for matrix/multiline row breaks.
+        """
+        if not s or not isinstance(s, str):
+            return s
+
+        # 1. Restore collapsed control characters
+        # \t collisions:
+        s = re.sub(r'\t(?=ext|imes|heta|au|an|ilde|op|riangle|ag|tfrac)', r'\\t', s)
+        # \r collisions:
+        s = re.sub(r'\r(?=\s*ightarrow|\s*ight|\s*ho|\s*angle|\s*eal|\s*oot|\s*eq)', r'\\r', s)
+        # \x0c (Form Feed) collisions:
+        s = re.sub(r'\x0c(?=rac|orall|lat|rown)', r'\\f', s)
+        # \x08 (Backspace) collisions:
+        s = re.sub(r'\x08(?=eta|ar|inom|egin|f|mathbf|boldsymbol|mathbb|ullet|ot|ox|owtie|race|mod)', r'\\b', s)
+        # \n collisions with \neq (where newline was placed right before eq):
+        s = re.sub(r'(?<![a-zA-Z0-9])\n(?=eq(?:[^a-zA-Z]|$))', r'\\n', s)
+
+        # 2. Heal matrix row breaks in math environments
+        env_pattern = re.compile(
+            r'(\\begin\{(?:pmatrix|bmatrix|vmatrix|Vmatrix|matrix|cases|aligned|array|split|gather)\}.*?\\end\{(?:pmatrix|bmatrix|vmatrix|Vmatrix|matrix|cases|aligned|array|split|gather)\})',
+            re.DOTALL
+        )
+        def fix_env(match):
+            env_content = match.group(1)
+            fixed = re.sub(r'(?<!\\)\\(?:\s+|\r?\n)(?=[&0-9a-zA-Z\-])', r'\\\\ \n', env_content)
+            fixed = re.sub(r'(\d+|[a-zA-Z]|[&])\s*\\(?![a-zA-Z\\])\s*(\d+|[a-zA-Z]|[&])', r'\1 \\\\ \2', fixed)
+            return fixed
+
+        return env_pattern.sub(fix_env, s)
+
+    @classmethod
+    def _robust_latex_json_repair(cls, raw_str: str) -> Optional[Any]:
+        r"""
         Repairs LLM-generated JSON strings containing mathematical/chemical LaTeX backslashes
         (e.g. \\text, \\frac, \\rightarrow, \\ce, \\uparrow) that violate strict JSON escape rules.
+        Pre-heals backslashes before invoking json.loads to guarantee zero control character corruption.
         """
+        if not raw_str or not isinstance(raw_str, str):
+            return None
+
+        clean = raw_str.strip()
+        if clean.startswith("```json"):
+            clean = clean[7:]
+        if clean.startswith("```"):
+            clean = clean[3:]
+        if clean.endswith("```"):
+            clean = clean[:-3]
+        clean = clean.strip()
+
+        # Step 1: Pre-sanitize raw string to prevent valid escape collapse (\text -> tab, \rightarrow -> CR)
+        sanitized = cls._sanitize_json_latex_backslashes(clean)
+
+        # Attempt 1: Direct parse of sanitized string
         try:
-            return json.loads(raw_str, strict=False)
+            return json.loads(sanitized, strict=False)
         except Exception:
             pass
 
-        # 1. Fix invalid unicode escapes: \u not followed by 4 hex digits
-        s_fixed = re.sub(r'\\u(?![0-9a-fA-F]{4})', r'\\\\u', raw_str)
+        # Step 2: Strip trailing commas before } or ]
+        comma_fixed = re.sub(r',\s*([}\]])', r'\1', sanitized)
+        try:
+            return json.loads(comma_fixed, strict=False)
+        except Exception:
+            pass
 
-        # 2. Fix unescaped backslashes before characters not in standard JSON escapes
+        # Step 3: Handle truncated JSON array (cut off by token limit)
+        if comma_fixed.startswith('[') and not comma_fixed.endswith(']'):
+            last_brace = comma_fixed.rfind('}')
+            if last_brace != -1:
+                candidate = comma_fixed[:last_brace + 1].strip()
+                if candidate.endswith(','):
+                    candidate = candidate[:-1].strip()
+                candidate += ']'
+                try:
+                    return json.loads(candidate, strict=False)
+                except Exception:
+                    pass
+
+        # Step 4: Extract JSON array with regex if surrounded by conversational filler
+        match = re.search(r'\[\s*\{.*\}\s*\]', comma_fixed, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0), strict=False)
+            except Exception:
+                pass
+
+        # Step 5: Legacy regex-based repair fallback as last resort
+        s_fixed = re.sub(r'\\u(?![0-9a-fA-F]{4})', r'\\\\u', clean)
         s_fixed = re.sub(r'\\(?![/\"\\bfnrtu])', r'\\\\', s_fixed)
-
-        # 3. Fix common LaTeX commands starting with JSON escape letters (\text, \frac, \rightarrow, etc.)
         latex_cmds = (
             r'(?:text|times|theta|to|tau|frac|rightarrow|right|rho|beta|left|alpha|ce|cdot|Delta|'
             r'omega|sigma|mu|lambda|pi|sqrt|infty|approx|pm|neq|leq|geq|uparrow|downarrow|over|sum|int|lim|partial)'
         )
         s_fixed = re.sub(r'(?<!\\)\\(' + latex_cmds + r')\b', r'\\\\\1', s_fixed)
-
         try:
             return json.loads(s_fixed, strict=False)
         except Exception:
             pass
 
-        # 4. Tokenizer-level string backslash sanitizer
-        out = []
-        in_str = False
-        i = 0
-        while i < len(raw_str):
-            c = raw_str[i]
-            if c == '"' and (i == 0 or raw_str[i - 1] != '\\'):
-                in_str = not in_str
-                out.append(c)
-                i += 1
-            elif in_str and c == '\\':
-                if i + 1 < len(raw_str):
-                    nxt = raw_str[i + 1]
-                    if nxt in ('"', '\\', '/'):
-                        out.append(c)
-                        out.append(nxt)
-                        i += 2
-                    elif nxt in ('b', 'f', 'n', 'r', 't'):
-                        sub = raw_str[i + 1 : i + 15]
-                        if re.match(r'^(?:text|times|theta|to|tau|frac|right|rho)\b', sub):
-                            out.append('\\\\')
-                            out.append(nxt)
-                            i += 2
-                        else:
-                            out.append(c)
-                            out.append(nxt)
-                            i += 2
-                    elif nxt == 'u' and i + 5 < len(raw_str) and re.match(r'^[0-9a-fA-F]{4}', raw_str[i + 2 : i + 6]):
-                        out.append(c)
-                        i += 1
-                    else:
-                        out.append('\\\\')
-                        i += 1
-                else:
-                    out.append('\\\\')
-                    i += 1
-            else:
-                out.append(c)
-                i += 1
-
-        try:
-            return json.loads(''.join(out), strict=False)
-        except Exception:
-            return None
+        return None
 
     def _parse_llm_response(
         self,
@@ -584,7 +724,7 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
         for item in data:
             if not isinstance(item, dict):
                 continue
-            q_text = str(item.get("question_text", "")).strip()
+            q_text = self._clean_latex_string(str(item.get("question_text", "")).strip())
             if not q_text or len(q_text) < 5:
                 continue
 
@@ -629,6 +769,8 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
                 if not isinstance(options, dict) or len(options) < 2:
                     # Provide default options if LLM hallucinated empty options
                     options = {"A": "True", "B": "False"}
+                else:
+                    options = {k: self._clean_latex_string(str(v)) for k, v in options.items()}
             else:
                 options = None
 
@@ -638,7 +780,8 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
             except Exception:
                 marks = Decimal(str(default_marks))
 
-            correct_ans = str(item.get("correct_answer") or "See explanation").strip()
+            correct_ans = self._clean_latex_string(str(item.get("correct_answer") or "See explanation").strip())
+            source_ref = self._clean_latex_string(str(item.get("source_reference") or ""))
 
             drafts.append(
                 QuestionDraft(
@@ -649,7 +792,7 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
                     learner_level=str(item.get("learner_level") or default_level).upper(),
                     correct_answer=correct_ans,
                     options=options,
-                    source_reference=str(item.get("source_reference") or ""),
+                    source_reference=source_ref,
                     topic_id=constraints.get("topic_id"),
                     topic_name=None,
                     is_active=True,
