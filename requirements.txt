@@ -47,3 +47,6 @@ django-redis==6.0.0
 # Word (.docx) and PDF Document Generation
 python-docx==1.2.0
 reportlab==5.0.1
+
+# Document AI & Schema validation
+pydantic>=2.8.0

@@ -764,6 +764,23 @@ export const PaperConfigurePageMobile: React.FC = () => {
         {/* ── Docked Mobile Proceed Action Bar ── */}
         <div className="fixed bottom-14 left-0 right-0 z-30 bg-surface/95 backdrop-blur-md border-t border-border px-4 py-2.5 shadow-float print:hidden">
           <div className="max-w-lg mx-auto">
+            {isSubmitting && (
+              <div className="mb-2 p-2.5 rounded-card bg-forest/10 border border-forest/25 flex items-start gap-2.5 animate-pulse">
+                <Loader2 className="w-4 h-4 text-forest animate-spin shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-tight space-y-0.5">
+                  <p className="font-heading font-semibold text-ink">
+                    {paper?.specifications?.source_mode === 'pdf'
+                      ? 'Formulating Questions from Chapter PDF & Rubric...'
+                      : 'Retrieving Questions from Question Bank...'}
+                  </p>
+                  <p className="text-ink/60 text-[10px]">
+                    {paper?.specifications?.source_mode === 'pdf'
+                      ? 'Allocating diagrams and drafting STEM LaTeX formulas. Please wait ~5–8s...'
+                      : 'Filtering questions according to difficulty and rubric tiers...'}
+                  </p>
+                </div>
+              </div>
+            )}
             <button
               type="submit"
               id="mobile-paper-proceed-btn"

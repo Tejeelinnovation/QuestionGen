@@ -12,6 +12,7 @@ import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { Loader2, Copy } from 'lucide-react';
 import { API_BASE_URL } from '../../api/client';
 import { MathText } from '../../components/ui/MathText';
+import { groupVersionQuestionsIntoSections, isRtlText } from '../../utils/versionSectionUtils';
 
 const VersionDetailPageDesktop: React.FC = () => {
   const { id, versionId } = useParams<{ id: string; versionId: string }>();
@@ -51,87 +52,8 @@ const VersionDetailPageDesktop: React.FC = () => {
     }
   }, [paperId, vId]);
 
-const groupedSections = React.useMemo(() => {
-    const raw = version?.question_snapshot || [];
-    if (!raw.length) return [];
-
-    const mcq: typeof raw = [];
-    const vsa: typeof raw = [];
-    const sa: typeof raw = [];
-    const la: typeof raw = [];
-
-    raw.forEach((q) => {
-      const marks = Number(q.marks || 1);
-      const qType = String(q.question_type || '').toUpperCase();
-      if (qType === 'MCQ' || (marks <= 1 && q.options && Object.keys(q.options).length > 0)) {
-        mcq.push(q);
-      } else if (marks <= 2 && qType !== 'LONG_ANSWER') {
-        vsa.push(q);
-      } else if (marks <= 3.5 && qType !== 'LONG_ANSWER') {
-        sa.push(q);
-      } else {
-        la.push(q);
-      }
-    });
-
-    const secCodes = ['A', 'B', 'C', 'D'];
-    let codeIdx = 0;
-    let runningQNum = 1;
-    const result: Array<{
-      code: string;
-      title: string;
-      instructions: string;
-      totalMarks: number;
-      questions: Array<(typeof raw)[number] & { displayNum: number }>;
-    }> = [];
-
-    const addSection = (baseTitle: string, baseInst: string, items: typeof raw) => {
-      if (!items.length) return;
-      const code = secCodes[codeIdx++];
-      const totalMarks = items.reduce((sum, item) => sum + Number(item.marks || 0), 0);
-      const itemsWithNum = items.map((item) => ({
-        ...item,
-        displayNum: runningQNum++,
-      }));
-
-      const distinctMarks = Array.from(new Set(items.map((i) => Number(i.marks || 1))));
-      let titleWithMarks = baseTitle;
-      let inst = baseInst;
-
-      if (distinctMarks.length === 1) {
-        const m = distinctMarks[0];
-        const markLabel = m === 1 ? '1 Mark' : `${m} Marks`;
-        titleWithMarks = `${baseTitle} (${markLabel} Each)`;
-        inst = `Questions carry ${markLabel.toLowerCase()} each. ${baseInst}`;
-      } else {
-        inst = `Marks for each question are indicated against it. ${baseInst}`;
-      }
-
-      result.push({
-        code,
-        title: `Section ${code} — ${titleWithMarks}`,
-        instructions: inst,
-        totalMarks: Math.round(totalMarks * 10) / 10,
-        questions: itemsWithNum,
-      });
-    };
-
-    addSection('Multiple Choice Questions', 'Select the single best option.', mcq);
-    addSection('Very Short Answer Questions', 'Answer concisely in 30–50 words with balanced equations or formulas where applicable.', vsa);
-    addSection('Short Answer Questions', 'Answer in 50–80 words with step-by-step working and units.', sa);
-    addSection('Long Answer & Analytical Questions', 'Provide detailed explanations, complete derivations, or diagrams.', la);
-
-    if (result.length <= 1) {
-      return [{
-        code: 'A',
-        title: 'All Examination Questions',
-        instructions: 'Read all questions carefully before attempting.',
-        totalMarks: raw.reduce((sum, item) => sum + Number(item.marks || 0), 0),
-        questions: raw.map((item, idx) => ({ ...item, displayNum: idx + 1 })),
-      }];
-    }
-
-    return result;
+  const groupedSections = React.useMemo(() => {
+    return groupVersionQuestionsIntoSections(version?.question_snapshot);
   }, [version?.question_snapshot]);
 
 
@@ -512,6 +434,20 @@ const groupedSections = React.useMemo(() => {
                         {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
                       </span>
                     </div>
+
+                    {q.case_study_passage && (
+                      <div
+                        className={`p-3.5 mb-2 rounded-card bg-sky-50 border-l-4 border-sky-600 text-xs text-ink/85 italic leading-relaxed break-words [overflow-wrap:anywhere] ${
+                          isRtlText(q.case_study_passage) ? 'border-l-0 border-r-4 text-right' : ''
+                        }`}
+                        dir={isRtlText(q.case_study_passage) ? 'rtl' : 'ltr'}
+                      >
+                        <strong className="block not-italic font-heading font-semibold text-sky-900 mb-1">
+                          {isRtlText(q.case_study_passage) ? 'مطالعہ عبارت / CASE STUDY PASSAGE:' : 'CASE STUDY / COMPREHENSION PASSAGE:'}
+                        </strong>
+                        <MathText text={q.case_study_passage} as="div" />
+                      </div>
+                    )}
 
                     <div className="font-body text-sm font-medium text-ink leading-relaxed">
                       <MathText text={q.question_text} as="p" />

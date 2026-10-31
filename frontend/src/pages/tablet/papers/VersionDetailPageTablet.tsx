@@ -9,6 +9,7 @@ import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 import { useToast } from '../../../context/ToastContext';
 import { MathText } from '../../../components/ui/MathText';
 import { API_BASE_URL } from '../../../api/client';
+import { groupVersionQuestionsIntoSections, isRtlText } from '../../../utils/versionSectionUtils';
 
 const resolveImgUrl = (url?: string): string => {
   if (!url) return '';
@@ -55,6 +56,10 @@ export const VersionDetailPageTablet: React.FC = () => {
       fetchVersion();
     }
   }, [paperId, vId]);
+
+  const groupedSections = React.useMemo(() => {
+    return groupVersionQuestionsIntoSections(version?.question_snapshot);
+  }, [version?.question_snapshot]);
 
   const handleFinalize = async () => {
     setErrorMessage(null);
@@ -300,68 +305,128 @@ export const VersionDetailPageTablet: React.FC = () => {
         </div>
       </div>
 
-      {/* Questions Snapshot */}
-      <div className="space-y-3">
-        <h2 className="font-heading font-bold text-lg text-ink">
-          Snapshot Questions
-        </h2>
+      {/* ── Structured Academic Exam Sections ── */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between border-b border-border/80 pb-2">
+          <h2 className="font-heading font-bold text-lg text-ink">
+            Snapshot Questions
+          </h2>
+          <span className="font-mono text-xs text-ink/50">
+            {questionCount} {questionCount === 1 ? 'Question' : 'Questions'}
+          </span>
+        </div>
 
-        {version.question_snapshot?.map((q, idx) => (
-          <div
-            key={q.question_id || idx}
-            className="bg-surface border border-border rounded-card p-5 shadow-card space-y-2.5"
-          >
-            <div className="flex items-center justify-between border-b border-border/70 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-xs bg-bg border border-border px-2 py-0.5 rounded-sm">
-                  Q{idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
-                </span>
-                <span className="pill pill-muted text-[10px]">{q.question_type}</span>
-                <span className="pill pill-muted text-[10px]">{q.difficulty}</span>
-              </div>
-              <span className="font-mono text-xs font-bold text-forest">
-                {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
-              </span>
-            </div>
-
-            <div className="font-body text-sm font-medium text-ink leading-relaxed">
-              <MathText text={q.question_text} as="p" />
-            </div>
-
-            {/* Diagram Display if attached */}
-            {q.diagram && q.diagram.image_url && (
-              <div className="py-2.5 flex flex-col items-center justify-center bg-bg/50 border border-border/60 rounded-card p-2">
-                <img
-                  src={resolveImgUrl(q.diagram.image_url)}
-                  alt={q.diagram.title || 'Question Diagram'}
-                  className="max-h-56 max-w-sm object-contain border border-border rounded"
-                  onError={(e) => {
-                    const cur = (e.currentTarget as HTMLImageElement).src;
-                    if (!cur.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
-                      (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
-                    }
-                  }}
-                />
-                {q.diagram.title && (
-                  <span className="text-[11px] font-mono text-ink/60 mt-1 italic">
-                    {q.diagram.title}
-                  </span>
+        {groupedSections.map((sec) => (
+          <div key={sec.code} className="space-y-3">
+            {/* Section Header Banner */}
+            <div className="border border-border/90 bg-surface-muted/60 rounded-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+              <div>
+                <h3 className="font-heading font-bold text-base text-ink tracking-tight">
+                  {sec.title}
+                </h3>
+                {sec.instructions && (
+                  <p className="text-xs text-ink/70 italic mt-0.5 font-serif">
+                    {sec.instructions}
+                  </p>
                 )}
               </div>
-            )}
-
-            {q.options && Object.keys(q.options).length > 0 && (
-              <div className="grid grid-cols-2 gap-2 pt-1 pl-2">
-                {Object.entries(q.options).map(([optKey, optVal]) => (
-                  <div key={optKey} className="p-2 rounded-card border border-border/70 bg-bg text-xs flex items-baseline gap-1.5" dir="auto">
-                    <span className="font-mono font-bold text-forest">({optKey})</span>
-                    <MathText text={optVal} as="span" />
-                  </div>
-                ))}
+              <div className="text-xs font-mono font-bold text-forest bg-forest/10 border border-forest/20 px-3 py-1 rounded-pill shrink-0 self-start sm:self-auto">
+                {sec.questions.length} {sec.questions.length === 1 ? 'Question' : 'Questions'} • {sec.totalMarks} Marks
               </div>
-            )}
+            </div>
+
+            {/* Questions within this section */}
+            <div className="space-y-3">
+              {sec.questions.map((q, qIdx) => (
+                <div
+                  key={q.question_id || qIdx}
+                  className="bg-surface border border-border rounded-card p-5 shadow-card space-y-3 hover:border-forest/40 transition-colors"
+                >
+                  <div className="flex items-center justify-between text-xs border-b border-border/70 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-xs bg-bg border border-border px-2 py-0.5 rounded-sm">
+                        Q{(q.displayNum || (qIdx + 1)) < 10 ? `0${q.displayNum || (qIdx + 1)}` : (q.displayNum || (qIdx + 1))}
+                      </span>
+                      <span
+                        className={`pill text-[10px] ${
+                          q.question_type === 'MCQ'
+                            ? 'pill-forest'
+                            : q.question_type === 'SHORT_ANSWER'
+                            ? 'pill-ember'
+                            : 'pill-grape'
+                        }`}
+                      >
+                        {q.question_type}
+                      </span>
+                      <span className="pill pill-muted text-[10px]">{q.difficulty}</span>
+                    </div>
+
+                    <span className="font-mono text-xs font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-pill">
+                      {q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}
+                    </span>
+                  </div>
+
+                  {q.case_study_passage && (
+                    <div
+                      className={`p-3.5 mb-2 rounded-card bg-sky-50 border-l-4 border-sky-600 text-xs text-ink/85 italic leading-relaxed break-words [overflow-wrap:anywhere] ${
+                        isRtlText(q.case_study_passage) ? 'border-l-0 border-r-4 text-right' : ''
+                      }`}
+                      dir={isRtlText(q.case_study_passage) ? 'rtl' : 'ltr'}
+                    >
+                      <strong className="block not-italic font-heading font-semibold text-sky-900 mb-1">
+                        {isRtlText(q.case_study_passage) ? 'مطالعہ عبارت / CASE STUDY PASSAGE:' : 'CASE STUDY / COMPREHENSION PASSAGE:'}
+                      </strong>
+                      <MathText text={q.case_study_passage} as="div" />
+                    </div>
+                  )}
+
+                  <div className="font-body text-sm font-medium text-ink leading-relaxed">
+                    <MathText text={q.question_text} as="p" />
+                  </div>
+
+                  {/* Diagram Display if attached */}
+                  {q.diagram && q.diagram.image_url && (
+                    <div className="py-2.5 flex flex-col items-center justify-center bg-bg/50 border border-border/60 rounded-card p-2">
+                      <img
+                        src={resolveImgUrl(q.diagram.image_url)}
+                        alt={q.diagram.title || 'Question Diagram'}
+                        className="max-h-56 max-w-sm object-contain border border-border rounded"
+                        onError={(e) => {
+                          const cur = (e.currentTarget as HTMLImageElement).src;
+                          if (!cur.includes(':8000') && q.diagram?.image_url?.startsWith('/')) {
+                            (e.currentTarget as HTMLImageElement).src = `http://127.0.0.1:8000${q.diagram.image_url}`;
+                          }
+                        }}
+                      />
+                      {q.diagram.title && (
+                        <span className="text-[11px] font-mono text-ink/60 mt-1 italic">
+                          {q.diagram.title}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {q.options && Object.keys(q.options).length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 pt-1 pl-2">
+                      {Object.entries(q.options).map(([optKey, optVal]) => (
+                        <div key={optKey} className="p-2 rounded-card border border-border/70 bg-bg text-xs flex items-baseline gap-1.5" dir="auto">
+                          <span className="font-mono font-bold text-forest">({optKey})</span>
+                          <MathText text={optVal} as="span" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         ))}
+
+        {(!version.question_snapshot || version.question_snapshot.length === 0) && (
+          <div className="bg-surface border-2 border-dashed border-border rounded-card p-10 text-center text-xs text-ink/50">
+            No questions snapshot recorded for this version.
+          </div>
+        )}
       </div>
     </div>
   );
