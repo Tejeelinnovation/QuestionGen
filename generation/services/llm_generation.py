@@ -37,6 +37,8 @@ Generate high-quality academic questions strictly aligned to the provided chapte
 SUBJECT-SPECIFIC RIGOR MANDATES:
 1. CHEMISTRY:
    - All chemical formulas, ions, and reaction equations MUST be formatted in LaTeX notation (e.g. $\\text{MnO}_4^-$, $\\text{H}_2\\text{SO}_4$, $\\text{Fe}^{3+} + e^- \\rightarrow \\text{Fe}^{2+}$, $\\text{Cu}^{2+} + 2e^- \\rightarrow \\text{Cu}$, $\\text{Cr}_2\\text{O}_7^{2-}$).
+   - Use LaTeX \\ce{...} syntax for balanced reactions, complexes, and states (e.g. $\\ce{2KMnO4 + 16HCl -> 2KCl + 2MnCl2 + 5Cl2 + 8H2O}$, $\\ce{[Fe(CN)6]^4-}$).
+   - For organic reactions, stereochemistry, and Lewis molecular structures, provide the 2D skeletal structure using a ```smiles ... ``` block containing the standard SMILES notation (e.g. ```smiles c1ccccc1 ``` for Benzene, ```smiles CC(=O)Oc1ccccc1C(=O)O ``` for Aspirin).
    - Explicitly write oxidation numbers with signs (e.g. $+7, +2, -1, 0$).
    - For redox reactions and balancing questions, write full balanced chemical reactions with physical states ($s, l, g, aq$).
 2. MATHEMATICS & PHYSICS:
@@ -48,18 +50,21 @@ SUBJECT-SPECIFIC RIGOR MANDATES:
    - Questions on depreciation, partnership, shares, or ratios must provide explicit numeric details and calculations.
 4. BIOLOGY & LIFE SCIENCES:
    - Use standard scientific terminology, taxonomic hierarchies (Kingdom, Phylum, Class, Order, Family, Genus, Species), binomial nomenclature rules, and precise physiological mechanisms.
+   - For classification and evolutionary lineage problems, provide hierarchical cladograms using ```cladogram ... ``` blocks.
    - For diagram questions, ask students to identify anatomical structures, trace biochemical cycles, or distinguish cellular components.
 5. COMPUTER SCIENCE & INFORMATICS:
    - Use formatted syntax blocks for code (Python/SQL/C++), boolean expressions, logic gate truth tables, and algorithm trace problems.
-6. LANGUAGE & MEDIUM FIDELITY (HINDI, SANSKRIT, URDU, REGIONAL):
+6. GEOGRAPHY & SPATIAL MAP WORK:
+   - For Class 10/12 Geography and Social Science papers, generate a dedicated 5-mark Map Work question requiring students to locate and label 5 distinct features (e.g. Major Seaports, International Airports, Iron & Steel Plants, Nuclear Power Plants, Major Dams/River Projects, Soil/Crop Zones). Use question_type "MAP_WORK" and include ```mapwork ... ``` blocks.
+7. LANGUAGE & MEDIUM FIDELITY (HINDI, SANSKRIT, URDU, REGIONAL):
    - If the source textbook text is in Hindi, Sanskrit, or Urdu, formulate questions, options, and model solutions in that same language with accurate academic vocabulary.
-7. MULTIPLE CHOICE QUESTIONS (MCQs):
+8. MULTIPLE CHOICE QUESTIONS (MCQs):
    - Every MCQ MUST include exactly 4 distinct, plausible, academically rigorous options under keys "A", "B", "C", "D".
    - Distractors must test plausible student misconceptions or common calculation pitfalls.
    - STRICT PROHIBITION: NEVER use generic dummy placeholder options like "The inverse relation holds true", "None of the above statements are supported", or "Unverified assumption".
-8. SHORT & LONG ANSWERS:
+9. SHORT & LONG ANSWERS:
    - 'correct_answer' must contain the full model solution, key marking steps, and relevant equations.
-9. DIAGRAM-BASED QUESTIONS:
+10. DIAGRAM-BASED QUESTIONS:
    - When ATTACHED FIGURES are provided in the prompt, you MUST construct diagram-specific question(s) referencing the figure and include the exact 'diagram' object with 'figure_id', 'title', and 'image_url'.
 
 OUTPUT REQUIREMENTS:
@@ -809,7 +814,7 @@ Generate exactly {quantity} questions strictly conforming to the JSON schema. Re
                 continue
 
             q_type = str(item.get("question_type") or default_type).upper()
-            if q_type not in ("MCQ", "SHORT_ANSWER", "LONG_ANSWER", "DIAGRAM_BASED"):
+            if q_type not in ("MCQ", "SHORT_ANSWER", "LONG_ANSWER", "DIAGRAM_BASED", "MAP_WORK"):
                 q_type = default_type
 
             # Handle diagram attachment if present

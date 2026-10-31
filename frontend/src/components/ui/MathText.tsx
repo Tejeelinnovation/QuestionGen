@@ -1,6 +1,11 @@
 import React, { useMemo } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+// @ts-ignore - KaTeX mhchem chemical equation extension
+import 'katex/dist/contrib/mhchem';
+import { ChemicalStructure } from './ChemicalStructure';
+import { CladogramTree } from './CladogramTree';
+import { GeographyMapWork } from './GeographyMapWork';
 
 interface MathTextProps {
   text: string;
@@ -38,6 +43,8 @@ function cleanLatex(formula: string): string {
   s = s.replace(/(?:[\t\x09]|\b)heta\b/g, '\\theta ');
   s = s.replace(/(?:[\r\x0d]|\b)ho\b/g, '\\rho ');
   s = s.replace(/(?:[\r\x0d]|\b)ight\b/g, '\\right');
+  s = s.replace(/(?:[\r\x0d]|\b)xrightarrow\b/g, '\\xrightarrow ');
+  s = s.replace(/\bce\{/g, '\\ce{');
 
   // Normalize reaction arrows and dashes
   s = s.replace(/→/g, '\\rightarrow ').replace(/⇌/g, '\\rightleftharpoons ');
@@ -93,8 +100,44 @@ function renderTextWithMarkdownElements(text: string, keyPrefix: string): React.
     // Fenced code block ```...```
     if (part.startsWith('```') && part.endsWith('```') && part.length >= 6) {
       const inner = part.slice(3, -3);
-      // Strip optional leading language identifier (e.g. javascript\n or python\n)
-      const codeContent = inner.replace(/^[a-zA-Z0-9_-]+\r?\n/, '');
+      const firstLineMatch = inner.match(/^([a-zA-Z0-9_-]+)\r?\n/);
+      const lang = firstLineMatch ? firstLineMatch[1].toLowerCase() : '';
+      const codeContent = lang ? inner.replace(/^[a-zA-Z0-9_-]+\r?\n/, '').trim() : inner.trim();
+
+      // 1. Chemical Structure / SMILES rendering
+      if (lang === 'smiles' || lang === 'chemical') {
+        return (
+          <ChemicalStructure
+            key={`${keyPrefix}-chem-${pIdx}`}
+            smiles={codeContent}
+            className="my-2"
+          />
+        );
+      }
+
+      // 2. Biological Cladogram / Taxonomic Tree rendering
+      if (lang === 'cladogram' || lang === 'taxonomy' || lang === 'tree') {
+        return (
+          <CladogramTree
+            key={`${keyPrefix}-clado-${pIdx}`}
+            content={codeContent}
+            className="my-2"
+          />
+        );
+      }
+
+      // 3. Geographic & Spatial Map Work rendering
+      if (lang === 'mapwork' || lang === 'map') {
+        const lines = codeContent.split(/\r?\n/).filter(l => l.trim().length > 0);
+        return (
+          <GeographyMapWork
+            key={`${keyPrefix}-map-${pIdx}`}
+            features={lines.length > 0 ? lines : undefined}
+            className="my-2"
+          />
+        );
+      }
+
       return (
         <pre
           key={`${keyPrefix}-code-block-${pIdx}`}
@@ -131,28 +174,73 @@ function renderTextWithMarkdownElements(text: string, keyPrefix: string): React.
         const dataLines = sepIdx !== -1 ? lines.slice(sepIdx + 1) : lines.slice(1);
         const dataRows = dataLines.map(parseRow);
 
+        // Check for Accounting Journal or Ledger modalities
+        const isJournal = headers.some((h) => /debit|credit|l\.?f\.?/i.test(h));
+        const isLedger =
+          headers.some((h) => /\b(dr|cr)\b/i.test(h)) ||
+          (headers.length >= 6 && headers.filter((h) => /particulars/i.test(h)).length >= 2);
+
         return (
           <div key={`${keyPrefix}-table-${pIdx}`} className="overflow-x-auto my-3 block clear-both">
+            {isJournal && (
+              <div className="text-[10px] font-mono font-bold tracking-wider text-forest print:text-black mb-1 uppercase">
+                [FINANCIAL JOURNAL BOOK — 5-COLUMN FORMAT]
+              </div>
+            )}
+            {isLedger && (
+              <div className="text-[10px] font-mono font-bold tracking-wider text-forest print:text-black mb-1 uppercase">
+                [T-ACCOUNT FINANCIAL LEDGER]
+              </div>
+            )}
             <table className="min-w-full border-collapse border border-gray-300 text-xs font-mono text-left bg-white print:border-black shadow-xs">
               <thead className="bg-gray-100 print:bg-gray-100/90 border-b-2 border-gray-300 print:border-black font-heading font-bold text-gray-900">
                 <tr>
-                  {headers.map((h, hIdx) => (
-                    <th key={hIdx} className="border border-gray-300 print:border-black px-3 py-1.5 text-center">
-                      <MathText text={h} as="span" />
-                    </th>
-                  ))}
+                  {headers.map((h, hIdx) => {
+                    const isAmountCol = /debit|credit|amount|rs|balance|\(₹\)|\(rs\)/i.test(h);
+                    return (
+                      <th
+                        key={hIdx}
+                        className={`border border-gray-300 print:border-black px-3 py-1.5 ${
+                          isAmountCol ? 'text-right' : 'text-center'
+                        }`}
+                      >
+                        <MathText text={h} as="span" />
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {dataRows.map((row, rIdx) => (
-                  <tr key={rIdx} className={rIdx % 2 === 1 ? 'bg-gray-50/70 print:bg-transparent' : 'bg-white'}>
-                    {row.map((cell, cIdx) => (
-                      <td key={cIdx} className="border border-gray-300 print:border-black px-3 py-1.5 align-middle">
-                        <MathText text={cell} as="span" />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {dataRows.map((row, rIdx) => {
+                  const isTotalRow = row.some((cell) => /total|balance\s*c\/d|balance\s*b\/d/i.test(cell));
+                  return (
+                    <tr
+                      key={rIdx}
+                      className={
+                        isTotalRow
+                          ? 'border-b-4 border-double border-gray-900 font-bold bg-gray-50 print:bg-transparent print:border-black'
+                          : rIdx % 2 === 1
+                          ? 'bg-gray-50/70 print:bg-transparent'
+                          : 'bg-white'
+                      }
+                    >
+                      {row.map((cell, cIdx) => {
+                        const hName = headers[cIdx] || '';
+                        const isAmountCol = /debit|credit|amount|rs|balance|\(₹\)|\(rs\)/i.test(hName);
+                        return (
+                          <td
+                            key={cIdx}
+                            className={`border border-gray-300 print:border-black px-3 py-1.5 align-middle ${
+                              isAmountCol ? 'text-right font-mono' : 'text-left'
+                            }`}
+                          >
+                            <MathText text={cell} as="span" />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

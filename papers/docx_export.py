@@ -443,11 +443,20 @@ class ExamPaperDocxService:
             if trimmed.startswith('```') and trimmed.endswith('```'):
                 lines = trimmed.splitlines()
                 first_line = lines[0][3:].strip()
-                lang = first_line if first_line else ""
+                lang = first_line.lower() if first_line else ""
                 code_lines = lines[1:-1] if len(lines) >= 2 else []
                 code_content = "\n".join(code_lines)
+                if lang in ('smiles', 'chemical'):
+                    b_type = 'chemical'
+                elif lang in ('cladogram', 'taxonomy', 'tree'):
+                    b_type = 'cladogram'
+                elif lang in ('map', 'mapwork'):
+                    b_type = 'map'
+                else:
+                    b_type = 'code'
+
                 blocks.append({
-                    'type': 'code',
+                    'type': b_type,
                     'lang': lang,
                     'content': code_content,
                 })
@@ -594,11 +603,142 @@ class ExamPaperDocxService:
             if i < len(lines) - 1:
                 cp.add_run("\n")
 
+    def _render_chemical_structure_box(self, doc: docx.Document, smiles: str) -> None:
+        """Render a styled 2D chemical structure & molecular formula container."""
+        tbl = doc.add_table(rows=1, cols=1)
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tbl.autofit = False
+
+        cell = tbl.cell(0, 0)
+        cell.width = Inches(6.5)
+
+        borders = parse_xml(
+            f'<w:tcBorders {nsdecls("w")}>'
+            f'  <w:top w:val="single" w:sz="6" w:space="0" w:color="0284C7"/>'
+            f'  <w:left w:val="single" w:sz="18" w:space="0" w:color="0284C7"/>'
+            f'  <w:bottom w:val="single" w:sz="6" w:space="0" w:color="0284C7"/>'
+            f'  <w:right w:val="single" w:sz="6" w:space="0" w:color="0284C7"/>'
+            f'</w:tcBorders>'
+        )
+        cell._tc.get_or_add_tcPr().append(borders)
+        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F0F9FF"/>')
+        cell._tc.get_or_add_tcPr().append(shd)
+
+        cp = cell.paragraphs[0]
+        cp.paragraph_format.space_before = Pt(3)
+        cp.paragraph_format.space_after = Pt(3)
+        r_hdr = cp.add_run("[2D CHEMICAL STRUCTURE & SKELETAL FORMULA]\n")
+        r_hdr.bold = True
+        r_hdr.font.size = Pt(8.5)
+        r_hdr.font.color.rgb = RGBColor(2, 132, 199)
+
+        r_body = cp.add_run(f"Molecular SMILES / Structure: {smiles.strip()}")
+        r_body.font.name = "Consolas"
+        r_body.font.size = Pt(9)
+        r_body.font.color.rgb = RGBColor(15, 23, 42)
+
+    def _render_cladogram_box(self, doc: docx.Document, text: str) -> None:
+        """Render a biological taxonomic hierarchy and cladogram container."""
+        tbl = doc.add_table(rows=1, cols=1)
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tbl.autofit = False
+
+        cell = tbl.cell(0, 0)
+        cell.width = Inches(6.5)
+
+        borders = parse_xml(
+            f'<w:tcBorders {nsdecls("w")}>'
+            f'  <w:top w:val="single" w:sz="6" w:space="0" w:color="059669"/>'
+            f'  <w:left w:val="single" w:sz="18" w:space="0" w:color="059669"/>'
+            f'  <w:bottom w:val="single" w:sz="6" w:space="0" w:color="059669"/>'
+            f'  <w:right w:val="single" w:sz="6" w:space="0" w:color="059669"/>'
+            f'</w:tcBorders>'
+        )
+        cell._tc.get_or_add_tcPr().append(borders)
+        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="ECFDF5"/>')
+        cell._tc.get_or_add_tcPr().append(shd)
+
+        cp = cell.paragraphs[0]
+        cp.paragraph_format.space_before = Pt(3)
+        cp.paragraph_format.space_after = Pt(3)
+        r_hdr = cp.add_run("[TAXONOMIC HIERARCHY / BIOLOGICAL CLADOGRAM]\n")
+        r_hdr.bold = True
+        r_hdr.font.size = Pt(8.5)
+        r_hdr.font.color.rgb = RGBColor(5, 150, 105)
+
+        r_body = cp.add_run(text.strip())
+        r_body.font.name = "Consolas"
+        r_body.font.size = Pt(9)
+        r_body.font.color.rgb = RGBColor(6, 78, 59)
+
+    def _render_map_work_box(self, doc: docx.Document, text: str) -> None:
+        """Render a geographic map work examination task container."""
+        tbl = doc.add_table(rows=1, cols=1)
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tbl.autofit = False
+
+        cell = tbl.cell(0, 0)
+        cell.width = Inches(6.5)
+
+        borders = parse_xml(
+            f'<w:tcBorders {nsdecls("w")}>'
+            f'  <w:top w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+            f'  <w:left w:val="single" w:sz="18" w:space="0" w:color="000000"/>'
+            f'  <w:bottom w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+            f'  <w:right w:val="single" w:sz="12" w:space="0" w:color="000000"/>'
+            f'</w:tcBorders>'
+        )
+        cell._tc.get_or_add_tcPr().append(borders)
+        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="FAFAFA"/>')
+        cell._tc.get_or_add_tcPr().append(shd)
+
+        cp = cell.paragraphs[0]
+        cp.paragraph_format.space_before = Pt(3)
+        cp.paragraph_format.space_after = Pt(3)
+        r_hdr = cp.add_run("SECTION MAP WORK [OUTLINE MAP — LAT 8°4'N TO 37°6'N | LONG 68°7'E TO 97°25'E]\n")
+        r_hdr.bold = True
+        r_hdr.font.size = Pt(9)
+        r_hdr.font.color.rgb = RGBColor(0, 0, 0)
+
+        lines = [l.strip() for l in text.strip().split("\n") if l.strip()] if text.strip() else [
+            "(A) A major seaport on the western coast",
+            "(B) An iron and steel plant in eastern India",
+            "(C) A major wheat-producing region",
+            "(D) A national park in north-eastern India",
+            "(E) A nuclear power plant on the southern coast",
+        ]
+        for line in lines:
+            cp.add_run(f"• {line}\n")
+            r_ans = cp.add_run("   Identified Feature / Location: _____________________________________\n")
+            r_ans.font.color.rgb = RGBColor(100, 116, 139)
+
     def _render_markdown_table(self, doc: docx.Document, headers: List[str], data_rows: List[List[str]]) -> None:
         """Render a styled tabular dataset (Accounting Journals, Ledgers, Data Tables)."""
         if not headers:
             return
         num_cols = len(headers)
+
+        # Check if table represents an Accounting Journal or Ledger
+        is_journal = any(re.search(r'debit|credit|l\.?f\.?', h, re.I) for h in headers)
+        is_ledger = any(re.search(r'\b(dr|cr)\b', h, re.I) for h in headers)
+
+        if is_journal:
+            p_badge = doc.add_paragraph()
+            p_badge.paragraph_format.space_before = Pt(4)
+            p_badge.paragraph_format.space_after = Pt(1)
+            r_b = p_badge.add_run("[FINANCIAL JOURNAL BOOK — 5-COLUMN FORMAT]")
+            r_b.font.size = Pt(8)
+            r_b.font.bold = True
+            r_b.font.color.rgb = RGBColor(31, 77, 58)
+        elif is_ledger:
+            p_badge = doc.add_paragraph()
+            p_badge.paragraph_format.space_before = Pt(4)
+            p_badge.paragraph_format.space_after = Pt(1)
+            r_b = p_badge.add_run("[T-ACCOUNT FINANCIAL LEDGER]")
+            r_b.font.size = Pt(8)
+            r_b.font.bold = True
+            r_b.font.color.rgb = RGBColor(31, 77, 58)
+
         table = doc.add_table(rows=len(data_rows) + 1, cols=num_cols)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = True
@@ -606,6 +746,7 @@ class ExamPaperDocxService:
         hdr_cells = table.rows[0].cells
         for i, h_text in enumerate(headers):
             cell = hdr_cells[i]
+            is_amount = bool(re.search(r'debit|credit|amount|rs|balance|\(₹\)|\(rs\)', h_text, re.I))
             shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F1F5F9"/>')
             cell._tc.get_or_add_tcPr().append(shd)
 
@@ -622,6 +763,10 @@ class ExamPaperDocxService:
             cp = cell.paragraphs[0]
             cp.paragraph_format.space_before = Pt(2)
             cp.paragraph_format.space_after = Pt(2)
+            if is_amount:
+                cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            else:
+                cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
             r = cp.add_run(h_text)
             r.bold = True
             r.font.size = Pt(9)
@@ -629,29 +774,48 @@ class ExamPaperDocxService:
 
         for r_idx, row_data in enumerate(data_rows, start=1):
             row_cells = table.rows[r_idx].cells
-            bg_color = "F8FAFC" if r_idx % 2 == 0 else "FFFFFF"
+            is_total_row = any(re.search(r'total|balance\s*c\/d|balance\s*b\/d', cell_val, re.I) for cell_val in row_data)
+            bg_color = "F8FAFC" if r_idx % 2 == 0 and not is_total_row else "FFFFFF"
+
             for c_idx in range(num_cols):
                 cell = row_cells[c_idx]
                 val = row_data[c_idx] if c_idx < len(row_data) else ""
+                h_name = headers[c_idx] if c_idx < len(headers) else ""
+                is_amount = bool(re.search(r'debit|credit|amount|rs|balance|\(₹\)|\(rs\)', h_name, re.I))
+
                 if bg_color != "FFFFFF":
                     shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{bg_color}"/>')
                     cell._tc.get_or_add_tcPr().append(shd)
 
-                borders = parse_xml(
-                    f'<w:tcBorders {nsdecls("w")}>'
-                    f'  <w:top w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/>'
-                    f'  <w:left w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
-                    f'  <w:bottom w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/>'
-                    f'  <w:right w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
-                    f'</w:tcBorders>'
-                )
+                if is_total_row:
+                    borders = parse_xml(
+                        f'<w:tcBorders {nsdecls("w")}>'
+                        f'  <w:top w:val="single" w:sz="6" w:space="0" w:color="000000"/>'
+                        f'  <w:left w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+                        f'  <w:bottom w:val="double" w:sz="12" w:space="0" w:color="000000"/>'
+                        f'  <w:right w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+                        f'</w:tcBorders>'
+                    )
+                else:
+                    borders = parse_xml(
+                        f'<w:tcBorders {nsdecls("w")}>'
+                        f'  <w:top w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/>'
+                        f'  <w:left w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+                        f'  <w:bottom w:val="single" w:sz="4" w:space="0" w:color="E2E8F0"/>'
+                        f'  <w:right w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+                        f'</w:tcBorders>'
+                    )
                 cell._tc.get_or_add_tcPr().append(borders)
 
                 cp = cell.paragraphs[0]
                 cp.paragraph_format.space_before = Pt(2)
                 cp.paragraph_format.space_after = Pt(2)
+                if is_amount:
+                    cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 r = cp.add_run(val)
                 r.font.size = Pt(8.5)
+                if is_total_row:
+                    r.bold = True
                 r.font.name = "Consolas" if any(c in val for c in ["0","1","2","3","4","5","6","7","8","9"]) else "Calibri"
 
     def _render_question_content(
@@ -692,6 +856,15 @@ class ExamPaperDocxService:
         for block in remaining_blocks:
             if block["type"] == "table":
                 self._render_markdown_table(doc, block["headers"], block["rows"])
+                last_p = None
+            elif block["type"] == "chemical":
+                self._render_chemical_structure_box(doc, block["content"])
+                last_p = None
+            elif block["type"] == "cladogram":
+                self._render_cladogram_box(doc, block["content"])
+                last_p = None
+            elif block["type"] == "map":
+                self._render_map_work_box(doc, block["content"])
                 last_p = None
             elif block["type"] == "code":
                 self._render_code_block(doc, block["content"], block.get("lang", ""))

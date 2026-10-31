@@ -185,14 +185,29 @@ class PaperPublishingService:
                 "base_title": "Section {code} — Long Answer & Analytical Questions",
                 "items": [],
             },
+            "map": {
+                "base_title": "Section {code} — Map Work",
+                "items": [],
+            },
         }
 
         for item in raw_items:
             q_type = str(item.get("question_type", "")).upper()
             raw_marks = item.get("marks", 1.0)
             marks_val = float(raw_marks) if raw_marks is not None else 1.0
+            q_text_lower = str(item.get("question_text", "")).lower()
 
-            if q_type == "MCQ" or (marks_val <= 1.0 and item.get("options")):
+            is_map = (
+                q_type in ("MAP_WORK", "MAP_BASED")
+                or (
+                    any(kw in q_text_lower for kw in ["outline map", "on the given map", "on the provided map", "locate and label", "نقشے پر", "मानचित्र"])
+                    and marks_val >= 2.0
+                )
+            )
+
+            if is_map:
+                buckets["map"]["items"].append(item)
+            elif q_type == "MCQ" or (marks_val <= 1.0 and item.get("options")):
                 buckets["mcq"]["items"].append(item)
             elif marks_val <= 2.0 and q_type != "LONG_ANSWER":
                 buckets["vsa"]["items"].append(item)
@@ -203,7 +218,7 @@ class PaperPublishingService:
 
         # Assemble active sections
         active_sections: List[ExamSection] = []
-        section_codes = ["A", "B", "C", "D", "E"]
+        section_codes = ["A", "B", "C", "D", "E", "F"]
         code_idx = 0
         global_num = 1
 
@@ -243,6 +258,8 @@ class PaperPublishingService:
                 inst = f"{inst_prefix} Answer concisely in 30–50 words with balanced equations/steps where applicable."
             elif key == "sa":
                 inst = f"{inst_prefix} Show step-by-step working and units where applicable."
+            elif key == "map":
+                inst = f"{inst_prefix} On the provided outline map of India / World, locate and label the given geographical features with appropriate symbols. Attach the completed outline map securely with your answer script."
             else:
                 inst = f"{inst_prefix} Provide detailed derivations, explanations, or labelled diagrams."
 

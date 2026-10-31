@@ -1,6 +1,7 @@
 import React from 'react';
 import type { PaperPrintData } from '../../types';
 import { MathText } from '../ui/MathText';
+import { GeographyMapWork } from '../ui/GeographyMapWork';
 import { API_BASE_URL } from '../../api/client';
 
 const resolveImageUrl = (url?: string): string => {
@@ -117,6 +118,16 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
                   [{sec.question_count} {sec.question_count === 1 ? 'Question' : 'Questions'} • {sec.total_marks} Marks]
                 </div>
               </div>
+
+              {/* Dedicated Geography Map Work Section Outline Map Stimulus */}
+              {sec.title.toLowerCase().includes('map work') &&
+                !sec.questions.some((q) => q.diagram?.image_url || (q.question_text && q.question_text.includes('```map'))) && (
+                  <GeographyMapWork
+                    title={sec.title}
+                    instructions={sec.instructions}
+                    className="mb-4"
+                  />
+                )}
 
               {/* Section Questions */}
               <div className="space-y-8 pt-1">
