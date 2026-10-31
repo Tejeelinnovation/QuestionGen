@@ -18,6 +18,7 @@ import {
   Sparkles,
   BookOpen,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Select,
@@ -50,6 +51,13 @@ const PaperSetupPageDesktop: React.FC = () => {
   const [sourceMode, setSourceMode] = useState<'curriculum' | 'pdf'>('curriculum');
   const [isInspectingPdf, setIsInspectingPdf] = useState(false);
   const [inspectionResult, setInspectionResult] = useState<PdfInspectionResult | null>(null);
+  const [inspectionProgress, setInspectionProgress] = useState<{
+    step: number;
+    total: number;
+    label: string;
+    sublabel: string;
+  } | null>(null);
+  const [inspectionError, setInspectionError] = useState<string | null>(null);
   const [selectedFigureIds, setSelectedFigureIds] = useState<string[]>([]);
   const [contributeToBank, setContributeToBank] = useState(true);
   const [uploadedFileName, setUploadedFileName] = useState('');
@@ -106,11 +114,38 @@ const PaperSetupPageDesktop: React.FC = () => {
     setUploadedFileName(file.name);
     setIsInspectingPdf(true);
     setInspectionResult(null);
+    setInspectionError(null);
+    setInspectionProgress({
+      step: 1,
+      total: 3,
+      label: 'Reading chapter pages & Devanagari typography...',
+      sublabel: `Analyzing ${file.name} for selectable text and unicode characters...`,
+    });
+
+    const timer1 = setTimeout(() => {
+      setInspectionProgress({
+        step: 2,
+        total: 3,
+        label: 'Scanning figures & diagrams with AI Vision...',
+        sublabel: 'Harvesting educational charts, apparatus, and formula bounding boxes in parallel...',
+      });
+    }, 1800);
+
+    const timer2 = setTimeout(() => {
+      setInspectionProgress({
+        step: 3,
+        total: 3,
+        label: 'Structuring blueprint metadata...',
+        sublabel: 'Finalizing page anchors and inspection cache for question formulation...',
+      });
+    }, 5500);
 
     try {
       const result = await papersApi.inspectPdf(file);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       setInspectionResult(result);
-      // Default to empty so the teacher selects ONLY the figures they want on the exam
+      setInspectionProgress(null);
       setSelectedFigureIds([]);
 
       if (!title.trim()) {
@@ -121,7 +156,13 @@ const PaperSetupPageDesktop: React.FC = () => {
         `PDF analyzed: ${result.page_count} pages, ${result.figure_count} diagrams found.`
       );
     } catch (err: any) {
-      toast.error(extractApiErrorMessage(err, 'Failed to inspect PDF document.'));
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      const errMsg = extractApiErrorMessage(err, 'Failed to inspect PDF document.');
+      setInspectionError(errMsg);
+      setInspectionProgress(null);
+      setUploadedFileName(''); // Clear false positive
+      toast.error(errMsg);
     } finally {
       setIsInspectingPdf(false);
     }
@@ -344,41 +385,79 @@ const PaperSetupPageDesktop: React.FC = () => {
                           disabled={isInspectingPdf || isSubmitting}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
                         />
-                        <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
-                          <div className="w-12 h-12 rounded-full bg-forest/10 text-forest flex items-center justify-center">
-                            {isInspectingPdf ? (
+                        {isInspectingPdf && inspectionProgress ? (
+                          <div className="flex flex-col items-center justify-center space-y-3 pointer-events-none py-2 w-full max-w-sm mx-auto">
+                            <div className="w-12 h-12 rounded-full bg-forest/10 text-forest flex items-center justify-center">
                               <Loader2 className="w-6 h-6 animate-spin text-forest" />
-                            ) : (
-                              <UploadCloud className="w-6 h-6" />
-                            )}
-                          </div>
-                          {isInspectingPdf ? (
-                            <div className="space-y-1">
-                              <p className="font-heading font-semibold text-xs text-ink">
-                                Extracting text and harvesting diagrams...
+                            </div>
+                            <div className="space-y-1.5 text-center w-full">
+                              <div className="flex items-center justify-between text-[11px] font-mono text-ink/60 px-1">
+                                <span className="font-heading font-semibold text-forest">
+                                  Step {inspectionProgress.step} of {inspectionProgress.total}
+                                </span>
+                                <span>{Math.round((inspectionProgress.step / inspectionProgress.total) * 100)}%</span>
+                              </div>
+                              <div className="w-full bg-border/60 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="bg-forest h-1.5 rounded-full transition-all duration-500 ease-out"
+                                  style={{ width: `${(inspectionProgress.step / inspectionProgress.total) * 100}%` }}
+                                />
+                              </div>
+                              <p className="font-heading font-semibold text-xs text-ink pt-1">
+                                {inspectionProgress.label}
                               </p>
-                              <p className="font-mono text-[11px] text-ink/50">
-                                In-memory inspection typically takes 1–3 seconds
+                              <p className="font-mono text-[11px] text-ink/50 leading-relaxed">
+                                {inspectionProgress.sublabel}
                               </p>
                             </div>
-                          ) : (
+                          </div>
+                        ) : inspectionError ? (
+                          <div className="flex flex-col items-center justify-center space-y-2 py-2">
+                            <div className="w-12 h-12 rounded-full bg-ember/10 text-ember flex items-center justify-center">
+                              <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <div className="space-y-1 text-center max-w-xs">
+                              <p className="font-heading font-semibold text-xs text-ember">
+                                Inspection Failed
+                              </p>
+                              <p className="text-[11px] text-ink/70 break-words">
+                                {inspectionError}
+                              </p>
+                              <p className="text-[10px] font-mono text-forest underline pt-1">
+                                Click or drop here to try again
+                              </p>
+                            </div>
+                          </div>
+                        ) : inspectionResult ? (
+                          <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none py-1">
+                            <div className="w-12 h-12 rounded-full bg-forest/10 text-forest flex items-center justify-center">
+                              <CheckCircle2 className="w-6 h-6 text-forest" />
+                            </div>
+                            <div className="space-y-1">
+                              <p className="font-heading font-semibold text-xs text-forest flex items-center justify-center gap-1.5">
+                                <span>{uploadedFileName}</span>
+                                <span className="text-[11px] font-mono text-ink/50">(Click to replace)</span>
+                              </p>
+                              <p className="font-mono text-[11px] text-ink/60">
+                                Ready: {inspectionResult.page_count} pages • {inspectionResult.figure_count} diagrams found
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none py-1">
+                            <div className="w-12 h-12 rounded-full bg-forest/10 text-forest flex items-center justify-center">
+                              <UploadCloud className="w-6 h-6" />
+                            </div>
                             <div className="space-y-1">
                               <p className="font-heading font-semibold text-xs text-ink">
-                                {uploadedFileName ? (
-                                  <span className="text-forest flex items-center justify-center gap-1.5">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    {uploadedFileName} (Click to replace)
-                                  </span>
-                                ) : (
-                                  'Drop chapter PDF here, or click to browse'
-                                )}
+                                Drop chapter PDF here, or click to browse
                               </p>
                               <p className="font-mono text-[11px] text-ink/50">
                                 Supports textbooks, lecture notes, and question sheets (up to 100 pages)
                               </p>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -618,13 +697,18 @@ const PaperSetupPageDesktop: React.FC = () => {
                 <button
                   type="submit"
                   id="submit-paper-setup-btn"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || (sourceMode === 'pdf' && isInspectingPdf)}
                   className="px-6 py-2.5 text-xs font-heading font-semibold rounded-pill bg-forest text-white hover:bg-forest/90 transition-all shadow-sm cursor-pointer disabled:opacity-75 flex items-center gap-2"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       <span>Creating Blueprint...</span>
+                    </>
+                  ) : isInspectingPdf ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-lime" />
+                      <span>Analyzing Chapter Document...</span>
                     </>
                   ) : (
                     <>

@@ -15,6 +15,7 @@ import os
 import logging
 import re
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 import pymupdf  # PyMuPDF
@@ -145,7 +146,7 @@ class PdfInspectionService:
             for model in models_to_try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
                 try:
-                    res = requests.post(url, json=payload, timeout=20)
+                    res = requests.post(url, json=payload, timeout=12)
                     if res.status_code == 200:
                         break
                 except Exception as net_err:
@@ -255,6 +256,10 @@ class PdfInspectionService:
 
         total_words = 0
 
+        # Pass 1: Extract Text & Identify Diagram Candidates across all pages
+        page_records = []
+        vision_candidates = []
+
         for page_idx in range(page_count):
             page = doc[page_idx]
             page_num = page_idx + 1
@@ -289,30 +294,64 @@ class PdfInspectionService:
             if page_text.strip():
                 full_text_parts.append(f"--- [Page {page_num}] ---\n{page_text.strip()}")
 
-            # 2. Vision Diagram Detector (AI Visual Semantic Classifier)
             has_drawings = len(page.get_drawings()) > 10
             has_images = len(page.get_images()) > 0
             has_caption = bool(re.search(r"\b(?:fig|figure|diagram|chart|graph|चित्र|आकृति|सारणी|تصویر|شکل|خاکہ)\b", page_text, re.I))
 
+            priority = 2 if has_caption else (1 if has_images else 0)
+            if (has_caption or has_images or has_drawings) and page_num <= 8:
+                vision_candidates.append((priority, page_idx, page_num))
+
+            page_records.append({
+                "page_idx": page_idx,
+                "page_num": page_num,
+                "page": page,
+                "page_text": page_text,
+            })
+
+        # Run Parallel Vision Diagram Extraction on top candidate pages (max 4 concurrent threads)
+        vision_candidates.sort(key=lambda x: x[0], reverse=True)
+        top_candidates = vision_candidates[:4]
+        vision_results_by_page: Dict[int, List[Dict[str, Any]]] = {}
+
+        if top_candidates:
+            def _scan_page_vision(cand):
+                _, p_idx, p_num = cand
+                p = doc[p_idx]
+                return p_num, cls._detect_diagrams_with_vision(p, p_num)
+
+            with ThreadPoolExecutor(max_workers=min(4, len(top_candidates))) as executor:
+                futures = {executor.submit(_scan_page_vision, c): c for c in top_candidates}
+                for f in as_completed(futures):
+                    try:
+                        p_num, v_figs = f.result(timeout=14)
+                        if v_figs:
+                            vision_results_by_page[p_num] = v_figs
+                    except Exception as pool_err:
+                        logger.debug(f"Vision diagram pool error: {pool_err}")
+
+        # Pass 2: Assemble Detected Figures (Vision + Embedded Image / Composite Fallback)
+        for rec in page_records:
+            page = rec["page"]
+            page_num = rec["page_num"]
+            page_text = rec["page_text"]
             vision_handled = False
-            max_vision_pages = 6 if total_words < 50 else 12
-            if (has_drawings or has_images or has_caption) and page_num <= max_vision_pages and len(detected_figures) < 15:
-                v_figs = cls._detect_diagrams_with_vision(page, page_num)
-                if v_figs:
-                    vision_handled = True
-                    for vf in v_figs:
-                        fig_id = vf["figure_id"]
-                        detected_figures.append({
-                            "figure_id": fig_id,
-                            "page_number": page_num,
-                            "width": vf["width"],
-                            "height": vf["height"],
-                            "caption": vf["caption"],
-                            "thumbnail_b64": vf["thumbnail_b64"],
-                            "mime_type": "image/png",
-                        })
-                        high_res_images[fig_id] = vf["image_bytes"]
-                        cls._high_res_cache[fig_id] = vf["image_bytes"]
+
+            if page_num in vision_results_by_page and vision_results_by_page[page_num]:
+                vision_handled = True
+                for vf in vision_results_by_page[page_num]:
+                    fig_id = vf["figure_id"]
+                    detected_figures.append({
+                        "figure_id": fig_id,
+                        "page_number": page_num,
+                        "width": vf["width"],
+                        "height": vf["height"],
+                        "caption": vf["caption"],
+                        "thumbnail_b64": vf["thumbnail_b64"],
+                        "mime_type": "image/png",
+                    })
+                    high_res_images[fig_id] = vf["image_bytes"]
+                    cls._high_res_cache[fig_id] = vf["image_bytes"]
 
             # 3. Fallback: Extract Embedded Images with True Colorspace Conversion if Vision did not run
             if not vision_handled:
