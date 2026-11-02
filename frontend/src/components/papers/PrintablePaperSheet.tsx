@@ -36,6 +36,14 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
 
   const formattedTitle = (printData.title || '').replace(/_/g, ' ');
 
+  // Filter out raw file codes or extensions from subject presentation
+  const validSubjects = (printData.subjects || []).filter(
+    (s) =>
+      s &&
+      !s.toLowerCase().endsWith('.pdf') &&
+      !/^[a-z]{2,5}\d{1,5}$/i.test(s.trim())
+  );
+
   return (
     <div className="printable-paper-sheet bg-white text-black border border-border print:border-none p-6 sm:p-12 rounded-card print:rounded-none print:p-0 shadow-card print:shadow-none space-y-8 font-body min-w-0 max-w-full overflow-hidden">
       {/* Formal Institutional Header */}
@@ -57,9 +65,30 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
           <span>MAXIMUM MARKS: {printData.total_marks}</span>
         </div>
 
-        {printData.subjects && printData.subjects.length > 0 && (
+        {/* Print-specific style override: strips browser date/time headers and URL footers */}
+        <style>{`
+          @media print {
+            @page {
+              size: A4 portrait;
+              margin: 0 !important;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+            .printable-paper-sheet {
+              padding: 12mm 15mm !important;
+              margin: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+            }
+          }
+        `}</style>
+
+        {validSubjects.length > 0 && (
           <div className="text-xs font-mono font-medium text-black text-center pt-1 break-words [overflow-wrap:anywhere]">
-            SUBJECTS: {printData.subjects.join(' • ')}
+            {validSubjects.length === 1 ? 'SUBJECT' : 'SUBJECTS'}: {validSubjects.join(' • ')}
           </div>
         )}
 

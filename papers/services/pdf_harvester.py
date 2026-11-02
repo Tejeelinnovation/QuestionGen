@@ -251,6 +251,94 @@ class PdfInspectionService:
             return []
 
     @classmethod
+    def _detect_subject_and_title(cls, extracted_text: str, filename: str) -> tuple[str, str]:
+        """
+        Deduces academic subject and clean paper/chapter title from textbook PDF text and filename.
+        Replaces raw system filenames (e.g. 'khat101.pdf') with genuine curriculum names.
+        """
+        clean_fn = re.sub(r"\.[^/.]+$", "", filename).replace("_", " ").replace("-", " ").strip()
+        text_lower = (extracted_text or "")[:4000].lower()
+
+        # 1. Academic Subject Detection
+        subject = ""
+        # Science & sub-disciplines
+        if any(k in text_lower for k in [
+            "chemical", "photosynthesis", "respiration", "अभिक्रिया", "रासायनिक",
+            "अम्ल", "क्षारक", "धातु", "कोशिका", "विद्युत", "acid", "organism",
+            "biology", "physics", "chemistry", "जीव विज्ञान", "भौतिकी", "रसायन"
+        ]):
+            if any(k in text_lower for k in ["chemical", "रासायनिक", "अभिक्रिया", "अम्ल", "क्षारक", "acid", "compound", "यौगिक"]):
+                subject = "Chemistry"
+            elif any(k in text_lower for k in ["cell", "कोशिका", "biology", "photosynthesis", "जीव", "tissue", "ऊतक", "dna", "reproduction"]):
+                subject = "Biology"
+            elif any(k in text_lower for k in ["current", "विद्युत", "physics", "force", "बल", "गति", "optics", "प्रकाश", "lens", "लेंस", "ohm"]):
+                subject = "Physics"
+            else:
+                subject = "Science"
+        elif any(k in text_lower for k in [
+            "theorem", "triangle", "quadratic", "polynomial", "त्रिभुज", "बहुपद",
+            "समीकरण", "प्रमेय", "क्षेत्रमिति", "algebra", "trigonometry", "mathematics",
+            "गणित", "वास्तविक संख्याएं", "समांतर श्रेढ़ी", "निर्देशांक"
+        ]):
+            subject = "Mathematics"
+        elif any(k in text_lower for k in [
+            "प्रेमचंद", "कबीर", "सूरदास", "व्याकरण", "कविता", "कहानी", "गद्य", "पद्य",
+            "मुहावरे", "लेखक", "दोहे", "संवाद", "निबंध", "हिंदी"
+        ]):
+            subject = "Hindi"
+        elif any(k in text_lower for k in [
+            "constitution", "democracy", "revolution", "संविधान", "लोकतंत्र",
+            "इतिहास", "भूगोल", "अर्थशास्त्र", "history", "geography", "civics", "economics"
+        ]):
+            subject = "Social Science"
+        elif any(k in text_lower for k in ["poetry", "stanza", "comprehension", "grammar", "prose", "shakespeare"]):
+            subject = "English"
+
+        # NCERT standard curriculum code prefixes (if subject not yet found)
+        if not subject:
+            fn_l = filename.lower()
+            if fn_l.startswith(("khat", "jhat", "hhat", "khed", "jhed")):
+                subject = "Hindi"
+            elif fn_l.startswith(("jesc", "hesc", "kesc")):
+                subject = "Science"
+            elif fn_l.startswith(("jemh", "hemh", "kemh")):
+                subject = "Mathematics"
+            elif fn_l.startswith(("kepy", "hepy")):
+                subject = "Physics"
+            elif fn_l.startswith(("kech", "hech")):
+                subject = "Chemistry"
+            elif fn_l.startswith(("kebo", "hebo")):
+                subject = "Biology"
+            elif fn_l.startswith(("jess", "hess")):
+                subject = "Social Science"
+
+        # 2. Chapter / Blueprint Title Detection
+        title = ""
+        # Match "Chapter 1: Real Numbers" or "अध्याय 1 : रासायनिक अभिक्रियाएँ एवं समीकरण" or "पाठ 1"
+        m = re.search(r"(?:Chapter|अध्याय|पाठ|Unit)\s*([0-9०-९]+)[:\.\-\s]+([^\n\r]+)", extracted_text, re.IGNORECASE)
+        if m:
+            raw_t = m.group(2).strip()
+            raw_t = re.sub(r"[\r\n\t]+", " ", raw_t).strip()
+            raw_t = re.split(r"\b(?:class|standard|page|www|http|copyright|isbn)\b", raw_t, flags=re.I)[0].strip()
+            if 2 <= len(raw_t) <= 80:
+                title = raw_t
+
+        if not title:
+            lines = [l.strip() for l in extracted_text.splitlines() if l.strip()]
+            for l in lines[:8]:
+                if 3 <= len(l) <= 65 and not re.search(r"^(page|www|http|copyright|isbn|class|standard|ncert|edition|printed|chapter|\d+$)", l, re.I):
+                    title = l
+                    break
+
+        if not title:
+            title = f"{subject} Examination" if subject else f"{clean_fn} Examination"
+        else:
+            if subject and subject.lower() not in title.lower():
+                title = f"{subject}: {title}"
+
+        return subject, title
+
+    @classmethod
     def inspect_pdf(cls, file_bytes: bytes, filename: str) -> Dict[str, Any]:
         """
         Inspects PDF in memory and extracts text, metadata, and detected figures.
@@ -590,10 +678,17 @@ class PdfInspectionService:
 
                 extracted_full_text = "\n\n".join(full_text_parts)
 
+                # Deduce academic subject and refined chapter title from document text
+                detected_subject, detected_title = cls._detect_subject_and_title(
+                    extracted_full_text, filename
+                )
+
                 # Cache the inspection bundle
                 cache_bundle = {
                     "inspection_id": inspection_id,
                     "filename": filename,
+                    "detected_title": detected_title,
+                    "detected_subject": detected_subject,
                     "page_count": page_count,
                     "word_count": total_words,
                     "full_text": extracted_full_text,
@@ -607,6 +702,8 @@ class PdfInspectionService:
                 return {
                     "inspection_id": inspection_id,
                     "filename": filename,
+                    "detected_title": detected_title,
+                    "detected_subject": detected_subject,
                     "page_count": page_count,
                     "word_count": total_words,
                     "full_text": extracted_full_text,

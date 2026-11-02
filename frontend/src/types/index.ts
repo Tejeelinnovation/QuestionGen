@@ -244,6 +244,8 @@ export interface PdfDetectedFigure {
 export interface PdfInspectionResult {
   inspection_id: string;
   filename: string;
+  detected_title?: string;
+  detected_subject?: string;
   page_count: number;
   word_count: number;
   figure_count: number;

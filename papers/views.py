@@ -153,6 +153,27 @@ class PaperListCreateView(APIView):
                     selected_fig_ids = paper.specifications.get("selected_figure_ids", [])
                     cached_insp = PdfInspectionService.get_inspection_data(insp_id)
                     if cached_insp:
+                        det_subject = cached_insp.get("detected_subject")
+                        det_title = cached_insp.get("detected_title")
+                        raw_fn = cached_insp.get("filename", "")
+                        clean_fn = os.path.splitext(raw_fn)[0].replace("_", " ").strip()
+
+                        # Auto-populate subject if blank
+                        if not paper.subjects and det_subject:
+                            paper.subjects = [det_subject]
+                            paper.save(update_fields=["subjects"])
+
+                        # Auto-replace raw/default filename with genuine detected academic title
+                        curr_title_clean = paper.title.strip().lower()
+                        is_raw_title = (
+                            not curr_title_clean or
+                            curr_title_clean in [clean_fn.lower(), f"{clean_fn.lower()} examination", f"{clean_fn.lower()} exam"] or
+                            bool(re.match(r"^[a-z]{2,5}\d{1,5}(\s+(examination|exam))?$", curr_title_clean))
+                        )
+                        if is_raw_title and det_title:
+                            paper.title = det_title
+                            paper.save(update_fields=["title"])
+
                         detected_map = {f["figure_id"]: f for f in cached_insp.get("detected_figures", [])}
                         high_res_map = cached_insp.get("high_res_images", {})
                         store_local = getattr(settings, "STORE_DIAGRAMS_LOCAL", settings.DEBUG)
@@ -928,6 +949,12 @@ class PaperVersionPrintView(APIView):
         elif getattr(request.user, "school", None) and request.user.school:
             school_name = request.user.school.name
 
+        paper_subjects = list(paper.subjects or [])
+        if not paper_subjects and paper.specifications:
+            det_sub = paper.specifications.get("detected_subject")
+            if det_sub:
+                paper_subjects = [det_sub]
+
         print_data = {
             "paper_id": paper.id,
             "title": paper.title,
@@ -936,7 +963,7 @@ class PaperVersionPrintView(APIView):
             "version_label": version.version_label,
             "duration_minutes": paper.duration_minutes,
             "total_question_count": paper.total_question_count or len(version.question_snapshot),
-            "subjects": paper.subjects,
+            "subjects": paper_subjects,
             "total_marks": version.total_marks,
             "question_count": len(version.question_snapshot),
             "questions": formatted_questions,

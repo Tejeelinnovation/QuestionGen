@@ -148,9 +148,11 @@ const PaperSetupPageDesktop: React.FC = () => {
       setInspectionProgress(null);
       setSelectedFigureIds([]);
 
-      if (!title.trim()) {
-        const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-        setTitle(`${cleanTitle} Examination`);
+      const autoTitle = result.detected_title || (result.detected_subject ? `${result.detected_subject} Examination` : '');
+      const rawCleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+
+      if (!title.trim() || title.toLowerCase().includes(rawCleanTitle.toLowerCase())) {
+        setTitle(autoTitle || `${rawCleanTitle} Examination`);
       }
       toast.success(
         `PDF analyzed: ${result.page_count} pages, ${result.figure_count} diagrams found.`
@@ -205,7 +207,7 @@ const PaperSetupPageDesktop: React.FC = () => {
           title: title.trim(),
           instructions: instructions.trim(),
           chapter: null,
-          subjects: [],
+          subjects: inspectionResult?.detected_subject ? [inspectionResult.detected_subject] : [],
           duration_minutes: 60,
           total_question_count: 0,
           specifications: {
@@ -213,6 +215,8 @@ const PaperSetupPageDesktop: React.FC = () => {
             inspection_id: inspectionResult.inspection_id,
             selected_figure_ids: selectedFigureIds,
             contribute_to_bank: contributeToBank,
+            detected_subject: inspectionResult.detected_subject,
+            detected_title: inspectionResult.detected_title,
           },
         });
 

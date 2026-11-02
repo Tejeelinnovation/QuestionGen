@@ -42,6 +42,21 @@ export const PrintViewPageTablet: React.FC = () => {
     }
   }, [paperId, vId]);
 
+  // Set document.title so browser "Save as PDF" defaults to the actual paper name
+  useEffect(() => {
+    if (printData?.title) {
+      const originalTitle = document.title;
+      const safeTitle = printData.title.trim().replace(/[\\/:*?"<>|]/g, ' ');
+      const vLabel = printData.version_label ? `_Version_${printData.version_label}` : '';
+      document.title = `${safeTitle}${vLabel}`;
+
+      return () => {
+        document.title = originalTitle;
+      };
+    }
+  }, [printData]);
+
+
   const handlePrint = () => {
     window.print();
   };
