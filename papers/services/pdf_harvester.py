@@ -312,29 +312,13 @@ class PdfInspectionService:
             elif fn_l.startswith(("jess", "hess")):
                 subject = "Social Science"
 
-        # 2. Chapter / Blueprint Title Detection
-        title = ""
-        # Match "Chapter 1: Real Numbers" or "अध्याय 1 : रासायनिक अभिक्रियाएँ एवं समीकरण" or "पाठ 1"
-        m = re.search(r"(?:Chapter|अध्याय|पाठ|Unit)\s*([0-9०-९]+)[:\.\-\s]+([^\n\r]+)", extracted_text, re.IGNORECASE)
-        if m:
-            raw_t = m.group(2).strip()
-            raw_t = re.sub(r"[\r\n\t]+", " ", raw_t).strip()
-            raw_t = re.split(r"\b(?:class|standard|page|www|http|copyright|isbn)\b", raw_t, flags=re.I)[0].strip()
-            if 2 <= len(raw_t) <= 80:
-                title = raw_t
-
-        if not title:
-            lines = [l.strip() for l in extracted_text.splitlines() if l.strip()]
-            for l in lines[:8]:
-                if 3 <= len(l) <= 65 and not re.search(r"^(page|www|http|copyright|isbn|class|standard|ncert|edition|printed|chapter|\d+$)", l, re.I):
-                    title = l
-                    break
-
-        if not title:
-            title = f"{subject} Examination" if subject else f"{clean_fn} Examination"
+        # 2. Exam Paper Title: Simple and clean (e.g. 'Chemistry Exam Paper')
+        if subject:
+            title = f'{subject} Exam Paper'
+        elif clean_fn and not re.match(r'^[a-z]{2,5}\d{1,5}$', clean_fn, re.I):
+            title = f'{clean_fn} Exam Paper'
         else:
-            if subject and subject.lower() not in title.lower():
-                title = f"{subject}: {title}"
+            title = 'Exam Paper'
 
         return subject, title
 

@@ -158,19 +158,22 @@ class PaperListCreateView(APIView):
                         raw_fn = cached_insp.get("filename", "")
                         clean_fn = os.path.splitext(raw_fn)[0].replace("_", " ").strip()
 
-                        # Auto-populate subject if blank
-                        if not paper.subjects and det_subject:
+                        # Auto-populate subject if blank or corrupted with page markers
+                        has_bad_subject = not paper.subjects or any("page" in str(s).lower() or "---" in str(s) for s in paper.subjects)
+                        if has_bad_subject and det_subject:
                             paper.subjects = [det_subject]
                             paper.save(update_fields=["subjects"])
 
-                        # Auto-replace raw/default filename with genuine detected academic title
+                        # Auto-replace raw filename or page-marker corrupted title with clean title (e.g. "Chemistry Exam Paper")
                         curr_title_clean = paper.title.strip().lower()
-                        is_raw_title = (
+                        is_raw_or_corrupted = (
                             not curr_title_clean or
-                            curr_title_clean in [clean_fn.lower(), f"{clean_fn.lower()} examination", f"{clean_fn.lower()} exam"] or
-                            bool(re.match(r"^[a-z]{2,5}\d{1,5}(\s+(examination|exam))?$", curr_title_clean))
+                            curr_title_clean in [clean_fn.lower(), f"{clean_fn.lower()} examination", f"{clean_fn.lower()} exam", f"{clean_fn.lower()} exam paper"] or
+                            bool(re.match(r"^[a-z]{2,5}\d{1,5}(\s+(examination|exam|exam paper))?$", curr_title_clean)) or
+                            "---" in curr_title_clean or
+                            "page" in curr_title_clean
                         )
-                        if is_raw_title and det_title:
+                        if is_raw_or_corrupted and det_title:
                             paper.title = det_title
                             paper.save(update_fields=["title"])
 
@@ -950,20 +953,32 @@ class PaperVersionPrintView(APIView):
             school_name = request.user.school.name
 
         paper_subjects = list(paper.subjects or [])
-        if not paper_subjects and paper.specifications:
-            det_sub = paper.specifications.get("detected_subject")
-            if det_sub:
-                paper_subjects = [det_sub]
+        det_sub = (paper.specifications or {}).get("detected_subject") if paper.specifications else None
+        
+        # Strip out page markers, raw file codes, or .pdf extensions from printed subjects
+        clean_subjects = [
+            str(s).strip() for s in paper_subjects
+            if s and not any(bad in str(s).lower() for bad in ["page", "---", ".pdf"])
+            and not re.match(r"^[a-z]{2,5}\d{1,5}$", str(s).strip(), re.I)
+        ]
+        if not clean_subjects and det_sub:
+            clean_subjects = [det_sub]
+
+        # Clean print title if it contains legacy page markers like "Chemistry: --- [Page 1] ---"
+        clean_title = paper.title or ""
+        if "---" in clean_title or re.search(r"\[page\s*\d+\]", clean_title, re.I):
+            sub_name = det_sub or (clean_subjects[0] if clean_subjects else "")
+            clean_title = f"{sub_name} Exam Paper" if sub_name else "Exam Paper" 
 
         print_data = {
             "paper_id": paper.id,
-            "title": paper.title,
+            "title": clean_title,
             "school_name": school_name,
             "instructions": paper.instructions,
             "version_label": version.version_label,
             "duration_minutes": paper.duration_minutes,
             "total_question_count": paper.total_question_count or len(version.question_snapshot),
-            "subjects": paper_subjects,
+            "subjects": clean_subjects,
             "total_marks": version.total_marks,
             "question_count": len(version.question_snapshot),
             "questions": formatted_questions,

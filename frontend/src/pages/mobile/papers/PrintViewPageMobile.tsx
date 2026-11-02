@@ -46,7 +46,12 @@ export const PrintViewPageMobile: React.FC = () => {
   useEffect(() => {
     if (printData?.title) {
       const originalTitle = document.title;
-      const safeTitle = printData.title.trim().replace(/[\\/:*?"<>|]/g, ' ');
+      let rawTitle = printData.title.trim();
+      if (rawTitle.includes('---') || /\[page\s*\d+\]/i.test(rawTitle)) {
+        const subjectPrefix = rawTitle.split(':')[0].trim();
+        rawTitle = subjectPrefix && !subjectPrefix.includes('-') ? `${subjectPrefix} Exam Paper` : 'Exam Paper';
+      }
+      const safeTitle = rawTitle.replace(/[\\/:*?"<>|]/g, ' ');
       const vLabel = printData.version_label ? `_Version_${printData.version_label}` : '';
       document.title = `${safeTitle}${vLabel}`;
 

@@ -148,11 +148,16 @@ const PaperSetupPageDesktop: React.FC = () => {
       setInspectionProgress(null);
       setSelectedFigureIds([]);
 
-      const autoTitle = result.detected_title || (result.detected_subject ? `${result.detected_subject} Examination` : '');
+      const autoTitle = result.detected_title || (result.detected_subject ? `${result.detected_subject} Exam Paper` : '');
       const rawCleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
 
-      if (!title.trim() || title.toLowerCase().includes(rawCleanTitle.toLowerCase())) {
-        setTitle(autoTitle || `${rawCleanTitle} Examination`);
+      if (
+        !title.trim() ||
+        title.toLowerCase().includes(rawCleanTitle.toLowerCase()) ||
+        title.includes('---') ||
+        /\[page\s*\d+\]/i.test(title)
+      ) {
+        setTitle(autoTitle || `${result.detected_subject || rawCleanTitle} Exam Paper`);
       }
       toast.success(
         `PDF analyzed: ${result.page_count} pages, ${result.figure_count} diagrams found.`

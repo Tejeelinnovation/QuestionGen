@@ -34,13 +34,19 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
     ? printData.school_name.toUpperCase()
     : 'INSTITUTIONAL EXAMINATION PAPER';
 
-  const formattedTitle = (printData.title || '').replace(/_/g, ' ');
+  let formattedTitle = (printData.title || '').replace(/_/g, ' ');
+  if (formattedTitle.includes('---') || /\[page\s*\d+\]/i.test(formattedTitle)) {
+    const subjectPrefix = formattedTitle.split(':')[0].trim();
+    formattedTitle = subjectPrefix && !subjectPrefix.includes('-') ? `${subjectPrefix} Exam Paper` : 'Exam Paper';
+  }
 
-  // Filter out raw file codes or extensions from subject presentation
+  // Filter out raw file codes, page markers, or extensions from subject presentation
   const validSubjects = (printData.subjects || []).filter(
     (s) =>
       s &&
       !s.toLowerCase().endsWith('.pdf') &&
+      !s.toLowerCase().includes('page') &&
+      !s.includes('---') &&
       !/^[a-z]{2,5}\d{1,5}$/i.test(s.trim())
   );
 
