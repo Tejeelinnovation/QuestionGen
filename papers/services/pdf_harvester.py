@@ -100,11 +100,12 @@ class PdfInspectionService:
             return True
 
     @classmethod
-    def _detect_diagrams_with_vision(cls, page: pymupdf.Page, page_num: int) -> List[Dict[str, Any]]:
+    def _detect_diagrams_with_vision(cls, page: pymupdf.Page, page_num: int, inspection_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Uses Gemini Vision to semantically detect genuine educational figures and precise bounding boxes.
         Strictly excludes advertisements, promotional download banners, Table of Contents,
         logos, barcodes, and decorative elements.
+        Memory-safe: caps snapshot resolution and streams cropped diagrams directly to disk.
         """
         try:
             from django.conf import settings
@@ -117,7 +118,11 @@ class PdfInspectionService:
 
         try:
             import requests
-            pix = page.get_pixmap(dpi=115)
+            # Bound page snapshot to max 1024px to keep bitmap allocation tiny (<2MB)
+            max_dim = max(page.rect.width, page.rect.height)
+            scale = min(1.2, 1024.0 / max(max_dim, 1.0))
+            matrix = pymupdf.Matrix(scale, scale)
+            pix = page.get_pixmap(matrix=matrix)
             b64_img = base64.b64encode(pix.tobytes("jpeg")).decode("utf-8")
             pix = None
 
@@ -221,7 +226,11 @@ class PdfInspectionService:
                     if clip_rect.width < 50 or clip_rect.height < 40:
                         continue
 
-                    cropped_pix = page.get_pixmap(clip=clip_rect, dpi=160)
+                    # Bound crop resolution to max 1200px (~120-140 dpi) for crisp print without memory spikes
+                    crop_max_dim = max(clip_rect.width, clip_rect.height)
+                    crop_scale = min(1.66, 1200.0 / max(crop_max_dim, 1.0))
+                    crop_mat = pymupdf.Matrix(crop_scale, crop_scale)
+                    cropped_pix = page.get_pixmap(clip=clip_rect, matrix=crop_mat)
                     cropped_bytes = cropped_pix.tobytes("png")
                     c_width = cropped_pix.width
                     c_height = cropped_pix.height
@@ -234,6 +243,10 @@ class PdfInspectionService:
                     caption = cls.clean_academic_caption(str(item.get("caption") or f"Figure {page_num}.{idx + 1}"))
                     thumb_b64 = cls._generate_thumbnail_base64(cropped_bytes)
 
+                    # Direct Disk Streaming: persist to scratch disk immediately to keep memory flat
+                    if inspection_id:
+                        cls._save_figure_to_disk(inspection_id, fig_id, cropped_bytes)
+
                     results.append({
                         "figure_id": fig_id,
                         "page_number": page_num,
@@ -242,8 +255,10 @@ class PdfInspectionService:
                         "caption": caption,
                         "diagram_type": str(item.get("diagram_type", "DIAGRAM")),
                         "thumbnail_b64": thumb_b64,
-                        "image_bytes": cropped_bytes,
+                        "image_bytes": None if inspection_id else cropped_bytes,
                     })
+                    del cropped_bytes
+                    gc.collect()
                 except Exception as item_err:
                     logger.debug(f"Error parsing vision item {idx} on page {page_num}: {item_err}")
                     continue
@@ -434,11 +449,14 @@ class PdfInspectionService:
                     has_images = len(page.get_images()) > 0
                     has_caption = bool(re.search(r"\b(?:fig|figure|diagram|chart|graph|problem|structure|scheme|reaction|चित्र|आकृति|सारणी|उदाहरण|प्रश्न|تصویر|شکل|خاکہ)\b", page_text, re.I))
 
-                    # Lightweight drawing check for vector graphics
+                    # Lightweight drawing check for vector graphics (guard against heavy topography maps)
                     has_drawings = False
                     if not (has_caption or has_images) and page_num <= 20:
                         try:
-                            has_drawings = len(page.get_drawings()) > 10
+                            d_list = page.get_drawings()
+                            # 10 to 300 drawings is typical for circuit/apparatus; > 300 is terrain/map
+                            has_drawings = 10 < len(d_list) <= 300
+                            del d_list
                         except Exception:
                             has_drawings = False
 
@@ -463,7 +481,7 @@ class PdfInspectionService:
                         _, p_idx, p_num = cand
                         p = doc[p_idx]
                         try:
-                            v_figs = cls._detect_diagrams_with_vision(p, p_num)
+                            v_figs = cls._detect_diagrams_with_vision(p, p_num, inspection_id)
                             if v_figs:
                                 vision_results_by_page[p_num] = v_figs
                         except Exception as pool_err:
@@ -585,21 +603,16 @@ class PdfInspectionService:
                                 re.IGNORECASE,
                             )
                             blocks = page.get_text("blocks")
-                            for b in blocks:
-                                block_text = b[4].strip()
-                                m = caption_regex.match(block_text)
-                                if m:
-                                    fig_num_tag = m.group(1).replace(".", "_")
-                                    fig_id = f"fig_p{page_num}_comp_{fig_num_tag}"
-                                    existing_ids = {f["figure_id"] for f in detected_figures}
-                                    if fig_id in existing_ids:
-                                        continue
+                            has_caption_match = any(
+                                caption_regex.match(b[4].strip()) for b in blocks if len(b) > 4
+                            )
 
-                                    cap_box = pymupdf.Rect(b[:4])
-                                    cap_text = cls.clean_academic_caption(block_text)
-
-                                    # Collect drawing and image bounding rects on this page
-                                    elements = [d["rect"] for d in page.get_drawings()]
+                            if has_caption_match:
+                                raw_drawings = page.get_drawings()
+                                # If page has > 300 drawings, it is a map/GIS/hatching contour, skip heavy composite analysis
+                                if len(raw_drawings) <= 300:
+                                    elements = [d["rect"] for d in raw_drawings]
+                                    del raw_drawings
                                     for img in page.get_images():
                                         elements.extend(page.get_image_rects(img[0]))
 
@@ -610,51 +623,68 @@ class PdfInspectionService:
                                         r for r in elements
                                         if 20 < r.width < 580 and 10 < r.height < 650
                                     ]
-                                    above = [r for r in valid_elements if r.y1 <= cap_box.y0 + 10 and r.y0 >= cap_box.y0 - 450]
-                                    below = [r for r in valid_elements if r.y0 >= cap_box.y1 - 10 and r.y1 <= cap_box.y1 + 450]
 
-                                    cand_rect = None
-                                    if len(above) >= 2:
-                                        cand_rect = above[0]
-                                        for r in above[1:]:
-                                            cand_rect = cand_rect | r
-                                    elif len(below) >= 2:
-                                        cand_rect = below[0]
-                                        for r in below[1:]:
-                                            cand_rect = cand_rect | r
+                                    for b in blocks:
+                                        block_text = b[4].strip()
+                                        m = caption_regex.match(block_text)
+                                        if not m:
+                                            continue
+                                        fig_num_tag = m.group(1).replace(".", "_")
+                                        fig_id = f"fig_p{page_num}_comp_{fig_num_tag}"
+                                        existing_ids = {f["figure_id"] for f in detected_figures}
+                                        if fig_id in existing_ids:
+                                            continue
 
-                                    if cand_rect and 70 <= cand_rect.width <= 550 and 50 <= cand_rect.height <= 600:
-                                        clip_rect = (
-                                            pymupdf.Rect(
-                                                cand_rect.x0 - 6,
-                                                cand_rect.y0 - 6,
-                                                cand_rect.x1 + 6,
-                                                cand_rect.y1 + 6,
+                                        cap_box = pymupdf.Rect(b[:4])
+                                        cap_text = cls.clean_academic_caption(block_text)
+
+                                        above = [r for r in valid_elements if r.y1 <= cap_box.y0 + 10 and r.y0 >= cap_box.y0 - 450]
+                                        below = [r for r in valid_elements if r.y0 >= cap_box.y1 - 10 and r.y1 <= cap_box.y1 + 450]
+
+                                        cand_rect = None
+                                        if len(above) >= 2:
+                                            cand_rect = above[0]
+                                            for r in above[1:]:
+                                                cand_rect = cand_rect | r
+                                        elif len(below) >= 2:
+                                            cand_rect = below[0]
+                                            for r in below[1:]:
+                                                cand_rect = cand_rect | r
+
+                                        if cand_rect and 70 <= cand_rect.width <= 550 and 50 <= cand_rect.height <= 600:
+                                            clip_rect = (
+                                                pymupdf.Rect(
+                                                    cand_rect.x0 - 6,
+                                                    cand_rect.y0 - 6,
+                                                    cand_rect.x1 + 6,
+                                                    cand_rect.y1 + 6,
+                                                )
+                                                & page.rect
                                             )
-                                            & page.rect
-                                        )
-                                        comp_pix = page.get_pixmap(clip=clip_rect, dpi=110)
-                                        comp_bytes = comp_pix.tobytes("png")
-                                        c_w = comp_pix.width
-                                        c_h = comp_pix.height
-                                        comp_pix = None
+                                            comp_pix = page.get_pixmap(clip=clip_rect, dpi=110)
+                                            comp_bytes = comp_pix.tobytes("png")
+                                            c_w = comp_pix.width
+                                            c_h = comp_pix.height
+                                            comp_pix = None
 
-                                        if cls._is_valid_diagram_image(comp_bytes, c_w, c_h):
-                                            thumb_b64 = cls._generate_thumbnail_base64(comp_bytes)
-                                            cls._save_figure_to_disk(inspection_id, fig_id, comp_bytes)
-                                            detected_figures.append(
-                                                {
-                                                    "figure_id": fig_id,
-                                                    "page_number": page_num,
-                                                    "width": c_w,
-                                                    "height": c_h,
-                                                    "caption": cap_text,
-                                                    "thumbnail_b64": thumb_b64,
-                                                    "mime_type": "image/png",
-                                                }
-                                            )
-                                            del comp_bytes
-                                            gc.collect()
+                                            if cls._is_valid_diagram_image(comp_bytes, c_w, c_h):
+                                                thumb_b64 = cls._generate_thumbnail_base64(comp_bytes)
+                                                cls._save_figure_to_disk(inspection_id, fig_id, comp_bytes)
+                                                detected_figures.append(
+                                                    {
+                                                        "figure_id": fig_id,
+                                                        "page_number": page_num,
+                                                        "width": c_w,
+                                                        "height": c_h,
+                                                        "caption": cap_text,
+                                                        "thumbnail_b64": thumb_b64,
+                                                        "mime_type": "image/png",
+                                                    }
+                                                )
+                                                del comp_bytes
+                                                gc.collect()
+                                else:
+                                    del raw_drawings
                         except Exception as comp_err:
                             logger.debug(f"Composite diagram detection error on page {page_num}: {comp_err}")
 

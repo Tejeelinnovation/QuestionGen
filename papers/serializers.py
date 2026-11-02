@@ -51,7 +51,6 @@ class PaperListSerializer(serializers.ModelSerializer):
             "subjects",
             "duration_minutes",
             "total_question_count",
-            "specifications",
             "created_by",
             "created_by_username",
             "school",
@@ -129,10 +128,11 @@ class PaperCreateSerializer(serializers.ModelSerializer):
 
 
 class PaperDetailSerializer(PaperListSerializer):
+    specifications = serializers.JSONField(read_only=True)
     versions = serializers.SerializerMethodField()
 
     class Meta(PaperListSerializer.Meta):
-        fields = PaperListSerializer.Meta.fields + ["versions"]
+        fields = PaperListSerializer.Meta.fields + ["specifications", "versions"]
 
     def get_versions(self, obj: Paper) -> list[dict[str, Any]]:
         return [
