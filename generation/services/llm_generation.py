@@ -245,18 +245,54 @@ class LLMQuestionGenerationService(QuestionGenerationService):
             needed = target_quantity - len(final_drafts)
             logger.info(f"Backfilling {needed} question(s) to fulfill target quantity ({target_quantity}).")
             try:
-                if constraints.get("source_text"):
+                mark_dist = constraints.get("mark_distribution") or []
+                deficient_mark_dist = []
+                if mark_dist:
+                    from collections import Counter
+                    current_tier_counts = Counter(round(float(d.marks or 1.0), 1) for d in final_drafts)
+                    for tier in mark_dist:
+                        t_m = round(float(tier.get("marks", 1.0)), 1)
+                        t_req = int(tier.get("count", 0))
+                        t_curr = current_tier_counts.get(t_m, 0)
+                        if t_curr < t_req:
+                            deficient_mark_dist.append({
+                                **tier,
+                                "count": t_req - t_curr,
+                            })
+
+                source_text = constraints.get("source_text") or ""
+                if not source_text and constraints.get("inspection_id"):
+                    try:
+                        from papers.services.pdf_harvester import PdfInspectionService
+                        insp = PdfInspectionService.get_inspection_data(constraints["inspection_id"])
+                        if insp:
+                            source_text = insp.get("full_text", "")
+                    except Exception:
+                        pass
+
+                if source_text:
                     bf_constraints = dict(constraints)
+                    bf_constraints["source_text"] = source_text
                     bf_constraints["quantity"] = needed
+                    if deficient_mark_dist:
+                        bf_constraints["mark_distribution"] = deficient_mark_dist
                     used_fig_ids = {d.diagram.get("figure_id") for d in final_drafts if d.diagram}
                     bf_constraints["attached_figures"] = [
                         f for f in (constraints.get("attached_figures") or [])
                         if f.get("figure_id") not in used_fig_ids
                     ]
+                    bf_constraints["sentence_offset"] = len(final_drafts) * 4
                     backfills = self._generate_from_source_text_fallback(chapter_instance, bf_constraints)
                     final_drafts.extend(backfills[:needed])
-                else:
+                elif chapter is not None:
                     backfills = self.fallback_service.generate_questions(chapter, {**constraints, "quantity": needed})
+                    final_drafts.extend(backfills[:needed])
+                else:
+                    bf_constraints = dict(constraints)
+                    bf_constraints["quantity"] = needed
+                    if deficient_mark_dist:
+                        bf_constraints["mark_distribution"] = deficient_mark_dist
+                    backfills = self._generate_from_source_text_fallback(chapter_instance, bf_constraints)
                     final_drafts.extend(backfills[:needed])
             except Exception as bf_err:
                 logger.warning(f"Shortfall backfill error: {bf_err}")
@@ -381,11 +417,13 @@ class LLMQuestionGenerationService(QuestionGenerationService):
         # Try to pull parsed items from content_ingestion if available
         try:
             from content_ingestion.models import ExtractedItem
-            items = ExtractedItem.objects.filter(chapter__job__title__icontains=getattr(chapter_instance, "title", ""))[:30]
-            if items.exists():
-                for item in items:
-                    heading = f"### {item.heading}\n" if item.heading else ""
-                    context_parts.append(f"{heading}[{item.item_type}] {item.content}")
+            ch_title = getattr(chapter_instance, "title", "") if chapter_instance else ""
+            if ch_title and ch_title.strip():
+                items = ExtractedItem.objects.filter(chapter__job__title__icontains=ch_title.strip())[:30]
+                if items.exists():
+                    for item in items:
+                        heading = f"### {item.heading}\n" if item.heading else ""
+                        context_parts.append(f"{heading}[{item.item_type}] {item.content}")
         except Exception:
             pass
 

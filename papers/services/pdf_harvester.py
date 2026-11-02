@@ -394,18 +394,18 @@ class PdfInspectionService:
                         full_text_parts.append(f"--- [Page {page_num}] ---\n{page_text.strip()}")
 
                     has_images = len(page.get_images()) > 0
-                    has_caption = bool(re.search(r"\b(?:fig|figure|diagram|chart|graph|चित्र|आकृति|सारणी|تصویر|شکل|خاکہ)\b", page_text, re.I))
+                    has_caption = bool(re.search(r"\b(?:fig|figure|diagram|chart|graph|problem|structure|scheme|reaction|चित्र|आकृति|सारणी|उदाहरण|प्रश्न|تصویر|شکل|خاکہ)\b", page_text, re.I))
 
-                    # Avoid expensive get_drawings() on later pages or if caption/images already found
+                    # Lightweight drawing check for vector graphics
                     has_drawings = False
-                    if page_num <= 8 and not (has_caption or has_images):
+                    if not (has_caption or has_images) and page_num <= 20:
                         try:
                             has_drawings = len(page.get_drawings()) > 10
                         except Exception:
                             has_drawings = False
 
                     priority = 2 if has_caption else (1 if has_images else 0)
-                    if (has_caption or has_images or has_drawings) and page_num <= 8:
+                    if has_caption or has_images or has_drawings:
                         vision_candidates.append((priority, page_idx, page_num))
 
                     # Store lightweight record without holding PyMuPDF page object in memory
@@ -415,9 +415,10 @@ class PdfInspectionService:
                         "page_text": page_text,
                     })
 
-                # Run Parallel Vision Diagram Extraction on top candidate pages (max 2 concurrent threads to cap RAM)
-                vision_candidates.sort(key=lambda x: x[0], reverse=True)
-                top_candidates = vision_candidates[:4]
+                # Run Parallel Vision Diagram Extraction on diverse candidate pages across the document
+                vision_candidates.sort(key=lambda x: (x[0], -abs(x[2] - (page_count / 2))), reverse=True)
+                # Pick up to 6 candidate pages across document
+                top_candidates = vision_candidates[:6]
                 vision_results_by_page: Dict[int, List[Dict[str, Any]]] = {}
 
                 if top_candidates:
@@ -535,11 +536,11 @@ class PdfInspectionService:
                             finally:
                                 pix = None
 
-                    # 4. Extract Vector & Composite Textbook Diagrams via Caption Anchors (if not already handled by vision)
-                    if not vision_handled and page_num <= 10:
+                    # 4. Extract Vector & Composite Textbook Diagrams via Caption Anchors across all pages
+                    if not vision_handled and len(detected_figures) < 30:
                         try:
                             caption_regex = re.compile(
-                                r"^\s*(?:Fig(?:ure)?\.?|चित्र|आकृति|सारणी|تصویر|شکل|خاکہ|جدول|باکس|Diagram)\s*([0-9۰-۹०-९]+(?:[\.\-][0-9۰-۹०-९]+)*)",
+                                r"^\s*(?:Fig(?:ure)?\.?|Problem|Structure|Scheme|Reaction|चित्र|आकृति|सारणी|उदाहरण|प्रश्न|تصویر|شکل|خاکہ|جدول|باکس|Diagram)\s*([0-9۰-۹०-९]+(?:[\.\-][0-9۰-۹०-९]+)*)",
                                 re.IGNORECASE,
                             )
                             blocks = page.get_text("blocks")

@@ -23,6 +23,7 @@ from typing import Any
 
 import logging
 import os
+import re
 import threading
 from django.conf import settings
 from django.db import models, transaction
@@ -386,8 +387,24 @@ class PaperSelectQuestionsView(APIView):
             if mark_dist:
                 target_quantity = sum(int(t.get("count", 0)) for t in mark_dist)
 
+            extracted_text = paper.specifications.get("extracted_text", "")
+            insp_id = paper.specifications.get("inspection_id")
+            if not extracted_text and insp_id:
+                try:
+                    from papers.services.pdf_harvester import PdfInspectionService
+                    cached_insp = PdfInspectionService.get_inspection_data(insp_id)
+                    if cached_insp:
+                        extracted_text = cached_insp.get("full_text", "")
+                        paper.specifications["extracted_text"] = extracted_text
+                        if not paper.specifications.get("pdf_filename"):
+                            paper.specifications["pdf_filename"] = cached_insp.get("filename", "")
+                        paper.save(update_fields=["specifications"])
+                except Exception as rec_err:
+                    logger.debug(f"Could not recover cached inspection text: {rec_err}")
+
             llm_constraints = {
-                "source_text": paper.specifications.get("extracted_text", ""),
+                "source_text": extracted_text,
+                "inspection_id": insp_id,
                 "attached_figures": paper.specifications.get("attached_diagrams", []),
                 "difficulty": data.get("difficulty", "MEDIUM"),
                 "question_type": data.get("question_type", "ANY"),
