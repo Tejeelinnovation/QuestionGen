@@ -269,7 +269,43 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 0 !important; /* Zero margin suppresses browser default date/time headers and URL footers */
+    margin-top: 14mm;
+    margin-bottom: 12mm;
+    margin-left: 14mm;
+    margin-right: 14mm;
+
+    @top-left {
+      content: "Examination Paper";
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #374151;
+      border-bottom: 0.5pt solid #d1d5db;
+      padding-bottom: 2mm;
+    }
+
+    @top-right {
+      content: "Question Generation System";
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 8pt;
+      font-weight: 500;
+      color: #6b7280;
+      border-bottom: 0.5pt solid #d1d5db;
+      padding-bottom: 2mm;
+    }
+
+    @bottom-center {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 8pt;
+      font-weight: 500;
+      color: #6b7280;
+      border-top: 0.5pt solid #e5e7eb;
+      padding-top: 2mm;
+      width: 100%;
+    }
   }
 
   /* 1. Strictly hide all app navigation, headers, footers, sidebars, buttons, dev tools */
@@ -324,7 +360,7 @@
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
-    padding: 12mm 15mm !important;
+    padding: 0 !important;
     margin: 0 !important;
     width: 100% !important;
     max-width: 100% !important;

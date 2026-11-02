@@ -196,9 +196,13 @@ class PaperListCreateView(APIView):
                                         logger.warning(f"Failed to cache diagram {fig_id} on disk: {d_err}")
                                     del raw_b
 
+                            clean_fig_title = (
+                                PdfInspectionService.clean_academic_caption(fig_meta.get("caption", ""))
+                                or f"Figure (Page {fig_meta.get('page_number', 1)})"
+                            )
                             initial_diagrams.append({
                                 "figure_id": fig_id,
-                                "title": fig_meta.get("caption", f"Figure (Page {fig_meta.get('page_number', 1)})"),
+                                "title": clean_fig_title,
                                 "page_number": fig_meta.get("page_number", 1),
                                 "thumbnail_b64": fig_meta.get("thumbnail_b64", ""),
                                 "image_url": f"/api/papers/diagram-asset/{fig_id}/",

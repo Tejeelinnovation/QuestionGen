@@ -15,6 +15,96 @@ const resolveImageUrl = (url?: string): string => {
 const RTL_REGEX = /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/;
 const isRtlText = (text?: string): boolean => !!text && RTL_REGEX.test(text);
 
+export const cleanAcademicCaption = (raw?: string): string => {
+  if (!raw || !raw.trim()) return '';
+  let clean = raw.trim().replace(/\u00a0/g, ' ').replace(/\u200b/g, '');
+
+  const fontFixes: [RegExp, string][] = [
+    [/3DpHU\s*FKURPDWRJUDpK[\\\/]?/gi, 'Paper Chromatography'],
+    [/&KURPDWRJUDpK[\\\/]?/gi, 'Chromatography'],
+    [/FKURPDWRJUDpK[\\\/]?/gi, 'Chromatography'],
+    [/3DpHU/gi, 'Paper'],
+    [/pDpHU/gi, 'Paper'],
+    [/sKDpHs/gi, 'Phases'],
+    [/'LIIHUHQWLDO\s*H\[WUDFWLRQ/gi, 'Differential Extraction'],
+    [/'LIIHUHQWLDO/gi, 'Differential'],
+    [/H\[WUDFWLRQ/gi, 'Extraction'],
+    [/\(\[WUDFWLRQ\s+RI\s+FRP/gi, '(Extraction of Compound)'],
+    [/\bCfd\.?\s*([0-9])/gi, 'Fig. $1'],
+    [/\bCfd\b/gi, 'Fig.'],
+    [/[\(\[]?\)?ractional\b/gi, 'Fractional'],
+    [/\b6IMmLE\b/gi, 'Simple'],
+    [/\b6imple\b/gi, 'Simple'],
+    [/\bMolyibj\b/gi, 'Problem'],
+    [/\bMroblem\b/gi, 'Problem'],
+    [/[\(\[]?\b(?:S|s)timation\b/gi, 'Estimation'],
+    [/:ater\b/gi, 'Water'],
+    [/\b7he\b/gi, 'The'],
+    [/\bVAmOURp\b/gi, 'Vapours'],
+    [/\bSubptance\b/gi, 'Substance'],
+    [/\bPotappium\b/gi, 'Potassium'],
+    [/\bABpORBED\b/gi, 'Absorbed'],
+    [/\bANHYDROUp\b/gi, 'Anhydrous'],
+    [/\bSolutionp\b/gi, 'Solutions'],
+    [/\bpolutionp\b/gi, 'solutions'],
+    [/\bDIpTILLATION\b/gi, 'Distillation'],
+    [/\bFLApK\b/gi, 'Flask'],
+    [/\bFIRpT\b/gi, 'First'],
+    [/\bFRACTIONp\b/gi, 'Fractions'],
+    [/\bTOm\b/gi, 'Top'],
+  ];
+
+  for (const [pattern, repl] of fontFixes) {
+    clean = clean.replace(pattern, repl);
+  }
+
+  clean = clean.replace(/^[^\w\(\[\{]+/, '').replace(/\s+/g, ' ').trim();
+
+  const match = clean.match(
+    /^(?:(?<lbl>Fig(?:ure)?\.?|Problem|Structure|Scheme|Reaction|Chart|Diagram|Map|Graph|Table|चित्र|आकृति|सारणी|उदाहरण|प्रश्न|تصویر|شکل)\s*(?<num>[0-9A-Za-z]+(?:[\.\-][0-9A-Za-z]+)*)[\s:\.\-]*)?(?<rest>.*)$/i
+  );
+  if (match) {
+    let lbl = match.groups?.lbl || '';
+    const num = match.groups?.num || '';
+    const rest = (match.groups?.rest || '').trim();
+
+    if (lbl.toLowerCase().startsWith('fig')) lbl = 'Fig.';
+    else if (lbl.toLowerCase().startsWith('prob')) lbl = 'Problem';
+
+    const prefix = lbl && num ? `${lbl} ${num}:` : (lbl || num ? `${lbl} ${num}`.trim() : '');
+
+    const stopMatch = rest.match(
+      /^(.*?)(?:(?:\s*[:\-\u2013]\s*|\s+)(?:The\s+vapour|Water\s+and\s+carbon|On\s+complete\s+combustion|are\s+absorbed|formed\s+on\s+oxidation|formed\s+are|reach\s+the|is\s+collected|are\s+collected|showing\s+|which\s+is|used\s+for|in\s+two\s+different\s+phases|developed\s+chromatogram|extraction\s+of\s+comp|\(\s*extraction|\(\s*chromatography|chromatography\s+paper)).*$/i
+    );
+    let titleBody = stopMatch ? stopMatch[1].trim() : rest;
+
+    titleBody = titleBody.replace(/^[\s\'\"\`\-\:\;\(\[\{]+/, '').replace(/[\s\'\"\`\-\:\;\)\]\}]+$/, '');
+
+    if (titleBody.length > 65) {
+      titleBody = titleBody.split(/[,;\.\-\u2013]/)[0].trim();
+    }
+
+    if (titleBody && !/[^\u0000-\u007F]/.test(titleBody)) {
+      titleBody = titleBody
+        .split(' ')
+        .map((w, idx) => {
+          const lower = w.toLowerCase();
+          if (idx > 0 && ['of', 'and', 'in', 'on', 'for', 'with', 'to', 'a', 'an', 'the'].includes(lower)) {
+            return lower;
+          }
+          return w.length > 0 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w;
+        })
+        .join(' ');
+    }
+
+    if (prefix && titleBody) return `${prefix} ${titleBody}`;
+    if (prefix) return prefix;
+    if (titleBody) return titleBody;
+  }
+
+  return clean.slice(0, 70).trim();
+};
+
 interface PrintablePaperSheetProps {
   printData: PaperPrintData;
   linesPerMark?: number;
@@ -71,20 +161,58 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
           <span>MAXIMUM MARKS: {printData.total_marks}</span>
         </div>
 
-        {/* Print-specific style override: strips browser date/time headers and URL footers */}
+        {/* Proctored Print / PDF Running Header, Footer & Page Numbers */}
         <style>{`
           @media print {
             @page {
               size: A4 portrait;
-              margin: 0 !important;
+              margin-top: 14mm;
+              margin-bottom: 12mm;
+              margin-left: 14mm;
+              margin-right: 14mm;
+
+              @top-left {
+                content: ${JSON.stringify(formattedTitle.toUpperCase())};
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                font-size: 8pt;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: #374151;
+                border-bottom: 0.5pt solid #d1d5db;
+                padding-bottom: 2mm;
+              }
+
+              @top-right {
+                content: "Question Generation System";
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                font-size: 8pt;
+                font-weight: 500;
+                color: #6b7280;
+                border-bottom: 0.5pt solid #d1d5db;
+                padding-bottom: 2mm;
+              }
+
+              @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                font-size: 8pt;
+                font-weight: 500;
+                color: #6b7280;
+                border-top: 0.5pt solid #e5e7eb;
+                padding-top: 2mm;
+                width: 100%;
+              }
             }
+
             html, body {
               margin: 0 !important;
               padding: 0 !important;
               background: #ffffff !important;
             }
+
             .printable-paper-sheet {
-              padding: 12mm 15mm !important;
+              padding: 0 !important;
               margin: 0 !important;
               border: none !important;
               box-shadow: none !important;
@@ -223,7 +351,7 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
                           />
                           {q.diagram.title && (
                             <span className="text-[11px] font-mono text-gray-600 mt-1 italic">
-                              {q.diagram.title}
+                              {cleanAcademicCaption(q.diagram.title)}
                             </span>
                           )}
                         </div>
@@ -370,7 +498,7 @@ export const PrintablePaperSheet: React.FC<PrintablePaperSheetProps> = ({
                     />
                     {q.diagram.title && (
                       <span className="text-[11px] font-mono text-gray-600 mt-1 italic">
-                        {q.diagram.title}
+                        {cleanAcademicCaption(q.diagram.title)}
                       </span>
                     )}
                   </div>

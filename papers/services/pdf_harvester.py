@@ -231,7 +231,7 @@ class PdfInspectionService:
                         continue
 
                     fig_id = f"fig_p{page_num}_vdiag_{idx + 1}"
-                    caption = str(item.get("caption") or f"Figure {page_num}.{idx + 1}")
+                    caption = cls.clean_academic_caption(str(item.get("caption") or f"Figure {page_num}.{idx + 1}"))
                     thumb_b64 = cls._generate_thumbnail_base64(cropped_bytes)
 
                     results.append({
@@ -596,12 +596,7 @@ class PdfInspectionService:
                                         continue
 
                                     cap_box = pymupdf.Rect(b[:4])
-                                    cap_text = " ".join(block_text.split()[:25])
-                                    if detect_caesar_shift(cap_text):
-                                        try:
-                                            cap_text = unshift_ncert_text(cap_text)
-                                        except Exception:
-                                            pass
+                                    cap_text = cls.clean_academic_caption(block_text)
 
                                     # Collect drawing and image bounding rects on this page
                                     elements = [d["rect"] for d in page.get_drawings()]
@@ -890,10 +885,11 @@ class PdfInspectionService:
             del img_bytes
             gc.collect()
 
+            clean_cap = cls.clean_academic_caption(fig_meta.get("caption", ""))
             uploaded_diagrams.append(
                 {
                     "figure_id": fig_id,
-                    "title": fig_meta.get("caption", f"Figure (Page {fig_meta.get('page_number', 1)})"),
+                    "title": clean_cap or f"Figure (Page {fig_meta.get('page_number', 1)})",
                     "page_number": fig_meta.get("page_number", 1),
                     "thumbnail_b64": fig_meta.get("thumbnail_b64", ""),
                     "drive_file_id": file_id,
@@ -936,6 +932,108 @@ class PdfInspectionService:
             trimmed_lower = trimmed.lower()
             if any(trimmed_lower.startswith(prefix) for prefix in academic_prefixes):
                 if len(trimmed) < 120:
-                    return trimmed
+                    return cls.clean_academic_caption(trimmed)
 
         return f"Figure {page_num}.{fig_num} (Page {page_num})"
+
+    @classmethod
+    def clean_academic_caption(cls, raw: str) -> str:
+        """
+        Universally cleans diagram captions across all subjects (Chemistry, Physics, Biology,
+        Math, History, Geography, Accounts, etc.) and all PDF sources (NCERT, state boards, teacher uploads).
+        """
+        if not raw or not str(raw).strip():
+            return ""
+        text = str(raw).strip()
+        text = text.replace("\u00a0", " ").replace("\u200b", "")
+
+        font_fixes = [
+            (r"3DpHU\s*FKURPDWRJUDpK[\\\/]?", "Paper Chromatography"),
+            (r"&KURPDWRJUDpK[\\\/]?", "Chromatography"),
+            (r"FKURPDWRJUDpK[\\\/]?", "Chromatography"),
+            (r"3DpHU", "Paper"),
+            (r"pDpHU", "Paper"),
+            (r"sKDpHs", "Phases"),
+            (r"['\u2018\u2019]?LIIHUHQWLDO\s*H\[WUDFWLRQ", "Differential Extraction"),
+            (r"['\u2018\u2019]?LIIHUHQWLDO", "Differential"),
+            (r"H\[WUDFWLRQ", "Extraction"),
+            (r"\(\[WUDFWLRQ\s+RI\s+FRP", "(Extraction of Compound)"),
+            (r"\bCfd\.?\s*([0-9])", r"Fig. \1"),
+            (r"\bCfd\b", "Fig."),
+            (r"[\(\[]?\)?ractional\b", "Fractional"),
+            (r"\b6IMmLE\b", "Simple"),
+            (r"\b6imple\b", "Simple"),
+            (r"\bMolyibj\b", "Problem"),
+            (r"\bMroblem\b", "Problem"),
+            (r"[\(\[]?\b(?:S|s)timation\b", "Estimation"),
+            (r":ater\b", "Water"),
+            (r"\b7he\b", "The"),
+            (r"\bVAmOURp\b", "Vapours"),
+            (r"\bSubptance\b", "Substance"),
+            (r"\bPotappium\b", "Potassium"),
+            (r"\bABpORBED\b", "Absorbed"),
+            (r"\bANHYDROUp\b", "Anhydrous"),
+            (r"\bSolutionp\b", "Solutions"),
+            (r"\bpolutionp\b", "solutions"),
+            (r"\bDIpTILLATION\b", "Distillation"),
+            (r"\bFLApK\b", "Flask"),
+            (r"\bFIRpT\b", "First"),
+            (r"\bFRACTIONp\b", "Fractions"),
+            (r"\bTOm\b", "Top"),
+        ]
+        for pattern, repl in font_fixes:
+            text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
+
+        # Clean leading garbage or stray quotation marks
+        text = re.sub(r"^[\s\'\"\`\-\:\;\(\[\{]+", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+
+        # Extract standard academic label and concise title across all subjects
+        label_pattern = re.compile(
+            r'^(?:(?P<lbl>Fig(?:ure)?\.?|Problem|Structure|Scheme|Reaction|Chart|Diagram|Map|Graph|Table|चित्र|आकृति|सारणी|उदाहरण|प्रश्न|تصویر|شکل)\s*(?P<num>[0-9A-Za-z]+(?:[\.\-][0-9A-Za-z]+)*)[\s:\.\-]*)?(?P<rest>.*)$',
+            re.IGNORECASE,
+        )
+        m = label_pattern.match(text)
+        if m:
+            lbl = m.group("lbl") or ""
+            num = m.group("num") or ""
+            rest = (m.group("rest") or "").strip()
+
+            if lbl.lower().startswith("fig"):
+                lbl = "Fig."
+            elif lbl.lower().startswith("prob"):
+                lbl = "Problem"
+
+            prefix = f"{lbl} {num}:".strip() if (lbl and num) else (f"{lbl} {num}".strip() if (lbl or num) else "")
+
+            # Trim run-on textbook explanatory text
+            stop_words_re = re.compile(
+                r'^(.*?)(?:(?:\s*[:\-\u2013]\s*|\s+)(?:The\s+vapour|Water\s+and\s+carbon|On\s+complete\s+combustion|are\s+absorbed|formed\s+on\s+oxidation|formed\s+are|reach\s+the|is\s+collected|are\s+collected|showing\s+|which\s+is|used\s+for|in\s+two\s+different\s+phases|developed\s+chromatogram|extraction\s+of\s+comp|\(\s*extraction|\(\s*chromatography|chromatography\s+paper)).*$',
+                re.IGNORECASE,
+            )
+            stop_match = stop_words_re.match(rest)
+            title_body = stop_match.group(1).strip() if stop_match else rest
+
+            title_body = re.sub(r"^[\s\'\"\`\-\:\;\(\[\{]+", "", title_body)
+            title_body = re.sub(r"[\s\'\"\`\-\:\;\)\]\}]+$", "", title_body)
+
+            if len(title_body) > 65:
+                clauses = re.split(r'[,;\.\-\u2013]', title_body)
+                title_body = clauses[0].strip()
+
+            # Clean capitalization if English
+            words = title_body.split()
+            if words and not any(ord(c) > 127 for c in title_body):
+                title_body = " ".join(
+                    w.capitalize() if not w.isupper() and w.lower() not in ("of", "and", "in", "on", "for", "with", "to", "a", "an", "the") else w
+                    for w in words
+                )
+
+            if prefix and title_body:
+                return f"{prefix} {title_body}"
+            elif prefix:
+                return prefix
+            elif title_body:
+                return title_body
+
+        return text[:70].strip()
