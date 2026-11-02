@@ -179,22 +179,22 @@ class PaperListCreateView(APIView):
                             paper.save(update_fields=["title"])
 
                         detected_map = {f["figure_id"]: f for f in cached_insp.get("detected_figures", [])}
-                        high_res_map = cached_insp.get("high_res_images", {})
-                        store_local = getattr(settings, "STORE_DIAGRAMS_LOCAL", settings.DEBUG)
-                        if store_local:
-                            disk_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
-                            os.makedirs(disk_dir, exist_ok=True)
+                        disk_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
+                        os.makedirs(disk_dir, exist_ok=True)
 
                         initial_diagrams = []
                         for fig_id in selected_fig_ids:
                             fig_meta = detected_map.get(fig_id, {})
-                            raw_b = high_res_map.get(fig_id)
-                            if raw_b and store_local:
-                                try:
-                                    with open(os.path.join(disk_dir, f"{fig_id}.png"), "wb") as df:
-                                        df.write(raw_b)
-                                except Exception as d_err:
-                                    logger.warning(f"Failed to cache diagram {fig_id} on disk: {d_err}")
+                            target_file = os.path.join(disk_dir, f"{fig_id}.png")
+                            if not os.path.exists(target_file):
+                                raw_b = PdfInspectionService.get_figure_bytes(fig_id, insp_id)
+                                if raw_b:
+                                    try:
+                                        with open(target_file, "wb") as df:
+                                            df.write(raw_b)
+                                    except Exception as d_err:
+                                        logger.warning(f"Failed to cache diagram {fig_id} on disk: {d_err}")
+                                    del raw_b
 
                             initial_diagrams.append({
                                 "figure_id": fig_id,
@@ -989,14 +989,14 @@ class PaperVersionPrintView(APIView):
 
         print_data = {
             "paper_id": paper.id,
-            "title": clean_title,
-            "school_name": school_name,
-            "instructions": paper.instructions,
-            "version_label": version.version_label,
-            "duration_minutes": paper.duration_minutes,
+            "title": clean_title or "Exam Paper",
+            "school_name": school_name or "",
+            "instructions": paper.instructions or "",
+            "version_label": version.version_label or "A",
+            "duration_minutes": paper.duration_minutes or 60,
             "total_question_count": paper.total_question_count or len(version.question_snapshot),
-            "subjects": clean_subjects,
-            "total_marks": version.total_marks,
+            "subjects": clean_subjects or [],
+            "total_marks": version.total_marks or 0,
             "question_count": len(version.question_snapshot),
             "questions": formatted_questions,
         }

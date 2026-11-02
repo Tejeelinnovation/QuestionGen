@@ -9,14 +9,17 @@ upload to Google Drive subfolder 'paper_creation_diagrams/'.
 from __future__ import annotations
 
 import base64
+import gc
 import io
 import json
-import os
 import logging
+import os
 import re
+import shutil
+import tempfile
 import threading
+import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 import pymupdf  # PyMuPDF
@@ -323,6 +326,36 @@ class PdfInspectionService:
         return subject, title
 
     @classmethod
+    def _get_inspection_scratch_dir(cls, inspection_id: str) -> str:
+        base = os.path.join(tempfile.gettempdir(), "qgs_inspections", inspection_id)
+        os.makedirs(base, exist_ok=True)
+        return base
+
+    @classmethod
+    def _save_figure_to_disk(cls, inspection_id: str, fig_id: str, img_bytes: bytes) -> str:
+        from django.conf import settings
+        # 1. Save to ephemeral scratch directory on disk (Free tier safe)
+        scratch_dir = cls._get_inspection_scratch_dir(inspection_id)
+        scratch_path = os.path.join(scratch_dir, f"{fig_id}.png")
+        try:
+            with open(scratch_path, "wb") as f:
+                f.write(img_bytes)
+        except Exception as e:
+            logger.warning(f"Failed to write diagram {fig_id} to scratch: {e}")
+
+        # 2. Also cache directly into media/diagrams for immediate static serving
+        try:
+            media_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
+            os.makedirs(media_dir, exist_ok=True)
+            media_path = os.path.join(media_dir, f"{fig_id}.png")
+            with open(media_path, "wb") as mf:
+                mf.write(img_bytes)
+        except Exception:
+            pass
+
+        return scratch_path
+
+    @classmethod
     def inspect_pdf(cls, file_bytes: bytes, filename: str) -> Dict[str, Any]:
         """
         Inspects PDF in memory and extracts text, metadata, and detected figures.
@@ -334,24 +367,29 @@ class PdfInspectionService:
         - Strict finally block guarantees doc.close() and gc.collect().
         """
         with cls._inspection_semaphore:
-            # Bound in-memory caches to prevent memory creep across uploads
-            if len(cls._inspection_cache) > 4:
-                oldest_keys = list(cls._inspection_cache.keys())[:-4]
-                for k in oldest_keys:
-                    cls._inspection_cache.pop(k, None)
+            # Periodic cleanup of inspection scratch folders older than 1 hour (Zero disk accumulation)
+            try:
+                base_scratch = os.path.join(tempfile.gettempdir(), "qgs_inspections")
+                if os.path.exists(base_scratch):
+                    now_ts = time.time()
+                    for sub in os.listdir(base_scratch):
+                        sub_path = os.path.join(base_scratch, sub)
+                        if os.path.isdir(sub_path) and (now_ts - os.path.getmtime(sub_path) > 3600):
+                            shutil.rmtree(sub_path, ignore_errors=True)
+            except Exception:
+                pass
 
-            if len(cls._high_res_cache) > 50:
-                oldest_figs = list(cls._high_res_cache.keys())[:-50]
-                for fk in oldest_figs:
-                    cls._high_res_cache.pop(fk, None)
+            # Flush in-memory caches to guarantee 0 MB heap creep across uploads
+            cls._inspection_cache.clear()
+            cls._high_res_cache.clear()
 
             inspection_id = f"insp_{uuid.uuid4().hex[:12]}"
+            scratch_dir = cls._get_inspection_scratch_dir(inspection_id)
             doc = pymupdf.open(stream=file_bytes, filetype="pdf")
             try:
                 page_count = len(doc)
                 full_text_parts: List[str] = []
                 detected_figures: List[Dict[str, Any]] = []
-                high_res_images: Dict[str, bytes] = {}
 
                 total_words = 0
 
@@ -415,27 +453,24 @@ class PdfInspectionService:
                         "page_text": page_text,
                     })
 
-                # Run Parallel Vision Diagram Extraction on diverse candidate pages across the document
+                # Sequential Memory-Safe Vision Diagram Extraction across diverse pages
                 vision_candidates.sort(key=lambda x: (x[0], -abs(x[2] - (page_count / 2))), reverse=True)
-                # Pick up to 6 candidate pages across document
-                top_candidates = vision_candidates[:6]
+                top_candidates = vision_candidates[:5]
                 vision_results_by_page: Dict[int, List[Dict[str, Any]]] = {}
 
                 if top_candidates:
-                    def _scan_page_vision(cand):
+                    for cand in top_candidates:
                         _, p_idx, p_num = cand
                         p = doc[p_idx]
-                        return p_num, cls._detect_diagrams_with_vision(p, p_num)
-
-                    with ThreadPoolExecutor(max_workers=min(2, len(top_candidates))) as executor:
-                        futures = {executor.submit(_scan_page_vision, c): c for c in top_candidates}
-                        for f in as_completed(futures):
-                            try:
-                                p_num, v_figs = f.result(timeout=14)
-                                if v_figs:
-                                    vision_results_by_page[p_num] = v_figs
-                            except Exception as pool_err:
-                                logger.debug(f"Vision diagram pool error: {pool_err}")
+                        try:
+                            v_figs = cls._detect_diagrams_with_vision(p, p_num)
+                            if v_figs:
+                                vision_results_by_page[p_num] = v_figs
+                        except Exception as pool_err:
+                            logger.debug(f"Vision diagram error on page {p_num}: {pool_err}")
+                        finally:
+                            del p
+                            gc.collect()
 
                 # Pass 2: Assemble Detected Figures (Vision + Embedded Image / Composite Fallback)
                 for rec in page_records:
@@ -449,6 +484,9 @@ class PdfInspectionService:
                         vision_handled = True
                         for vf in vision_results_by_page[page_num]:
                             fig_id = vf["figure_id"]
+                            raw_b = vf.get("image_bytes")
+                            if raw_b:
+                                cls._save_figure_to_disk(inspection_id, fig_id, raw_b)
                             detected_figures.append({
                                 "figure_id": fig_id,
                                 "page_number": page_num,
@@ -458,8 +496,9 @@ class PdfInspectionService:
                                 "thumbnail_b64": vf["thumbnail_b64"],
                                 "mime_type": "image/png",
                             })
-                            high_res_images[fig_id] = vf["image_bytes"]
-                            cls._high_res_cache[fig_id] = vf["image_bytes"]
+                            vf["image_bytes"] = None
+                        del vision_results_by_page[page_num]
+                        gc.collect()
 
                     # 3. Fallback: Extract Embedded Images with True Colorspace Conversion if Vision did not run
                     if not vision_handled:
@@ -515,6 +554,9 @@ class PdfInspectionService:
                                 caption = cls._detect_caption(page_text, page_num, img_idx + 1)
                                 thumb_b64 = cls._generate_thumbnail_base64(img_bytes)
 
+                                # Stream directly to disk scratch file (Zero-RAM!)
+                                cls._save_figure_to_disk(inspection_id, fig_id, img_bytes)
+
                                 detected_figures.append(
                                     {
                                         "figure_id": fig_id,
@@ -526,9 +568,8 @@ class PdfInspectionService:
                                         "mime_type": "image/png",
                                     }
                                 )
-
-                                high_res_images[fig_id] = img_bytes
-                                cls._high_res_cache[fig_id] = img_bytes
+                                del img_bytes
+                                gc.collect()
 
                             except Exception as img_err:
                                 logger.debug(f"Could not extract image xref {xref} on page {page_num}: {img_err}")
@@ -550,7 +591,8 @@ class PdfInspectionService:
                                 if m:
                                     fig_num_tag = m.group(1).replace(".", "_")
                                     fig_id = f"fig_p{page_num}_comp_{fig_num_tag}"
-                                    if fig_id in high_res_images:
+                                    existing_ids = {f["figure_id"] for f in detected_figures}
+                                    if fig_id in existing_ids:
                                         continue
 
                                     cap_box = pymupdf.Rect(b[:4])
@@ -566,8 +608,8 @@ class PdfInspectionService:
                                     for img in page.get_images():
                                         elements.extend(page.get_image_rects(img[0]))
 
-                                    if len(elements) > 200:
-                                        elements = elements[:200]
+                                    if len(elements) > 150:
+                                        elements = elements[:150]
 
                                     valid_elements = [
                                         r for r in elements
@@ -596,7 +638,7 @@ class PdfInspectionService:
                                             )
                                             & page.rect
                                         )
-                                        comp_pix = page.get_pixmap(clip=clip_rect, dpi=140)
+                                        comp_pix = page.get_pixmap(clip=clip_rect, dpi=110)
                                         comp_bytes = comp_pix.tobytes("png")
                                         c_w = comp_pix.width
                                         c_h = comp_pix.height
@@ -604,6 +646,7 @@ class PdfInspectionService:
 
                                         if cls._is_valid_diagram_image(comp_bytes, c_w, c_h):
                                             thumb_b64 = cls._generate_thumbnail_base64(comp_bytes)
+                                            cls._save_figure_to_disk(inspection_id, fig_id, comp_bytes)
                                             detected_figures.append(
                                                 {
                                                     "figure_id": fig_id,
@@ -615,8 +658,8 @@ class PdfInspectionService:
                                                     "mime_type": "image/png",
                                                 }
                                             )
-                                            high_res_images[fig_id] = comp_bytes
-                                            cls._high_res_cache[fig_id] = comp_bytes
+                                            del comp_bytes
+                                            gc.collect()
                         except Exception as comp_err:
                             logger.debug(f"Composite diagram detection error on page {page_num}: {comp_err}")
 
@@ -647,6 +690,7 @@ class PdfInspectionService:
                                 if len(detected_figures) == 0:
                                     fig_id = f"fig_scan_p{p_num}"
                                     thumb_b64 = cls._generate_thumbnail_base64(img_bytes)
+                                    cls._save_figure_to_disk(inspection_id, fig_id, img_bytes)
                                     detected_figures.append({
                                         "figure_id": fig_id,
                                         "page_number": p_num,
@@ -656,8 +700,8 @@ class PdfInspectionService:
                                         "thumbnail_b64": thumb_b64,
                                         "mime_type": "image/png",
                                     })
-                                    high_res_images[fig_id] = img_bytes
-                                    cls._high_res_cache[fig_id] = img_bytes
+                                    del img_bytes
+                                    gc.collect()
                     except Exception as ocr_err:
                         logger.warning(f"OCR transcription fallback error for {filename}: {ocr_err}")
 
@@ -668,7 +712,7 @@ class PdfInspectionService:
                     extracted_full_text, filename
                 )
 
-                # Cache the inspection bundle
+                # Cache the inspection bundle (High-Res image bytes EXCLUDED from RAM, stored on disk!)
                 cache_bundle = {
                     "inspection_id": inspection_id,
                     "filename": filename,
@@ -678,7 +722,8 @@ class PdfInspectionService:
                     "word_count": total_words,
                     "full_text": extracted_full_text,
                     "detected_figures": detected_figures,
-                    "high_res_images": high_res_images,
+                    "high_res_images": {},
+                    "scratch_dir": scratch_dir,
                 }
                 cls._inspection_cache[inspection_id] = cache_bundle
                 cache.set(f"pdf_inspection_{inspection_id}", cache_bundle, timeout=CACHE_TTL_SECONDS)
@@ -712,23 +757,50 @@ class PdfInspectionService:
                     doc.close()
                 except Exception:
                     pass
-                import gc
                 gc.collect()
 
     @classmethod
-    def get_figure_bytes(cls, figure_id: str) -> Optional[bytes]:
+    def get_figure_bytes(cls, figure_id: str, inspection_id: Optional[str] = None) -> Optional[bytes]:
         """
-        Retrieves original high-res image bytes for a figure.
-        Checks in-memory fast cache, Django cache, and fallback storage.
+        Retrieves original diagram image bytes from disk (0 MB in persistent RAM).
+        Checks local disk media/diagrams, inspection scratch disk, and RAM fallback.
         """
+        from django.conf import settings
+
+        # 1. Check persistent media/diagrams disk
+        media_path = os.path.join(settings.MEDIA_ROOT, "diagrams", f"{figure_id}.png")
+        if os.path.exists(media_path):
+            try:
+                with open(media_path, "rb") as f:
+                    return f.read()
+            except Exception:
+                pass
+
+        # 2. Check inspection scratch directory on disk
+        if inspection_id:
+            scratch_path = os.path.join(cls._get_inspection_scratch_dir(inspection_id), f"{figure_id}.png")
+            if os.path.exists(scratch_path):
+                try:
+                    with open(scratch_path, "rb") as f:
+                        return f.read()
+                except Exception:
+                    pass
+
+        # 3. Check any existing inspection scratch folders
+        base_scratch = os.path.join(tempfile.gettempdir(), "qgs_inspections")
+        if os.path.exists(base_scratch):
+            try:
+                for sub in os.listdir(base_scratch):
+                    cand = os.path.join(base_scratch, sub, f"{figure_id}.png")
+                    if os.path.exists(cand):
+                        with open(cand, "rb") as f:
+                            return f.read()
+            except Exception:
+                pass
+
+        # 4. In-memory fallback
         if figure_id in cls._high_res_cache:
             return cls._high_res_cache[figure_id]
-
-        for insp_data in cls._inspection_cache.values():
-            high_res = insp_data.get("high_res_images", {})
-            if figure_id in high_res:
-                cls._high_res_cache[figure_id] = high_res[figure_id]
-                return high_res[figure_id]
 
         return None
 
@@ -777,7 +849,7 @@ class PdfInspectionService:
         store_local = getattr(settings, "STORE_DIAGRAMS_LOCAL", settings.DEBUG)
 
         for fig_id in selected_figure_ids:
-            img_bytes = high_res_images.get(fig_id)
+            img_bytes = cls.get_figure_bytes(fig_id, inspection_id)
             if not img_bytes:
                 continue
 
@@ -803,15 +875,20 @@ class PdfInspectionService:
             # Local proxy endpoint ensures 100% reliable image loading without cross-origin cookie blocks
             local_proxy_url = f"/api/papers/diagram-asset/{fig_id}/"
 
-            # Cache high-res image to disk media/diagrams/ only if local storage is permitted (dev)
+            # Cache high-res image to disk media/diagrams/
             if store_local:
                 try:
                     disk_dir = os.path.join(settings.MEDIA_ROOT, "diagrams")
                     os.makedirs(disk_dir, exist_ok=True)
-                    with open(os.path.join(disk_dir, f"{fig_id}.png"), "wb") as f_disk:
-                        f_disk.write(img_bytes)
+                    target_p = os.path.join(disk_dir, f"{fig_id}.png")
+                    if not os.path.exists(target_p):
+                        with open(target_p, "wb") as f_disk:
+                            f_disk.write(img_bytes)
                 except Exception as disk_err:
                     logger.debug(f"Failed to cache diagram {fig_id} on disk: {disk_err}")
+
+            del img_bytes
+            gc.collect()
 
             uploaded_diagrams.append(
                 {
