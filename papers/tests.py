@@ -909,6 +909,18 @@ class PaperPublishingAndAnswerKeyTests(TestCase):
         self.assertIn("SECTION B", full_text)
         self.assertIn("SECTION C", full_text)
 
+        # Part 1 Verification: A4 layout, dynamic running header & footer
+        sec = doc.sections[0]
+        self.assertAlmostEqual(sec.page_width.inches, 8.27, places=2)
+        self.assertAlmostEqual(sec.page_height.inches, 11.69, places=2)
+        self.assertTrue(sec.different_first_page_header_footer)
+        hdr_text = sec.header.paragraphs[0].text
+        self.assertIn("ACIDS & BASES MID-TERM", hdr_text)
+        self.assertIn("Question Generation System", hdr_text)
+        ftr_text = sec.footer.paragraphs[0].text
+        self.assertIn("Page", ftr_text)
+        self.assertIn("of", ftr_text)
+
     def test_docx_export_answer_key(self):
         from papers.docx_export import ExamPaperDocxService
         service = ExamPaperDocxService()

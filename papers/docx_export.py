@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import docx
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.shared import Inches, Pt, RGBColor
@@ -46,6 +46,23 @@ class ExamPaperDocxService:
     def __init__(self):
         self.publishing_service = PaperPublishingService()
 
+    @staticmethod
+    def clean_paper_title(raw_title: Optional[str]) -> str:
+        """
+        Normalize examination title, stripping underscores and raw OCR artifact tags.
+        Matches frontend PrintablePaperSheet clean title logic.
+        """
+        if not raw_title or not str(raw_title).strip():
+            return "EXAMINATION PAPER"
+        formatted = str(raw_title).replace("_", " ").strip()
+        if "---" in formatted or re.search(r"\[page\s*\d+\]", formatted, re.IGNORECASE):
+            prefix = formatted.split(":")[0].strip()
+            if prefix and "-" not in prefix:
+                formatted = f"{prefix} Exam Paper"
+            else:
+                formatted = "Exam Paper"
+        return formatted
+
     def generate_student_paper(
         self,
         version: PaperVersion,
@@ -59,8 +76,9 @@ class ExamPaperDocxService:
         overrides = {str(k): int(v) for k, v in (question_line_overrides or {}).items()}
         sections = self.publishing_service.compile_sections(version)
 
+        paper_title = self.clean_paper_title(getattr(version.paper, "title", "EXAMINATION PAPER"))
         doc = docx.Document()
-        self._configure_page_layout(doc)
+        self._configure_page_layout(doc, title=paper_title, is_answer_key=False)
 
         # 1. Institutional Header
         self._add_institutional_header(doc, version)
@@ -105,8 +123,9 @@ class ExamPaperDocxService:
         """
         sections = self.publishing_service.compile_sections(version)
 
+        paper_title = self.clean_paper_title(getattr(version.paper, "title", "EXAMINATION PAPER"))
         doc = docx.Document()
-        self._configure_page_layout(doc)
+        self._configure_page_layout(doc, title=f"{paper_title} — ANSWER KEY", is_answer_key=True)
 
         # 1. Answer Key Title Header
         self._add_answer_key_header(doc, version)
@@ -133,13 +152,87 @@ class ExamPaperDocxService:
     # Internal Document Styling & Builder Helpers
     # ---------------------------------------------------------------------------
 
-    def _configure_page_layout(self, doc: docx.Document) -> None:
-        """Set standard page margins and default styles."""
+    def _configure_page_layout(
+        self,
+        doc: docx.Document,
+        title: str = "EXAMINATION PAPER",
+        is_answer_key: bool = False,
+    ) -> None:
+        """
+        Set standard A4 page dimensions, margins (matching 14mm/12mm print PDF),
+        and professional running headers and footers.
+        """
         for section in doc.sections:
-            section.top_margin = Inches(0.75)
-            section.bottom_margin = Inches(0.75)
-            section.left_margin = Inches(0.75)
-            section.right_margin = Inches(0.75)
+            # Exact A4 portrait (210mm x 297mm)
+            section.page_width = Inches(8.27)
+            section.page_height = Inches(11.69)
+            # Match print PDF: 14mm top, 12mm bottom, 14mm sides
+            section.top_margin = Inches(0.55)
+            section.bottom_margin = Inches(0.50)
+            section.left_margin = Inches(0.55)
+            section.right_margin = Inches(0.55)
+            section.header_distance = Inches(0.30)
+            section.footer_distance = Inches(0.25)
+            section.different_first_page_header_footer = True
+
+            # First page header is blank (page 1 has large institutional banner)
+            p_first_hdr = section.first_page_header.paragraphs[0]
+            p_first_hdr.text = ""
+
+            # Running Header on page 2+ (Title on left, System brand on right, bottom border)
+            header = section.header
+            p_hdr = header.paragraphs[0]
+            p_hdr.text = ""
+            r_left = p_hdr.add_run(title.upper())
+            r_left.font.name = "Calibri"
+            r_left.font.size = Pt(8)
+            r_left.bold = True
+            r_left.font.color.rgb = RGBColor(55, 65, 81)  # Slate #374151
+
+            # Printable width is 8.27 - 0.55 - 0.55 = 7.17 inches
+            p_hdr.paragraph_format.tab_stops.add_tab_stop(Inches(7.17), WD_TAB_ALIGNMENT.RIGHT)
+            p_hdr.add_run("\t")
+
+            r_right = p_hdr.add_run("Question Generation System")
+            r_right.font.name = "Calibri"
+            r_right.font.size = Pt(8)
+            r_right.font.color.rgb = RGBColor(107, 114, 128)  # Slate #6B7280
+
+            # Subtle bottom rule under header (0.5pt #D1D5DB)
+            pPr_hdr = p_hdr._p.get_or_add_pPr()
+            pBdr_hdr = parse_xml(
+                f'<w:pBdr {nsdecls("w")}><w:bottom w:val="single" w:sz="4" w:space="2" w:color="D1D5DB"/></w:pBdr>'
+            )
+            pPr_hdr.append(pBdr_hdr)
+
+            # Running Footers on both page 1 and subsequent pages (Centered 'Page X of Y' with top rule)
+            for ftr in [section.first_page_footer, section.footer]:
+                p_ftr = ftr.paragraphs[0]
+                p_ftr.text = ""
+                p_ftr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+                # Subtle top rule above footer (0.5pt #E5E7EB)
+                pPr_ftr = p_ftr._p.get_or_add_pPr()
+                pBdr_ftr = parse_xml(
+                    f'<w:pBdr {nsdecls("w")}><w:top w:val="single" w:sz="4" w:space="2" w:color="E5E7EB"/></w:pBdr>'
+                )
+                pPr_ftr.append(pBdr_ftr)
+
+                r_p1 = p_ftr.add_run("Page ")
+                r_p1.font.name = "Calibri"
+                r_p1.font.size = Pt(8)
+                r_p1.font.color.rgb = RGBColor(107, 114, 128)
+
+                fld_curr = parse_xml(f'<w:fldSimple {nsdecls("w")} w:instr="PAGE"/>')
+                p_ftr._p.append(fld_curr)
+
+                r_p2 = p_ftr.add_run(" of ")
+                r_p2.font.name = "Calibri"
+                r_p2.font.size = Pt(8)
+                r_p2.font.color.rgb = RGBColor(107, 114, 128)
+
+                fld_total = parse_xml(f'<w:fldSimple {nsdecls("w")} w:instr="NUMPAGES"/>')
+                p_ftr._p.append(fld_total)
 
         # Normal text style
         normal_style = doc.styles["Normal"]
