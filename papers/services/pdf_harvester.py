@@ -1038,7 +1038,7 @@ class PdfInspectionService:
 
             # Trim run-on textbook explanatory text
             stop_words_re = re.compile(
-                r'^(.*?)(?:(?:\s*[:\-\u2013]\s*|\s+)(?:The\s+vapour|Water\s+and\s+carbon|On\s+complete\s+combustion|are\s+absorbed|formed\s+on\s+oxidation|formed\s+are|reach\s+the|is\s+collected|are\s+collected|showing\s+|which\s+is|used\s+for|in\s+two\s+different\s+phases|developed\s+chromatogram|extraction\s+of\s+comp|\(\s*extraction|\(\s*chromatography|chromatography\s+paper)).*$',
+                r'^(.*?)(?:(?:\s*[:\-\u2013\(]\s*|\s+)(?:The\s+vapour|Water\s+and\s+carbon|On\s+complete\s+combustion|are\s+absorbed|formed\s+on\s+oxidation|formed\s+are|reach\s+the|is\s+collected|are\s+collected|showing\s+|which\s+is|used\s+for|in\s+two\s+different\s+phases|developed\s+chromatogram|extraction\s+of\s+comp|\(\s*extraction|\(\s*chromatography|chromatography\s+paper)).*$',
                 re.IGNORECASE,
             )
             stop_match = stop_words_re.match(rest)

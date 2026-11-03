@@ -1287,3 +1287,88 @@ class ModalityRendererAndSectionHeaderTests(TestCase):
         self.assertIn("Calculate the net interest coverage", qs[1].question_text)
         self.assertNotIn("Read the following case study", qs[1].question_text)
 
+    def test_docx_export_diagram_embedding_and_caption_cleaning(self):
+        from papers.docx_export import ExamPaperDocxService
+        from papers.publishing import FormattedExamQuestion
+        import base64
+        import docx
+        import io
+        from PIL import Image
+
+        service = ExamPaperDocxService()
+
+        # 1. Verify clean_academic_caption across OCR distortions & textbook fonts
+        self.assertEqual(
+            service.clean_academic_caption("3DpHU FKURPDWRJUDpK"),
+            "Paper Chromatography",
+        )
+        self.assertEqual(
+            service.clean_academic_caption("Cfd. 1: Human Heart (Water and carbon formed on oxidation...)"),
+            "Fig. 1: Human Heart",
+        )
+        self.assertEqual(
+            service.clean_academic_caption("6IMmLE DIpTILLATION FLApK"),
+            "Simple Distillation Flask",
+        )
+        self.assertEqual(service.clean_academic_caption(""), "")
+        self.assertEqual(service.clean_academic_caption(None), "")
+
+        # 2. Test base64 data URI diagram embedding in Student Question Paper
+        img = Image.new("RGB", (120, 80), color="blue")
+        img_io = io.BytesIO()
+        img.save(img_io, format="PNG")
+        b64_str = base64.b64encode(img_io.getvalue()).decode("utf-8")
+        data_uri = f"data:image/png;base64,{b64_str}"
+
+        q_diag = FormattedExamQuestion(
+            section="A",
+            section_question_number=1,
+            global_question_number=1,
+            question_id=201,
+            question_text="Identify the parts labeled in the chromatography setup shown below.",
+            question_type="MCQ",
+            marks=1.0,
+            difficulty="MEDIUM",
+            options={"A": "Beaker", "B": "Flask", "C": "Burette", "D": "Pipette"},
+            correct_answer="B",
+            diagram={
+                "title": "3DpHU FKURPDWRJUDpK",
+                "image_url": data_uri,
+            },
+        )
+
+        doc = docx.Document()
+        service._add_student_question(doc, q_diag, blank_lines=0, line_style="dotted")
+        doc_text = "\n".join(p.text for p in doc.paragraphs)
+        self.assertIn("Paper Chromatography", doc_text)
+        self.assertGreater(len(doc.inline_shapes), 0)
+
+        # 3. Test Teacher Answer Key diagram parity
+        doc_t = docx.Document()
+        service._add_teacher_solution(doc_t, q_diag)
+        doc_t_text = "\n".join(p.text for p in doc_t.paragraphs)
+        self.assertIn("Paper Chromatography", doc_t_text)
+        self.assertIn("CORRECT ANSWER:", doc_t_text)
+        self.assertGreater(len(doc_t.inline_shapes), 0)
+
+        # 4. Test missing image bytes fallback callout
+        q_fallback = FormattedExamQuestion(
+            section="B",
+            section_question_number=1,
+            global_question_number=2,
+            question_id=202,
+            question_text="Refer to the apparatus shown in the figure.",
+            question_type="SHORT_ANSWER",
+            marks=2.0,
+            difficulty="MEDIUM",
+            correct_answer="Distillation setup",
+            diagram={
+                "title": "6IMmLE DIpTILLATION FLApK",
+                "figure_id": "non_existent_figure_999",
+            },
+        )
+        doc_fb = docx.Document()
+        service._add_student_question(doc_fb, q_fallback, blank_lines=0, line_style="dotted")
+        fb_text = "\n".join(p.text for p in doc_fb.paragraphs)
+        self.assertIn("[Diagram: Simple Distillation Flask]", fb_text)
+

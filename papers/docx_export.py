@@ -14,8 +14,10 @@ Supports:
 
 from __future__ import annotations
 
+import base64
 import io
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional, Union
 
@@ -94,6 +96,66 @@ class ExamPaperDocxService:
             else:
                 formatted = "Exam Paper"
         return formatted
+
+    @classmethod
+    def clean_academic_caption(cls, raw: Optional[str]) -> str:
+        """
+        Universally cleans diagram captions across all subjects (Chemistry, Physics, Biology,
+        Math, History, Geography, Accounts, etc.) and all PDF sources (NCERT, state boards, teacher uploads).
+        Calls PdfInspectionService.clean_academic_caption with robust regex fallback.
+        """
+        if not raw or not str(raw).strip():
+            return ""
+        try:
+            from papers.services.pdf_harvester import PdfInspectionService
+            cleaned = PdfInspectionService.clean_academic_caption(raw)
+            if cleaned:
+                return cleaned
+        except Exception:
+            pass
+
+        # Standalone heuristic fallback
+        text = str(raw).strip().replace("\u00a0", " ").replace("\u200b", "")
+        font_fixes = [
+            (r"3DpHU\s*FKURPDWRJUDpK[\\\/]?", "Paper Chromatography"),
+            (r"&KURPDWRJUDpK[\\\/]?", "Chromatography"),
+            (r"FKURPDWRJUDpK[\\\/]?", "Chromatography"),
+            (r"3DpHU", "Paper"),
+            (r"pDpHU", "Paper"),
+            (r"sKDpHs", "Phases"),
+            (r"['\u2018\u2019]?LIIHUHQWLDO\s*H\[WUDFWLRQ", "Differential Extraction"),
+            (r"['\u2018\u2019]?LIIHUHQWLDO", "Differential"),
+            (r"H\[WUDFWLRQ", "Extraction"),
+            (r"\(\[WUDFWLRQ\s+RI\s+FRP", "(Extraction of Compound)"),
+            (r"\bCfd\.?\s*([0-9])", r"Fig. \1"),
+            (r"\bCfd\b", "Fig."),
+            (r"[\(\[]?\)?ractional\b", "Fractional"),
+            (r"\b6IMmLE\b", "Simple"),
+            (r"\b6imple\b", "Simple"),
+            (r"\bMolyibj\b", "Problem"),
+            (r"\bMroblem\b", "Problem"),
+            (r"[\(\[]?\b(?:S|s)timation\b", "Estimation"),
+            (r":ater\b", "Water"),
+            (r"\b7he\b", "The"),
+            (r"\bVAmOURp\b", "Vapours"),
+            (r"\bSubptance\b", "Substance"),
+            (r"\bPotappium\b", "Potassium"),
+            (r"\bABpORBED\b", "Absorbed"),
+            (r"\bANHYDROUp\b", "Anhydrous"),
+            (r"\bSolutionp\b", "Solutions"),
+            (r"\bpolutionp\b", "solutions"),
+            (r"\bDIpTILLATION\b", "Distillation"),
+            (r"\bFLApK\b", "Flask"),
+            (r"\bFIRpT\b", "First"),
+            (r"\bFRACTIONp\b", "Fractions"),
+            (r"\bTOm\b", "Top"),
+        ]
+        for pattern, repl in font_fixes:
+            text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
+
+        text = re.sub(r"^[\s\'\"\`\-\:\;\(\[\{]+", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:70].strip()
 
     def generate_student_paper(
         self,
@@ -1029,6 +1091,194 @@ class ExamPaperDocxService:
                     r.bold = True
                 r.font.name = "Consolas" if any(c in val for c in ["0","1","2","3","4","5","6","7","8","9"]) else "Calibri"
 
+    def _resolve_diagram_bytes(self, diagram: Dict[str, Any]) -> Optional[bytes]:
+        """
+        Universal 6-tier diagram image resolution:
+        1. Fast in-memory inspection cache (PdfInspectionService)
+        2. Local disk storage (settings.MEDIA_ROOT / diagrams)
+        3. Base64 data URI in image_url
+        4. Base64 thumbnail string in thumbnail_b64
+        5. Cloud storage via GoogleDriveClient
+        6. HTTP / HTTPS URL fetch via requests
+        """
+        if not diagram or not isinstance(diagram, dict):
+            return None
+
+        fig_id = str(diagram.get("figure_id") or diagram.get("id") or "").strip()
+        img_url = str(diagram.get("image_url") or "").strip()
+
+        # If figure_id was not explicitly provided, extract it from diagram-asset URL if possible
+        if not fig_id and img_url:
+            m = re.search(r'/api/papers/diagram-asset/([^/?#]+)', img_url)
+            if m:
+                fig_id = m.group(1).strip()
+
+        # Tier 1: In-memory fast cache
+        if fig_id:
+            try:
+                from papers.services.pdf_harvester import PdfInspectionService
+                cached_bytes = PdfInspectionService.get_figure_bytes(fig_id)
+                if cached_bytes:
+                    return cached_bytes
+            except Exception:
+                pass
+
+        # Tier 2: Local media disk storage
+        try:
+            from django.conf import settings
+            if fig_id:
+                local_path = os.path.join(settings.MEDIA_ROOT, "diagrams", f"{fig_id}.png")
+                if os.path.exists(local_path):
+                    with open(local_path, "rb") as lf:
+                        return lf.read()
+
+            if img_url:
+                clean_url = img_url.split("?")[0].split("#")[0]
+                if "/media/" in clean_url:
+                    sub_path = clean_url.split("/media/", 1)[1].lstrip("/\\")
+                    p = os.path.join(settings.MEDIA_ROOT, sub_path)
+                    if os.path.exists(p):
+                        with open(p, "rb") as f:
+                            return f.read()
+
+                if os.path.isabs(clean_url) and os.path.exists(clean_url):
+                    with open(clean_url, "rb") as f:
+                        return f.read()
+
+                rel_p = os.path.join(settings.MEDIA_ROOT, clean_url.lstrip("/\\"))
+                if os.path.exists(rel_p):
+                    with open(rel_p, "rb") as f:
+                        return f.read()
+        except Exception:
+            pass
+
+        # Tier 3: Base64 data URI in image_url
+        if img_url.startswith("data:image/"):
+            try:
+                b64_part = img_url.split(",", 1)[-1]
+                return base64.b64decode(b64_part)
+            except Exception:
+                pass
+
+        # Tier 4: Base64 thumbnail
+        thumb_b64 = diagram.get("thumbnail_b64") or diagram.get("thumbnail")
+        if thumb_b64 and isinstance(thumb_b64, str):
+            try:
+                if "," in thumb_b64:
+                    thumb_b64 = thumb_b64.split(",", 1)[-1]
+                return base64.b64decode(thumb_b64)
+            except Exception:
+                pass
+
+        # Tier 5: Google Drive download
+        drive_file_id = diagram.get("drive_file_id") or diagram.get("file_id")
+        if drive_file_id:
+            try:
+                from content_ingestion.storage.drive_client import GoogleDriveClient
+                drive_client = GoogleDriveClient()
+                if drive_client.is_configured:
+                    drive_bytes = drive_client.download_bytes(drive_file_id)
+                    if drive_bytes:
+                        return drive_bytes
+            except Exception:
+                pass
+
+        # Tier 6: External / Remote HTTP(S) URL
+        if img_url.startswith("http://") or img_url.startswith("https://"):
+            try:
+                import requests
+                resp = requests.get(img_url, timeout=4)
+                if resp.status_code == 200 and resp.content:
+                    return resp.content
+            except Exception:
+                pass
+
+        return None
+
+    def _render_diagram(self, doc: docx.Document, diagram: Dict[str, Any]) -> None:
+        """
+        Render question diagram image and universally cleaned academic caption.
+        Supports all sources: RAM cache, disk media, base64 data URI, thumbnail base64,
+        Google Drive cloud storage, and HTTP(S) URLs.
+        """
+        if not diagram or not isinstance(diagram, dict):
+            return
+
+        img_bytes = self._resolve_diagram_bytes(diagram)
+        raw_cap = diagram.get("title") or diagram.get("caption") or ""
+        cap = self.clean_academic_caption(raw_cap)
+
+        if img_bytes:
+            try:
+                # Sanitize and convert if necessary via Pillow to ensure python-docx compatibility
+                try:
+                    from PIL import Image
+                    with Image.open(io.BytesIO(img_bytes)) as pil_img:
+                        if pil_img.format not in ("PNG", "JPEG") or pil_img.mode in ("CMYK", "P"):
+                            target_mode = "RGBA" if "A" in pil_img.mode else "RGB"
+                            converted = pil_img.convert(target_mode)
+                            c_buf = io.BytesIO()
+                            converted.save(c_buf, format="PNG")
+                            img_bytes = c_buf.getvalue()
+                except Exception:
+                    pass
+
+                p_img = doc.add_paragraph()
+                p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p_img.paragraph_format.space_before = Pt(4)
+                p_img.paragraph_format.space_after = Pt(2)
+                p_img.paragraph_format.keep_with_next = True
+                r_img = p_img.add_run()
+
+                # Aspect-ratio aware sizing
+                pic_kwargs = {"width": Inches(3.8)}
+                try:
+                    from PIL import Image
+                    with Image.open(io.BytesIO(img_bytes)) as pil_img:
+                        w_px, h_px = pil_img.size
+                        if h_px > 0 and w_px > 0:
+                            aspect = w_px / float(h_px)
+                            if aspect < 0.75:  # Tall diagram
+                                pic_kwargs = {"height": Inches(2.6)}
+                            elif aspect > 2.5:  # Panoramic chart or timeline
+                                pic_kwargs = {"width": Inches(4.5)}
+                            else:
+                                pic_kwargs = {"width": Inches(3.8)}
+                except Exception:
+                    pic_kwargs = {"width": Inches(3.8)}
+
+                r_img.add_picture(io.BytesIO(img_bytes), **pic_kwargs)
+
+                # Academic Caption
+                if cap:
+                    p_cap = doc.add_paragraph()
+                    p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p_cap.paragraph_format.space_before = Pt(0)
+                    p_cap.paragraph_format.space_after = Pt(4)
+                    p_cap.paragraph_format.keep_with_next = True
+                    r_cap = p_cap.add_run(cap)
+                    r_cap.italic = True
+                    r_cap.font.size = Pt(8.5)
+                    r_cap.font.color.rgb = self.COLOR_MUTED
+            except Exception as img_err:
+                logger.debug(f"Could not embed diagram picture into DOCX: {img_err}")
+                self._render_diagram_fallback(doc, cap)
+        else:
+            self._render_diagram_fallback(doc, cap)
+
+    def _render_diagram_fallback(self, doc: docx.Document, caption: str) -> None:
+        """Fallback callout when raw image bytes cannot be resolved."""
+        callout = f"[Diagram: {caption}]" if caption else "[Diagram: Refer to attached visual figure]"
+        p_cap = doc.add_paragraph()
+        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_cap.paragraph_format.space_before = Pt(2)
+        p_cap.paragraph_format.space_after = Pt(4)
+        p_cap.paragraph_format.keep_with_next = True
+        r_cap = p_cap.add_run(callout)
+        r_cap.italic = True
+        r_cap.font.size = Pt(9)
+        r_cap.font.color.rgb = self.COLOR_INDIGO
+
     def _render_question_content(
         self,
         doc: docx.Document,
@@ -1152,82 +1402,8 @@ class ExamPaperDocxService:
         )
 
         # Render Question Diagram if present
-        if q.diagram:
-            fig_id = q.diagram.get("figure_id")
-            if fig_id:
-                try:
-                    from papers.services.pdf_harvester import PdfInspectionService
-                    img_bytes = PdfInspectionService.get_figure_bytes(fig_id)
-
-                    # Tier 2: Check persistent local media storage
-                    if not img_bytes:
-                        try:
-                            from django.conf import settings
-                            local_path = os.path.join(settings.MEDIA_ROOT, "diagrams", f"{fig_id}.png")
-                            if os.path.exists(local_path):
-                                with open(local_path, "rb") as lf:
-                                    img_bytes = lf.read()
-                        except Exception:
-                            pass
-
-                    # Tier 3: Check base64 data URI in image_url
-                    if not img_bytes and str(q.diagram.get("image_url", "")).startswith("data:image/"):
-                        try:
-                            b64_part = q.diagram["image_url"].split(",", 1)[-1]
-                            img_bytes = base64.b64decode(b64_part)
-                        except Exception:
-                            pass
-
-                    # Tier 4: Check thumbnail base64
-                    if not img_bytes and q.diagram.get("thumbnail_b64"):
-                        try:
-                            img_bytes = base64.b64decode(q.diagram["thumbnail_b64"])
-                        except Exception:
-                            pass
-
-                    # Tier 5: Google Drive download
-                    if not img_bytes:
-                        try:
-                            from content_ingestion.storage.drive_client import GoogleDriveClient
-                            drive_client = GoogleDriveClient()
-                            drive_file_id = q.diagram.get("drive_file_id")
-                            if drive_file_id and drive_client.is_configured:
-                                img_bytes = drive_client.download_bytes(drive_file_id)
-                        except Exception:
-                            pass
-
-                    if img_bytes:
-                        p_img = doc.add_paragraph()
-                        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        p_img.paragraph_format.space_before = Pt(4)
-                        p_img.paragraph_format.space_after = Pt(4)
-                        p_img.paragraph_format.keep_with_next = True
-                        r_img = p_img.add_run()
-                        r_img.add_picture(io.BytesIO(img_bytes), width=Inches(3.8))
-
-                        # Caption
-                        cap = q.diagram.get("title")
-                        if cap:
-                            p_cap = doc.add_paragraph()
-                            p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                            p_cap.paragraph_format.space_before = Pt(0)
-                            p_cap.paragraph_format.space_after = Pt(4)
-                            p_cap.paragraph_format.keep_with_next = True
-                            r_cap = p_cap.add_run(cap)
-                            r_cap.italic = True
-                            r_cap.font.size = Pt(8.5)
-                            r_cap.font.color.rgb = self.COLOR_MUTED
-                    else:
-                        # Graceful callout if image bytes could not be located
-                        cap = q.diagram.get("title") or "Refer to diagram attached with question"
-                        p_cap = doc.add_paragraph()
-                        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                        r_cap = p_cap.add_run(f"[Diagram: {cap}]")
-                        r_cap.italic = True
-                        r_cap.font.size = Pt(9)
-                        r_cap.font.color.rgb = self.COLOR_INDIGO
-                except Exception as img_err:
-                    logger.debug(f"Could not embed diagram image into DOCX: {img_err}")
+        if q.diagram and isinstance(q.diagram, dict):
+            self._render_diagram(doc, q.diagram)
 
         # MCQ Options
         if q.options and isinstance(q.options, dict):
@@ -1326,6 +1502,10 @@ class ExamPaperDocxService:
             self.COLOR_MUTED,
             is_rtl=is_rtl,
         )
+
+        # Render Question Diagram if present (Teacher Answer Key parity with Student Paper)
+        if q.diagram and isinstance(q.diagram, dict):
+            self._render_diagram(doc, q.diagram)
 
         # Correct Answer block
         p_ans = doc.add_paragraph()
