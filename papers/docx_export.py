@@ -458,31 +458,96 @@ class ExamPaperDocxService:
         doc.add_paragraph().paragraph_format.space_after = Pt(4)
 
     def _add_section_header(self, doc: docx.Document, sec: ExamSection, is_answer_key: bool = False) -> None:
-        """Section banner with marks breakdown."""
-        p = doc.add_paragraph()
-        p.paragraph_format.space_before = Pt(12)
-        p.paragraph_format.space_after = Pt(3)
-        p.paragraph_format.keep_with_next = True
+        """
+        Render a formal academic section banner matching the PDF layout:
+        - Dual solid top & bottom borders.
+        - High-contrast background shading (#F1F5F9).
+        - Left cell: Section title & candidate instructions.
+        - Right cell: Dynamic [X Questions • Y Marks] badge.
+        """
+        p_pre = doc.add_paragraph()
+        p_pre.paragraph_format.space_before = Pt(10)
+        p_pre.paragraph_format.space_after = Pt(0)
+        p_pre.paragraph_format.keep_with_next = True
 
-        r_title = p.add_run(sec.title.upper())
-        r_title.bold = True
-        r_title.font.size = Pt(11)
-        r_title.font.color.rgb = self.COLOR_INDIGO if not is_answer_key else self.COLOR_CORRECT
+        tbl = doc.add_table(rows=1, cols=2)
+        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+        tbl.autofit = False
 
-        r_meta = p.add_run(f"  [{len(sec.questions)} Questions • Total {sec.total_marks:g} Marks]")
-        r_meta.bold = True
-        r_meta.font.size = Pt(9)
-        r_meta.font.color.rgb = self.COLOR_MUTED
+        col_widths = [Inches(5.17), Inches(2.00)]
+        row = tbl.rows[0]
+        for i, cell in enumerate(row.cells):
+            cell.width = col_widths[i]
+
+        for cell in row.cells:
+            tcPr = cell._tc.get_or_add_tcPr()
+            tcPr.append(parse_xml(f'<w:shd {nsdecls("w")} w:fill="F1F5F9"/>'))
+            mar = parse_xml(
+                f'<w:tcMar {nsdecls("w")}>'
+                f'  <w:top w:w="120" w:type="dxa"/>'
+                f'  <w:left w:w="140" w:type="dxa"/>'
+                f'  <w:bottom w:w="120" w:type="dxa"/>'
+                f'  <w:right w:w="140" w:type="dxa"/>'
+                f'</w:tcMar>'
+            )
+            tcPr.append(mar)
+
+        border_color = "000000" if not is_answer_key else "15803D"
+        tblPr = tbl._tbl.tblPr
+        borders = parse_xml(
+            f'<w:tblBorders {nsdecls("w")}>\n'
+            f'  <w:top w:val="single" w:sz="16" w:space="0" w:color="{border_color}"/>\n'
+            f'  <w:bottom w:val="single" w:sz="16" w:space="0" w:color="{border_color}"/>\n'
+            f'  <w:left w:val="none"/>\n'
+            f'  <w:right w:val="none"/>\n'
+            f'  <w:insideH w:val="none"/>\n'
+            f'  <w:insideV w:val="none"/>\n'
+            f'</w:tblBorders>'
+        )
+        tblPr.append(borders)
+
+        trPr = row._tr.get_or_add_trPr()
+        trPr.append(parse_xml(f'<w:cantSplit {nsdecls("w")}/>'))
+
+        # Left cell: Title & instructions
+        p_left = row.cells[0].paragraphs[0]
+        p_left.paragraph_format.space_before = Pt(2)
+        p_left.paragraph_format.space_after = Pt(1)
+        p_left.paragraph_format.keep_with_next = True
+        r_t = p_left.add_run(sec.title.upper())
+        r_t.bold = True
+        r_t.font.name = "Calibri"
+        r_t.font.size = Pt(10)
+        r_t.font.color.rgb = RGBColor(15, 23, 42) if not is_answer_key else self.COLOR_CORRECT
 
         if sec.instructions and not is_answer_key:
-            p_inst = doc.add_paragraph()
+            p_inst = row.cells[0].add_paragraph()
             p_inst.paragraph_format.space_before = Pt(0)
-            p_inst.paragraph_format.space_after = Pt(4)
+            p_inst.paragraph_format.space_after = Pt(2)
             p_inst.paragraph_format.keep_with_next = True
-            r_inst = p_inst.add_run(sec.instructions)
-            r_inst.italic = True
-            r_inst.font.size = Pt(8.5)
-            r_inst.font.color.rgb = self.COLOR_MUTED
+            r_i = p_inst.add_run(sec.instructions)
+            r_i.italic = True
+            r_i.font.name = "Calibri"
+            r_i.font.size = Pt(8.5)
+            r_i.font.color.rgb = RGBColor(71, 85, 105)
+
+        # Right cell: [X Questions • Y Marks]
+        p_right = row.cells[1].paragraphs[0]
+        p_right.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p_right.paragraph_format.space_before = Pt(2)
+        p_right.paragraph_format.space_after = Pt(2)
+        p_right.paragraph_format.keep_with_next = True
+        q_label = "Question" if len(sec.questions) == 1 else "Questions"
+        r_m = p_right.add_run(f"[{len(sec.questions)} {q_label} • {sec.total_marks:g} Marks]")
+        r_m.bold = True
+        r_m.font.name = "Calibri"
+        r_m.font.size = Pt(8.5)
+        r_m.font.color.rgb = RGBColor(15, 23, 42) if not is_answer_key else self.COLOR_CORRECT
+
+        p_post = doc.add_paragraph()
+        p_post.paragraph_format.space_before = Pt(0)
+        p_post.paragraph_format.space_after = Pt(4)
+        p_post.paragraph_format.keep_with_next = True
 
     def _is_rtl_text(self, text: str) -> bool:
         """Detect if text contains Arabic/Urdu/Persian script."""
@@ -1166,15 +1231,33 @@ class ExamPaperDocxService:
 
         # MCQ Options
         if q.options and isinstance(q.options, dict):
-            opts_table = doc.add_table(rows=0, cols=2)
+            # Check if any option is long (> 50 chars) to switch to 1-column layout
+            is_long = any(len(str(v)) > 50 for v in q.options.values())
+            num_cols = 1 if is_long else 2
+            opts_table = doc.add_table(rows=0, cols=num_cols)
             opts_table.alignment = WD_TABLE_ALIGNMENT.CENTER
             opts_table.autofit = False
 
-            col_widths = [Inches(3.3), Inches(3.3)]
+            # Printable width 7.17 in: 1 col = 6.9 in, 2 cols = 3.45 in each
+            col_widths = [Inches(6.9)] if is_long else [Inches(3.45), Inches(3.45)]
             keys = sorted(q.options.keys())
 
-            # Pair up keys (A, B), (C, D)
-            for i in range(0, len(keys), 2):
+            # Remove all borders for clean presentation matching PDF
+            tblPr = opts_table._tbl.tblPr
+            borders = parse_xml(
+                f'<w:tblBorders {nsdecls("w")}>\n'
+                f'  <w:top w:val="none"/>\n'
+                f'  <w:bottom w:val="none"/>\n'
+                f'  <w:left w:val="none"/>\n'
+                f'  <w:right w:val="none"/>\n'
+                f'  <w:insideH w:val="none"/>\n'
+                f'  <w:insideV w:val="none"/>\n'
+                f'</w:tblBorders>'
+            )
+            tblPr.append(borders)
+
+            step = 1 if is_long else 2
+            for i in range(0, len(keys), step):
                 row = opts_table.add_row()
                 for j, cell in enumerate(row.cells):
                     cell.width = col_widths[j]
@@ -1197,22 +1280,20 @@ class ExamPaperDocxService:
                         if is_rtl:
                             self._set_run_rtl(r_v)
 
-        # Ruled Blank Answer Lines
+        # Ruled Blank Answer Lines (Unbreakable native paragraph bottom borders)
         if blank_lines > 0:
+            bdr_val = "single" if line_style == "solid" else ("dotted" if line_style == "dotted" else "dashed")
             for _ in range(blank_lines):
                 p_line = doc.add_paragraph()
-                p_line.paragraph_format.space_before = Pt(1)
-                p_line.paragraph_format.space_after = Pt(2)
-                p_line.paragraph_format.left_indent = Inches(0.2)
+                p_line.paragraph_format.space_before = Pt(0)
+                p_line.paragraph_format.space_after = Pt(13)
+                p_line.paragraph_format.left_indent = Inches(0.25)
 
-                if line_style == "solid":
-                    line_chars = "_________________________________________________________________________________"
-                else:  # dotted
-                    line_chars = ".  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  ."
-
-                r_line = p_line.add_run(line_chars)
-                r_line.font.size = Pt(8)
-                r_line.font.color.rgb = self.COLOR_LINE
+                pPr = p_line._p.get_or_add_pPr()
+                pBdr = parse_xml(
+                    f'<w:pBdr {nsdecls("w")}><w:bottom w:val="{bdr_val}" w:sz="4" w:space="1" w:color="CBD5E1"/></w:pBdr>'
+                )
+                pPr.append(pBdr)
 
     def _add_teacher_solution(self, doc: docx.Document, q: FormattedExamQuestion) -> None:
         """Render question with correct answer and model solutions for teacher."""

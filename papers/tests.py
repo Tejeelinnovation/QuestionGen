@@ -903,11 +903,13 @@ class PaperPublishingAndAnswerKeyTests(TestCase):
         import docx
         doc = docx.Document(buf)
         full_text = "\n".join(p.text for p in doc.paragraphs)
+        table_text = "\n".join(cell.text for t in doc.tables for row in t.rows for cell in row.cells)
+        combined_text = full_text + "\n" + table_text
         self.assertIn("ST. XAVIER'S HIGH SCHOOL", full_text)
         self.assertIn("ACIDS & BASES MID-TERM", full_text)
-        self.assertIn("SECTION A", full_text)
-        self.assertIn("SECTION B", full_text)
-        self.assertIn("SECTION C", full_text)
+        self.assertIn("SECTION A", combined_text)
+        self.assertIn("SECTION B", combined_text)
+        self.assertIn("SECTION C", combined_text)
 
         # Part 1 Verification: A4 layout, dynamic running header & footer
         sec = doc.sections[0]
@@ -920,6 +922,16 @@ class PaperPublishingAndAnswerKeyTests(TestCase):
         ftr_text = sec.footer.paragraphs[0].text
         self.assertIn("Page", ftr_text)
         self.assertIn("of", ftr_text)
+
+        # Part 3 Verification: Formal academic section banners & non-wrapping ruled lines
+        sec_tbls = [t for t in doc.tables if len(t.columns) == 2 and "SECTION A" in t.rows[0].cells[0].text]
+        self.assertTrue(len(sec_tbls) >= 1)
+        import docx.oxml.ns
+        ruled_paragraphs = [
+            p for p in doc.paragraphs
+            if p._p.pPr is not None and p._p.pPr.find(docx.oxml.ns.qn("w:pBdr")) is not None
+        ]
+        self.assertGreater(len(ruled_paragraphs), 0)
 
     def test_docx_export_answer_key(self):
         from papers.docx_export import ExamPaperDocxService
