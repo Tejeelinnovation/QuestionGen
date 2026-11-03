@@ -1372,3 +1372,95 @@ class ModalityRendererAndSectionHeaderTests(TestCase):
         fb_text = "\n".join(p.text for p in doc_fb.paragraphs)
         self.assertIn("[Diagram: Simple Distillation Flask]", fb_text)
 
+    def test_docx_export_math_latex_and_specialized_modalities(self):
+        from papers.docx_export import ExamPaperDocxService
+        from papers.publishing import FormattedExamQuestion
+        import docx
+
+        service = ExamPaperDocxService()
+
+        # 1. Mathematical LaTeX Typography & Subscript/Superscript Runs
+        doc_math = docx.Document()
+        p_math = doc_math.add_paragraph()
+        math_text = r"Given circle equation $x^2 + y^2 = 25$ and chemical acid $2\text{H}_2 + \text{O}_2 \rightarrow 2\text{H}_2\text{O}$ at $100^\circ\text{C}$, find $\alpha + \beta = \pi$."
+        service._add_math_runs(p_math, math_text)
+
+        sub_runs = [r.text for r in p_math.runs if r.font.subscript]
+        sup_runs = [r.text for r in p_math.runs if r.font.superscript]
+        full_runs_text = "".join(r.text for r in p_math.runs)
+
+        self.assertIn("2", sub_runs)  # H_2 and H_2O
+        self.assertIn("2", sup_runs)  # x^2 and y^2
+        self.assertIn("→", full_runs_text)  # \rightarrow operator
+        self.assertIn("α", full_runs_text)  # Greek \alpha
+        self.assertIn("β", full_runs_text)  # Greek \beta
+        self.assertIn("π", full_runs_text)  # Greek \pi
+
+        # 2. Chemistry SMILES 2D Molecular Box
+        q_chem = FormattedExamQuestion(
+            section="B",
+            section_question_number=1,
+            global_question_number=3,
+            question_id=301,
+            question_text="Examine the organic structure shown below:\n```smiles\nc1ccccc1\n```\nState its IUPAC name and aromatic stability.",
+            question_type="SHORT_ANSWER",
+            marks=3.0,
+            difficulty="MEDIUM",
+            correct_answer="Benzene (C6H6) is aromatic due to 6 pi electron delocalization per Huckel rule.",
+        )
+        doc_chem = docx.Document()
+        service._add_student_question(doc_chem, q_chem, blank_lines=0, line_style="dotted")
+        chem_text = "\n".join(cell.text for t in doc_chem.tables for row in t.rows for cell in row.cells)
+        self.assertIn("2D CHEMICAL STRUCTURE", chem_text)
+        self.assertIn("Benzene", chem_text)
+        self.assertIn("C₆H₆", chem_text)
+        self.assertIn("c1ccccc1", chem_text)
+        # Verify 2D diagram picture was embedded
+        self.assertGreater(len(doc_chem.inline_shapes), 0)
+
+        # 3. Biological Cladogram Box
+        q_clado = FormattedExamQuestion(
+            section="B",
+            section_question_number=2,
+            global_question_number=4,
+            question_id=302,
+            question_text="Analyze the taxonomic hierarchy given below:\n```cladogram\nKingdom: Animalia (Animals)\n├── Phylum: Chordata (Vertebrates)\n└── Class: Mammalia (Mammals)\n```\nIdentify the shared primitive characteristics.",
+            question_type="SHORT_ANSWER",
+            marks=3.0,
+            difficulty="MEDIUM",
+            correct_answer="Notochord, dorsal nerve cord, post-anal tail.",
+        )
+        doc_clado = docx.Document()
+        service._add_student_question(doc_clado, q_clado, blank_lines=0, line_style="dotted")
+        clado_text = "\n".join(cell.text for t in doc_clado.tables for row in t.rows for cell in row.cells)
+        self.assertIn("TAXONOMIC HIERARCHY", clado_text)
+        self.assertIn("[KINGDOM]", clado_text)
+        self.assertIn("[PHYLUM]", clado_text)
+        self.assertIn("[CLASS]", clado_text)
+        self.assertIn("Animalia", clado_text)
+        self.assertIn("Chordata", clado_text)
+        self.assertIn("Mammalia", clado_text)
+
+        # 4. Geography India Outline Map Work Container
+        q_map = FormattedExamQuestion(
+            section="C",
+            section_question_number=1,
+            global_question_number=5,
+            question_id=303,
+            question_text="Locate the following spatial features:\n```mapwork\nA major seaport on the western coast\nAn iron and steel plant in eastern India\n```\nWrite your answers against the corresponding letters.",
+            question_type="LONG_ANSWER",
+            marks=5.0,
+            difficulty="HARD",
+            correct_answer="A - Kandla/Mumbai; B - Jamshedpur/Bokaro.",
+        )
+        doc_map = docx.Document()
+        service._add_student_question(doc_map, q_map, blank_lines=0, line_style="dotted")
+        map_text = "\n".join(cell.text for t in doc_map.tables for row in t.rows for cell in row.cells)
+        self.assertIn("SECTION MAP WORK", map_text)
+        self.assertIn("OUTLINE MAP OF INDIA", map_text)
+        self.assertIn("Answer (A):", map_text)
+        self.assertIn("Answer (B):", map_text)
+        self.assertIn("Tie this completed outline map securely", map_text)
+        # Verify map image was embedded into document
+        self.assertGreater(len(doc_map.inline_shapes), 0)
+

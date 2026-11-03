@@ -33,6 +33,126 @@ from papers.publishing import ExamSection, FormattedExamQuestion, PaperPublishin
 
 logger = logging.getLogger(__name__)
 
+GREEK_SYMBOLS = {
+    r"\alpha": "α", r"\beta": "β", r"\gamma": "γ", r"\delta": "δ",
+    r"\Delta": "Δ", r"\epsilon": "ε", r"\zeta": "ζ", r"\eta": "η",
+    r"\theta": "θ", r"\Theta": "Θ", r"\iota": "ι", r"\kappa": "κ",
+    r"\lambda": "λ", r"\Lambda": "Λ", r"\mu": "μ", r"\nu": "ν",
+    r"\xi": "ξ", r"\pi": "π", r"\Pi": "Π", r"\rho": "ρ",
+    r"\sigma": "σ", r"\Sigma": "Σ", r"\tau": "τ", r"\phi": "φ",
+    r"\Phi": "Φ", r"\chi": "χ", r"\psi": "ψ", r"\omega": "ω",
+    r"\Omega": "Ω",
+}
+
+MATH_OPERATORS = [
+    (r"\rightarrow", "→"),
+    (r"\to", "→"),
+    (r"\leftarrow", "←"),
+    (r"\rightleftharpoons", "⇌"),
+    (r"\uparrow", "↑"),
+    (r"\downarrow", "↓"),
+    (r"\leftrightarrow", "↔"),
+    (r"\pm", "±"),
+    (r"\mp", "∓"),
+    (r"\times", "×"),
+    (r"\cdot", "·"),
+    (r"\div", "÷"),
+    (r"\le", "≤"),
+    (r"\leq", "≤"),
+    (r"\ge", "≥"),
+    (r"\geq", "≥"),
+    (r"\neq", "≠"),
+    (r"\approx", "≈"),
+    (r"\sim", "~"),
+    (r"\propto", "∝"),
+    (r"\infty", "∞"),
+    (r"\degree", "°"),
+    (r"^\circ", "°"),
+    (r"\circ", "°"),
+    (r"\sum", "∑"),
+    (r"\prod", "∏"),
+    (r"\int", "∫"),
+    (r"\partial", "∂"),
+    (r"\nabla", "∇"),
+]
+
+CANONICAL_MOLECULES = {
+    "c1ccccc1": {
+        "name": "Benzene",
+        "formula": "C₆H₆",
+        "nodes": [(100, 45), (145, 70), (145, 120), (100, 145), (55, 120), (55, 70)],
+        "bonds": [(0, 1, 1), (1, 2, 2), (2, 3, 1), (3, 4, 2), (4, 5, 1), (5, 0, 2)],
+        "ring": (100, 95, 28),
+        "labels": {},
+    },
+    "c1ccc(O)cc1": {
+        "name": "Phenol (Carbolic Acid)",
+        "formula": "C₆H₅OH",
+        "nodes": [(100, 55), (145, 80), (145, 130), (100, 155), (55, 130), (55, 80), (100, 20)],
+        "bonds": [(0, 1, 1), (1, 2, 2), (2, 3, 1), (3, 4, 2), (4, 5, 1), (5, 0, 2), (0, 6, 1)],
+        "ring": (100, 105, 28),
+        "labels": {6: "OH"},
+    },
+    "Cc1ccccc1": {
+        "name": "Toluene (Methylbenzene)",
+        "formula": "C₇H₈",
+        "nodes": [(100, 55), (145, 80), (145, 130), (100, 155), (55, 130), (55, 80), (100, 20)],
+        "bonds": [(0, 1, 1), (1, 2, 2), (2, 3, 1), (3, 4, 2), (4, 5, 1), (5, 0, 2), (0, 6, 1)],
+        "ring": (100, 105, 28),
+        "labels": {6: "CH₃"},
+    },
+    "c1ccc(C(=O)O)cc1": {
+        "name": "Benzoic Acid",
+        "formula": "C₆H₅COOH",
+        "nodes": [(100, 65), (140, 90), (140, 135), (100, 155), (60, 135), (60, 90), (100, 35), (130, 15), (70, 15)],
+        "bonds": [(0, 1, 1), (1, 2, 2), (2, 3, 1), (3, 4, 2), (4, 5, 1), (5, 0, 2), (0, 6, 1), (6, 7, 2), (6, 8, 1)],
+        "ring": (100, 110, 26),
+        "labels": {7: "O", 8: "OH"},
+    },
+    "CC(=O)O": {
+        "name": "Ethanoic Acid (Acetic Acid)",
+        "formula": "CH₃COOH",
+        "nodes": [(40, 95), (95, 95), (140, 60), (140, 130)],
+        "bonds": [(0, 1, 1), (1, 2, 2), (1, 3, 1)],
+        "labels": {0: "CH₃", 2: "O", 3: "OH"},
+    },
+    "CCO": {
+        "name": "Ethanol (Ethyl Alcohol)",
+        "formula": "C₂H₅OH",
+        "nodes": [(40, 110), (95, 75), (150, 110)],
+        "bonds": [(0, 1, 1), (1, 2, 1)],
+        "labels": {0: "CH₃", 1: "CH₂", 2: "OH"},
+    },
+    "CC(=O)C": {
+        "name": "Propanone (Acetone)",
+        "formula": "CH₃COCH₃",
+        "nodes": [(40, 115), (95, 85), (95, 35), (150, 115)],
+        "bonds": [(0, 1, 1), (1, 2, 2), (1, 3, 1)],
+        "labels": {0: "CH₃", 2: "O", 3: "CH₃"},
+    },
+    "C=C": {
+        "name": "Ethene (Ethylene)",
+        "formula": "C₂H₄",
+        "nodes": [(60, 90), (140, 90)],
+        "bonds": [(0, 1, 2)],
+        "labels": {0: "H₂C", 1: "CH₂"},
+    },
+    "C#C": {
+        "name": "Ethyne (Acetylene)",
+        "formula": "C₂H₂",
+        "nodes": [(60, 90), (140, 90)],
+        "bonds": [(0, 1, 3)],
+        "labels": {0: "HC", 1: "CH"},
+    },
+    "CC": {
+        "name": "Ethane",
+        "formula": "C₂H₆",
+        "nodes": [(60, 90), (140, 90)],
+        "bonds": [(0, 1, 1)],
+        "labels": {0: "H₃C", 1: "CH₃"},
+    },
+}
+
 
 class ExamPaperDocxService:
     """
@@ -876,6 +996,76 @@ class ExamPaperDocxService:
             if i < len(lines) - 1:
                 cp.add_run("\n")
 
+    def _draw_molecule_image(self, smiles: str) -> Optional[bytes]:
+        """Generate high-contrast 2D skeletal line diagram PNG using Pillow."""
+        try:
+            from PIL import Image, ImageDraw
+            clean = smiles.strip()
+            mol = CANONICAL_MOLECULES.get(clean)
+
+            w, h = 260, 180
+            img = Image.new("RGB", (w, h), color="#FAFAFA")
+            draw = ImageDraw.Draw(img)
+            draw.rounded_rectangle([(2, 2), (w - 3, h - 3)], radius=6, outline="#CBD5E1", width=1)
+
+            if mol:
+                nodes = mol["nodes"]
+                bonds = mol["bonds"]
+                labels = mol.get("labels", {})
+                ring = mol.get("ring")
+
+                for b in bonds:
+                    u, v, order = b[0], b[1], b[2]
+                    p1, p2 = nodes[u], nodes[v]
+                    if order == 1:
+                        draw.line([p1, p2], fill="#0F172A", width=2)
+                    elif order == 2:
+                        dx = p2[0] - p1[0]
+                        dy = p2[1] - p1[1]
+                        length = (dx * dx + dy * dy) ** 0.5
+                        if length > 0:
+                            ox = -dy / length * 3
+                            oy = dx / length * 3
+                            draw.line([(p1[0] + ox, p1[1] + oy), (p2[0] + ox, p2[1] + oy)], fill="#0F172A", width=2)
+                            draw.line([(p1[0] - ox, p1[1] - oy), (p2[0] - ox, p2[1] - oy)], fill="#0F172A", width=2)
+                        else:
+                            draw.line([p1, p2], fill="#0F172A", width=2)
+                    elif order == 3:
+                        dx = p2[0] - p1[0]
+                        dy = p2[1] - p1[1]
+                        length = (dx * dx + dy * dy) ** 0.5
+                        if length > 0:
+                            ox = -dy / length * 4
+                            oy = dx / length * 4
+                            draw.line([p1, p2], fill="#0F172A", width=2)
+                            draw.line([(p1[0] + ox, p1[1] + oy), (p2[0] + ox, p2[1] + oy)], fill="#0F172A", width=2)
+                            draw.line([(p1[0] - ox, p1[1] - oy), (p2[0] - ox, p2[1] - oy)], fill="#0F172A", width=2)
+                        else:
+                            draw.line([p1, p2], fill="#0F172A", width=2)
+
+                if ring:
+                    rx, ry, rad = ring
+                    draw.ellipse([(rx - rad, ry - rad), (rx + rad, ry + rad)], outline="#0F172A", width=2)
+
+                for idx, text in labels.items():
+                    pos = nodes[idx]
+                    draw.ellipse([(pos[0] - 14, pos[1] - 10), (pos[0] + 14, pos[1] + 10)], fill="#FAFAFA")
+                    draw.text((pos[0], pos[1]), text, fill="#0F172A", anchor="mm")
+
+                caption = f"{mol['name']} ({mol['formula']})"
+                draw.text((w // 2, h - 14), caption, fill="#475569", anchor="mm")
+            else:
+                draw.text((w // 2, 60), "[2D MOLECULAR FORMULA]", fill="#0284C7", anchor="mm")
+                draw.text((w // 2, 95), clean[:25], fill="#0F172A", anchor="mm")
+                draw.text((w // 2, 130), "Skeletal Structural Formula", fill="#64748B", anchor="mm")
+
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            return buf.getvalue()
+        except Exception as e:
+            logger.debug(f"Could not generate chemical structure image: {e}")
+            return None
+
     def _render_chemical_structure_box(self, doc: docx.Document, smiles: str) -> None:
         """Render a styled 2D chemical structure & molecular formula container."""
         tbl = doc.add_table(rows=1, cols=1)
@@ -899,16 +1089,37 @@ class ExamPaperDocxService:
 
         cp = cell.paragraphs[0]
         cp.paragraph_format.space_before = Pt(3)
-        cp.paragraph_format.space_after = Pt(3)
+        cp.paragraph_format.space_after = Pt(2)
         r_hdr = cp.add_run("[2D CHEMICAL STRUCTURE & SKELETAL FORMULA]\n")
         r_hdr.bold = True
         r_hdr.font.size = Pt(8.5)
         r_hdr.font.color.rgb = RGBColor(2, 132, 199)
 
-        r_body = cp.add_run(f"Molecular SMILES / Structure: {smiles.strip()}")
+        clean_smiles = smiles.strip()
+        mol = CANONICAL_MOLECULES.get(clean_smiles)
+
+        # Generate and embed 2D skeletal line diagram
+        img_bytes = self._draw_molecule_image(clean_smiles)
+        if img_bytes:
+            p_img = cell.add_paragraph()
+            p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_img.paragraph_format.space_before = Pt(2)
+            p_img.paragraph_format.space_after = Pt(2)
+            r_img = p_img.add_run()
+            r_img.add_picture(io.BytesIO(img_bytes), width=Inches(2.5))
+
+        p_info = cell.add_paragraph()
+        p_info.paragraph_format.space_before = Pt(2)
+        p_info.paragraph_format.space_after = Pt(2)
+        if mol:
+            r_name = p_info.add_run(f"Compound: {mol['name']}   |   Formula: {mol['formula']}\n")
+            r_name.bold = True
+            r_name.font.size = Pt(9)
+            r_name.font.color.rgb = RGBColor(15, 23, 42)
+        r_body = p_info.add_run(f"Molecular SMILES: {clean_smiles}")
         r_body.font.name = "Consolas"
-        r_body.font.size = Pt(9)
-        r_body.font.color.rgb = RGBColor(15, 23, 42)
+        r_body.font.size = Pt(8.5)
+        r_body.font.color.rgb = RGBColor(71, 85, 105)
 
     def _render_cladogram_box(self, doc: docx.Document, text: str) -> None:
         """Render a biological taxonomic hierarchy and cladogram container."""
@@ -933,25 +1144,149 @@ class ExamPaperDocxService:
 
         cp = cell.paragraphs[0]
         cp.paragraph_format.space_before = Pt(3)
-        cp.paragraph_format.space_after = Pt(3)
-        r_hdr = cp.add_run("[TAXONOMIC HIERARCHY / BIOLOGICAL CLADOGRAM]\n")
+        cp.paragraph_format.space_after = Pt(2)
+        r_hdr = cp.add_run("[TAXONOMIC HIERARCHY / BIOLOGICAL CLADOGRAM]")
         r_hdr.bold = True
         r_hdr.font.size = Pt(8.5)
         r_hdr.font.color.rgb = RGBColor(5, 150, 105)
 
-        r_body = cp.add_run(text.strip())
-        r_body.font.name = "Consolas"
-        r_body.font.size = Pt(9)
-        r_body.font.color.rgb = RGBColor(6, 78, 59)
+        lines = [l for l in text.strip().splitlines() if l.strip()]
+        ranks = ("DOMAIN", "KINGDOM", "PHYLUM", "CLASS", "ORDER", "FAMILY", "GENUS", "SPECIES", "CLADE")
+
+        for l in lines:
+            p_node = cell.add_paragraph()
+            p_node.paragraph_format.space_before = Pt(1)
+            p_node.paragraph_format.space_after = Pt(1)
+
+            clean = l.strip()
+            indent_level = max(0, (len(l) - len(l.lstrip(" │\t"))) // 2)
+            if any(sym in clean for sym in ("├", "└", "─", "│")):
+                indent_level = max(indent_level, 1)
+
+            clean_text = re.sub(r"^[│├└─\s\-–—>]+", "", clean).strip()
+            p_node.paragraph_format.left_indent = Inches(0.18 * min(indent_level, 5))
+
+            r_branch = p_node.add_run("└── " if indent_level > 0 else "• ")
+            r_branch.font.name = "Consolas"
+            r_branch.font.size = Pt(8.5)
+            r_branch.font.color.rgb = RGBColor(148, 163, 184)
+
+            colon_idx = clean_text.find(":")
+            if colon_idx != -1:
+                potential_rank = clean_text[:colon_idx].strip().upper()
+                if any(r in potential_rank for r in ranks):
+                    r_rank = p_node.add_run(f"[{potential_rank}] ")
+                    r_rank.bold = True
+                    r_rank.font.size = Pt(8)
+                    r_rank.font.color.rgb = RGBColor(5, 150, 105)
+                    clean_text = clean_text[colon_idx + 1:].strip()
+
+            paren_match = re.match(r"^([^(]+)\s*\(([^)]+)\)$", clean_text)
+            if paren_match:
+                main_name = paren_match.group(1).strip()
+                sub_name = paren_match.group(2).strip()
+                r_main = p_node.add_run(main_name)
+                r_main.bold = True
+                r_main.font.size = Pt(9)
+                r_main.font.color.rgb = RGBColor(15, 23, 42)
+
+                r_sub = p_node.add_run(f" ({sub_name})")
+                r_sub.italic = True
+                r_sub.font.size = Pt(8.5)
+                r_sub.font.color.rgb = RGBColor(100, 116, 139)
+            else:
+                r_name = p_node.add_run(clean_text)
+                r_name.bold = True
+                r_name.font.size = Pt(9)
+                r_name.font.color.rgb = RGBColor(15, 23, 42)
+
+    def _draw_india_outline_map_image(self, width: int = 400, height: int = 480) -> Optional[bytes]:
+        """
+        Renders high-resolution vector outline map of India with coordinate grid lines,
+        Tropic of Cancer, Standard Meridian of India, and examination pointing stations (A to E).
+        """
+        try:
+            from PIL import Image, ImageDraw
+            img = Image.new("RGB", (width, height), color="#FFFFFF")
+            draw = ImageDraw.Draw(img)
+
+            # Outer coordinate grid bounding box
+            draw.rectangle([(20, 20), (380, 460)], outline="#0F172A", width=2)
+
+            # Latitude dashed grid lines
+            lat_lines = [
+                (40, "36°N", False),
+                (120, "28°N", False),
+                (165, "23°30'N (Tropic of Cancer)", True),
+                (240, "20°N", False),
+                (340, "12°N", False),
+                (410, "8°4'N", False),
+            ]
+            for y, lbl, is_cancer in lat_lines:
+                color = "#64748B" if is_cancer else "#CBD5E1"
+                w = 2 if is_cancer else 1
+                for x in range(20, 380, 8):
+                    draw.line([(x, y), (min(x + 4, 380), y)], fill=color, width=w)
+                draw.text((25, y - 11), lbl, fill="#0F172A" if is_cancer else "#475569")
+
+            # Longitude dashed grid lines
+            long_lines = [
+                (60, "68°E", False),
+                (220, "82°30'E (Std Meridian)", True),
+                (330, "96°E", False),
+            ]
+            for x, lbl, is_meridian in long_lines:
+                color = "#64748B" if is_meridian else "#CBD5E1"
+                w = 2 if is_meridian else 1
+                for y in range(20, 460, 8):
+                    draw.line([(x, y), (x, min(y + 4, 460))], fill=color, width=w)
+                draw.text((x - 24 if is_meridian else x - 10, 442), lbl, fill="#0F172A" if is_meridian else "#475569")
+
+            # Silhouette polygon of India
+            india_coords = [
+                (180, 45), (210, 50), (230, 70), (215, 95), (205, 110), (220, 120), (250, 130),
+                (275, 135), (300, 125), (320, 140), (345, 155), (355, 175), (340, 195), (325, 210),
+                (310, 205), (295, 215), (275, 230), (260, 260), (250, 290), (240, 320), (225, 360),
+                (200, 410), (185, 380), (165, 340), (150, 300), (140, 265), (130, 240), (115, 225),
+                (90, 210), (80, 185), (105, 170), (125, 160), (140, 140), (130, 115), (120, 90),
+                (145, 55), (180, 45)
+            ]
+            draw.polygon(india_coords, fill="#F8FAFC", outline="#0F172A", width=2)
+
+            # Pointing Stations (A to E)
+            stations = [
+                ("A", (112, 225), "#DC2626", (35, -20)),
+                ("B", (255, 185), "#2563EB", (35, 20)),
+                ("C", (150, 115), "#16A34A", (-35, -18)),
+                ("D", (325, 160), "#7C3AED", (32, -18)),
+                ("E", (205, 375), "#D97706", (35, 20)),
+            ]
+            for code, pos, col, flag_offset in stations:
+                cx, cy = pos
+                draw.ellipse([(cx - 9, cy - 9), (cx + 9, cy + 9)], fill=col, outline="#000000", width=1)
+                draw.text((cx, cy), code, fill="#FFFFFF", anchor="mm")
+                fx, fy = cx + flag_offset[0], cy + flag_offset[1]
+                draw.line([(cx, cy), (fx, fy)], fill="#000000", width=1)
+                draw.rectangle([(fx - 10, fy - 8), (fx + 10, fy + 8)], fill="#FFFFFF", outline="#000000", width=1)
+                draw.text((fx, fy), code, fill="#000000", anchor="mm")
+
+            draw.text((width // 2, 12), "INDIA OUTLINE MAP WITH LATITUDE / LONGITUDE EXTENTS", fill="#0F172A", anchor="mm")
+
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            return buf.getvalue()
+        except Exception as e:
+            logger.debug(f"Could not render India outline map: {e}")
+            return None
 
     def _render_map_work_box(self, doc: docx.Document, text: str) -> None:
-        """Render a geographic map work examination task container."""
+        """Render a geographic map work examination task container with embedded India outline map."""
         tbl = doc.add_table(rows=1, cols=1)
         tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
         tbl.autofit = False
 
         cell = tbl.cell(0, 0)
-        cell.width = Inches(6.5)
+        cell.width = Inches(6.9)
 
         borders = parse_xml(
             f'<w:tcBorders {nsdecls("w")}>'
@@ -967,23 +1302,76 @@ class ExamPaperDocxService:
 
         cp = cell.paragraphs[0]
         cp.paragraph_format.space_before = Pt(3)
-        cp.paragraph_format.space_after = Pt(3)
-        r_hdr = cp.add_run("SECTION MAP WORK [OUTLINE MAP — LAT 8°4'N TO 37°6'N | LONG 68°7'E TO 97°25'E]\n")
+        cp.paragraph_format.space_after = Pt(2)
+        r_hdr = cp.add_run("SECTION MAP WORK [OUTLINE MAP OF INDIA — 5 MARKS]\n")
         r_hdr.bold = True
-        r_hdr.font.size = Pt(9)
+        r_hdr.font.size = Pt(9.5)
         r_hdr.font.color.rgb = RGBColor(0, 0, 0)
 
+        r_inst = cp.add_run("On the outline map below, identify the geographic features marked by letters (A) to (E). Write their correct names against the corresponding blanks.")
+        r_inst.italic = True
+        r_inst.font.size = Pt(8.5)
+        r_inst.font.color.rgb = RGBColor(71, 85, 105)
+
+        # Add Map Image centered inside container
+        map_bytes = self._draw_india_outline_map_image()
+        if map_bytes:
+            p_m = cell.add_paragraph()
+            p_m.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_m.paragraph_format.space_before = Pt(4)
+            p_m.paragraph_format.space_after = Pt(4)
+            r_m = p_m.add_run()
+            r_m.add_picture(io.BytesIO(map_bytes), width=Inches(3.4))
+
+        # Add Identification Tasks sequentially
         lines = [l.strip() for l in text.strip().split("\n") if l.strip()] if text.strip() else [
-            "(A) A major seaport on the western coast",
-            "(B) An iron and steel plant in eastern India",
-            "(C) A major wheat-producing region",
-            "(D) A national park in north-eastern India",
-            "(E) A nuclear power plant on the southern coast",
+            "A major seaport on the western coast",
+            "An iron and steel plant in eastern India",
+            "A major wheat-producing region",
+            "A national park in north-eastern India",
+            "A nuclear power plant on the southern coast",
         ]
-        for line in lines:
-            cp.add_run(f"• {line}\n")
-            r_ans = cp.add_run("   Identified Feature / Location: _____________________________________\n")
+
+        p_t_hdr = cell.add_paragraph()
+        p_t_hdr.paragraph_format.space_before = Pt(3)
+        p_t_hdr.paragraph_format.space_after = Pt(2)
+        r_t_hdr = p_t_hdr.add_run("Map Identification Tasks [1 Mark Each]:")
+        r_t_hdr.bold = True
+        r_t_hdr.font.size = Pt(8.5)
+        r_t_hdr.font.color.rgb = RGBColor(15, 23, 42)
+
+        for f_idx, line in enumerate(lines):
+            letter = chr(65 + f_idx) if f_idx < 26 else str(f_idx + 1)
+            clean_item = re.sub(r"^\([A-Za-z0-9]\)\s*", "", line).strip()
+
+            p_item = cell.add_paragraph()
+            p_item.paragraph_format.space_before = Pt(2)
+            p_item.paragraph_format.space_after = Pt(1)
+
+            r_lbl = p_item.add_run(f"({letter}) ")
+            r_lbl.bold = True
+            r_lbl.font.size = Pt(8.5)
+            r_lbl.font.color.rgb = RGBColor(15, 23, 42)
+
+            r_txt = p_item.add_run(clean_item)
+            r_txt.font.size = Pt(8.5)
+            r_txt.font.color.rgb = RGBColor(30, 41, 59)
+
+            p_ans = cell.add_paragraph()
+            p_ans.paragraph_format.space_before = Pt(0)
+            p_ans.paragraph_format.space_after = Pt(3)
+            p_ans.paragraph_format.left_indent = Inches(0.15)
+            r_ans = p_ans.add_run(f"Answer ({letter}): __________________________")
+            r_ans.font.size = Pt(8)
             r_ans.font.color.rgb = RGBColor(100, 116, 139)
+
+        p_note = cell.add_paragraph()
+        p_note.paragraph_format.space_before = Pt(2)
+        p_note.paragraph_format.space_after = Pt(2)
+        r_note = p_note.add_run("* Note for Candidates: Tie this completed outline map securely inside your main answer booklet.")
+        r_note.italic = True
+        r_note.font.size = Pt(8)
+        r_note.font.color.rgb = RGBColor(100, 116, 139)
 
     def _render_markdown_table(self, doc: docx.Document, headers: List[str], data_rows: List[List[str]]) -> None:
         """Render a styled tabular dataset (Accounting Journals, Ledgers, Data Tables)."""
@@ -1040,10 +1428,7 @@ class ExamPaperDocxService:
                 cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             else:
                 cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            r = cp.add_run(h_text)
-            r.bold = True
-            r.font.size = Pt(9)
-            r.font.color.rgb = RGBColor(15, 23, 42)
+            self._add_math_runs(cp, h_text, Pt(9), RGBColor(15, 23, 42), is_bold=True)
 
         for r_idx, row_data in enumerate(data_rows, start=1):
             row_cells = table.rows[r_idx].cells
@@ -1085,11 +1470,7 @@ class ExamPaperDocxService:
                 cp.paragraph_format.space_after = Pt(2)
                 if is_amount:
                     cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                r = cp.add_run(val)
-                r.font.size = Pt(8.5)
-                if is_total_row:
-                    r.bold = True
-                r.font.name = "Consolas" if any(c in val for c in ["0","1","2","3","4","5","6","7","8","9"]) else "Calibri"
+                self._add_math_runs(cp, val, Pt(8.5), RGBColor(15, 23, 42), is_bold=is_total_row)
 
     def _resolve_diagram_bytes(self, diagram: Dict[str, Any]) -> Optional[bytes]:
         """
@@ -1279,6 +1660,133 @@ class ExamPaperDocxService:
         r_cap.font.size = Pt(9)
         r_cap.font.color.rgb = self.COLOR_INDIGO
 
+    @classmethod
+    def clean_latex(cls, formula: str) -> str:
+        """Repair collapsed JSON escape artifacts and OCR quirks in LaTeX math."""
+        if not formula:
+            return ""
+        s = str(formula).strip()
+        s = re.sub(r'(?:[\t\x09]|\b)ext\{', r'\\text{', s)
+        s = re.sub(r'(?:[\r\x0d]|\b)ightarrow\b', r'\\rightarrow ', s)
+        s = re.sub(r'(?:[\x0c]|\b)rac\{', r'\\frac{', s)
+        s = re.sub(r'(?:[\t\x09]|\b)imes\b', r'\\times ', s)
+        s = re.sub(r'(?:[\t\x09]|\b)heta\b', r'\\theta ', s)
+        s = re.sub(r'(?:[\r\x0d]|\b)ho\b', r'\\rho ', s)
+        s = re.sub(r'(?:[\r\x0d]|\b)ight\b', r'\\right', s)
+        s = re.sub(r'(?:[\r\x0d]|\b)xrightarrow\b', r'\\xrightarrow ', s)
+        s = re.sub(r'\bce\{', r'\\ce{', s)
+        s = s.replace('→', r'\rightarrow ').replace('⇌', r'\rightleftharpoons ')
+        return s
+
+    def _add_single_math_token_runs(
+        self,
+        p: Any,
+        math_str: str,
+        font_size: Pt,
+        color: RGBColor,
+        is_bold: bool = False,
+        is_rtl: bool = False,
+    ) -> None:
+        """Parse a LaTeX math expression into runs with subscripts, superscripts, and math symbols."""
+        s = self.clean_latex(math_str)
+        if s.startswith("$$") and s.endswith("$$") and len(s) >= 4:
+            s = s[2:-2].strip()
+        elif s.startswith("\\[") and s.endswith("\\]") and len(s) >= 4:
+            s = s[2:-2].strip()
+        elif s.startswith("$") and s.endswith("$") and len(s) >= 2:
+            s = s[1:-1].strip()
+        elif s.startswith("\\(") and s.endswith("\\)") and len(s) >= 4:
+            s = s[2:-2].strip()
+
+        # Simplify common LaTeX text containers
+        s = re.sub(r'\\(?:text|mathrm|mathbf|ce)\{([^}]+)\}', r'\1', s)
+        s = re.sub(r'\\frac\{([^{}]+)\}\{([^{}]+)\}', r'(\1 / \2)', s)
+        s = re.sub(r'\\sqrt\{([^{}]+)\}', r'√(\1)', s)
+        s = re.sub(r'\\sqrt\s*([a-zA-Z0-9])', r'√\1', s)
+
+        # Replace Greek symbols
+        for sym, repl in GREEK_SYMBOLS.items():
+            s = re.sub(re.escape(sym) + r'(?![a-zA-Z])', repl, s)
+
+        # Replace Math operators
+        for op, repl in MATH_OPERATORS:
+            s = re.sub(re.escape(op) + r'(?![a-zA-Z])', repl, s)
+
+        s = re.sub(r'\\[,;!]|\\quad|\\qquad', ' ', s)
+        s = s.replace(r'\{', '{').replace(r'\}', '}')
+
+        # Match subscripts and superscripts: e.g. H_2O, x^2, x_{1,2}, Ca^{2+}
+        sub_super_pattern = re.compile(r'([\^_])(?:\{([^}]+)\}|([a-zA-Z0-9+\-]))')
+        pos = 0
+        for match in sub_super_pattern.finditer(s):
+            before = s[pos:match.start()]
+            if before:
+                r = p.add_run(before)
+                r.font.size = font_size
+                r.font.color.rgb = color
+                r.bold = is_bold
+                if is_rtl:
+                    self._set_run_rtl(r)
+
+            indicator = match.group(1)
+            val = match.group(2) if match.group(2) is not None else match.group(3)
+            r_sub_sup = p.add_run(val)
+            r_sub_sup.font.size = Pt(font_size.pt * 0.85)
+            r_sub_sup.font.color.rgb = color
+            r_sub_sup.bold = is_bold
+            if indicator == '^':
+                r_sub_sup.font.superscript = True
+            else:
+                r_sub_sup.font.subscript = True
+            if is_rtl:
+                self._set_run_rtl(r_sub_sup)
+            pos = match.end()
+
+        tail = s[pos:]
+        if tail:
+            r = p.add_run(tail)
+            r.font.size = font_size
+            r.font.color.rgb = color
+            r.bold = is_bold
+            if is_rtl:
+                self._set_run_rtl(r)
+
+    def _add_math_runs(
+        self,
+        p: Any,
+        text: str,
+        font_size: Pt = Pt(10),
+        color: Optional[RGBColor] = None,
+        is_bold: bool = False,
+        is_rtl: bool = False,
+    ) -> None:
+        """Parse mixed text and LaTeX tokens into properly formatted runs."""
+        if not text:
+            return
+        c = color or self.COLOR_PRIMARY
+        text_str = str(text)
+
+        tokens = re.split(r'(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[^\$\n]+?\$|\\\([^\)]+?\\\))', text_str)
+        for token in tokens:
+            if not token:
+                continue
+            is_disp = (token.startswith("$$") and token.endswith("$$") and len(token) >= 4) or \
+                      (token.startswith("\\[") and token.endswith("\\]") and len(token) >= 4)
+            is_inline = (token.startswith("$") and token.endswith("$") and len(token) >= 2) or \
+                        (token.startswith("\\(") and token.endswith("\\)") and len(token) >= 4)
+
+            if is_disp or is_inline:
+                self._add_single_math_token_runs(p, token, font_size, c, is_bold=is_bold, is_rtl=is_rtl)
+            elif "\\" in token and re.search(r'\\[a-zA-Z]{2,}', token):
+                self._add_single_math_token_runs(p, token, font_size, c, is_bold=is_bold, is_rtl=is_rtl)
+            else:
+                r = p.add_run(token)
+                r.font.size = font_size
+                r.font.color.rgb = c
+                r.bold = is_bold
+                if is_rtl:
+                    self._set_run_rtl(r)
+
     def _render_question_content(
         self,
         doc: docx.Document,
@@ -1292,9 +1800,7 @@ class ExamPaperDocxService:
         """Render question content with support for markdown tables, code blocks, and prose."""
         blocks = self._parse_content_blocks(question_text)
         if not blocks:
-            r_text = p_q.add_run(question_text)
-            r_text.font.size = Pt(10)
-            r_text.font.color.rgb = text_color
+            self._add_math_runs(p_q, question_text, Pt(10), text_color, is_bold=False, is_rtl=is_rtl)
             r_marks = p_q.add_run(marks_str)
             r_marks.bold = True
             r_marks.font.size = Pt(9)
@@ -1305,11 +1811,7 @@ class ExamPaperDocxService:
         first_block = blocks[0]
 
         if first_block["type"] == "text":
-            r_text = p_q.add_run(first_block["content"])
-            r_text.font.size = Pt(10)
-            r_text.font.color.rgb = text_color
-            if is_rtl:
-                self._set_run_rtl(r_text)
+            self._add_math_runs(p_q, first_block["content"], Pt(10), text_color, is_bold=False, is_rtl=is_rtl)
             remaining_blocks = blocks[1:]
         else:
             remaining_blocks = blocks
@@ -1338,11 +1840,7 @@ class ExamPaperDocxService:
                     p.paragraph_format.left_indent = Inches(0.25)
                 p.paragraph_format.space_before = Pt(2)
                 p.paragraph_format.space_after = Pt(3)
-                r = p.add_run(block["content"])
-                r.font.size = Pt(10)
-                r.font.color.rgb = text_color
-                if is_rtl:
-                    self._set_run_rtl(r)
+                self._add_math_runs(p, block["content"], Pt(10), text_color, is_bold=False, is_rtl=is_rtl)
                 last_p = p
 
         if last_p is not None:
@@ -1451,10 +1949,7 @@ class ExamPaperDocxService:
                         r_k.font.size = Pt(9.5)
                         if is_rtl:
                             self._set_run_rtl(r_k)
-                        r_v = cp.add_run(str(v))
-                        r_v.font.size = Pt(9.5)
-                        if is_rtl:
-                            self._set_run_rtl(r_v)
+                        self._add_math_runs(cp, str(v), Pt(9.5), self.COLOR_PRIMARY, is_bold=False, is_rtl=is_rtl)
 
         # Ruled Blank Answer Lines (Unbreakable native paragraph bottom borders)
         if blank_lines > 0:
@@ -1527,15 +2022,16 @@ class ExamPaperDocxService:
         if q.question_type == "MCQ" and q.options:
             correct_key = q.correct_answer.strip().upper()
             opt_text = q.options.get(correct_key, "")
-            r_ans_val = p_ans.add_run(f"Option ({correct_key}) — {opt_text}" if opt_text else f"Option ({correct_key})")
+            r_ans_val = p_ans.add_run(f"Option ({correct_key}) — " if opt_text else f"Option ({correct_key})")
+            r_ans_val.bold = True
+            r_ans_val.font.size = Pt(9.5)
+            r_ans_val.font.color.rgb = self.COLOR_CORRECT
+            if is_rtl:
+                self._set_run_rtl(r_ans_val)
+            if opt_text:
+                self._add_math_runs(p_ans, opt_text, Pt(9.5), self.COLOR_CORRECT, is_bold=True, is_rtl=is_rtl)
         else:
-            r_ans_val = p_ans.add_run(q.correct_answer or "Descriptive solution evaluation per rubric.")
-
-        r_ans_val.bold = True
-        r_ans_val.font.size = Pt(9.5)
-        r_ans_val.font.color.rgb = self.COLOR_CORRECT
-        if is_rtl:
-            self._set_run_rtl(r_ans_val)
+            self._add_math_runs(p_ans, q.correct_answer or "Descriptive solution evaluation per rubric.", Pt(9.5), self.COLOR_CORRECT, is_bold=True, is_rtl=is_rtl)
 
         # Source / Topic info
         if q.topic_name or q.source_reference:
