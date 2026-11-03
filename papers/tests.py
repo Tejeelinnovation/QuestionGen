@@ -956,6 +956,52 @@ class PaperPublishingAndAnswerKeyTests(TestCase):
         self.assertEqual(res_key["Content-Type"], "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         self.assertIn("Answer_Key.docx", res_key["Content-Disposition"])
 
+    def test_docx_export_title_subject_sanitization_and_filename(self):
+        """Part 2: Verify raw title/subject OCR noise is sanitized in DOCX and download filename."""
+        from papers.models import Paper, PaperVersion, VersionStatus
+        from papers.docx_export import ExamPaperDocxService
+        import docx
+
+        noisy_paper = Paper.objects.create(
+            title="kech201: --- [Page 1] ---",
+            created_by=self.teacher,
+            school=self.school,
+            chapter=self.chapter,
+            subjects=["kech201.pdf", "Page 1", "---", "Chemistry"],
+        )
+        noisy_version = PaperVersion.objects.create(
+            paper=noisy_paper,
+            version_label="B",
+            total_marks=5.0,
+            status=VersionStatus.FINALIZED,
+            question_snapshot=self.version.question_snapshot[:1],
+        )
+
+        service = ExamPaperDocxService()
+        buf = service.generate_student_paper(noisy_version)
+        doc = docx.Document(buf)
+        full_text = "\n".join(p.text for p in doc.paragraphs)
+
+        # Title cleaned to Chemistry Exam Paper
+        self.assertIn("CHEMISTRY EXAM PAPER", full_text)
+        self.assertNotIn("--- [PAGE 1] ---", full_text)
+
+        # Subjects filtered to exclude .pdf and page markers
+        self.assertIn("SUBJECT: Chemistry", full_text)
+        self.assertNotIn("kech201.pdf", full_text)
+
+        # Candidate table calibrated width
+        candidate_tbl = doc.tables[0]
+        self.assertAlmostEqual(candidate_tbl.rows[0].cells[0].width.inches, 3.58, places=2)
+
+        # API download filename check
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(user=self.teacher)
+        res = client.get(f"/api/papers/{noisy_paper.id}/versions/{noisy_version.id}/export-docx/?target=paper")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Chemistry_Exam_Paper_vB_Question_Paper.docx", res["Content-Disposition"])
+
     def test_pdf_inspect_and_paper_generation_flow(self):
         """
         Verify the fast multimodal teacher PDF workflow:

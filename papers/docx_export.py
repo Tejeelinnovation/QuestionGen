@@ -47,7 +47,7 @@ class ExamPaperDocxService:
         self.publishing_service = PaperPublishingService()
 
     @staticmethod
-    def clean_paper_title(raw_title: Optional[str]) -> str:
+    def clean_paper_title(raw_title: Optional[str], subjects: Optional[List[str]] = None) -> str:
         """
         Normalize examination title, stripping underscores and raw OCR artifact tags.
         Matches frontend PrintablePaperSheet clean title logic.
@@ -57,6 +57,38 @@ class ExamPaperDocxService:
         formatted = str(raw_title).replace("_", " ").strip()
         if "---" in formatted or re.search(r"\[page\s*\d+\]", formatted, re.IGNORECASE):
             prefix = formatted.split(":")[0].strip()
+            # If prefix is a raw textbook code like kech201, detect subject or fallback
+            if re.match(r"^[a-zA-Z]{2,5}\d{1,5}$", prefix):
+                prefix_l = prefix.lower()
+                if prefix_l.startswith(("kech", "hech")):
+                    return "Chemistry Exam Paper"
+                elif prefix_l.startswith(("kepy", "hepy")):
+                    return "Physics Exam Paper"
+                elif prefix_l.startswith(("kebo", "hebo", "khbo")):
+                    return "Biology Exam Paper"
+                elif prefix_l.startswith(("kemh", "jemh", "hemh")):
+                    return "Mathematics Exam Paper"
+                elif prefix_l.startswith(("kecs", "hecs")):
+                    return "Computer Science Exam Paper"
+                elif prefix_l.startswith(("kesc", "jesc", "hesc")):
+                    return "Science Exam Paper"
+                elif prefix_l.startswith("khgy"):
+                    return "Geography Exam Paper"
+                elif prefix_l.startswith("khat"):
+                    return "Hindi Exam Paper"
+                elif prefix_l.startswith("khsk"):
+                    return "Sanskrit Exam Paper"
+                elif prefix_l.startswith("kesy"):
+                    return "Sociology Exam Paper"
+                elif subjects:
+                    valid_s = [
+                        s for s in subjects
+                        if s and not re.match(r"^[a-zA-Z]{2,5}\d{1,5}$", s.strip()) and not s.lower().endswith(".pdf")
+                    ]
+                    if valid_s:
+                        return f"{valid_s[0]} Exam Paper"
+                return "Exam Paper"
+
             if prefix and "-" not in prefix:
                 formatted = f"{prefix} Exam Paper"
             else:
@@ -76,7 +108,10 @@ class ExamPaperDocxService:
         overrides = {str(k): int(v) for k, v in (question_line_overrides or {}).items()}
         sections = self.publishing_service.compile_sections(version)
 
-        paper_title = self.clean_paper_title(getattr(version.paper, "title", "EXAMINATION PAPER"))
+        paper_title = self.clean_paper_title(
+            getattr(version.paper, "title", "EXAMINATION PAPER"),
+            subjects=getattr(version.paper, "subjects", []),
+        )
         doc = docx.Document()
         self._configure_page_layout(doc, title=paper_title, is_answer_key=False)
 
@@ -123,7 +158,10 @@ class ExamPaperDocxService:
         """
         sections = self.publishing_service.compile_sections(version)
 
-        paper_title = self.clean_paper_title(getattr(version.paper, "title", "EXAMINATION PAPER"))
+        paper_title = self.clean_paper_title(
+            getattr(version.paper, "title", "EXAMINATION PAPER"),
+            subjects=getattr(version.paper, "subjects", []),
+        )
         doc = docx.Document()
         self._configure_page_layout(doc, title=f"{paper_title} — ANSWER KEY", is_answer_key=True)
 
@@ -255,12 +293,13 @@ class ExamPaperDocxService:
         r_school.font.size = Pt(13)
         r_school.font.color.rgb = self.COLOR_PRIMARY
 
-        # Paper Title
+        # Paper Title (Cleaned)
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_title.paragraph_format.space_before = Pt(0)
         p_title.paragraph_format.space_after = Pt(4)
-        r_title = p_title.add_run(paper.title.upper())
+        clean_title = self.clean_paper_title(paper.title, subjects=paper.subjects)
+        r_title = p_title.add_run(clean_title.upper())
         r_title.bold = True
         r_title.font.size = Pt(16)
         r_title.font.color.rgb = self.COLOR_INDIGO
@@ -285,13 +324,23 @@ class ExamPaperDocxService:
         r_meta.font.size = Pt(9.5)
         r_meta.font.color.rgb = self.COLOR_MUTED
 
-        # Subjects (if any)
-        if paper.subjects:
+        # Filtered Subjects (matching PrintablePaperSheet logic)
+        valid_subjects = [
+            s.strip()
+            for s in (paper.subjects or [])
+            if s
+            and not s.lower().endswith(".pdf")
+            and "page" not in s.lower()
+            and "---" not in s
+            and not re.match(r"^[a-zA-Z]{2,5}\d{1,5}$", s.strip())
+        ]
+        if valid_subjects:
             p_sub = doc.add_paragraph()
             p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p_sub.paragraph_format.space_before = Pt(0)
             p_sub.paragraph_format.space_after = Pt(8)
-            r_sub = p_sub.add_run(f"SUBJECTS: {' • '.join(paper.subjects)}")
+            lbl = "SUBJECT" if len(valid_subjects) == 1 else "SUBJECTS"
+            r_sub = p_sub.add_run(f"{lbl}: {' • '.join(valid_subjects)}")
             r_sub.font.size = Pt(9)
             r_sub.font.color.rgb = self.COLOR_MUTED
 
@@ -311,7 +360,8 @@ class ExamPaperDocxService:
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_title.paragraph_format.space_after = Pt(3)
-        r_title = p_title.add_run(f"{paper.title.upper()} — ANSWER KEY")
+        clean_title = self.clean_paper_title(paper.title, subjects=paper.subjects)
+        r_title = p_title.add_run(f"{clean_title.upper()} — ANSWER KEY")
         r_title.bold = True
         r_title.font.size = Pt(16)
         r_title.font.color.rgb = self.COLOR_CORRECT
@@ -325,31 +375,34 @@ class ExamPaperDocxService:
         r_sub.font.color.rgb = self.COLOR_PRIMARY
 
     def _add_candidate_identification_table(self, doc: docx.Document) -> None:
-        """2x2 bordered grid for student identification details."""
+        """2x2 bordered grid for student identification details calibrated to A4 width."""
         table = doc.add_table(rows=2, cols=2)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         table.autofit = False
 
-        col_widths = [Inches(3.5), Inches(3.5)]
+        # Calibrate to printable width: 8.27 in - 2 * 0.55 in = 7.17 in
+        col_widths = [Inches(3.58), Inches(3.58)]
         for row in table.rows:
             for i, cell in enumerate(row.cells):
                 cell.width = col_widths[i]
 
         cells = table.rows[0].cells
-        self._format_meta_cell(cells[0], "STUDENT NAME:", "_____________________________________")
-        self._format_meta_cell(cells[1], "EXAMINATION DATE:", "_________________________")
+        self._format_meta_cell(cells[0], "STUDENT NAME:", "_" * 27)
+        self._format_meta_cell(cells[1], "EXAMINATION DATE:", "_" * 22, align_right=True)
 
         cells_2 = table.rows[1].cells
-        self._format_meta_cell(cells_2[0], "ROLL / ADMISSION ID:", "_____________________________________")
-        self._format_meta_cell(cells_2[1], "INVIGILATOR SIGNATURE:", "_________________________")
+        self._format_meta_cell(cells_2[0], "ROLL / ADMISSION ID:", "_" * 19)
+        self._format_meta_cell(cells_2[1], "INVIGILATOR SIGNATURE:", "_" * 18, align_right=True)
 
         self._set_table_borders(table)
         doc.add_paragraph().paragraph_format.space_after = Pt(4)
 
-    def _format_meta_cell(self, cell, label: str, fill_line: str) -> None:
+    def _format_meta_cell(self, cell, label: str, fill_line: str, align_right: bool = False) -> None:
         p = cell.paragraphs[0]
         p.paragraph_format.space_before = Pt(3)
         p.paragraph_format.space_after = Pt(3)
+        if align_right:
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         r_label = p.add_run(f"{label} ")
         r_label.bold = True
         r_label.font.size = Pt(8.5)

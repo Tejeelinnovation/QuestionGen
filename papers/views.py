@@ -1093,7 +1093,9 @@ class PaperVersionDocxExportView(APIView):
         from .docx_export import ExamPaperDocxService
         service = ExamPaperDocxService()
 
-        safe_title = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in paper.title).strip("_") or "Exam"
+        clean_title = service.clean_paper_title(paper.title, subjects=paper.subjects)
+        safe_title = re.sub(r"[^a-zA-Z0-9_\-]+", "_", clean_title).strip("_")
+        safe_title = re.sub(r"_+", "_", safe_title) or "Exam"
 
         if target == "answer-key":
             buf = service.generate_answer_key(version)
