@@ -6,6 +6,8 @@ import type { Paper } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { PaperWorkflowNavTablet } from './components/PaperWorkflowNavTablet';
 import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
+import { EditPaperTitleSubjectModal } from '../../papers/components/EditPaperTitleSubjectModal';
+import { Edit3 } from 'lucide-react';
 
 export const PaperDetailPageTablet: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +17,7 @@ export const PaperDetailPageTablet: React.FC = () => {
   const [paper, setPaper] = useState<Paper | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchPaper = async () => {
@@ -80,9 +83,22 @@ export const PaperDetailPageTablet: React.FC = () => {
         {/* Column 1: Blueprint Overview Card */}
         <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-4 min-w-0 overflow-hidden">
           <div className="space-y-1.5 min-w-0">
-            <span className="pill pill-forest text-[10px]">
-              Blueprint #{paper.id}
-            </span>
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+              <span className="pill pill-forest text-[10px]">
+                Blueprint #{paper.id}
+              </span>
+              {canCreatePaper && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors inline-flex items-center gap-1 cursor-pointer"
+                  title="Modify examination title and academic subject"
+                >
+                  <Edit3 className="w-3 h-3 text-forest" />
+                  <span>Edit Title / Subject</span>
+                </button>
+              )}
+            </div>
             <h1 className="font-heading font-bold text-2xl text-ink tracking-tight break-words [overflow-wrap:anywhere]">
               {(paper.title || '').replace(/_/g, ' ')}
             </h1>
@@ -202,6 +218,22 @@ export const PaperDetailPageTablet: React.FC = () => {
         </div>
 
       </div>
+      {paper && (
+        <EditPaperTitleSubjectModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          paperId={paper.id}
+          initialTitle={paper.title}
+          initialSubject={paper.subjects && paper.subjects.length > 0 ? paper.subjects[0] : ''}
+          onSaved={(newTitle, newSubj) => {
+            setPaper((prev) => (prev ? {
+              ...prev,
+              title: newTitle,
+              subjects: newSubj ? [newSubj] : prev.subjects,
+            } : null));
+          }}
+        />
+      )}
     </div>
   );
 };

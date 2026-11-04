@@ -11,7 +11,8 @@ import { PaperConfigurePageTablet } from '../tablet/papers/PaperConfigurePageTab
 import { PaperConfigurePageMobile } from '../mobile/papers/PaperConfigurePageMobile';
 import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { MOTION } from '../../lib/motion';
-import { Clock, CheckCircle2, Plus, Trash2, Sliders, Loader2 } from 'lucide-react';
+import { Clock, CheckCircle2, Plus, Trash2, Sliders, Loader2, Edit3 } from 'lucide-react';
+import { EditPaperTitleSubjectModal } from './components/EditPaperTitleSubjectModal';
 
 export interface MarkTierConfig {
   id: string;
@@ -63,6 +64,7 @@ const PaperConfigurePageDesktop: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     const loadPaperAndTopics = async () => {
@@ -659,9 +661,20 @@ const PaperConfigurePageDesktop: React.FC = () => {
                       Sampling candidate questions across registered disciplines
                     </p>
                   </div>
-                  <span className="pill pill-forest text-[10px]">
-                    Combined Blueprint
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="pill pill-forest text-[10px]">
+                      {paper.subjects.length > 1 ? 'Combined Blueprint' : 'Curriculum Subject'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(true)}
+                      className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      title="Modify examination title and academic subject"
+                    >
+                      <Edit3 className="w-3 h-3 text-forest" />
+                      <span>Modify</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -955,6 +968,22 @@ const PaperConfigurePageDesktop: React.FC = () => {
             </button>
           </div>
         </div>
+        {paper && (
+          <EditPaperTitleSubjectModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            paperId={paper.id}
+            initialTitle={paper.title}
+            initialSubject={paper.subjects && paper.subjects.length > 0 ? paper.subjects[0] : ''}
+            onSaved={(newTitle, newSubj) => {
+              setPaper((prev) => (prev ? {
+                ...prev,
+                title: newTitle,
+                subjects: newSubj ? [newSubj] : prev.subjects,
+              } : null));
+            }}
+          />
+        )}
       </form>
     </div>
   );

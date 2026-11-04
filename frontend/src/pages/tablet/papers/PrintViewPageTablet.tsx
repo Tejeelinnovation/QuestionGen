@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import type { PaperPrintData } from '../../../types';
-import { FileText, Download, Printer } from 'lucide-react';
+import { FileText, Download, Printer, Edit3 } from 'lucide-react';
+import { EditPaperTitleSubjectModal } from '../../papers/components/EditPaperTitleSubjectModal';
 import { PrintablePaperSheet } from '../../../components/papers/PrintablePaperSheet';
 import { Skeleton } from '../../../components/ui/skeleton';
 
@@ -20,6 +21,7 @@ export const PrintViewPageTablet: React.FC = () => {
   const [questionLineOverrides, setQuestionLineOverrides] = useState<Record<number, number>>({});
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isExportingKey, setIsExportingKey] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     const loadPrintData = async () => {
@@ -143,7 +145,7 @@ export const PrintViewPageTablet: React.FC = () => {
       <div className="print:hidden bg-surface border border-border rounded-card p-4 shadow-card space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="w-2 h-2 rounded-full bg-forest" />
               <span className="font-heading font-bold text-sm text-ink">
                 Printable Sheet Preview • Tablet
@@ -151,6 +153,15 @@ export const PrintViewPageTablet: React.FC = () => {
               <span className="font-mono text-[11px] text-ink/50">
                 • Version {printData.version_label}
               </span>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(true)}
+                className="ml-1 px-2.5 py-1 text-[11px] font-heading font-semibold rounded-pill border border-border bg-bg text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors inline-flex items-center gap-1 cursor-pointer"
+                title="Modify examination title or subject before printing/exporting"
+              >
+                <Edit3 className="w-3 h-3 text-forest" />
+                <span>Edit Title / Subject</span>
+              </button>
             </div>
             <p className="text-xs text-ink/60 mt-0.5">
               Configure blank lines and download editable Microsoft Word documents or print.
@@ -246,6 +257,22 @@ export const PrintViewPageTablet: React.FC = () => {
         onOverrideChange={handleOverrideChange}
         interactive={true}
       />
+      {printData && (
+        <EditPaperTitleSubjectModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          paperId={paperId}
+          initialTitle={printData.title}
+          initialSubject={printData.subjects && printData.subjects.length > 0 ? printData.subjects[0] : ''}
+          onSaved={(newTitle, newSubj) => {
+            setPrintData((prev) => (prev ? {
+              ...prev,
+              title: newTitle,
+              subjects: newSubj ? [newSubj] : prev.subjects,
+            } : null));
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -174,7 +174,7 @@ class PaperListCreateView(APIView):
                             "---" in curr_title_clean or
                             "page" in curr_title_clean
                         )
-                        if is_raw_or_corrupted and det_title:
+                        if is_raw_or_corrupted and det_title and not (paper.specifications or {}).get("title_modified"):
                             paper.title = det_title
                             paper.save(update_fields=["title"])
 
@@ -293,9 +293,18 @@ class PaperDetailView(APIView):
                 {"detail": "You do not have permission to modify papers."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        for field in ["title", "instructions", "duration_minutes", "total_question_count", "specifications"]:
+        for field in ["title", "instructions", "duration_minutes", "total_question_count", "specifications", "subjects"]:
             if field in request.data:
                 setattr(paper, field, request.data[field])
+
+        # If subjects were updated and paper has specifications, keep specifications in sync
+        if "subjects" in request.data and isinstance(paper.specifications, dict):
+            specs = dict(paper.specifications)
+            if paper.subjects and len(paper.subjects) > 0:
+                specs["detected_subject"] = paper.subjects[0]
+            specs["subject_modified_by_user"] = True
+            paper.specifications = specs
+
         paper.save()
         return Response(PaperDetailSerializer(paper).data, status=status.HTTP_200_OK)
 

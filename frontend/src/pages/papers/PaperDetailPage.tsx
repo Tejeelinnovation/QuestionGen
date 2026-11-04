@@ -9,6 +9,8 @@ import { PaperDetailPageTablet } from '../tablet/papers/PaperDetailPageTablet';
 import { PaperDetailPageMobile } from '../mobile/papers/PaperDetailPageMobile';
 import { SkeletonPaperDetail } from '../../components/ui/skeleton';
 import { getStaggerDelay, MOTION } from '../../lib/motion';
+import { EditPaperTitleSubjectModal } from './components/EditPaperTitleSubjectModal';
+import { Edit3 } from 'lucide-react';
 
 const PaperDetailPageDesktop: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +20,7 @@ const PaperDetailPageDesktop: React.FC = () => {
   const [paper, setPaper] = useState<Paper | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchPaper = async () => {
@@ -85,9 +88,22 @@ const PaperDetailPageDesktop: React.FC = () => {
         <div className="lg:col-span-4 space-y-6 min-w-0">
           <div className="bg-surface border border-border rounded-card p-6 shadow-card space-y-5 overflow-hidden">
             <div className="space-y-2 min-w-0">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-bg border border-border text-xs font-semibold text-forest">
-                <span className="w-2 h-2 rounded-full bg-forest" />
-                Paper Blueprint #{paper.id}
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-bg border border-border text-xs font-semibold text-forest">
+                  <span className="w-2 h-2 rounded-full bg-forest" />
+                  Paper Blueprint #{paper.id}
+                </div>
+                {canCreatePaper && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink/70 hover:text-ink hover:bg-surface-muted transition-colors inline-flex items-center gap-1 cursor-pointer"
+                    title="Modify examination title and academic subject"
+                  >
+                    <Edit3 className="w-3 h-3 text-forest" />
+                    <span>Edit Title / Subject</span>
+                  </button>
+                )}
               </div>
               <h1 className="font-heading font-bold text-2xl text-ink tracking-tight break-words break-all [overflow-wrap:anywhere]">
                 {(paper.title || '').replace(/_/g, ' ')}
@@ -240,10 +256,25 @@ const PaperDetailPageDesktop: React.FC = () => {
         </div>
 
       </div>
+      {paper && (
+        <EditPaperTitleSubjectModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          paperId={paper.id}
+          initialTitle={paper.title}
+          initialSubject={paper.subjects && paper.subjects.length > 0 ? paper.subjects[0] : ''}
+          onSaved={(newTitle, newSubj) => {
+            setPaper((prev) => (prev ? {
+              ...prev,
+              title: newTitle,
+              subjects: newSubj ? [newSubj] : prev.subjects,
+            } : null));
+          }}
+        />
+      )}
     </div>
   );
 };
-
 export const PaperDetailPage: React.FC = () => {
   const breakpoint = useBreakpoint();
   if (breakpoint === 'mobile') {

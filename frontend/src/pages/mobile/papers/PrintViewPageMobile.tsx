@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { papersApi } from '../../../api/papers';
 import type { PaperPrintData } from '../../../types';
-import { Printer, ChevronLeft, FileText, Download } from 'lucide-react';
+import { Printer, ChevronLeft, FileText, Download, Edit3 } from 'lucide-react';
+import { EditPaperTitleSubjectModal } from '../../papers/components/EditPaperTitleSubjectModal';
 import { PrintablePaperSheet } from '../../../components/papers/PrintablePaperSheet';
 import { Skeleton } from '../../../components/ui/skeleton';
 
@@ -20,6 +21,7 @@ export const PrintViewPageMobile: React.FC = () => {
   const [questionLineOverrides, setQuestionLineOverrides] = useState<Record<number, number>>({});
   const [isExportingDocx, setIsExportingDocx] = useState(false);
   const [isExportingKey, setIsExportingKey] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     const loadPrintData = async () => {
@@ -154,6 +156,27 @@ export const PrintViewPageMobile: React.FC = () => {
           </button>
         </div>
 
+        {/* Document Title & Subject Quick Bar */}
+        <div className="p-2.5 rounded-card bg-surface border border-border flex items-center justify-between gap-2 text-xs shadow-2xs">
+          <div className="min-w-0">
+            <span className="font-heading font-semibold text-ink block truncate">
+              {printData.title || 'Exam Paper'}
+            </span>
+            <span className="text-[10px] text-ink/60 font-mono">
+              Subject: {printData.subjects && printData.subjects.length > 0 ? printData.subjects[0] : 'General'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsEditModalOpen(true)}
+            className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink/80 hover:text-ink shrink-0 inline-flex items-center gap-1 cursor-pointer min-h-[34px]"
+            title="Modify title and subject"
+          >
+            <Edit3 className="w-3 h-3 text-forest" />
+            <span>Edit</span>
+          </button>
+        </div>
+
         {/* Word (.docx) & Answer Key Export Buttons */}
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -226,6 +249,22 @@ export const PrintViewPageMobile: React.FC = () => {
         onOverrideChange={handleOverrideChange}
         interactive={true}
       />
+      {printData && (
+        <EditPaperTitleSubjectModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          paperId={paperId}
+          initialTitle={printData.title}
+          initialSubject={printData.subjects && printData.subjects.length > 0 ? printData.subjects[0] : ''}
+          onSaved={(newTitle, newSubj) => {
+            setPrintData((prev) => (prev ? {
+              ...prev,
+              title: newTitle,
+              subjects: newSubj ? [newSubj] : prev.subjects,
+            } : null));
+          }}
+        />
+      )}
     </div>
   );
 };

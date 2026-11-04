@@ -5,7 +5,8 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { Paper } from '../../../types';
 import { getStaggerDelay, MOTION } from '../../../lib/motion';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
-import { FilePlus, ChevronRight } from 'lucide-react';
+import { FilePlus, ChevronRight, Edit3 } from 'lucide-react';
+import { EditPaperTitleSubjectModal } from '../../papers/components/EditPaperTitleSubjectModal';
 import { SkeletonPaperDetail } from '../../../components/ui/skeleton';
 
 export const PaperDetailPageMobile: React.FC = () => {
@@ -16,6 +17,7 @@ export const PaperDetailPageMobile: React.FC = () => {
   const [paper, setPaper] = useState<Paper | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchPaper = async () => {
@@ -88,6 +90,22 @@ export const PaperDetailPageMobile: React.FC = () => {
             {paper.instructions}
           </div>
         )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-border/50">
+          <div className="text-[11px] text-ink/50 font-mono">
+            Blueprint #{paper.id}
+          </div>
+          {hasCapability('CREATE_PAPER') && (
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              className="px-2.5 py-1 text-xs font-heading font-semibold rounded-pill border border-border bg-bg text-ink/80 hover:text-ink transition-colors inline-flex items-center gap-1 cursor-pointer min-h-[36px]"
+            >
+              <Edit3 className="w-3 h-3 text-forest" />
+              <span>Edit Title / Subject</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Action: Configure New Version */}
@@ -152,6 +170,22 @@ export const PaperDetailPageMobile: React.FC = () => {
           })
         )}
       </div>
+      {paper && (
+        <EditPaperTitleSubjectModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          paperId={paper.id}
+          initialTitle={paper.title}
+          initialSubject={paper.subjects && paper.subjects.length > 0 ? paper.subjects[0] : ''}
+          onSaved={(newTitle, newSubj) => {
+            setPaper((prev) => (prev ? {
+              ...prev,
+              title: newTitle,
+              subjects: newSubj ? [newSubj] : prev.subjects,
+            } : null));
+          }}
+        />
+      )}
     </div>
   );
 };

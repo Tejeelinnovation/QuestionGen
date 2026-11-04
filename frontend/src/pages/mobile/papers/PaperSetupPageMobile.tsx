@@ -6,6 +6,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import type { Chapter, PdfInspectionResult } from '../../../types';
 import { PaperWorkflowNavMobile } from './components/PaperWorkflowNavMobile';
 import { FigurePickerGallery } from '../../papers/components/FigurePickerGallery';
+import { DetectedSubjectEditor } from '../../papers/components/DetectedSubjectEditor';
 import { useToast } from '../../../context/ToastContext';
 import { extractApiErrorMessage } from '../../../utils/errorUtils';
 import {
@@ -56,6 +57,9 @@ export const PaperSetupPageMobile: React.FC = () => {
   const [selectedFigureIds, setSelectedFigureIds] = useState<string[]>([]);
   const [contributeToBank, setContributeToBank] = useState(true);
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [pdfSubject, setPdfSubject] = useState<string>('');
+  const [isSubjectCustomized, setIsSubjectCustomized] = useState<boolean>(false);
+  const [syncTitleWithSubject, setSyncTitleWithSubject] = useState<boolean>(true);
 
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,8 +137,12 @@ export const PaperSetupPageMobile: React.FC = () => {
       setInspectionProgress(null);
       setSelectedFigureIds([]);
 
-      const autoTitle = result.detected_title || (result.detected_subject ? `${result.detected_subject} Exam Paper` : '');
+      const detSubject = result.detected_subject || '';
+      const autoTitle = result.detected_title || (detSubject ? `${detSubject} Exam Paper` : '');
       const rawCleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+
+      setPdfSubject(detSubject);
+      setIsSubjectCustomized(false);
 
       if (
         !title.trim() ||
@@ -142,7 +150,7 @@ export const PaperSetupPageMobile: React.FC = () => {
         title.includes('---') ||
         /\[page\s*\d+\]/i.test(title)
       ) {
-        setTitle(autoTitle || `${result.detected_subject || rawCleanTitle} Exam Paper`);
+        setTitle(autoTitle || `${detSubject || rawCleanTitle} Exam Paper`);
       }
       toast.success(
         `PDF analyzed: ${result.page_count} pages, ${result.figure_count} diagrams found.`
@@ -193,11 +201,12 @@ export const PaperSetupPageMobile: React.FC = () => {
 
       setIsSubmitting(true);
       try {
+        const finalSubject = pdfSubject.trim() || inspectionResult?.detected_subject || '';
         const paper = await papersApi.createPaper({
           title: title.trim(),
           instructions: instructions.trim(),
           chapter: null,
-          subjects: inspectionResult?.detected_subject ? [inspectionResult.detected_subject] : [],
+          subjects: finalSubject ? [finalSubject] : [],
           duration_minutes: 60,
           total_question_count: 0,
           specifications: {
@@ -205,8 +214,10 @@ export const PaperSetupPageMobile: React.FC = () => {
             inspection_id: inspectionResult.inspection_id,
             selected_figure_ids: selectedFigureIds,
             contribute_to_bank: contributeToBank,
-            detected_subject: inspectionResult.detected_subject,
-            detected_title: inspectionResult.detected_title,
+            detected_subject: finalSubject,
+            detected_title: title.trim(),
+            subject_modified: isSubjectCustomized,
+            title_modified: true,
           },
         });
 
@@ -425,6 +436,23 @@ export const PaperSetupPageMobile: React.FC = () => {
                     <span className="text-forest font-bold">{inspectionResult.figure_count} figures</span>
                   </div>
                 </div>
+              )}
+
+              {/* Detected Subject & Title Modification Component */}
+              {inspectionResult && (
+                <DetectedSubjectEditor
+                  subject={pdfSubject}
+                  detectedSubject={inspectionResult.detected_subject}
+                  detectedTitle={inspectionResult.detected_title}
+                  isGuessed={Boolean(inspectionResult.detected_subject)}
+                  onSubjectChange={setPdfSubject}
+                  title={title}
+                  onTitleChange={setTitle}
+                  syncTitleWithSubject={syncTitleWithSubject}
+                  onToggleSyncTitle={setSyncTitleWithSubject}
+                  isCustomized={isSubjectCustomized}
+                  onCustomizedChange={setIsSubjectCustomized}
+                />
               )}
 
               {/* Figure Picker */}

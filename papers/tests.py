@@ -1464,3 +1464,45 @@ class ModalityRendererAndSectionHeaderTests(TestCase):
         # Verify map image was embedded into document
         self.assertGreater(len(doc_map.inline_shapes), 0)
 
+    def test_paper_patch_subjects_and_user_modified_subject_preservation(self):
+        """Verify PATCH /api/papers/{id}/ updates subjects and preserves user-modified titles/subjects."""
+        from rest_framework.test import APIClient
+        from schools.models import School
+        from users.models import User, Capability
+
+        school = School.objects.create(name="Patch Test School")
+        user = User.objects.create_user(username="test_patch_teacher", password="pw", school=school)
+        from users.models import UserCapability
+        cap, _ = Capability.objects.get_or_create(name="CREATE_PAPER")
+        UserCapability.objects.create(user=user, capability=cap)
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        # 1. Create a paper with initial guessed subject
+        paper = Paper.objects.create(
+            title="Science Exam Paper",
+            created_by=user,
+            school=school,
+            subjects=["Science"],
+            specifications={"source_mode": "pdf", "detected_subject": "Science"},
+            duration_minutes=60,
+        )
+
+        # 2. Teacher modifies the subject and title via PATCH
+        res = client.patch(
+            f"/api/papers/{paper.id}/",
+            {
+                "title": "Advanced Organic Chemistry Unit Test",
+                "subjects": ["Organic Chemistry"],
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        paper.refresh_from_db()
+        self.assertEqual(paper.title, "Advanced Organic Chemistry Unit Test")
+        self.assertEqual(paper.subjects, ["Organic Chemistry"])
+        self.assertEqual(paper.specifications.get("detected_subject"), "Organic Chemistry")
+        self.assertTrue(paper.specifications.get("subject_modified_by_user"))
+
+
